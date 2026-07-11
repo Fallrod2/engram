@@ -6,13 +6,20 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:db": "bun test ./src/db/*.spec.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@engram/shared": "workspace:*",
-    "hono": "^4.6.14"
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.6.14",
+    "ts-fsrs": "^5.4.1"
   },
   "devDependencies": {
-    "@types/bun": "^1.1.14"
+    "@types/bun": "^1.1.14",
+    "drizzle-kit": "^0.31.10"
   }
 }
