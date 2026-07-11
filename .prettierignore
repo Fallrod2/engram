@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+data
+bun.lock
+
+# Orchestrator / agent-owned docs — not formatted by this workspace
+CLAUDE.md
+PROGRESS.md
+DEV_OPUS.md
+REVIEWER_SONNET.md
+.claude

@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+build/
+
+# test / coverage artifacts
+coverage/
+*.tsbuildinfo
+
+# local database (sqlite)
+data/
+
+# env — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+
+# OS / editor cruft
+.DS_Store

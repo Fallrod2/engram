@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# engram pre-commit hook — blocks the commit if quality gates fail.
+set -e
+
+echo "pre-commit: bun run check"
+bun run check
