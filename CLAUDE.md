@@ -83,7 +83,8 @@ engram/
 bun install
 bun run dev          # server :3001 + web :5173 en parallèle
 bun run check        # typecheck + lint + format check
-bun run test         # vitest
+bun run test         # vitest (.test.ts) + test:db (intégration DB via bun:test)
+bun run test:db      # tests d'intégration DB (cascade FK, round-trip FSRS, DTO) — bun test *.spec.ts
 bun run test:e2e     # playwright
 bun run db:migrate   # drizzle migrations
 bun run db:studio    # drizzle studio

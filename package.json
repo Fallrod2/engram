@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "bun run typecheck && bun run lint && bun run format:check",
-    "test": "vitest run",
+    "test": "vitest run && bun run test:db",
+    "test:db": "bun run --filter @engram/server test:db",
     "db:generate": "bun run --filter @engram/server db:generate",
     "db:migrate": "bun run --filter @engram/server db:migrate",
     "db:studio": "bun run --filter @engram/server db:studio"
