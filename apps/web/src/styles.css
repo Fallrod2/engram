@@ -272,6 +272,12 @@
     border-radius: var(--radius-sm);
   }
 
+  /* Cibles de focus non-interactives (conteneur de scroll, ancre du skip-link) :
+     on ne peint pas l'anneau autour de toute la zone de contenu. */
+  [tabindex='-1']:focus-visible {
+    box-shadow: none;
+  }
+
   ::selection {
     background-color: var(--color-accent-subtle);
     color: var(--color-text);

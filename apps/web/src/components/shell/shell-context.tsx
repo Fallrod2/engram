@@ -17,9 +17,11 @@ interface ShellContextValue {
 
 const ShellContext = createContext<ShellContextValue | null>(null)
 
-function readCollapsed(): boolean {
-  if (typeof localStorage === 'undefined') return false
-  return localStorage.getItem(COLLAPSE_KEY) === 'true'
+/** Stored collapse preference, or `null` when the user has never chosen. */
+function readCollapsePref(): boolean | null {
+  if (typeof localStorage === 'undefined') return null
+  const raw = localStorage.getItem(COLLAPSE_KEY)
+  return raw === 'true' ? true : raw === 'false' ? false : null
 }
 
 /** True when the target of a keyboard event is a text-entry surface. */
@@ -31,21 +33,25 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 export function ShellProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
+  // ≥1280 expands by default; 768–1279 collapses by default but stays
+  // toggleable; <768 the sidebar is hidden (mobile tab bar takes over).
   const isWide = useMediaQuery('(min-width: 1280px)')
-  const [userCollapsed, setUserCollapsed] = useState<boolean>(readCollapsed)
+  const isDesktop = useMediaQuery('(min-width: 768px)')
+  const [pref, setPref] = useState<boolean | null>(readCollapsePref)
   const [commandOpen, setCommandOpen] = useState(false)
 
-  // Below 1280px the sidebar is always collapsed (spec §5 responsive).
-  const collapsed = isWide ? userCollapsed : true
+  // No stored choice → auto: expanded when wide, collapsed when narrower.
+  const collapsed = pref ?? !isWide
 
   const toggleCollapse = useCallback(() => {
-    if (!isWide) return
-    setUserCollapsed((prev) => {
-      const next = !prev
+    if (!isDesktop) return
+    setPref((prev) => {
+      const base = prev ?? !isWide
+      const next = !base
       localStorage.setItem(COLLAPSE_KEY, String(next))
       return next
     })
-  }, [isWide])
+  }, [isDesktop, isWide])
 
   // Global shortcuts: ⌘K (palette), [ (collapse), ⌘1…9 (jump to nav item).
   useEffect(() => {
@@ -79,12 +85,12 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<ShellContextValue>(
     () => ({
       collapsed,
-      canToggleCollapse: isWide,
+      canToggleCollapse: isDesktop,
       toggleCollapse,
       commandOpen,
       setCommandOpen,
     }),
-    [collapsed, isWide, toggleCollapse, commandOpen],
+    [collapsed, isDesktop, toggleCollapse, commandOpen],
   )
 
   return <ShellContext value={value}>{children}</ShellContext>
