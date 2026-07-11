@@ -280,3 +280,102 @@ export type StartGeneration = z.infer<typeof startGenerationSchema>
 export type ResolveGeneration = z.infer<typeof resolveGenerationSchema>
 export type CreateExam = z.infer<typeof createExamSchema>
 export type UpdateExam = z.infer<typeof updateExamSchema>
+
+// --- API error envelope (single error contract) ---------------------------
+
+export const apiErrorCodeSchema = z.enum([
+  'validation_error',
+  'not_found',
+  'conflict',
+  'internal_error',
+])
+export const apiErrorSchema = z.object({
+  error: z.object({
+    code: apiErrorCodeSchema,
+    message: z.string(),
+    details: z.unknown().optional(),
+  }),
+})
+export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>
+export type ApiErrorResponse = z.infer<typeof apiErrorSchema>
+
+// --- Query helpers ---------------------------------------------------------
+
+/** `'true'`/`'false'` query string → boolean. */
+const boolParam = z.enum(['true', 'false']).transform((v) => v === 'true')
+
+// --- Params & queries ------------------------------------------------------
+
+/** Single definition of the `:id` path param (a missing/malformed id 404s, not 400). */
+export const idParamSchema = z.object({ id: z.string().min(1) })
+
+export const listSubjectsQuerySchema = z.object({ includeArchived: boolParam.optional() })
+export const listDecksQuerySchema = z.object({ subjectId: z.string().optional() })
+export const listCardsQuerySchema = z.object({
+  deckId: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+})
+export const previewQuerySchema = z.object({ now: iso.optional() })
+export const reviewQueueQuerySchema = z.object({
+  deckId: z.string().optional(),
+  subjectId: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  now: iso.optional(),
+})
+export const reviewCountsQuerySchema = z.object({ now: iso.optional() })
+
+export type ListSubjectsQuery = z.infer<typeof listSubjectsQuerySchema>
+export type ListDecksQuery = z.infer<typeof listDecksQuerySchema>
+export type ListCardsQuery = z.infer<typeof listCardsQuerySchema>
+export type PreviewQuery = z.infer<typeof previewQuerySchema>
+export type ReviewQueueQuery = z.infer<typeof reviewQueueQuerySchema>
+export type ReviewCountsQuery = z.infer<typeof reviewCountsQuerySchema>
+
+// --- Composite responses ---------------------------------------------------
+
+export const listCardsResponseSchema = z.object({
+  total: z.number().int().nonnegative(),
+  cards: z.array(cardSchema),
+})
+export const reviewQueueResponseSchema = z.object({
+  now: iso,
+  total: z.number().int().nonnegative(),
+  cards: z.array(cardSchema),
+})
+export const reviewResultSchema = z.object({ card: cardSchema, log: reviewLogSchema })
+export const dueCountsSchema = z.object({
+  now: iso,
+  total: z.number().int().nonnegative(),
+  bySubject: z.array(z.object({ subjectId: z.string(), dueCount: z.number().int().nonnegative() })),
+  byDeck: z.array(
+    z.object({
+      deckId: z.string(),
+      subjectId: z.string(),
+      dueCount: z.number().int().nonnegative(),
+    }),
+  ),
+})
+
+/** Projected outcome of a single grade (read-only preview of the 4 buttons). */
+export const gradePreviewSchema = z.object({
+  due: iso,
+  stability: z.number(),
+  difficulty: z.number(),
+  scheduledDays: z.number().int().nonnegative(),
+  state: fsrsStateSchema,
+})
+export const reviewPreviewSchema = z.object({
+  now: iso,
+  again: gradePreviewSchema,
+  hard: gradePreviewSchema,
+  good: gradePreviewSchema,
+  easy: gradePreviewSchema,
+})
+
+export type ListCardsResponse = z.infer<typeof listCardsResponseSchema>
+export type ReviewQueueResponse = z.infer<typeof reviewQueueResponseSchema>
+export type ReviewResult = z.infer<typeof reviewResultSchema>
+export type DueCounts = z.infer<typeof dueCountsSchema>
+export type GradePreview = z.infer<typeof gradePreviewSchema>
+export type ReviewPreview = z.infer<typeof reviewPreviewSchema>

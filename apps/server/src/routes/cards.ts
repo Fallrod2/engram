@@ -1,0 +1,91 @@
+import { Hono } from 'hono'
+import {
+  cardSchema,
+  createCardSchema,
+  idParamSchema,
+  listCardsQuerySchema,
+  listCardsResponseSchema,
+  previewQuerySchema,
+  reviewCardSchema,
+  reviewPreviewSchema,
+  reviewResultSchema,
+  updateCardSchema,
+} from '@engram/shared'
+import { db } from '../db/client'
+import { zValidator } from '../http/validate'
+import { ok } from '../http/respond'
+import {
+  createCard,
+  deleteCard,
+  getCard,
+  listCards,
+  previewCard,
+  updateCard,
+} from '../services/cards.service'
+import { reviewCard, type ReviewInput } from '../services/review.service'
+
+export const cardsRouter = new Hono()
+
+cardsRouter.get('/', zValidator('query', listCardsQuerySchema), (c) => {
+  const q = c.req.valid('query')
+  return ok(
+    c,
+    listCardsResponseSchema,
+    listCards(db, {
+      limit: q.limit ?? 100,
+      offset: q.offset ?? 0,
+      ...(q.deckId ? { deckId: q.deckId } : {}),
+    }),
+  )
+})
+
+cardsRouter.post('/', zValidator('json', createCardSchema), (c) => {
+  return ok(c, cardSchema, createCard(db, c.req.valid('json')), 201)
+})
+
+cardsRouter.get('/:id', zValidator('param', idParamSchema), (c) => {
+  return ok(c, cardSchema, getCard(db, c.req.valid('param').id))
+})
+
+cardsRouter.patch(
+  '/:id',
+  zValidator('param', idParamSchema),
+  zValidator('json', updateCardSchema),
+  (c) => {
+    return ok(c, cardSchema, updateCard(db, c.req.valid('param').id, c.req.valid('json')))
+  },
+)
+
+cardsRouter.delete('/:id', zValidator('param', idParamSchema), (c) => {
+  deleteCard(db, c.req.valid('param').id)
+  return c.body(null, 204)
+})
+
+cardsRouter.get(
+  '/:id/preview',
+  zValidator('param', idParamSchema),
+  zValidator('query', previewQuerySchema),
+  (c) => {
+    const { now } = c.req.valid('query')
+    return ok(
+      c,
+      reviewPreviewSchema,
+      previewCard(db, c.req.valid('param').id, now ? new Date(now) : new Date()),
+    )
+  },
+)
+
+cardsRouter.post(
+  '/:id/review',
+  zValidator('param', idParamSchema),
+  zValidator('json', reviewCardSchema),
+  (c) => {
+    const body = c.req.valid('json')
+    const input: ReviewInput = {
+      grade: body.grade,
+      ...(body.durationMs !== undefined ? { durationMs: body.durationMs } : {}),
+      ...(body.reviewedAt !== undefined ? { reviewedAt: new Date(body.reviewedAt) } : {}),
+    }
+    return ok(c, reviewResultSchema, reviewCard(db, c.req.valid('param').id, input))
+  },
+)
