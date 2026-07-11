@@ -4,6 +4,9 @@ coverage
 data
 bun.lock
 
+# Fichiers générés par drizzle-kit — format imposé par l'outil
+apps/server/drizzle/
+
 # Orchestrator / agent-owned docs — not formatted by this workspace
 CLAUDE.md
 PROGRESS.md
