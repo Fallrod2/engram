@@ -1,0 +1,322 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* ============================================================
+   engram — Précision Linear
+   Dark = défaut. Light surchargé via [data-theme="light"].
+   Les valeurs statiques (typo, radius, spacing, ombres) vivent
+   dans @theme ; les couleurs thémables sont exposées en @theme
+   et pilotées par les blocs :root ci-dessous.
+   ============================================================ */
+
+@theme {
+  /* — Fonts (self-hostées via @fontsource-variable, importées en JS) — */
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* — Couleurs : exposées à Tailwind, valeurs pilotées plus bas — */
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-subtle: var(--accent-subtle);
+
+  /* Sémantiques en triplet : base / -fg (texte sur fill) / -subtle (fond teinté) */
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-subtle: var(--info-subtle);
+
+  /* 8 pigments de matières */
+  --color-subject-1: var(--subj-1);
+  --color-subject-2: var(--subj-2);
+  --color-subject-3: var(--subj-3);
+  --color-subject-4: var(--subj-4);
+  --color-subject-5: var(--subj-5);
+  --color-subject-6: var(--subj-6);
+  --color-subject-7: var(--subj-7);
+  --color-subject-8: var(--subj-8);
+
+  /* — Échelle typo — ratio ~1.2, ancrée sur 14px (densité Linear). — */
+  --text-2xs: 0.6875rem; /* 11 */
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-base: 0.875rem; /* 14 */
+  --text-md: 1rem; /* 16 */
+  --text-lg: 1.25rem; /* 20 */
+  --text-xl: 1.75rem; /* 28 */
+  --text-2xl: 2.5rem; /* 40 */
+  --text-3xl: 3.5rem; /* 56 */
+
+  /* — Espacement — base 4px, dense — */
+  --spacing: 0.25rem;
+
+  /* — Rayons — géométrie serrée, jamais pilule — */
+  --radius-xs: 0.25rem; /* 4 */
+  --radius-sm: 0.375rem; /* 6 */
+  --radius-md: 0.5rem; /* 8 */
+  --radius-lg: 0.75rem; /* 12 */
+  --radius-full: 999px;
+
+  /* — Élévations — froides, basses, jamais diffuses. — */
+  --shadow-sm: 0 1px 2px oklch(0.15 0.01 265 / 0.3);
+  --shadow-md: 0 2px 8px oklch(0.12 0.01 265 / 0.35), 0 1px 2px oklch(0.12 0.01 265 / 0.3);
+  --shadow-lg: 0 8px 28px oklch(0.1 0.01 265 / 0.45);
+
+  /* — Motion — budget dur : tout < 250ms — */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 220ms;
+}
+
+/* ==================== DARK (défaut) ==================== */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: oklch(0.185 0.006 265);
+  --surface-1: oklch(0.205 0.007 265);
+  --surface-2: oklch(0.235 0.008 264);
+  --surface-3: oklch(0.275 0.01 263);
+
+  --border: oklch(0.3 0.01 263);
+  --border-strong: oklch(0.36 0.012 262);
+
+  --text: oklch(0.96 0.004 265);
+  --text-muted: oklch(0.72 0.01 264);
+  --text-faint: oklch(0.56 0.012 263);
+
+  --accent: oklch(0.62 0.17 268);
+  --accent-hover: oklch(0.67 0.175 268);
+  --accent-active: oklch(0.575 0.165 268);
+  --accent-fg: oklch(0.985 0.005 265);
+  --accent-subtle: oklch(0.3 0.055 268);
+
+  --danger: oklch(0.635 0.17 25);
+  --danger-fg: oklch(0.985 0.01 25);
+  --danger-subtle: oklch(0.3 0.055 25);
+  --warning: oklch(0.77 0.12 85);
+  --warning-fg: oklch(0.18 0.03 85);
+  --warning-subtle: oklch(0.32 0.045 85);
+  --success: oklch(0.7 0.135 165);
+  --success-fg: oklch(0.16 0.02 165);
+  --success-subtle: oklch(0.3 0.045 165);
+  --info: oklch(0.68 0.12 235);
+  --info-fg: oklch(0.16 0.02 235);
+  --info-subtle: oklch(0.3 0.045 235);
+
+  --subj-1: oklch(0.7 0.14 268);
+  --subj-2: oklch(0.7 0.13 200);
+  --subj-3: oklch(0.72 0.13 165);
+  --subj-4: oklch(0.75 0.13 130);
+  --subj-5: oklch(0.78 0.13 95);
+  --subj-6: oklch(0.7 0.15 40);
+  --subj-7: oklch(0.66 0.16 5);
+  --subj-8: oklch(0.66 0.15 320);
+}
+
+/* ==================== LIGHT (miroir de luminance) ==================== */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: oklch(0.985 0.003 265);
+  --surface-1: oklch(0.97 0.004 265);
+  --surface-2: oklch(1 0 0);
+  --surface-3: oklch(0.945 0.006 264);
+
+  --border: oklch(0.91 0.006 263);
+  --border-strong: oklch(0.86 0.008 262);
+
+  --text: oklch(0.24 0.012 265);
+  --text-muted: oklch(0.47 0.012 264);
+  --text-faint: oklch(0.62 0.012 263);
+
+  --accent: oklch(0.545 0.185 268);
+  --accent-hover: oklch(0.5 0.185 268);
+  --accent-active: oklch(0.47 0.18 268);
+  --accent-fg: oklch(0.99 0.004 265);
+  --accent-subtle: oklch(0.93 0.045 268);
+
+  --danger: oklch(0.545 0.19 25);
+  --danger-fg: oklch(0.99 0.01 25);
+  --danger-subtle: oklch(0.95 0.035 25);
+  --warning: oklch(0.64 0.13 75);
+  --warning-fg: oklch(0.99 0.01 75);
+  --warning-subtle: oklch(0.955 0.045 80);
+  --success: oklch(0.56 0.13 165);
+  --success-fg: oklch(0.99 0.01 165);
+  --success-subtle: oklch(0.945 0.03 165);
+  --info: oklch(0.56 0.13 235);
+  --info-fg: oklch(0.99 0.01 235);
+  --info-subtle: oklch(0.945 0.035 235);
+
+  --subj-1: oklch(0.55 0.16 268);
+  --subj-2: oklch(0.55 0.14 200);
+  --subj-3: oklch(0.55 0.14 165);
+  --subj-4: oklch(0.58 0.15 130);
+  --subj-5: oklch(0.62 0.15 95);
+  --subj-6: oklch(0.58 0.17 40);
+  --subj-7: oklch(0.55 0.18 5);
+  --subj-8: oklch(0.53 0.16 320);
+}
+
+/* Respecte la préférence système quand aucun thème n'est forcé.
+   Le toggle produit stampe [data-theme] sur <html> et gagne toujours. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+
+    --bg: oklch(0.985 0.003 265);
+    --surface-1: oklch(0.97 0.004 265);
+    --surface-2: oklch(1 0 0);
+    --surface-3: oklch(0.945 0.006 264);
+
+    --border: oklch(0.91 0.006 263);
+    --border-strong: oklch(0.86 0.008 262);
+
+    --text: oklch(0.24 0.012 265);
+    --text-muted: oklch(0.47 0.012 264);
+    --text-faint: oklch(0.62 0.012 263);
+
+    --accent: oklch(0.545 0.185 268);
+    --accent-hover: oklch(0.5 0.185 268);
+    --accent-active: oklch(0.47 0.18 268);
+    --accent-fg: oklch(0.99 0.004 265);
+    --accent-subtle: oklch(0.93 0.045 268);
+
+    --danger: oklch(0.545 0.19 25);
+    --danger-fg: oklch(0.99 0.01 25);
+    --danger-subtle: oklch(0.95 0.035 25);
+    --warning: oklch(0.64 0.13 75);
+    --warning-fg: oklch(0.99 0.01 75);
+    --warning-subtle: oklch(0.955 0.045 80);
+    --success: oklch(0.56 0.13 165);
+    --success-fg: oklch(0.99 0.01 165);
+    --success-subtle: oklch(0.945 0.03 165);
+    --info: oklch(0.56 0.13 235);
+    --info-fg: oklch(0.99 0.01 235);
+    --info-subtle: oklch(0.945 0.035 235);
+
+    --subj-1: oklch(0.55 0.16 268);
+    --subj-2: oklch(0.55 0.14 200);
+    --subj-3: oklch(0.55 0.14 165);
+    --subj-4: oklch(0.58 0.15 130);
+    --subj-5: oklch(0.62 0.15 95);
+    --subj-6: oklch(0.58 0.17 40);
+    --subj-7: oklch(0.55 0.18 5);
+    --subj-8: oklch(0.53 0.16 320);
+  }
+}
+
+/* ==================== Base layer ==================== */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Inter : formes neutres + chiffres tabulaires */
+    font-feature-settings: 'cv05', 'cv08', 'ss03', 'tnum';
+  }
+
+  /* JetBrains Mono : tabulaire + zéro barré (distinction O/0 dans les stats). */
+  .font-mono,
+  code,
+  kbd,
+  samp,
+  pre {
+    font-feature-settings: 'tnum', 'zero';
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus clavier = double-anneau indigo, jamais l'outline système. */
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-bg),
+      0 0 0 4px var(--color-accent);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Cibles de focus non-interactives (conteneur de scroll, ancre du skip-link) :
+     on ne peint pas l'anneau autour de toute la zone de contenu. */
+  [tabindex='-1']:focus-visible {
+    box-shadow: none;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-subtle);
+    color: var(--color-text);
+  }
+
+  /* Scrollbars froides et discrètes. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border-radius: var(--radius-full);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-text-faint);
+  }
+}
+
+/* prefers-reduced-motion : coupe toutes les durées (le flip Phase 2 devient
+   cross-fade géré côté composant, la respiration du streak est supprimée). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Utilitaire : nombres tabulaires pour toute donnée mesurée. */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}

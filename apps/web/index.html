@@ -1,9 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
     <title>engram</title>
+    <!-- Anti-FOUC : applique le thème stocké avant le premier paint. -->
+    <script>
+      ;(function () {
+        try {
+          var t = localStorage.getItem('engram-theme')
+          if (t === 'dark' || t === 'light') {
+            document.documentElement.setAttribute('data-theme', t)
+          }
+        } catch (e) {
+          /* localStorage indisponible : on laisse prefers-color-scheme décider. */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
