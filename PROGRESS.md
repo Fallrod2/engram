@@ -8,15 +8,17 @@
 
 - Repo initialisé, docs de pilotage en place (`CLAUDE.md`, `DEV_OPUS.md`, `REVIEWER_SONNET.md`).
 - Définitions d'agents installées dans `.claude/agents/` (dev-opus, reviewer-sonnet).
+- Bun 1.3.14 installé sur la machine (Homebrew).
+- **WS-A mergé dans `main`** (ff, branche supprimée) : monorepo Bun workspaces, tsconfig strict (ES2022, noUncheckedIndexedAccess, verbatimModuleSyntax), ESLint 9 flat + Prettier, `packages/shared` (`healthResponseSchema` Zod), `apps/server` (Hono :3001, `GET /api/health` validé par le schéma partagé), `apps/web` (Vite React 19 :5173, proxy `/api` → :3001), Vitest (5 tests verts), hook pre-commit `.githooks/` + `core.hooksPath` via script `prepare`. Review Sonnet : APPROVE (0 correctif). Vérifié par l'orchestrateur : check ✅ test ✅ dev + curls ✅.
 
 ## En cours
 
-- **WS-A `feat/phase0-foundations`** (dev-opus) : racine monorepo (workspaces Bun, tsconfig, eslint flat + prettier, scripts `check`/`test`/`dev`), `packages/shared` (Zod), stubs minimaux `apps/server` (Hono :3001, `/api/health`) et `apps/web` (Vite React :5173), hook pre-commit versionné.
+- Workflow `phase0-specs` (armada) : spec DB (draft Opus vérifié contre les vrais `.d.ts` de ts-fsrs → critique Sonnet → révision) + spec design (panel 3 directions Opus → juge). Sorties attendues dans le scratchpad (`specs/ws-b-db-spec.md`, `specs/ws-c-design-spec.md`).
 
 ## À venir (Phase 0)
 
-- **WS-B `feat/phase0-server-db`** : Drizzle + schéma complet du domaine + migrations (`data/engram.db`), scripts `db:migrate`/`db:studio`. Dépend de WS-A.
-- **WS-C `feat/phase0-design-system`** : Tailwind v4 + shadcn/ui, tokens, thème sombre/clair, app shell avec sidebar, fonts Inter + JetBrains Mono. Dépend de WS-A ; parallèle à WS-B (fichiers disjoints `apps/web` vs `apps/server`).
+- **WS-B `feat/phase0-server-db`** : Drizzle + schéma complet du domaine + migrations (`data/engram.db`), scripts `db:migrate`/`db:studio`. Basé sur la spec DB.
+- **WS-C `feat/phase0-design-system`** : Tailwind v4 + shadcn/ui, tokens, thème sombre/clair, app shell avec sidebar, fonts Inter + JetBrains Mono. Basé sur la spec design ; parallèle à WS-B (fichiers disjoints `apps/web` vs `apps/server`).
 - Fin de phase : tag `phase-0`.
 
 ## Décisions prises
