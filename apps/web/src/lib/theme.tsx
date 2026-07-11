@@ -27,9 +27,10 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 function readStoredTheme(): ThemePreference {
-  if (typeof localStorage === 'undefined') return 'system'
+  // Défaut projet (CLAUDE.md) : dark tant qu'aucune préférence n'est stockée.
+  if (typeof localStorage === 'undefined') return 'dark'
   const raw = localStorage.getItem(STORAGE_KEY)
-  return raw === 'dark' || raw === 'light' || raw === 'system' ? raw : 'system'
+  return raw === 'dark' || raw === 'light' || raw === 'system' ? raw : 'dark'
 }
 
 function systemPrefersDark(): boolean {
@@ -58,11 +59,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  // Reflect the preference onto <html> and persist it.
+  // Reflect the preference onto <html> and persist it ('system' included:
+  // sans clé stockée le défaut redeviendrait 'dark').
   useEffect(() => {
     applyTheme(theme)
-    if (theme === 'system') localStorage.removeItem(STORAGE_KEY)
-    else localStorage.setItem(STORAGE_KEY, theme)
+    localStorage.setItem(STORAGE_KEY, theme)
   }, [theme])
 
   const resolved: ResolvedTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme

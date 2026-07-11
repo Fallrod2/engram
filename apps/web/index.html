@@ -10,11 +10,14 @@
       ;(function () {
         try {
           var t = localStorage.getItem('engram-theme')
-          if (t === 'dark' || t === 'light') {
-            document.documentElement.setAttribute('data-theme', t)
+          if (t === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light')
+          } else if (t !== 'system') {
+            /* Défaut projet : dark, même sans préférence stockée. */
+            document.documentElement.setAttribute('data-theme', 'dark')
           }
         } catch (e) {
-          /* localStorage indisponible : on laisse prefers-color-scheme décider. */
+          document.documentElement.setAttribute('data-theme', 'dark')
         }
       })()
     </script>
