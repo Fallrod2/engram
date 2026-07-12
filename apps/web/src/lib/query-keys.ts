@@ -23,6 +23,18 @@ export const qk = {
   dueCounts: {
     all: ['due-counts'] as const,
   },
+  planning: {
+    all: ['planning'] as const,
+    // `range` = { from, to } local day keys of the visible grid window.
+    plan: (range: { from: string; to: string }) => ['planning', 'plan', range] as const,
+    // "What to review today" (live dues × exam proximity).
+    today: ['planning', 'today'] as const,
+  },
+  exams: {
+    all: ['exams'] as const,
+    list: ['exams', 'list'] as const,
+    detail: (examId: string) => ['exams', 'detail', examId] as const,
+  },
   notes: {
     all: ['notes'] as const,
     // `subjectId` absent → every note; `null` → only the "Sans matière" group.
