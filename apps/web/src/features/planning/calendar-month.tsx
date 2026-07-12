@@ -1,11 +1,10 @@
 import { useMemo } from 'react'
 import type { StudyPlanResponse, Subject } from '@engram/shared'
 import { monthMatrix, parseDayKey } from '@/lib/calendar'
+import { weekdayAbbrevs } from '@/lib/format'
 import { DayCell } from './day-cell'
 import { useCalendarGrid } from './use-calendar-grid'
 import { indexDays, subjectsById, windowMax } from './plan-utils'
-
-const WEEKDAYS = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'] as const
 
 /**
  * Month view (spec §2): a `role="grid"` of 6×7 cells (Monday→Sunday), 1px
@@ -27,6 +26,7 @@ export function CalendarMonth({
   onSelect: (key: string) => void
   onActivate: () => void
 }) {
+  const weekdays = weekdayAbbrevs()
   const matrix = useMemo(() => monthMatrix(parseDayKey(dayKey), now), [dayKey, now])
   const daysIndex = useMemo(() => indexDays(plan), [plan])
   const max = useMemo(() => windowMax(plan), [plan])
@@ -42,7 +42,7 @@ export function CalendarMonth({
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-border">
       <div className="grid grid-cols-7 bg-bg" role="presentation">
-        {WEEKDAYS.map((label) => (
+        {weekdays.map((label) => (
           <div
             key={label}
             role="columnheader"

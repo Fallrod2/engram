@@ -1,6 +1,5 @@
+import { weekdayAbbrevs } from '@/lib/format'
 import { Skeleton } from '@/components/ui/skeleton'
-
-const WEEKDAYS = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'] as const
 
 /**
  * Cold-cache calendar skeleton (spec §5.1): the day-header chrome is real and
@@ -11,7 +10,7 @@ export function PlanningGridSkeleton() {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-border">
       <div className="grid grid-cols-7 bg-bg">
-        {WEEKDAYS.map((label) => (
+        {weekdayAbbrevs().map((label) => (
           <div
             key={label}
             className="px-2 py-1.5 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint"

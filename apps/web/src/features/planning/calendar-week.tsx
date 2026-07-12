@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { HTMLAttributes } from 'react'
 import type { StudyPlanDay, StudyPlanResponse, Subject } from '@engram/shared'
 import { parseDayKey, weekDays, type DayCell as DayCellData } from '@/lib/calendar'
-import { formatLongDay } from '@/lib/format'
+import { formatLongDay, weekdayAbbrevs } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { DayLoad } from '@/components/day-load'
 import { ExamChip } from '@/components/exam-chip'
@@ -10,8 +10,6 @@ import { SubjectCompositionBar } from '@/components/subject-composition-bar'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCalendarGrid } from './use-calendar-grid'
 import { daySegments, indexDays, subjectsById, windowMax } from './plan-utils'
-
-const WEEKDAY_ABBR = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'] as const
 
 /**
  * Week view (spec §3): same `role="grid"` and keyboard model as the month, but
@@ -33,6 +31,7 @@ export function CalendarWeek({
   onSelect: (key: string) => void
   onActivate: () => void
 }) {
+  const weekdays = weekdayAbbrevs()
   const days = useMemo(() => weekDays(parseDayKey(dayKey), now), [dayKey, now])
   const daysIndex = useMemo(() => indexDays(plan), [plan])
   const max = useMemo(() => windowMax(plan), [plan])
@@ -57,7 +56,7 @@ export function CalendarWeek({
         <WeekColumn
           key={cell.key}
           cell={cell}
-          abbr={WEEKDAY_ABBR[i]!}
+          abbr={weekdays[i]!}
           day={daysIndex.get(cell.key)}
           max={max}
           subjectsById={byId}

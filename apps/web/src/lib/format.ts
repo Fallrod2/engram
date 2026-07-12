@@ -18,7 +18,8 @@ let currentLocale = 'fr-FR'
 export function setLocale(locale: string): void {
   currentLocale = locale
 }
-const isEn = (): boolean => currentLocale.startsWith('en')
+/** Whether the active locale is English (drives the few inline textual words). */
+export const isEn = (): boolean => currentLocale.startsWith('en')
 
 /** Start-of-day epoch for a date (local time). */
 function startOfDay(d: Date): number {
@@ -95,6 +96,21 @@ export function formatLongDay(dayKey: string): string {
     month: 'short',
     year: 'numeric',
   })
+}
+
+/**
+ * Monday-first, uppercase short weekday labels for the active locale — the
+ * calendar column headers (spec §2/§3). FR → `LUN…DIM`, EN → `MON…SUN`. Derived
+ * from `Intl` so the grid header follows the language instead of hard-coding FR.
+ */
+export function weekdayAbbrevs(): string[] {
+  const monday = new Date(2023, 0, 2) // 2 Jan 2023 is a Monday
+  return Array.from({ length: 7 }, (_, i) =>
+    addDays(monday, i)
+      .toLocaleDateString(currentLocale, { weekday: 'short' })
+      .replace(/\.$/, '')
+      .toUpperCase(),
+  )
 }
 
 /** Month + year label for the month toolbar, e.g. `juillet 2026`. */
