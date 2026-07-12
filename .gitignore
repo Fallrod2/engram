@@ -1,3 +1,10 @@
+# AI orchestration docs — local only, never in the repo
+CLAUDE.md
+PROGRESS.md
+DEV_OPUS.md
+REVIEWER_SONNET.md
+.claude/
+
 # dependencies
 node_modules/
 
