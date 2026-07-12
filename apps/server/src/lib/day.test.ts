@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { localDayKey, localMidnight } from './day'
+import { localDayDiff, localDayKey, localMidnight } from './day'
 
 /**
  * Locks WS-B spec §1.9: day bucketing is LOCAL, never UTC. These assertions use
@@ -35,5 +35,29 @@ describe('localMidnight', () => {
     expect(d.getHours()).toBe(0)
     expect(d.getMinutes()).toBe(0)
     expect(localDayKey(d)).toBe('2026-07-20')
+  })
+})
+
+describe('localDayDiff', () => {
+  it('is 0 for the same day (any time of day)', () => {
+    expect(localDayDiff(new Date(2026, 6, 12, 9, 0), new Date(2026, 6, 12, 23, 30))).toBe(0)
+  })
+
+  it('counts whole forward and backward calendar days', () => {
+    expect(localDayDiff(new Date(2026, 6, 12), new Date(2026, 6, 13))).toBe(1)
+    expect(localDayDiff(new Date(2026, 6, 12), new Date(2026, 6, 9))).toBe(-3)
+  })
+
+  it('spans month boundaries', () => {
+    expect(localDayDiff(new Date(2026, 6, 30), new Date(2026, 7, 2))).toBe(3)
+  })
+
+  it('yields a whole number across a DST transition (spring forward)', () => {
+    // US spring-forward 2026 is 2026-03-08. A 23h local day must still be 1 day.
+    const before = new Date(2026, 2, 7, 12, 0)
+    const after = new Date(2026, 2, 8, 12, 0)
+    const diff = localDayDiff(before, after)
+    expect(Number.isInteger(diff)).toBe(true)
+    expect(diff).toBe(1)
   })
 })

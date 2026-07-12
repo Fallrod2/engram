@@ -1,7 +1,8 @@
 import { createEmptyCard } from 'ts-fsrs'
 import type { DB } from '../db/client'
-import { card, deck, generation, note, reviewLog, subject } from '../db/schema'
+import { card, deck, exam, examSubject, generation, note, reviewLog, subject } from '../db/schema'
 import { fsrsCardToColumns } from '../db/mappers'
+import { localMidnight } from '../lib/day'
 
 /**
  * Shared seeding/reset helpers for the bun:sqlite integration specs. All
@@ -11,6 +12,8 @@ import { fsrsCardToColumns } from '../db/mappers'
 
 /** Delete every row (child tables first) so each test starts clean. */
 export function resetDb(db: DB): void {
+  db.delete(examSubject).run()
+  db.delete(exam).run()
   db.delete(reviewLog).run()
   db.delete(card).run()
   db.delete(generation).run()
@@ -70,4 +73,25 @@ export function seedCard(
     })
     .returning()
     .get()
+}
+
+export function seedExam(
+  db: DB,
+  subjectIds: string[],
+  o: { title?: string; date?: Date; notes?: string } = {},
+) {
+  const now = new Date()
+  const row = db
+    .insert(exam)
+    .values({
+      title: o.title ?? 'Exam',
+      date: o.date ?? localMidnight(now.getFullYear(), now.getMonth(), now.getDate()),
+      ...(o.notes !== undefined ? { notes: o.notes } : {}),
+    })
+    .returning()
+    .get()
+  for (const subjectId of [...new Set(subjectIds)]) {
+    db.insert(examSubject).values({ examId: row.id, subjectId }).run()
+  }
+  return row
 }
