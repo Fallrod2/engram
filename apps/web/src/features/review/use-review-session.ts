@@ -272,6 +272,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     // Graded cards shift their `due` → the study-plan load and "today" suggestion
     // rebalance in real time (Phase 4 §1.4).
     void queryClient.invalidateQueries({ queryKey: qk.planning.all })
+    // Each review is a row in `review_log` — the raw material of every analytic.
+    // A finished session refreshes tiles + heatmap + graphs (Phase 5 §1.6).
+    void queryClient.invalidateQueries({ queryKey: qk.analytics.all })
   }, [queryClient])
 
   useEffect(() => {
