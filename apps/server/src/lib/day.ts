@@ -31,3 +31,14 @@ export function localDayDiff(a: Date, b: Date): number {
   const bm = localMidnight(b.getFullYear(), b.getMonth(), b.getDate()).getTime()
   return Math.round((bm - am) / 86_400_000)
 }
+
+/**
+ * Local midnight of the Monday of `d`'s ISO week (Mon→Sun). Local components
+ * only (never Date.UTC), consistent with localMidnight/localDayKey. The weekly
+ * bucket key is `localDayKey(localWeekStart(review))`.
+ */
+export function localWeekStart(d: Date): Date {
+  const dow = d.getDay() // 0=Sun … 6=Sat
+  const sinceMonday = (dow + 6) % 7 // Mon→0, Sun→6
+  return localMidnight(d.getFullYear(), d.getMonth(), d.getDate() - sinceMonday)
+}
