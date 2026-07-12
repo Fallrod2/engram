@@ -9,5 +9,8 @@ const TITLES: Record<string, string> = {
 }
 
 export function getPageTitle(pathname: string): string {
+  // The subjects subtree (decks, cards) keeps the section title in the global
+  // header; each screen renders its own breadcrumb + entity title in-content.
+  if (pathname.startsWith('/subjects')) return 'Matières'
   return TITLES[pathname] ?? 'engram'
 }
