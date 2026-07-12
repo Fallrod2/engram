@@ -23,6 +23,7 @@ export const dictFr = {
     reviewNow: 'Réviser maintenant',
     backToDashboard: 'Retour au tableau de bord',
     unavailable: 'Indisponible pour le moment.',
+    skipToContent: 'Aller au contenu',
   },
 
   nav: {

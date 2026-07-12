@@ -8,11 +8,13 @@ import { CommandMenu } from './command-menu'
 import { CreateHost } from './command-actions'
 import { ShortcutsDialog } from './shortcuts-dialog'
 import { ShellProvider } from './shell-context'
-import { getPageTitle } from './page-title'
+import { getPageTitleKey } from './page-title'
+import { useT } from '@/lib/i18n'
 
 function ShellInner() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const reduceMotion = useReducedMotion()
+  const t = useT()
   const [scrolled, setScrolled] = useState(false)
 
   return (
@@ -22,7 +24,7 @@ function ShellInner() {
         href="#main-content"
         className="sr-only left-3 top-3 z-50 rounded-sm bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg focus:not-sr-only focus:absolute"
       >
-        Aller au contenu
+        {t('common.skipToContent')}
       </a>
 
       <div className="hidden md:flex">
@@ -30,7 +32,7 @@ function ShellInner() {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header title={getPageTitle(pathname)} scrolled={scrolled} />
+        <Header title={t(getPageTitleKey(pathname))} scrolled={scrolled} />
         <main
           id="main-content"
           tabIndex={-1}

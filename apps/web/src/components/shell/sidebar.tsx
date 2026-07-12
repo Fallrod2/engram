@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { PanelLeftClose, PanelLeftOpen, Search, Settings } from 'lucide-react'
 import type { Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
@@ -22,6 +23,7 @@ import { ApiStatus } from './api-status'
 
 export function Sidebar() {
   const { collapsed, canToggleCollapse, toggleCollapse, setCommandOpen } = useShell()
+  const t = useT()
 
   const subjectsQuery = useQuery(subjectsListOptions())
   const dueQuery = useQuery(dueCountsOptions())
@@ -106,14 +108,14 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={toggleCollapse}
-                    aria-label="Réduire la barre latérale"
+                    aria-label={t('sidebar.collapseAria')}
                     className="ml-auto flex size-6 items-center justify-center rounded-sm text-text-faint transition-colors duration-fast hover:bg-surface-2 hover:text-text"
                   >
                     <PanelLeftClose className="size-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Réduire <Kbd className="ml-1">[</Kbd>
+                  {t('sidebar.collapse')} <Kbd className="ml-1">[</Kbd>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -129,14 +131,14 @@ export function Sidebar() {
               <button
                 type="button"
                 onClick={() => setCommandOpen(true)}
-                aria-label="Rechercher"
+                aria-label={t('sidebar.search')}
                 className="flex size-8 w-full items-center justify-center rounded-sm bg-surface-2 text-text-faint transition-colors duration-fast hover:bg-surface-3 hover:text-text"
               >
                 <Search className="size-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              Rechercher <Kbd className="ml-1">⌘K</Kbd>
+              {t('sidebar.search')} <Kbd className="ml-1">⌘K</Kbd>
             </TooltipContent>
           </Tooltip>
         ) : (
@@ -146,7 +148,7 @@ export function Sidebar() {
             className="flex h-8 w-full items-center gap-2 rounded-sm bg-surface-2 px-2.5 text-text-faint transition-colors duration-fast hover:bg-surface-3"
           >
             <Search className="size-4 shrink-0" />
-            <span className="text-sm">Rechercher…</span>
+            <span className="text-sm">{t('sidebar.searchPlaceholder')}</span>
             <Kbd className="ml-auto">⌘K</Kbd>
           </button>
         )}
@@ -155,7 +157,7 @@ export function Sidebar() {
       {/* Navigation */}
       <ScrollArea className="flex-1">
         <nav
-          aria-label="Navigation principale"
+          aria-label={t('nav.aria.mainNav')}
           onKeyDown={onNavKeyDown}
           className={cn('flex flex-col gap-4 px-3 py-2', collapsed && 'px-2')}
         >
@@ -165,7 +167,7 @@ export function Sidebar() {
                 <Separator className="mx-auto my-1 w-6" />
               ) : (
                 <p className="px-2 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-                  {group.label}
+                  {t(group.label)}
                 </p>
               )}
 
@@ -175,6 +177,7 @@ export function Sidebar() {
                   <NavLink
                     key={item.to}
                     item={item}
+                    label={t(item.label)}
                     collapsed={collapsed}
                     count={item.to === '/review' ? totalDue : undefined}
                     countLoading={item.to === '/review' && dueLoading}
@@ -228,13 +231,13 @@ export function Sidebar() {
               <TooltipTrigger asChild>
                 <Link
                   to="/settings"
-                  aria-label="Réglages"
+                  aria-label={t('sidebar.settings')}
                   className="flex size-8 items-center justify-center rounded-sm text-text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-text data-[status=active]:bg-accent-subtle data-[status=active]:text-accent"
                 >
                   <Settings className="size-4" />
                 </Link>
               </TooltipTrigger>
-              <TooltipContent side="right">Réglages</TooltipContent>
+              <TooltipContent side="right">{t('sidebar.settings')}</TooltipContent>
             </Tooltip>
           ) : (
             <Link
@@ -242,7 +245,7 @@ export function Sidebar() {
               className="flex h-8 items-center gap-2 rounded-sm px-2 text-sm text-text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-text data-[status=active]:bg-accent-subtle data-[status=active]:text-accent"
             >
               <Settings className="size-4" />
-              Réglages
+              {t('sidebar.settings')}
             </Link>
           )}
           <div className={cn('ml-auto flex items-center gap-1', collapsed && 'ml-0 flex-col')}>
@@ -257,13 +260,13 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={toggleCollapse}
-                    aria-label="Déployer la barre latérale"
+                    aria-label={t('sidebar.expandAria')}
                     className="flex size-8 items-center justify-center rounded-sm text-text-faint transition-colors duration-fast hover:bg-surface-2 hover:text-text"
                   >
                     <PanelLeftOpen className="size-4" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right">Déployer</TooltipContent>
+                <TooltipContent side="right">{t('sidebar.expand')}</TooltipContent>
               </Tooltip>
             )}
             {!collapsed && <ThemeToggle />}
@@ -277,6 +280,8 @@ export function Sidebar() {
 
 interface NavLinkProps {
   item: NavItem
+  /** Pre-resolved (translated) label; `item.label` is an i18n key. */
+  label: string
   collapsed: boolean
   count: number | undefined
   countLoading: boolean
@@ -286,7 +291,16 @@ interface NavLinkProps {
 }
 
 /** A static nav row: active = accent-subtle + 2px indigo edge bar (spec §5). */
-function NavLink({ item, collapsed, count, countLoading, tabIndex, onFocus, ref }: NavLinkProps) {
+function NavLink({
+  item,
+  label,
+  collapsed,
+  count,
+  countLoading,
+  tabIndex,
+  onFocus,
+  ref,
+}: NavLinkProps) {
   const Icon = item.icon
   const row = (
     <Link
@@ -294,7 +308,7 @@ function NavLink({ item, collapsed, count, countLoading, tabIndex, onFocus, ref 
       to={item.to}
       tabIndex={tabIndex}
       onFocus={onFocus}
-      aria-label={collapsed ? item.label : undefined}
+      aria-label={collapsed ? label : undefined}
       className={cn(
         'group/nav relative flex h-8 items-center rounded-sm text-sm text-text-muted',
         'transition-colors duration-fast hover:bg-surface-2 hover:text-text',
@@ -314,7 +328,7 @@ function NavLink({ item, collapsed, count, countLoading, tabIndex, onFocus, ref 
       </span>
       {!collapsed && (
         <>
-          <span className="truncate">{item.label}</span>
+          <span className="truncate">{label}</span>
           {count != null && (
             <span className="ml-auto">
               {countLoading ? <CountShimmer /> : <DueCount value={count} />}
@@ -328,7 +342,7 @@ function NavLink({ item, collapsed, count, countLoading, tabIndex, onFocus, ref 
   return (
     <Tooltip>
       <TooltipTrigger asChild>{row}</TooltipTrigger>
-      <TooltipContent side="right">{item.label}</TooltipContent>
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   )
 }

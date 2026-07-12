@@ -19,6 +19,7 @@ export const dictEn: Dict = {
     reviewNow: 'Review now',
     backToDashboard: 'Back to dashboard',
     unavailable: 'Unavailable right now.',
+    skipToContent: 'Skip to content',
   },
 
   nav: {

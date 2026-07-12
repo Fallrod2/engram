@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMediaQuery } from '@/lib/use-media-query'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { ThemeToggle } from './theme-toggle'
@@ -14,6 +15,7 @@ import { useShell } from './shell-context'
  */
 export function Header({ title, scrolled }: { title: string; scrolled: boolean }) {
   const { setCommandOpen } = useShell()
+  const t = useT()
   // Mobile has no sidebar, so the header title doubles as the way back to the
   // dashboard `/` (spec §5.5); on desktop the sidebar owns navigation.
   const isMobile = !useMediaQuery('(min-width: 768px)')
@@ -33,7 +35,7 @@ export function Header({ title, scrolled }: { title: string; scrolled: boolean }
           <Link
             to="/"
             className="transition-colors duration-fast hover:text-text-muted"
-            aria-label={`${title} — aller au tableau de bord`}
+            aria-label={t('header.backToDashboardAria', { title })}
           >
             {title}
           </Link>
@@ -46,7 +48,7 @@ export function Header({ title, scrolled }: { title: string; scrolled: boolean }
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Rechercher"
+          aria-label={t('header.search')}
           onClick={() => setCommandOpen(true)}
           className="text-text-muted"
         >
@@ -60,10 +62,10 @@ export function Header({ title, scrolled }: { title: string; scrolled: boolean }
           type="button"
           onClick={() => setCommandOpen(true)}
           className="hidden h-8 items-center gap-2 rounded-sm border border-border bg-surface-1 px-2.5 text-text-faint transition-colors duration-fast hover:bg-surface-2 lg:flex"
-          aria-label="Rechercher"
+          aria-label={t('header.search')}
         >
           <Search className="size-3.5" />
-          <span className="text-xs">Rechercher</span>
+          <span className="text-xs">{t('header.search')}</span>
           <Kbd className="ml-1">⌘K</Kbd>
         </button>
       </div>

@@ -7,45 +7,48 @@ import {
   Upload,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import type { TKey } from '@/lib/i18n'
 
 export interface NavItem {
-  label: string
+  /** i18n key resolved with `t(...)` at render (spec §9.4). */
+  label: TKey
   to: string
   icon: LucideIcon
 }
 
 export interface NavGroup {
   id: string
-  label: string
+  /** i18n key resolved with `t(...)` at render. */
+  label: TKey
   items: NavItem[]
 }
 
 /**
  * Primary navigation (spec §5). The "Session de révision" item carries the real
  * total due count; the Matières group is filled with real subjects at runtime
- * (see `sidebar.tsx`).
+ * (see `sidebar.tsx`). Labels are i18n keys resolved by the consumer.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'review',
-    label: 'Réviser',
+    label: 'nav.groups.review',
     items: [
-      { label: "Aujourd'hui", to: '/', icon: LayoutDashboard },
-      { label: 'Session de révision', to: '/review', icon: GraduationCap },
+      { label: 'nav.items.today', to: '/', icon: LayoutDashboard },
+      { label: 'nav.items.session', to: '/review', icon: GraduationCap },
     ],
   },
   {
     id: 'subjects',
-    label: 'Matières',
-    items: [{ label: 'Toutes les matières', to: '/subjects', icon: Layers }],
+    label: 'nav.groups.subjects',
+    items: [{ label: 'nav.items.allSubjects', to: '/subjects', icon: Layers }],
   },
   {
     id: 'tools',
-    label: 'Outils',
+    label: 'nav.groups.tools',
     items: [
-      { label: 'Planning', to: '/planning', icon: CalendarDays },
-      { label: 'Analytics', to: '/analytics', icon: ChartColumn },
-      { label: 'Import', to: '/import', icon: Upload },
+      { label: 'nav.items.planning', to: '/planning', icon: CalendarDays },
+      { label: 'nav.items.analytics', to: '/analytics', icon: ChartColumn },
+      { label: 'nav.items.import', to: '/import', icon: Upload },
     ],
   },
 ]
