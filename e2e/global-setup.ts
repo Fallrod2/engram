@@ -14,12 +14,22 @@ export default async function globalSetup(): Promise<void> {
   if (!res.ok) {
     throw new Error(`e2e boot guard: /api/health returned ${res.status}`)
   }
-  const body = (await res.json()) as { fakeAi?: unknown }
+  const body = (await res.json()) as { fakeAi?: unknown; authEnforced?: unknown }
   if (body.fakeAi !== true) {
     throw new Error(
       'e2e boot guard: /api/health reports fakeAi != true — the fake AI generator is NOT wired. ' +
         'Aborting before any spec so no real Anthropic API call can happen. ' +
         'Check ENGRAM_FAKE_AI=1 and the wiring in apps/server/src/index.ts.',
+    )
+  }
+  // The default suite MUST run with the auth gate OFF (spec §6.3): the specs hit
+  // the API directly without a token, so an accidentally-enforced gate would
+  // 401 everything. Fail the whole run before any spec if auth is ON.
+  if (body.authEnforced !== false) {
+    throw new Error(
+      'e2e boot guard: /api/health reports authEnforced != false — the auth gate is ENFORCED. ' +
+        'The default suite runs auth OFF; check ENGRAM_AUTH_DISABLED=1 and that no ' +
+        'SUPABASE_URL/SUPABASE_JWT_SECRET leaked into the server env.',
     )
   }
 }
