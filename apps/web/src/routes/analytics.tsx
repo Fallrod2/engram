@@ -3,12 +3,12 @@ import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useReducedMotion } from 'motion/react'
 import { z } from 'zod'
-import { BarChart3, ChartColumn, GraduationCap } from 'lucide-react'
+import { GraduationCap } from 'lucide-react'
 import type { HeatmapResponse } from '@engram/shared'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { PageHeader } from '@/components/page-header'
+import { AnalyticsIllustration } from '@/components/illustrations'
 import { localDayKey } from '@/lib/calendar'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import {
@@ -66,20 +66,13 @@ function AnalyticsError() {
   return <ErrorState kind="planning" onRetry={() => void router.invalidate()} />
 }
 
+/**
+ * Analytics is a root-of-section screen: the global shell header already names
+ * it "Analytics", so there is NO in-page `<h1>` (§4.1 — removes the doublon).
+ * Only the window-filter row renders here.
+ */
 function PageHeaderRow({ children }: { children?: React.ReactNode }) {
-  return (
-    <>
-      <PageHeader
-        title={
-          <span className="flex items-center gap-2">
-            <BarChart3 className="size-5 text-text-muted" strokeWidth={1.75} />
-            Analytics
-          </span>
-        }
-      />
-      {children && <div className="mb-6">{children}</div>}
-    </>
-  )
+  return children ? <div className="mb-6">{children}</div> : null
 }
 
 function AnalyticsPending() {
@@ -121,7 +114,7 @@ function AnalyticsPage() {
       <div>
         <PageHeaderRow />
         <EmptyState
-          icon={ChartColumn}
+          illustration={<AnalyticsIllustration />}
           title="Rien à analyser pour l'instant."
           meta="0 review enregistrée"
           action={
