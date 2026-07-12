@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import type { ReviewVolumeBucket, ReviewVolumeResponse } from '@engram/shared'
 import { RATINGS } from '@/features/review/labels'
+import { useT } from '@/lib/i18n'
 import { formatLongDay } from '@/lib/format'
 import { chartInk, ratingColor } from '../chart-theme'
 import { formatAxisDay } from '../metrics'
@@ -29,11 +30,6 @@ const SERIES = [
   { key: 'good', token: 'success' },
   { key: 'easy', token: 'info' },
 ] as const
-
-const legendItems: LegendItem[] = RATINGS.map((r) => ({
-  colorVar: ratingColor[r.token],
-  label: r.label,
-}))
 
 const tableColumns: ChartColumn<ReviewVolumeBucket>[] = [
   { key: 'date', header: 'Jour', render: (b) => b.date, mono: true },
@@ -59,6 +55,13 @@ export function ReviewVolumeChart({
   onRetry: () => void
   reduce: boolean
 }) {
+  const t = useT()
+  // Legend labels reuse the shared rating i18n keys so they stay in sync with
+  // the session (RATINGS[].label is an i18n key, resolved here).
+  const legendItems: LegendItem[] = RATINGS.map((r) => ({
+    colorVar: ratingColor[r.token],
+    label: t(r.label),
+  }))
   const buckets = data?.buckets ?? []
   const empty = data !== undefined && data.totals.total === 0
   // Selective direct label (spec §5): the total sits on the tallest column only,
