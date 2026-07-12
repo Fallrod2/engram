@@ -1,7 +1,16 @@
 import { useMemo, useRef, useState } from 'react'
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, MoreHorizontal, Pencil, Plus, SquareStack, Trash2 } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  GraduationCap,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  SquareStack,
+  Trash2,
+} from 'lucide-react'
 import type { Card } from '@engram/shared'
 import { ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -121,6 +130,12 @@ function CardsPage() {
   const deleteDeckMut = useDeleteDeck(subjectId)
 
   const sorted = useMemo(() => sortCards(cards, sort), [cards, sort])
+  // Due-now count for this deck, derived from the loaded cards (avoids a second
+  // request) — drives the "Réviser" entry into a deck-scoped session (spec §3.1).
+  const deckDue = useMemo(() => {
+    const now = Date.now()
+    return cards.filter((c) => new Date(c.fsrs.due).getTime() <= now).length
+  }, [cards])
 
   const roving = useRovingList<HTMLTableRowElement>(sorted.length, (i) => {
     const c = sorted[i]
@@ -177,6 +192,18 @@ function CardsPage() {
         title={<span className="truncate">{deck.name}</span>}
         actions={
           <>
+            {deckDue > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => void navigate({ to: '/review', search: { deckId } })}
+              >
+                <GraduationCap />
+                Réviser
+                <span className="ml-1 font-mono text-xs tabular-nums text-text-muted">
+                  {deckDue}
+                </span>
+              </Button>
+            )}
             <Button onClick={() => composerRef.current?.focus()}>
               <Plus />
               Ajouter une carte

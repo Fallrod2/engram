@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Layers, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { GraduationCap, Layers, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { Deck } from '@engram/shared'
 import { ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -162,6 +162,18 @@ function DecksPage() {
         }
         actions={
           <>
+            {subjectDue > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => void navigate({ to: '/review', search: { subjectId } })}
+              >
+                <GraduationCap />
+                Réviser
+                <span className="ml-1 font-mono text-xs tabular-nums text-text-muted">
+                  {subjectDue}
+                </span>
+              </Button>
+            )}
             <Button onClick={() => setCreateOpen(true)}>
               <Plus />
               Nouveau deck
