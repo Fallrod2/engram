@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatCountdown,
+  formatDayMonth,
   formatDue,
   formatLongDay,
   formatMonthLabel,
@@ -48,6 +49,13 @@ describe('formatRelativeDay', () => {
     expect(formatRelativeDay('2026-07-11', now)).toBe('hier')
     expect(formatRelativeDay('2026-07-15', now)).toBe('dans 3 jours')
     expect(formatRelativeDay('2026-07-09', now)).toBe('il y a 3 jours')
+  })
+})
+
+describe('formatDayMonth', () => {
+  it('formats a compact day + month in the active locale', () => {
+    // Noon local avoids any TZ day-shift; the default locale is fr-FR.
+    expect(formatDayMonth(new Date(2026, 6, 15, 12).toISOString())).toBe('15 juil.')
   })
 })
 

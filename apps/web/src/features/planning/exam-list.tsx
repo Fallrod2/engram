@@ -2,6 +2,7 @@ import { useImperativeHandle, useMemo, type Ref } from 'react'
 import { ChevronDown, GraduationCap, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Exam, Subject } from '@engram/shared'
 import { localDayKey } from '@/lib/calendar'
+import { formatDayMonth } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
@@ -169,10 +170,7 @@ function ExamRow({
   const subjects = exam.subjectIds
     .map((id) => subjectsById.get(id))
     .filter((s): s is Subject => !!s)
-  const dateLabel = new Date(exam.date).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-  })
+  const dateLabel = formatDayMonth(exam.date)
   const optimistic = exam.id.startsWith('optimistic:')
 
   return (

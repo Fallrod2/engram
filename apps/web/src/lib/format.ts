@@ -55,6 +55,14 @@ export function formatDateTime(iso: string): string {
   })
 }
 
+/** Compact day + month for an ISO instant, e.g. `15 juil.` / `Jul 15`. */
+export function formatDayMonth(iso: string): string {
+  return new Date(iso).toLocaleDateString(currentLocale, {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 /** `reps·lapses`, e.g. `12·1`. */
 export function formatReps(reps: number, lapses: number): string {
   return `${reps}·${lapses}`
