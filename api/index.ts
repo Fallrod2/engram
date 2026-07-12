@@ -7,12 +7,15 @@ import { app } from '../apps/server/src/app'
  * verbatim — this file only adapts it to Vercel's invocation contract. The local
  * dev entrypoint (`apps/server/src/index.ts`, run by `bun run dev`) is untouched.
  *
- * Vercel's Node.js runtime calls a default-exported Web handler with a standard
- * `Request` and expects a `Response`, which is exactly the shape of Hono's
- * `app.fetch`. `vercel.json` rewrites `/api/(.*)` to this function; the rewrite
- * preserves the original request URL (e.g. `/api/health`), so Hono's router — which
- * mounts every route under `/api/*` — matches it directly with no path rewriting.
+ * Vercel's Node.js runtime detects a Web handler when the default export exposes a
+ * `fetch(request)` method (or named `GET`/`POST`/… exports) — a bare default-exported
+ * function is instead treated as a legacy `(req, res)` Node handler. We therefore
+ * export an object with a `fetch` method, which is exactly the shape of Hono's
+ * `app.fetch` and the pattern both Vercel and Hono document for the Node.js runtime.
+ * `vercel.json` rewrites `/api/(.*)` to this function; the rewrite preserves the
+ * original request URL (e.g. `/api/health`), so Hono's router — which mounts every
+ * route under `/api/*` — matches it directly with no path rewriting.
  */
-export default function handler(request: Request): Response | Promise<Response> {
-  return app.fetch(request)
+export default {
+  fetch: app.fetch,
 }
