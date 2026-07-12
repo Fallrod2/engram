@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { sqliteTable, text, integer, index, check } from 'drizzle-orm/sqlite-core'
+import { pgTable, text, integer, jsonb, index, check } from 'drizzle-orm/pg-core'
 import type { GenerationItem } from '@engram/shared'
 import { id, createdAt, updatedAt } from './columns'
 import { note } from './note'
@@ -11,7 +11,7 @@ import { deck } from './deck'
  * an ephemeral review buffer, so a dedicated `generation_item` table is not
  * warranted for a single-user local app.
  */
-export const generation = sqliteTable(
+export const generation = pgTable(
   'generation',
   {
     id: id(),
@@ -22,7 +22,7 @@ export const generation = sqliteTable(
     kind: text('kind').notNull(), // 'cards' | 'quiz'
     status: text('status').notNull().default('pending'), // 'pending' | 'succeeded' | 'failed'
     model: text('model').notNull(), // e.g. 'claude-sonnet-4-6'
-    items: text('items', { mode: 'json' })
+    items: jsonb('items')
       .$type<GenerationItem[]>()
       .notNull()
       .$defaultFn(() => []),

@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm'
-import { sqliteTable, text, integer, real, index, check } from 'drizzle-orm/sqlite-core'
+import {
+  pgTable,
+  text,
+  integer,
+  doublePrecision,
+  timestamp,
+  index,
+  check,
+} from 'drizzle-orm/pg-core'
 import { id, createdAt, updatedAt } from './columns'
 import { deck } from './deck'
 
@@ -9,7 +17,7 @@ import { deck } from './deck'
  * (see `mappers.ts`). Deprecated ts-fsrs fields are kept for fidelity and will
  * be dropped by a migration when we move to FSRS v6.
  */
-export const card = sqliteTable(
+export const card = pgTable(
   'card',
   {
     id: id(),
@@ -20,16 +28,16 @@ export const card = sqliteTable(
     back: text('back').notNull(), // Markdown verso
 
     // --- FSRS state (ts-fsrs 5.4.1 Card) ---
-    due: integer('due', { mode: 'timestamp_ms' }).notNull(),
-    stability: real('stability').notNull().default(0),
-    difficulty: real('difficulty').notNull().default(0),
+    due: timestamp('due', { withTimezone: true, mode: 'date' }).notNull(),
+    stability: doublePrecision('stability').notNull().default(0),
+    difficulty: doublePrecision('difficulty').notNull().default(0),
     elapsedDays: integer('elapsed_days').notNull().default(0), // @deprecated ts-fsrs
     scheduledDays: integer('scheduled_days').notNull().default(0),
     learningSteps: integer('learning_steps').notNull().default(0), // new in 5.4
     reps: integer('reps').notNull().default(0),
     lapses: integer('lapses').notNull().default(0),
     state: integer('state').notNull().default(0), // State 0..3
-    lastReview: integer('last_review', { mode: 'timestamp_ms' }), // nullable
+    lastReview: timestamp('last_review', { withTimezone: true, mode: 'date' }), // nullable
 
     createdAt: createdAt(),
     updatedAt: updatedAt(),

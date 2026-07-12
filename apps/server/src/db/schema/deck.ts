@@ -1,8 +1,8 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core'
+import { pgTable, text, integer, index } from 'drizzle-orm/pg-core'
 import { id, createdAt, updatedAt } from './columns'
 import { subject } from './subject'
 
-export const deck = sqliteTable(
+export const deck = pgTable(
   'deck',
   {
     id: id(),
