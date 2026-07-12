@@ -28,4 +28,18 @@ describe('<EmptyState> (spec §6)', () => {
     )
     expect(screen.getByText('Nouveau deck')).toBeTruthy()
   })
+
+  it('renders the illustration slot in place of the icon (spec §7.5)', () => {
+    const { container } = render(
+      <EmptyState
+        icon={Layers}
+        illustration={<svg data-testid="illus" />}
+        title="Aucune matière"
+      />,
+    )
+    // The provided illustration wins; the icon square is not rendered.
+    expect(container.querySelector('[data-testid="illus"]')).not.toBeNull()
+    // Only the illustration SVG is present (the Lucide icon square is gone).
+    expect(container.querySelectorAll('svg')).toHaveLength(1)
+  })
 })
