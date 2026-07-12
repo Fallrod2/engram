@@ -24,32 +24,30 @@ import { getCardGenerator, type CardGenerator } from '../ai/generator'
 const MAX_TOTAL_ITEMS = 100
 
 /** Fetch a raw generation row or throw 404. */
-export function requireGenerationRow(db: DB, id: string) {
-  const row = db.select().from(generation).where(eq(generation.id, id)).get()
+export async function requireGenerationRow(db: DB, id: string) {
+  const [row] = await db.select().from(generation).where(eq(generation.id, id))
   if (!row) throw new NotFoundError(`generation ${id} not found`)
   return row
 }
 
-export function listGenerations(db: DB, noteId?: string): ListGenerationsResponse {
-  const rows = db
+export async function listGenerations(db: DB, noteId?: string): Promise<ListGenerationsResponse> {
+  const rows = await db
     .select()
     .from(generation)
     .where(noteId ? eq(generation.noteId, noteId) : undefined)
     .orderBy(desc(generation.createdAt))
-    .all()
   return { generations: rows.map(generationToDto) }
 }
 
-export function getGeneration(db: DB, id: string): Generation {
-  return generationToDto(requireGenerationRow(db, id))
+export async function getGeneration(db: DB, id: string): Promise<Generation> {
+  return generationToDto(await requireGenerationRow(db, id))
 }
 
-export function deleteGeneration(db: DB, id: string): void {
-  const res = db
+export async function deleteGeneration(db: DB, id: string): Promise<void> {
+  const res = await db
     .delete(generation)
     .where(eq(generation.id, id))
     .returning({ id: generation.id })
-    .all()
   if (res.length === 0) throw new NotFoundError(`generation ${id} not found`)
 }
 
@@ -58,19 +56,19 @@ export function deleteGeneration(db: DB, id: string): void {
  * pending DTO. `generator` defaults to the active registry entry (real in prod,
  * fake in tests) so the fire-and-forget path never hits the real API in tests.
  */
-export function startGeneration(
+export async function startGeneration(
   db: DB,
   input: StartGeneration,
   generator: CardGenerator = getCardGenerator(),
-): Generation {
-  requireNoteRow(db, input.noteId)
+): Promise<Generation> {
+  await requireNoteRow(db, input.noteId)
   if (input.deckId !== undefined) {
-    const deckRow = requireDeckRow(db, input.deckId)
-    if (requireSubjectRow(db, deckRow.subjectId).archived) {
+    const deckRow = await requireDeckRow(db, input.deckId)
+    if ((await requireSubjectRow(db, deckRow.subjectId)).archived) {
       throw new ConflictError('cannot generate into a deck under an archived subject')
     }
   }
-  const row = db
+  const [row] = await db
     .insert(generation)
     .values({
       noteId: input.noteId,
@@ -81,13 +79,12 @@ export function startGeneration(
       // items defaults to [] via the schema $defaultFn
     })
     .returning()
-    .get()
 
   // Fire-and-forget: the server process stays alive, the promise runs on.
-  void runGenerationJob(db, row.id, generator).catch(() => {
+  void runGenerationJob(db, row!.id, generator).catch(() => {
     /* runGenerationJob already captures everything; this is a belt. */
   })
-  return generationToDto(row)
+  return generationToDto(row!)
 }
 
 /**
@@ -100,11 +97,11 @@ export async function runGenerationJob(
   genId: string,
   generator: CardGenerator = getCardGenerator(),
 ): Promise<void> {
-  const gen = db.select().from(generation).where(eq(generation.id, genId)).get()
+  const [gen] = await db.select().from(generation).where(eq(generation.id, genId))
   if (!gen || gen.status !== 'pending') return // idempotence: only ever replays pending
 
   try {
-    const note = requireNoteRow(db, gen.noteId)
+    const note = await requireNoteRow(db, gen.noteId)
     const chunks = chunkNote(note.content)
     const items: GenerationItem[] = []
     let promptTokens = 0
@@ -122,16 +119,16 @@ export async function runGenerationJob(
       }
     }
 
-    db.update(generation)
+    await db
+      .update(generation)
       .set({ status: 'succeeded', items, promptTokens, completionTokens })
       .where(eq(generation.id, genId))
-      .run()
   } catch (e) {
     const message = e instanceof Error ? e.message : 'generation failed'
-    db.update(generation)
+    await db
+      .update(generation)
       .set({ status: 'failed', error: message.slice(0, 1000) })
       .where(eq(generation.id, genId))
-      .run()
   }
 }
 
@@ -141,8 +138,12 @@ export async function runGenerationJob(
  * decision can re-insert, re-status, or delete them (that would destroy FSRS
  * history).
  */
-export function resolveGeneration(db: DB, id: string, input: ResolveGeneration): Generation {
-  const row = requireGenerationRow(db, id)
+export async function resolveGeneration(
+  db: DB,
+  id: string,
+  input: ResolveGeneration,
+): Promise<Generation> {
+  const row = await requireGenerationRow(db, id)
   if (row.status !== 'succeeded') {
     throw new ConflictError('generation not ready to resolve')
   }
@@ -171,13 +172,13 @@ export function resolveGeneration(db: DB, id: string, input: ResolveGeneration):
   const deckId = row.deckId
   if (needsDeck) {
     if (deckId === null) throw new ConflictError('generation has no target deck')
-    const deckRow = requireDeckRow(db, deckId)
-    if (requireSubjectRow(db, deckRow.subjectId).archived) {
+    const deckRow = await requireDeckRow(db, deckId)
+    if ((await requireSubjectRow(db, deckRow.subjectId)).archived) {
       throw new ConflictError('cannot insert cards into a deck under an archived subject')
     }
   }
 
-  const updated = db.transaction((tx) => {
+  const updated = await db.transaction(async (tx) => {
     for (const item of input.items) {
       const s = stored.get(item.id)
       const target = nextById.get(item.id)
@@ -192,7 +193,7 @@ export function resolveGeneration(db: DB, id: string, input: ResolveGeneration):
       }
       if (item.status === 'accepted' || item.status === 'edited') {
         // deckId is guaranteed non-null here (needsDeck validated above).
-        const cardId = insertFreshCardRow(tx, {
+        const cardId = await insertFreshCardRow(tx, {
           deckId: deckId as string,
           front: item.front,
           back: item.back,
@@ -206,7 +207,12 @@ export function resolveGeneration(db: DB, id: string, input: ResolveGeneration):
       // 'pending' in the input: leave pending, no insertion.
     }
 
-    return tx.update(generation).set({ items: next }).where(eq(generation.id, id)).returning().get()
+    const [saved] = await tx
+      .update(generation)
+      .set({ items: next })
+      .where(eq(generation.id, id))
+      .returning()
+    return saved!
   })
 
   return generationToDto(updated)

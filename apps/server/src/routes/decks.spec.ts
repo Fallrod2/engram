@@ -26,17 +26,17 @@ describe('decks routes', () => {
   })
 
   it('POST /api/decks under an archived subject → 409', async () => {
-    const s = seedSubject(db, { archived: true })
+    const s = await seedSubject(db, { archived: true })
     const res = await postJson('/api/decks', { subjectId: s.id, name: 'D' })
     expect(res.status).toBe(409)
   })
 
   it('PATCH /api/decks/:id ignores subjectId; invalid body → 400', async () => {
-    const s1 = seedSubject(db)
-    const s2 = seedSubject(db)
-    const d = seedDeck(db, s1.id)
+    const s1 = await seedSubject(db)
+    await seedSubject(db)
+    const d = await seedDeck(db, s1.id)
     // subjectId is stripped by the update schema, so it is a no-op, not a move.
-    const ok = await patchJson(`/api/decks/${d.id}`, { name: 'Renamed', subjectId: s2.id })
+    const ok = await patchJson(`/api/decks/${d.id}`, { name: 'Renamed', subjectId: 'other' })
     const body = deckSchema.parse(await ok.json())
     expect(body.name).toBe('Renamed')
     expect(body.subjectId).toBe(s1.id)
@@ -46,14 +46,14 @@ describe('decks routes', () => {
   })
 
   it('CRUD nominal + subjectId filter', async () => {
-    const s1 = seedSubject(db)
-    const s2 = seedSubject(db)
+    const s1 = await seedSubject(db)
+    const s2 = await seedSubject(db)
     const created = await postJson('/api/decks', { subjectId: s1.id, name: 'A' })
     expect(created.status).toBe(201)
     const d = deckSchema.parse(await created.json())
 
     expect((await app.request(`/api/decks/${d.id}`)).status).toBe(200)
-    seedDeck(db, s2.id)
+    await seedDeck(db, s2.id)
     const filtered = (await (
       await app.request(`/api/decks?subjectId=${s1.id}`)
     ).json()) as unknown[]

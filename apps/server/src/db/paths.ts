@@ -1,20 +1,12 @@
-import { fileURLToPath } from 'node:url'
-import { mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
+/** Default local Supabase Postgres URL (CLI default DB port). */
+export const DEFAULT_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 /**
- * Absolute path to the SQLite file (repo-root `data/engram.db`), overridable
- * via `ENGRAM_DB_PATH` (used by tests and tooling). Pure: no `bun:sqlite`
- * import, so it can be shared by `drizzle.config.ts` and the runtime client.
+ * The Postgres connection string, read from `DATABASE_URL`, falling back to the
+ * local Supabase stack. Pure: no driver import, so it can be shared by
+ * `drizzle.config.ts`, the runtime client, and the migrate/reset scripts.
  */
-export function resolveDbFilePath(): string {
-  const override = process.env.ENGRAM_DB_PATH
-  if (override) return override
-  // This file lives at apps/server/src/db/ → 4 hops up to the repo root.
-  return fileURLToPath(new URL('../../../../data/engram.db', import.meta.url))
-}
-
-/** Ensure the directory holding the SQLite file exists. */
-export function ensureDataDir(): void {
-  mkdirSync(dirname(resolveDbFilePath()), { recursive: true })
+export function resolveDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL
+  return url && url.length > 0 ? url : DEFAULT_DATABASE_URL
 }

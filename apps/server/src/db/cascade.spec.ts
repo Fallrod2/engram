@@ -7,11 +7,11 @@ import { fsrsCardToColumns, fsrsLogToRow, toFsrsCard } from './mappers'
 
 let t: TestDb
 
-beforeEach(() => {
-  t = createTestDb()
+beforeEach(async () => {
+  t = await createTestDb()
 })
-afterEach(() => {
-  t.cleanup()
+afterEach(async () => {
+  await t.cleanup()
 })
 
 describe('foreign-key cascade / set null (PRAGMA foreign_keys = ON)', () => {

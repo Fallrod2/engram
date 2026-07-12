@@ -18,8 +18,8 @@ import { requireDeckRow } from './decks.service'
 import { freshFsrsCard, previewAll } from './fsrs'
 
 /** Fetch a raw card row or throw 404. */
-export function requireCardRow(db: DB, id: string) {
-  const row = db.select().from(card).where(eq(card.id, id)).get()
+export async function requireCardRow(db: DB, id: string) {
+  const [row] = await db.select().from(card).where(eq(card.id, id))
   if (!row) throw new NotFoundError(`card ${id} not found`)
   return row
 }
@@ -30,22 +30,22 @@ export interface ListCardsFilter {
   offset: number
 }
 
-export function listCards(db: DB, f: ListCardsFilter): ListCardsResponse {
+export async function listCards(db: DB, f: ListCardsFilter): Promise<ListCardsResponse> {
   const where = f.deckId ? eq(card.deckId, f.deckId) : undefined
-  const total = db.select({ n: count() }).from(card).where(where).get()?.n ?? 0
-  const rows = db
+  const [totalRow] = await db.select({ n: count() }).from(card).where(where)
+  const total = totalRow?.n ?? 0
+  const rows = await db
     .select()
     .from(card)
     .where(where)
     .orderBy(asc(card.createdAt))
     .limit(f.limit)
     .offset(f.offset)
-    .all()
   return { total, cards: rows.map(cardToDto) }
 }
 
-export function getCard(db: DB, id: string): Card {
-  return cardToDto(requireCardRow(db, id))
+export async function getCard(db: DB, id: string): Promise<Card> {
+  return cardToDto(await requireCardRow(db, id))
 }
 
 /**
@@ -54,11 +54,11 @@ export function getCard(db: DB, id: string): Card {
  * handle so a caller can insert several cards atomically. Performs NO deck/subject
  * validation — the caller validates the deck first (once).
  */
-export function insertFreshCardRow(
+export async function insertFreshCardRow(
   dbOrTx: DB | Tx,
   values: { deckId: string; front: string; back: string },
-): string {
-  const row = dbOrTx
+): Promise<string> {
+  const [row] = await dbOrTx
     .insert(card)
     .values({
       deckId: values.deckId,
@@ -67,18 +67,17 @@ export function insertFreshCardRow(
       ...fsrsCardToColumns(freshFsrsCard(new Date())),
     })
     .returning()
-    .get()
-  return row.id
+  return row!.id
 }
 
-export function createCard(db: DB, input: CreateCard): Card {
+export async function createCard(db: DB, input: CreateCard): Promise<Card> {
   // 404 if the deck is missing; 409 if its subject is archived.
-  const deckRow = requireDeckRow(db, input.deckId)
-  const subjectRow = requireSubjectRow(db, deckRow.subjectId)
+  const deckRow = await requireDeckRow(db, input.deckId)
+  const subjectRow = await requireSubjectRow(db, deckRow.subjectId)
   if (subjectRow.archived) {
     throw new ConflictError('cannot create a card under an archived subject')
   }
-  const id = insertFreshCardRow(db, {
+  const id = await insertFreshCardRow(db, {
     deckId: input.deckId,
     front: input.front,
     back: input.back,
@@ -86,19 +85,19 @@ export function createCard(db: DB, input: CreateCard): Card {
   return getCard(db, id)
 }
 
-export function updateCard(db: DB, id: string, patch: UpdateCard): Card {
-  requireCardRow(db, id)
+export async function updateCard(db: DB, id: string, patch: UpdateCard): Promise<Card> {
+  await requireCardRow(db, id)
   const set = {
     ...(patch.front !== undefined ? { front: patch.front } : {}),
     ...(patch.back !== undefined ? { back: patch.back } : {}),
   }
   if (Object.keys(set).length === 0) return getCard(db, id) // empty body: no-op
-  const row = db.update(card).set(set).where(eq(card.id, id)).returning().get()
-  return cardToDto(row)
+  const [row] = await db.update(card).set(set).where(eq(card.id, id)).returning()
+  return cardToDto(row!)
 }
 
-export function deleteCard(db: DB, id: string): void {
-  const res = db.delete(card).where(eq(card.id, id)).returning({ id: card.id }).all()
+export async function deleteCard(db: DB, id: string): Promise<void> {
+  const res = await db.delete(card).where(eq(card.id, id)).returning({ id: card.id })
   if (res.length === 0) throw new NotFoundError(`card ${id} not found`)
 }
 
@@ -113,8 +112,8 @@ function toGradePreview(item: RecordLogItem): GradePreview {
 }
 
 /** Read-only projection of the 4 grades (never writes to the DB). */
-export function previewCard(db: DB, id: string, now: Date): ReviewPreview {
-  const row = requireCardRow(db, id)
+export async function previewCard(db: DB, id: string, now: Date): Promise<ReviewPreview> {
+  const row = await requireCardRow(db, id)
   const preview = previewAll(toFsrsCard(row), now)
   return {
     now: now.toISOString(),

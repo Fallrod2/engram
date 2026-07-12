@@ -12,7 +12,7 @@ import { dueCounts, dueQueue, type QueueFilter } from '../services/review-queue.
 
 export const reviewRouter = new Hono()
 
-reviewRouter.get('/queue', zValidator('query', reviewQueueQuerySchema), (c) => {
+reviewRouter.get('/queue', zValidator('query', reviewQueueQuerySchema), async (c) => {
   const q = c.req.valid('query')
   const now = q.now ? new Date(q.now) : new Date()
   const filter: QueueFilter = {
@@ -21,13 +21,13 @@ reviewRouter.get('/queue', zValidator('query', reviewQueueQuerySchema), (c) => {
     ...(q.deckId ? { deckId: q.deckId } : {}),
     ...(q.subjectId ? { subjectId: q.subjectId } : {}),
   }
-  const { total, cards } = dueQueue(db, filter)
+  const { total, cards } = await dueQueue(db, filter)
   return ok(c, reviewQueueResponseSchema, { now: now.toISOString(), total, cards })
 })
 
-reviewRouter.get('/counts', zValidator('query', reviewCountsQuerySchema), (c) => {
+reviewRouter.get('/counts', zValidator('query', reviewCountsQuerySchema), async (c) => {
   const { now: nowIso } = c.req.valid('query')
   const now = nowIso ? new Date(nowIso) : new Date()
-  const counts = dueCounts(db, now)
+  const counts = await dueCounts(db, now)
   return ok(c, dueCountsSchema, { now: now.toISOString(), ...counts })
 })

@@ -10,10 +10,10 @@ const NOW_ISO = new Date(2026, 6, 12, 10, 0).toISOString()
 
 describe('study-plan routes', () => {
   it('GET /api/study-plan?from&to → 200 contract-valid', async () => {
-    const s = seedSubject(db)
-    const d = seedDeck(db, s.id)
-    seedCard(db, d.id, { due: new Date(2026, 6, 12, 8, 0) })
-    seedExam(db, [s.id], { date: new Date(2026, 6, 15) })
+    const s = await seedSubject(db)
+    const d = await seedDeck(db, s.id)
+    await seedCard(db, d.id, { due: new Date(2026, 6, 12, 8, 0) })
+    await seedExam(db, [s.id], { date: new Date(2026, 6, 15) })
     const res = await app.request(
       `/api/study-plan?from=2026-07-12&to=2026-07-20&now=${encodeURIComponent(NOW_ISO)}`,
     )
@@ -45,10 +45,10 @@ describe('study-plan routes', () => {
   })
 
   it('GET ?subjectId= → 200 scope respected', async () => {
-    const s1 = seedSubject(db)
-    const s2 = seedSubject(db)
-    seedCard(db, seedDeck(db, s1.id).id, { due: new Date(2026, 6, 13, 8, 0) })
-    seedCard(db, seedDeck(db, s2.id).id, { due: new Date(2026, 6, 13, 8, 0) })
+    const s1 = await seedSubject(db)
+    const s2 = await seedSubject(db)
+    await seedCard(db, (await seedDeck(db, s1.id)).id, { due: new Date(2026, 6, 13, 8, 0) })
+    await seedCard(db, (await seedDeck(db, s2.id)).id, { due: new Date(2026, 6, 13, 8, 0) })
     const res = await app.request(
       `/api/study-plan?from=2026-07-12&to=2026-07-15&subjectId=${s1.id}&now=${encodeURIComponent(NOW_ISO)}`,
     )
@@ -59,8 +59,8 @@ describe('study-plan routes', () => {
   })
 
   it('GET /api/study-plan/today → 200 contract-valid', async () => {
-    const s = seedSubject(db)
-    seedCard(db, seedDeck(db, s.id).id, { due: new Date(2026, 6, 12, 8, 0) })
+    const s = await seedSubject(db)
+    await seedCard(db, (await seedDeck(db, s.id)).id, { due: new Date(2026, 6, 12, 8, 0) })
     const res = await app.request(`/api/study-plan/today?now=${encodeURIComponent(NOW_ISO)}`)
     expect(res.status).toBe(200)
     expect(studyTodayResponseSchema.safeParse(await res.json()).success).toBe(true)

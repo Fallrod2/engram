@@ -16,8 +16,12 @@ build/
 coverage/
 *.tsbuildinfo
 
-# local database (sqlite)
+# local database (legacy sqlite, kept ignored — no effect)
 data/
+
+# Supabase local stack artifacts (config.toml stays tracked)
+supabase/.branches
+supabase/.temp
 
 # env — never commit real secrets
 .env

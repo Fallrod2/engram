@@ -19,20 +19,20 @@ export interface ReviewInput {
 /**
  * Read the card, validate `reviewedAt`, play `FSRS.next`, then persist the card
  * update and the `review_log` insert in ONE transaction. `sched` is injectable
- * (default singleton) for deterministic tests / future replay. bun:sqlite is
- * synchronous, so the transaction callback is synchronous (never `await`).
+ * (default singleton) for deterministic tests / future replay. A thrown guard
+ * rolls the whole transaction back, so no `review_log` row survives a rejection.
  */
-export function reviewCard(
+export async function reviewCard(
   db: DB,
   cardId: string,
   input: ReviewInput,
   sched: FSRS = scheduler,
-): ReviewResult {
+): Promise<ReviewResult> {
   const now = new Date()
   const reviewedAt = input.reviewedAt ?? now
 
-  return db.transaction((tx) => {
-    const row = tx.select().from(card).where(eq(card.id, cardId)).get()
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(card).where(eq(card.id, cardId))
     if (!row) throw new NotFoundError(`card ${cardId} not found`)
 
     // Guards depend on row.lastReview, so they sit after the select but before
@@ -46,13 +46,13 @@ export function reviewCard(
 
     const rec = schedule(toFsrsCard(row), toGrade(input.grade), reviewedAt, sched)
 
-    tx.update(card).set(fsrsCardToColumns(rec.card)).where(eq(card.id, cardId)).run()
+    await tx.update(card).set(fsrsCardToColumns(rec.card)).where(eq(card.id, cardId))
 
     const logRow = fsrsLogToRow(cardId, rec.log, input.durationMs)
-    const insertedLog = tx.insert(reviewLog).values(logRow).returning().get()
+    const [insertedLog] = await tx.insert(reviewLog).values(logRow).returning()
 
-    const updatedCard = tx.select().from(card).where(eq(card.id, cardId)).get()
+    const [updatedCard] = await tx.select().from(card).where(eq(card.id, cardId))
     if (!updatedCard) throw new NotFoundError(`card ${cardId} not found`)
-    return { card: cardToDto(updatedCard), log: reviewLogToDto(insertedLog) }
+    return { card: cardToDto(updatedCard), log: reviewLogToDto(insertedLog!) }
   })
 }

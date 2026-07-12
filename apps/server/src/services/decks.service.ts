@@ -7,33 +7,32 @@ import { NotFoundError, ConflictError } from '../http/errors'
 import { requireSubjectRow } from './subjects.service'
 
 /** Fetch a raw deck row or throw 404. Exported for cross-service guards. */
-export function requireDeckRow(db: DB, id: string) {
-  const row = db.select().from(deck).where(eq(deck.id, id)).get()
+export async function requireDeckRow(db: DB, id: string) {
+  const [row] = await db.select().from(deck).where(eq(deck.id, id))
   if (!row) throw new NotFoundError(`deck ${id} not found`)
   return row
 }
 
-export function listDecks(db: DB, subjectId?: string): Deck[] {
-  const rows = db
+export async function listDecks(db: DB, subjectId?: string): Promise<Deck[]> {
+  const rows = await db
     .select()
     .from(deck)
     .where(subjectId ? eq(deck.subjectId, subjectId) : undefined)
     .orderBy(asc(deck.position), asc(deck.createdAt))
-    .all()
   return rows.map(deckToDto)
 }
 
-export function getDeck(db: DB, id: string): Deck {
-  return deckToDto(requireDeckRow(db, id))
+export async function getDeck(db: DB, id: string): Promise<Deck> {
+  return deckToDto(await requireDeckRow(db, id))
 }
 
-export function createDeck(db: DB, input: CreateDeck): Deck {
+export async function createDeck(db: DB, input: CreateDeck): Promise<Deck> {
   // 404 if the parent subject is missing; 409 if it is archived.
-  const subjectRow = requireSubjectRow(db, input.subjectId)
+  const subjectRow = await requireSubjectRow(db, input.subjectId)
   if (subjectRow.archived) {
     throw new ConflictError('cannot create a deck under an archived subject')
   }
-  const row = db
+  const [row] = await db
     .insert(deck)
     .values({
       subjectId: input.subjectId,
@@ -41,23 +40,22 @@ export function createDeck(db: DB, input: CreateDeck): Deck {
       ...(input.description !== undefined ? { description: input.description } : {}),
     })
     .returning()
-    .get()
-  return deckToDto(row)
+  return deckToDto(row!)
 }
 
-export function updateDeck(db: DB, id: string, patch: UpdateDeck): Deck {
-  requireDeckRow(db, id)
+export async function updateDeck(db: DB, id: string, patch: UpdateDeck): Promise<Deck> {
+  await requireDeckRow(db, id)
   const set = {
     ...(patch.name !== undefined ? { name: patch.name } : {}),
     ...(patch.description !== undefined ? { description: patch.description } : {}),
     ...(patch.position !== undefined ? { position: patch.position } : {}),
   }
   if (Object.keys(set).length === 0) return getDeck(db, id) // empty body: no-op
-  const row = db.update(deck).set(set).where(eq(deck.id, id)).returning().get()
-  return deckToDto(row)
+  const [row] = await db.update(deck).set(set).where(eq(deck.id, id)).returning()
+  return deckToDto(row!)
 }
 
-export function deleteDeck(db: DB, id: string): void {
-  const res = db.delete(deck).where(eq(deck.id, id)).returning({ id: deck.id }).all()
+export async function deleteDeck(db: DB, id: string): Promise<void> {
+  const res = await db.delete(deck).where(eq(deck.id, id)).returning({ id: deck.id })
   if (res.length === 0) throw new NotFoundError(`deck ${id} not found`)
 }

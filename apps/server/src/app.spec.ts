@@ -3,9 +3,9 @@ import { apiErrorSchema, healthResponseSchema } from '@engram/shared'
 import { app } from './app'
 
 /**
- * Transverse HTTP behaviour. Runs under bun:test (not vitest) because `app`
- * transitively imports the bun:sqlite client. The DB is provided by the
- * `db-preload` harness, though these cases need no seeded data.
+ * Transverse HTTP behaviour. Runs under bun:test (not vitest) because the DB
+ * client is swapped for an in-process PGlite database by the `db-preload`
+ * harness (via `mock.module`), though these cases need no seeded data.
  */
 describe('app transverse', () => {
   it('GET /api/health → contract-valid 200', async () => {

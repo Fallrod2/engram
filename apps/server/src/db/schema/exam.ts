@@ -1,18 +1,18 @@
-import { sqliteTable, text, integer, index, primaryKey } from 'drizzle-orm/sqlite-core'
+import { pgTable, text, timestamp, index, primaryKey } from 'drizzle-orm/pg-core'
 import { id, createdAt, updatedAt } from './columns'
 import { subject } from './subject'
 
 /**
- * A dated deadline. `date` stores an instant in epoch-ms, by convention set to
- * local midnight of the exam day (`new Date(y, mIdx, d)`); the countdown is
+ * A dated deadline. `date` stores an instant (timestamptz), by convention set
+ * to local midnight of the exam day (`new Date(y, mIdx, d)`); the countdown is
  * derived by comparing local calendar days, not by raw ms subtraction.
  */
-export const exam = sqliteTable(
+export const exam = pgTable(
   'exam',
   {
     id: id(),
     title: text('title').notNull(),
-    date: integer('date', { mode: 'timestamp_ms' }).notNull(),
+    date: timestamp('date', { withTimezone: true, mode: 'date' }).notNull(),
     notes: text('notes'), // nullable
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -21,7 +21,7 @@ export const exam = sqliteTable(
 )
 
 /** M2M junction between `exam` and `subject` (append-only). */
-export const examSubject = sqliteTable(
+export const examSubject = pgTable(
   'exam_subject',
   {
     examId: text('exam_id')

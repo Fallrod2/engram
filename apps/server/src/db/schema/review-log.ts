@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm'
-import { sqliteTable, text, integer, real, index, check } from 'drizzle-orm/sqlite-core'
+import {
+  pgTable,
+  text,
+  integer,
+  doublePrecision,
+  timestamp,
+  index,
+  check,
+} from 'drizzle-orm/pg-core'
 import { id, createdAt } from './columns'
 import { card } from './card'
 
@@ -13,7 +21,7 @@ import { card } from './card'
  * kept future-proof. The 1..4 business guarantee is enforced at the API edge
  * by `reviewCardSchema`. `duration_ms` NULL means "not measured" (≠ 0).
  */
-export const reviewLog = sqliteTable(
+export const reviewLog = pgTable(
   'review_log',
   {
     id: id(),
@@ -24,14 +32,14 @@ export const reviewLog = sqliteTable(
     // --- ts-fsrs 5.4.1 ReviewLog ---
     rating: integer('rating').notNull(), // Rating 0..4
     state: integer('state').notNull(), // State before the review
-    due: integer('due', { mode: 'timestamp_ms' }).notNull(), // scheduled
-    stability: real('stability').notNull(),
-    difficulty: real('difficulty').notNull(),
+    due: timestamp('due', { withTimezone: true, mode: 'date' }).notNull(), // scheduled
+    stability: doublePrecision('stability').notNull(),
+    difficulty: doublePrecision('difficulty').notNull(),
     elapsedDays: integer('elapsed_days').notNull(), // @deprecated
     lastElapsedDays: integer('last_elapsed_days').notNull(), // @deprecated
     scheduledDays: integer('scheduled_days').notNull(),
     learningSteps: integer('learning_steps').notNull(),
-    review: integer('review', { mode: 'timestamp_ms' }).notNull(), // actual
+    review: timestamp('review', { withTimezone: true, mode: 'date' }).notNull(), // actual
 
     // --- analytics extras ---
     durationMs: integer('duration_ms'), // nullable: NULL = not measured

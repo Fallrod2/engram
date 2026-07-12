@@ -22,13 +22,13 @@ const patchJson = (path: string, body: unknown) =>
     body: JSON.stringify(body),
   })
 
-function newDeck() {
-  return seedDeck(db, seedSubject(db).id).id
+async function newDeck() {
+  return (await seedDeck(db, (await seedSubject(db)).id)).id
 }
 
 describe('cards routes', () => {
   it('POST /api/cards seeds FSRS and strips client FSRS fields', async () => {
-    const deckId = newDeck()
+    const deckId = await newDeck()
     const res = await postJson('/api/cards', {
       deckId,
       front: 'f',
@@ -50,13 +50,13 @@ describe('cards routes', () => {
     expect((await postJson('/api/cards', { deckId: 'nope', front: 'f', back: 'b' })).status).toBe(
       404,
     )
-    const archivedDeck = seedDeck(db, seedSubject(db, { archived: true }).id)
+    const archivedDeck = await seedDeck(db, (await seedSubject(db, { archived: true })).id)
     const res = await postJson('/api/cards', { deckId: archivedDeck.id, front: 'f', back: 'b' })
     expect(res.status).toBe(409)
   })
 
   it('PATCH /api/cards/:id changes text, never FSRS state', async () => {
-    const c = seedCard(db, newDeck())
+    const c = await seedCard(db, await newDeck())
     const res = await patchJson(`/api/cards/${c.id}`, { front: 'new' })
     const dto = cardSchema.parse(await res.json())
     expect(dto.front).toBe('new')
@@ -65,8 +65,8 @@ describe('cards routes', () => {
   })
 
   it('GET /api/cards paginates with total; bad limit → 400', async () => {
-    const deckId = newDeck()
-    for (let i = 0; i < 3; i++) seedCard(db, deckId)
+    const deckId = await newDeck()
+    for (let i = 0; i < 3; i++) await seedCard(db, deckId)
     const res = await app.request(`/api/cards?deckId=${deckId}&limit=2&offset=0`)
     const body = listCardsResponseSchema.parse(await res.json())
     expect(body.total).toBe(3) // total ignores limit
@@ -76,16 +76,16 @@ describe('cards routes', () => {
   })
 
   it('DELETE /api/cards/:id cascades review_log', async () => {
-    const c = seedCard(db, newDeck())
-    reviewCard(db, c.id, { grade: 3 })
-    expect(db.select().from(reviewLog).all()).toHaveLength(1)
+    const c = await seedCard(db, await newDeck())
+    await reviewCard(db, c.id, { grade: 3 })
+    expect(await db.select().from(reviewLog)).toHaveLength(1)
     expect((await app.request(`/api/cards/${c.id}`, { method: 'DELETE' })).status).toBe(204)
-    expect(db.select().from(card).all()).toHaveLength(0)
-    expect(db.select().from(reviewLog).all()).toHaveLength(0)
+    expect(await db.select().from(card)).toHaveLength(0)
+    expect(await db.select().from(reviewLog)).toHaveLength(0)
   })
 
   it('GET /api/cards/:id/preview is ordered and read-only', async () => {
-    const c = seedCard(db, newDeck())
+    const c = await seedCard(db, await newDeck())
     const res = await app.request(`/api/cards/${c.id}/preview`)
     expect(res.status).toBe(200)
     const p = reviewPreviewSchema.parse(await res.json())
@@ -93,14 +93,14 @@ describe('cards routes', () => {
     expect(Date.parse(p.good.due)).toBeGreaterThanOrEqual(Date.parse(p.hard.due))
     expect(Date.parse(p.hard.due)).toBeGreaterThanOrEqual(Date.parse(p.again.due))
     // No DB write: the card is untouched.
-    const row = db.select().from(card).where(eq(card.id, c.id)).get()!
-    expect(row.reps).toBe(0)
-    expect(row.state).toBe(0)
+    const [row] = await db.select().from(card).where(eq(card.id, c.id))
+    expect(row!.reps).toBe(0)
+    expect(row!.state).toBe(0)
   })
 
   it('GET /api/cards/:id/preview: missing → 404, bad now → 400', async () => {
     expect((await app.request('/api/cards/nope/preview')).status).toBe(404)
-    const c = seedCard(db, newDeck())
+    const c = await seedCard(db, await newDeck())
     expect((await app.request(`/api/cards/${c.id}/preview?now=not-a-date`)).status).toBe(400)
   })
 })

@@ -5,28 +5,28 @@ import { fsrsCardToColumns } from '../db/mappers'
 import { localMidnight } from '../lib/day'
 
 /**
- * Shared seeding/reset helpers for the bun:sqlite integration specs. All
- * functions take an explicit `db` so they work both against a per-test
- * `createTestDb()` handle and against the singleton used by route specs.
+ * Shared async seeding/reset helpers for the integration specs. All functions
+ * take an explicit `db` so they work both against a per-test `createTestDb()`
+ * handle and against the singleton used by the route specs.
  */
 
 /** Delete every row (child tables first) so each test starts clean. */
-export function resetDb(db: DB): void {
-  db.delete(examSubject).run()
-  db.delete(exam).run()
-  db.delete(reviewLog).run()
-  db.delete(card).run()
-  db.delete(generation).run()
-  db.delete(note).run()
-  db.delete(deck).run()
-  db.delete(subject).run()
+export async function resetDb(db: DB): Promise<void> {
+  await db.delete(examSubject)
+  await db.delete(exam)
+  await db.delete(reviewLog)
+  await db.delete(card)
+  await db.delete(generation)
+  await db.delete(note)
+  await db.delete(deck)
+  await db.delete(subject)
 }
 
-export function seedSubject(
+export async function seedSubject(
   db: DB,
   o: { name?: string; color?: string; icon?: string; archived?: boolean; position?: number } = {},
 ) {
-  return db
+  const [row] = await db
     .insert(subject)
     .values({
       name: o.name ?? 'Subject',
@@ -36,15 +36,15 @@ export function seedSubject(
       ...(o.position !== undefined ? { position: o.position } : {}),
     })
     .returning()
-    .get()
+  return row!
 }
 
-export function seedDeck(
+export async function seedDeck(
   db: DB,
   subjectId: string,
   o: { name?: string; description?: string; position?: number } = {},
 ) {
-  return db
+  const [row] = await db
     .insert(deck)
     .values({
       subjectId,
@@ -53,16 +53,16 @@ export function seedDeck(
       ...(o.position !== undefined ? { position: o.position } : {}),
     })
     .returning()
-    .get()
+  return row!
 }
 
-export function seedCard(
+export async function seedCard(
   db: DB,
   deckId: string,
   o: { front?: string; back?: string; due?: Date } = {},
 ) {
   const cols = fsrsCardToColumns(createEmptyCard(new Date()))
-  return db
+  const [row] = await db
     .insert(card)
     .values({
       deckId,
@@ -72,7 +72,7 @@ export function seedCard(
       ...(o.due !== undefined ? { due: o.due } : {}),
     })
     .returning()
-    .get()
+  return row!
 }
 
 /**
@@ -81,13 +81,13 @@ export function seedCard(
  * analytics domain reads none of them). `durationMs` omitted → NULL column
  * (lets tests exercise the "not measured ≠ 0" contract).
  */
-export function seedReviewLog(
+export async function seedReviewLog(
   db: DB,
   cardId: string,
   o: { rating?: number; state?: number; review?: Date; durationMs?: number | null } = {},
 ) {
   const when = o.review ?? new Date()
-  return db
+  const [row] = await db
     .insert(reviewLog)
     .values({
       cardId,
@@ -104,16 +104,16 @@ export function seedReviewLog(
       ...(o.durationMs !== undefined ? { durationMs: o.durationMs } : {}),
     })
     .returning()
-    .get()
+  return row!
 }
 
-export function seedExam(
+export async function seedExam(
   db: DB,
   subjectIds: string[],
   o: { title?: string; date?: Date; notes?: string } = {},
 ) {
   const now = new Date()
-  const row = db
+  const [row] = await db
     .insert(exam)
     .values({
       title: o.title ?? 'Exam',
@@ -121,9 +121,8 @@ export function seedExam(
       ...(o.notes !== undefined ? { notes: o.notes } : {}),
     })
     .returning()
-    .get()
   for (const subjectId of [...new Set(subjectIds)]) {
-    db.insert(examSubject).values({ examId: row.id, subjectId }).run()
+    await db.insert(examSubject).values({ examId: row!.id, subjectId })
   }
-  return row
+  return row!
 }

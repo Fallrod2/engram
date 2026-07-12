@@ -84,7 +84,7 @@ describe('notes upload', () => {
   })
 
   it('POST /upload subjectId archived → 409 ; unknown → 404', async () => {
-    const archived = seedSubject(db, { archived: true })
+    const archived = await seedSubject(db, { archived: true })
     const mk = () => new File(['# ok\n\ntext'], 'a.md', { type: 'text/markdown' })
     expect((await upload(mk(), { subjectId: archived.id })).status).toBe(409)
     expect((await upload(mk(), { subjectId: 'nope' })).status).toBe(404)
@@ -111,7 +111,7 @@ describe('notes CRUD', () => {
   })
 
   it('GET /api/notes filters by subjectId ; GET /:id 404', async () => {
-    const s = seedSubject(db)
+    const s = await seedSubject(db)
     await postJson('/api/notes', { subjectId: s.id, title: 'a', sourceType: 'md', content: 'aaa' })
     await postJson('/api/notes', { title: 'b', sourceType: 'md', content: 'bbb' })
     const all = listNotesResponseSchema.parse(await (await app.request('/api/notes')).json())
@@ -128,7 +128,7 @@ describe('notes CRUD', () => {
     const created = noteSchema.parse(
       await (await postJson('/api/notes', { title: 'n', sourceType: 'md', content: 'ccc' })).json(),
     )
-    const s = seedSubject(db)
+    const s = await seedSubject(db)
     const patched = noteSchema.parse(
       await (await patchJson(`/api/notes/${created.id}`, { subjectId: s.id })).json(),
     )
@@ -141,12 +141,12 @@ describe('notes CRUD', () => {
     const created = noteSchema.parse(
       await (await postJson('/api/notes', { title: 'n', sourceType: 'md', content: 'ddd' })).json(),
     )
-    db.insert(generation)
+    await db
+      .insert(generation)
       .values({ noteId: created.id, kind: 'cards', model: 'claude-sonnet-4-6', status: 'pending' })
-      .run()
-    expect(db.select().from(generation).all()).toHaveLength(1)
+    expect(await db.select().from(generation)).toHaveLength(1)
     expect((await app.request(`/api/notes/${created.id}`, { method: 'DELETE' })).status).toBe(204)
-    expect(db.select().from(note).all()).toHaveLength(0)
-    expect(db.select().from(generation).all()).toHaveLength(0)
+    expect(await db.select().from(note)).toHaveLength(0)
+    expect(await db.select().from(generation)).toHaveLength(0)
   })
 })

@@ -34,8 +34,8 @@ describe('subjects routes', () => {
   })
 
   it('GET /api/subjects excludes archived by default, includes with flag', async () => {
-    seedSubject(db, { name: 'Active' })
-    seedSubject(db, { name: 'Old', archived: true })
+    await seedSubject(db, { name: 'Active' })
+    await seedSubject(db, { name: 'Old', archived: true })
     const def = (await (await app.request('/api/subjects')).json()) as unknown[]
     expect(def).toHaveLength(1)
     const all = (await (
@@ -51,7 +51,7 @@ describe('subjects routes', () => {
   })
 
   it('POST /api/subjects/:id/archive is idempotent', async () => {
-    const s = seedSubject(db)
+    const s = await seedSubject(db)
     const first = await postJson(`/api/subjects/${s.id}/archive`, {})
     expect(first.status).toBe(200)
     const second = await postJson(`/api/subjects/${s.id}/archive`, {})
@@ -60,14 +60,14 @@ describe('subjects routes', () => {
   })
 
   it('DELETE /api/subjects/:id cascades to decks/cards/logs', async () => {
-    const s = seedSubject(db)
-    const d = seedDeck(db, s.id)
-    seedCard(db, d.id)
+    const s = await seedSubject(db)
+    const d = await seedDeck(db, s.id)
+    await seedCard(db, d.id)
     const res = await app.request(`/api/subjects/${s.id}`, { method: 'DELETE' })
     expect(res.status).toBe(204)
-    expect(db.select().from(subject).all()).toHaveLength(0)
-    expect(db.select().from(deck).all()).toHaveLength(0)
-    expect(db.select().from(card).all()).toHaveLength(0)
-    expect(db.select().from(reviewLog).all()).toHaveLength(0)
+    expect(await db.select().from(subject)).toHaveLength(0)
+    expect(await db.select().from(deck)).toHaveLength(0)
+    expect(await db.select().from(card)).toHaveLength(0)
+    expect(await db.select().from(reviewLog)).toHaveLength(0)
   })
 })

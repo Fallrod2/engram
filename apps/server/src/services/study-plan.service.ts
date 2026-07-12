@@ -40,7 +40,7 @@ function ensureLoad(acc: DayAcc, subjectId: string): SubjectLoad {
 }
 
 /** Projected review load per local calendar day over `[from, to]` (inclusive). */
-export function studyPlan(db: DB, params: StudyPlanParams): StudyPlanResponse {
+export async function studyPlan(db: DB, params: StudyPlanParams): Promise<StudyPlanResponse> {
   const { from, to, now } = params
   // `from`/`to` are already zero-padded, so string comparison is chronological.
   if (from > to) throw new ValidationError('from must be <= to')
@@ -66,7 +66,7 @@ export function studyPlan(db: DB, params: StudyPlanParams): StudyPlanResponse {
   }
 
   // --- 1. Dues (single indexed range scan; overdue folded onto today) -------
-  const dueRows = db
+  const dueRows = await db
     .select({ due: card.due, subjectId: deck.subjectId })
     .from(card)
     .innerJoin(deck, eq(deck.id, card.deckId))
@@ -78,7 +78,6 @@ export function studyPlan(db: DB, params: StudyPlanParams): StudyPlanResponse {
         params.subjectId ? eq(deck.subjectId, params.subjectId) : undefined,
       ),
     )
-    .all()
 
   for (const row of dueRows) {
     const dueKey = localDayKey(row.due)
@@ -93,20 +92,18 @@ export function studyPlan(db: DB, params: StudyPlanParams): StudyPlanResponse {
 
   // --- 2. Exams in the window + ramp reach ----------------------------------
   const endExclusivePlusRamp = localMidnight(ty, tm - 1, td + 1 + EXAM_RAMP_DAYS)
-  const examRows = db
+  const examRows = await db
     .select()
     .from(exam)
     .where(and(gte(exam.date, fromMidnight), lt(exam.date, endExclusivePlusRamp)))
     .orderBy(asc(exam.date))
-    .all()
 
   if (examRows.length > 0) {
     const examIds = examRows.map((e) => e.id)
-    const links = db
+    const links = await db
       .select({ examId: examSubject.examId, subjectId: examSubject.subjectId })
       .from(examSubject)
       .where(inArray(examSubject.examId, examIds))
-      .all()
     const examSubjects = new Map<string, string[]>()
     for (const l of links) {
       const list = examSubjects.get(l.examId)
@@ -118,14 +115,13 @@ export function studyPlan(db: DB, params: StudyPlanParams): StudyPlanResponse {
     const allSubjectIds = [...new Set(links.map((l) => l.subjectId))]
     const scope = new Map<string, number>()
     if (allSubjectIds.length > 0) {
-      const scopeRows = db
+      const scopeRows = await db
         .select({ subjectId: deck.subjectId, n: count(card.id) })
         .from(card)
         .innerJoin(deck, eq(deck.id, card.deckId))
         .innerJoin(subject, eq(subject.id, deck.subjectId))
         .where(and(eq(subject.archived, false), inArray(deck.subjectId, allSubjectIds)))
         .groupBy(deck.subjectId)
-        .all()
       for (const r of scopeRows) scope.set(r.subjectId, r.n)
     }
 
@@ -192,17 +188,17 @@ export function studyPlan(db: DB, params: StudyPlanParams): StudyPlanResponse {
 }
 
 /** Prioritized "what to review today", crossing dues with exam proximity. */
-export function studyToday(db: DB, now: Date): StudyTodayResponse {
-  const counts = dueCounts(db, now)
+export async function studyToday(db: DB, now: Date): Promise<StudyTodayResponse> {
+  const counts = await dueCounts(db, now)
   const todayMidnight = localMidnight(now.getFullYear(), now.getMonth(), now.getDate())
   // Cards due strictly before local midnight today = the overdue backlog.
-  const overdueCount = dueCounts(db, new Date(todayMidnight.getTime() - 1)).total
+  const overdueCount = (await dueCounts(db, new Date(todayMidnight.getTime() - 1))).total
 
   // Next upcoming exam per subject, batched into ONE query (no N+1).
   const subjectIds = counts.bySubject.map((b) => b.subjectId)
   const nextExamBySubject = new Map<string, { examId: string; title: string; date: Date }>()
   if (subjectIds.length > 0) {
-    const rows = db
+    const rows = await db
       .select({
         subjectId: examSubject.subjectId,
         examId: exam.id,
@@ -213,7 +209,6 @@ export function studyToday(db: DB, now: Date): StudyTodayResponse {
       .innerJoin(examSubject, eq(examSubject.examId, exam.id))
       .where(and(inArray(examSubject.subjectId, subjectIds), gte(exam.date, todayMidnight)))
       .orderBy(asc(exam.date))
-      .all()
     for (const r of rows) {
       if (!nextExamBySubject.has(r.subjectId)) {
         nextExamBySubject.set(r.subjectId, { examId: r.examId, title: r.title, date: r.date })

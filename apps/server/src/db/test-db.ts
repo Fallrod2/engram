@@ -1,38 +1,35 @@
-import { Database } from 'bun:sqlite'
 import { fileURLToPath } from 'node:url'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import { PGlite } from '@electric-sql/pglite'
+import { drizzle } from 'drizzle-orm/pglite'
+import { migrate } from 'drizzle-orm/pglite/migrator'
 import * as schema from './schema'
+import type { DB } from './client'
 
 const migrationsFolder = fileURLToPath(new URL('../../drizzle', import.meta.url))
 
 export type TestDb = {
-  db: BunSQLiteDatabase<typeof schema>
-  /** Close the connection and delete the temp directory. */
-  cleanup: () => void
+  db: DB
+  /** The raw PGlite instance — the anti-N+1 spy hooks `client.query`. */
+  client: PGlite
+  /** Close the in-process database. */
+  cleanup: () => Promise<void>
 }
 
 /**
- * Build a fresh migrated SQLite database in a temp dir, with the same PRAGMAs
- * as the runtime client (foreign_keys ON is required for cascades). Used by the
- * integration tests so they never touch `data/engram.db`.
+ * Build a fresh migrated in-process PGlite database (Postgres compiled to WASM,
+ * zero daemon) so the integration specs never touch the real database. The
+ * drizzle handle is cast to the production `DB` type so service signatures
+ * accept it verbatim (the query-builder surface is identical across drivers).
  */
-export function createTestDb(): TestDb {
-  const dir = mkdtempSync(join(tmpdir(), 'engram-test-'))
-  const sqlite = new Database(join(dir, 'test.db'), { create: true })
-  sqlite.exec('PRAGMA journal_mode = WAL;')
-  sqlite.exec('PRAGMA foreign_keys = ON;')
-  sqlite.exec('PRAGMA busy_timeout = 5000;')
-  const db = drizzle(sqlite, { schema })
-  migrate(db, { migrationsFolder })
+export async function createTestDb(): Promise<TestDb> {
+  const client = new PGlite()
+  const db = drizzle(client, { schema })
+  await migrate(db, { migrationsFolder })
   return {
-    db,
-    cleanup: () => {
-      sqlite.close()
-      rmSync(dir, { recursive: true, force: true })
+    db: db as unknown as DB,
+    client,
+    cleanup: async () => {
+      await client.close()
     },
   }
 }

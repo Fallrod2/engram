@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { sqliteTable, text, index, check } from 'drizzle-orm/sqlite-core'
+import { pgTable, text, index, check } from 'drizzle-orm/pg-core'
 import { id, createdAt, updatedAt } from './columns'
 import { subject } from './subject'
 
@@ -8,7 +8,7 @@ import { subject } from './subject'
  * subject deletion: importing/extracting can happen before categorization,
  * and a note must survive its subject being removed.
  */
-export const note = sqliteTable(
+export const note = pgTable(
   'note',
   {
     id: id(),

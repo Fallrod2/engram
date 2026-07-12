@@ -1,7 +1,7 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core'
+import { pgTable, text, integer, boolean, index } from 'drizzle-orm/pg-core'
 import { id, createdAt, updatedAt } from './columns'
 
-export const subject = sqliteTable(
+export const subject = pgTable(
   'subject',
   {
     id: id(),
@@ -9,7 +9,7 @@ export const subject = sqliteTable(
     color: text('color').notNull(), // '#rrggbb' (validated by Zod)
     icon: text('icon').notNull(), // lucide icon id, e.g. 'book-open'
     position: integer('position').notNull().default(0),
-    archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+    archived: boolean('archived').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

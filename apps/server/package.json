@@ -8,8 +8,10 @@
     "start": "bun src/index.ts",
     "typecheck": "tsc --noEmit",
     "test:db": "bun test --preload ./src/test-support/db-preload.ts ./src/db/*.spec.ts ./src/services/*.spec.ts ./src/routes/*.spec.ts ./src/*.spec.ts",
+    "test:db:pg": "bun test ./src/db/postgres-driver.pgtest.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
+    "db:reset": "bun run src/db/reset.ts && bun run db:migrate",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
@@ -18,11 +20,13 @@
     "@hono/zod-validator": "0.4.3",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.6.14",
+    "postgres": "^3.4.9",
     "ts-fsrs": "^5.4.1",
     "unpdf": "^1.6.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/bun": "^1.1.14",
     "drizzle-kit": "^0.31.10"
   }
