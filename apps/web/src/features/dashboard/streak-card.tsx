@@ -1,7 +1,7 @@
 import { Flame } from 'lucide-react'
 import type { StreaksResponse } from '@engram/shared'
 import { cn } from '@/lib/utils'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 
 /**
  * Streak block of the dashboard rail (spec §5.3.B). Calm resting state only —
@@ -10,6 +10,7 @@ import { useT } from '@/lib/i18n'
  */
 export function StreakCard({ streaks }: { streaks: StreaksResponse }) {
   const t = useT()
+  const plural = usePlural()
   const active = streaks.current > 0
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border bg-surface-1 p-4">
@@ -26,11 +27,7 @@ export function StreakCard({ streaks }: { streaks: StreaksResponse }) {
             {streaks.current}
           </span>
           <span className="text-sm text-text-muted">
-            {t(
-              streaks.current > 1
-                ? 'dashboard.streak.daysStreak_other'
-                : 'dashboard.streak.daysStreak_one',
-            )}
+            {t(`dashboard.streak.daysStreak_${plural(streaks.current)}`)}
           </span>
         </span>
       </div>

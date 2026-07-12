@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { HeatmapResponse } from '@engram/shared'
 import { addDays, localDayKey } from '@/lib/calendar'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { heatLevel, HEAT_BG_CLASS } from '@/features/analytics/heat-scale'
 
@@ -16,6 +16,7 @@ const DAYS = 14
  */
 export function RecentActivity({ heatmap, now }: { heatmap: HeatmapResponse; now: Date }) {
   const t = useT()
+  const plural = usePlural()
   const cells = useMemo(() => {
     const byDate = new Map(heatmap.days.map((d) => [d.date, d.count]))
     const out: { date: string; count: number }[] = []
@@ -53,22 +54,17 @@ export function RecentActivity({ heatmap, now }: { heatmap: HeatmapResponse; now
             </TooltipTrigger>
             <TooltipContent>
               <span className="font-mono text-2xs tabular-nums">
-                {t(
-                  c.count > 1
-                    ? 'dashboard.activity.tooltip_other'
-                    : 'dashboard.activity.tooltip_one',
-                  {
-                    date: c.date,
-                    count: c.count,
-                  },
-                )}
+                {t(`dashboard.activity.tooltip_${plural(c.count)}`, {
+                  date: c.date,
+                  count: c.count,
+                })}
               </span>
             </TooltipContent>
           </Tooltip>
         ))}
       </div>
       <p className="font-mono text-xs tabular-nums text-text-faint">
-        {t(total > 1 ? 'dashboard.activity.summary_other' : 'dashboard.activity.summary_one', {
+        {t(`dashboard.activity.summary_${plural(total)}`, {
           total,
           active: activeDays,
           days: DAYS,

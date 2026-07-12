@@ -2,7 +2,7 @@ import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { RATINGS } from './labels'
 import type { SessionSummary as Summary } from './summary'
 import { formatDurationClock, formatSeconds } from './interval-format'
@@ -38,6 +38,7 @@ export function SessionSummary({
   onReviewAgain: () => void
 }) {
   const t = useT()
+  const plural = usePlural()
   const { viewed, byGrade, totalMs, avgMs, successRate } = summary
 
   return (
@@ -50,7 +51,7 @@ export function SessionSummary({
           {viewed}
         </p>
         <p className="text-sm text-text-muted">
-          {t(viewed > 1 ? 'session.summary.cardsViewed_other' : 'session.summary.cardsViewed_one')}
+          {t(`session.summary.cardsViewed_${plural(viewed)}`)}
         </p>
       </div>
 
