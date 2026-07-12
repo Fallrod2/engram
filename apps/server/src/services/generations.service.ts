@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { desc, eq } from 'drizzle-orm'
+import { waitUntil } from '@vercel/functions'
 import type {
   Generation,
   GenerationItem,
@@ -80,10 +81,16 @@ export async function startGeneration(
     })
     .returning()
 
-  // Fire-and-forget: the server process stays alive, the promise runs on.
-  void runGenerationJob(db, row!.id, generator).catch(() => {
+  // Fire-and-forget. Locally the long-lived Bun process keeps running until the
+  // promise settles. On Vercel the serverless function is frozen the instant the
+  // response is returned, so any work started after that never runs — register the
+  // promise with `waitUntil` to keep the invocation alive until the job completes.
+  // The env guard means the local/test behaviour is byte-for-byte unchanged:
+  // `waitUntil` is only ever invoked inside a real Vercel request context.
+  const job = runGenerationJob(db, row!.id, generator).catch(() => {
     /* runGenerationJob already captures everything; this is a belt. */
   })
+  if (process.env.VERCEL === '1') waitUntil(job)
   return generationToDto(row!)
 }
 
