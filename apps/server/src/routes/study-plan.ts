@@ -12,13 +12,13 @@ import { studyPlan, studyToday } from '../services/study-plan.service'
 
 export const studyPlanRouter = new Hono()
 
-studyPlanRouter.get('/', zValidator('query', studyPlanQuerySchema), (c) => {
+studyPlanRouter.get('/', zValidator('query', studyPlanQuerySchema), async (c) => {
   const q = c.req.valid('query')
   const now = q.now ? new Date(q.now) : new Date()
   return ok(
     c,
     studyPlanResponseSchema,
-    studyPlan(db, {
+    await studyPlan(db, {
       from: q.from,
       to: q.to,
       now,
@@ -27,8 +27,8 @@ studyPlanRouter.get('/', zValidator('query', studyPlanQuerySchema), (c) => {
   )
 })
 
-studyPlanRouter.get('/today', zValidator('query', studyTodayQuerySchema), (c) => {
+studyPlanRouter.get('/today', zValidator('query', studyTodayQuerySchema), async (c) => {
   const q = c.req.valid('query')
   const now = q.now ? new Date(q.now) : new Date()
-  return ok(c, studyTodayResponseSchema, studyToday(db, now))
+  return ok(c, studyTodayResponseSchema, await studyToday(db, now))
 })

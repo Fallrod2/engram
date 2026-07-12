@@ -21,37 +21,41 @@ import {
 
 export const subjectsRouter = new Hono()
 
-subjectsRouter.get('/', zValidator('query', listSubjectsQuerySchema), (c) => {
+subjectsRouter.get('/', zValidator('query', listSubjectsQuerySchema), async (c) => {
   const { includeArchived } = c.req.valid('query')
-  return ok(c, z.array(subjectSchema), listSubjects(db, includeArchived ?? false))
+  return ok(c, z.array(subjectSchema), await listSubjects(db, includeArchived ?? false))
 })
 
-subjectsRouter.post('/', zValidator('json', createSubjectSchema), (c) => {
-  return ok(c, subjectSchema, createSubject(db, c.req.valid('json')), 201)
+subjectsRouter.post('/', zValidator('json', createSubjectSchema), async (c) => {
+  return ok(c, subjectSchema, await createSubject(db, c.req.valid('json')), 201)
 })
 
-subjectsRouter.get('/:id', zValidator('param', idParamSchema), (c) => {
-  return ok(c, subjectSchema, getSubject(db, c.req.valid('param').id))
+subjectsRouter.get('/:id', zValidator('param', idParamSchema), async (c) => {
+  return ok(c, subjectSchema, await getSubject(db, c.req.valid('param').id))
 })
 
 subjectsRouter.patch(
   '/:id',
   zValidator('param', idParamSchema),
   zValidator('json', updateSubjectSchema),
-  (c) => {
-    return ok(c, subjectSchema, updateSubject(db, c.req.valid('param').id, c.req.valid('json')))
+  async (c) => {
+    return ok(
+      c,
+      subjectSchema,
+      await updateSubject(db, c.req.valid('param').id, c.req.valid('json')),
+    )
   },
 )
 
-subjectsRouter.post('/:id/archive', zValidator('param', idParamSchema), (c) => {
-  return ok(c, subjectSchema, setSubjectArchived(db, c.req.valid('param').id, true))
+subjectsRouter.post('/:id/archive', zValidator('param', idParamSchema), async (c) => {
+  return ok(c, subjectSchema, await setSubjectArchived(db, c.req.valid('param').id, true))
 })
 
-subjectsRouter.post('/:id/unarchive', zValidator('param', idParamSchema), (c) => {
-  return ok(c, subjectSchema, setSubjectArchived(db, c.req.valid('param').id, false))
+subjectsRouter.post('/:id/unarchive', zValidator('param', idParamSchema), async (c) => {
+  return ok(c, subjectSchema, await setSubjectArchived(db, c.req.valid('param').id, false))
 })
 
-subjectsRouter.delete('/:id', zValidator('param', idParamSchema), (c) => {
-  deleteSubject(db, c.req.valid('param').id)
+subjectsRouter.delete('/:id', zValidator('param', idParamSchema), async (c) => {
+  await deleteSubject(db, c.req.valid('param').id)
   return c.body(null, 204)
 })

@@ -14,28 +14,28 @@ import { createDeck, deleteDeck, getDeck, listDecks, updateDeck } from '../servi
 
 export const decksRouter = new Hono()
 
-decksRouter.get('/', zValidator('query', listDecksQuerySchema), (c) => {
-  return ok(c, z.array(deckSchema), listDecks(db, c.req.valid('query').subjectId))
+decksRouter.get('/', zValidator('query', listDecksQuerySchema), async (c) => {
+  return ok(c, z.array(deckSchema), await listDecks(db, c.req.valid('query').subjectId))
 })
 
-decksRouter.post('/', zValidator('json', createDeckSchema), (c) => {
-  return ok(c, deckSchema, createDeck(db, c.req.valid('json')), 201)
+decksRouter.post('/', zValidator('json', createDeckSchema), async (c) => {
+  return ok(c, deckSchema, await createDeck(db, c.req.valid('json')), 201)
 })
 
-decksRouter.get('/:id', zValidator('param', idParamSchema), (c) => {
-  return ok(c, deckSchema, getDeck(db, c.req.valid('param').id))
+decksRouter.get('/:id', zValidator('param', idParamSchema), async (c) => {
+  return ok(c, deckSchema, await getDeck(db, c.req.valid('param').id))
 })
 
 decksRouter.patch(
   '/:id',
   zValidator('param', idParamSchema),
   zValidator('json', updateDeckSchema),
-  (c) => {
-    return ok(c, deckSchema, updateDeck(db, c.req.valid('param').id, c.req.valid('json')))
+  async (c) => {
+    return ok(c, deckSchema, await updateDeck(db, c.req.valid('param').id, c.req.valid('json')))
   },
 )
 
-decksRouter.delete('/:id', zValidator('param', idParamSchema), (c) => {
-  deleteDeck(db, c.req.valid('param').id)
+decksRouter.delete('/:id', zValidator('param', idParamSchema), async (c) => {
+  await deleteDeck(db, c.req.valid('param').id)
   return c.body(null, 204)
 })
