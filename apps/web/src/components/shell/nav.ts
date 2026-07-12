@@ -1,4 +1,11 @@
-import { CalendarDays, ChartColumn, GraduationCap, Layers, LayoutDashboard } from 'lucide-react'
+import {
+  CalendarDays,
+  ChartColumn,
+  GraduationCap,
+  Layers,
+  LayoutDashboard,
+  Upload,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -38,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Planning', to: '/planning', icon: CalendarDays },
       { label: 'Analytics', to: '/analytics', icon: ChartColumn },
+      { label: 'Import', to: '/import', icon: Upload },
     ],
   },
 ]

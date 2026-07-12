@@ -23,6 +23,17 @@ export const qk = {
   dueCounts: {
     all: ['due-counts'] as const,
   },
+  notes: {
+    all: ['notes'] as const,
+    // `subjectId` absent → every note; `null` → only the "Sans matière" group.
+    list: (opts: { subjectId?: string | null }) => ['notes', 'list', opts] as const,
+    detail: (noteId: string) => ['notes', 'detail', noteId] as const,
+  },
+  generations: {
+    all: ['generations'] as const,
+    listByNote: (noteId: string) => ['generations', 'list', { noteId }] as const,
+    detail: (generationId: string) => ['generations', 'detail', generationId] as const,
+  },
   review: {
     /**
      * Frozen queue (spec §13.1). `now` (the session's frozen `sessionNow`)
