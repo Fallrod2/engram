@@ -221,10 +221,14 @@ function ProposalEditor({
 
   function onKeyDown(e: React.KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      // stopPropagation so the same ⌘↵ can't also reach the board's window
+      // hotkey and open the insertion confirm — the keystroke stays local.
       e.preventDefault()
+      e.stopPropagation()
       save()
     } else if (e.key === 'Escape') {
       e.preventDefault()
+      e.stopPropagation()
       onCancel()
     }
   }
