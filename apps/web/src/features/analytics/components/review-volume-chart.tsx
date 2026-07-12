@@ -86,6 +86,7 @@ export function ReviewVolumeChart({
         <ChartLegend items={legendItems} />
         <ResponsiveContainer width="100%" height={HEIGHT} className="mt-2">
           <BarChart
+            accessibilityLayer
             data={buckets}
             margin={{ top: 4, right: 8, bottom: 0, left: -8 }}
             barCategoryGap="15%"
@@ -122,7 +123,7 @@ export function ReviewVolumeChart({
                 maxBarSize={24}
                 isAnimationActive={!reduce}
                 animationDuration={180}
-                radius={i === SERIES.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                radius={i === SERIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
               />
             ))}
           </BarChart>

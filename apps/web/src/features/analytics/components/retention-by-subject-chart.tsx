@@ -103,6 +103,7 @@ export function RetentionBySubjectChart({
       <div>
         <ResponsiveContainer width="100%" height={rated.length * ROW_H + 28}>
           <BarChart
+            accessibilityLayer
             data={rated}
             layout="vertical"
             margin={{ top: 0, right: 44, bottom: 4, left: 0 }}

@@ -78,7 +78,11 @@ export function StudyTimeChart({
   } else {
     body = (
       <ResponsiveContainer width="100%" height={HEIGHT}>
-        <AreaChart data={buckets} margin={{ top: 8, right: 12, bottom: 0, left: -4 }}>
+        <AreaChart
+          accessibilityLayer
+          data={buckets}
+          margin={{ top: 8, right: 12, bottom: 0, left: -4 }}
+        >
           <CartesianGrid stroke={chartInk.grid} vertical={false} />
           <XAxis
             dataKey="date"

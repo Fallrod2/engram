@@ -121,7 +121,12 @@ export function ActivityHeatmap({
     const w = Math.floor(offset / 7)
     const d = ((offset % 7) + 7) % 7
     const count = countByKey.get(key) ?? 0
-    return { left: w * PITCH + CELL / 2, top: d * PITCH, count, key }
+    // The scroller uses overflow-x:auto, which per the CSS overflow spec forces
+    // overflow-y to compute to `auto` too — so a tooltip popped ABOVE a top-row
+    // cell gets its top edge clipped. The top two rows (Lun/Mar) have no room
+    // above the month-label band, so flip their tooltip to render below the cell.
+    const below = d <= 1
+    return { left: w * PITCH + CELL / 2, top: d * PITCH, count, key, below }
   }
 
   return (
@@ -199,9 +204,16 @@ export function ActivityHeatmap({
 
               {tip && (
                 <div
-                  className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-border bg-surface-3 px-2 py-1 shadow-md"
-                  style={{ left: tip.left, top: tip.top - 6 }}
+                  className={cn(
+                    'pointer-events-none absolute z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-surface-3 px-2 py-1 shadow-md',
+                    tip.below ? 'translate-y-0' : '-translate-y-full',
+                  )}
+                  style={{ left: tip.left, top: tip.below ? tip.top + CELL + 6 : tip.top - 6 }}
                 >
+                  {/* Count only: the shipped `heatmapResponseSchema` (packages/shared,
+                      the sole source of API types) carries `count` per day but no
+                      `studyMs`, so the spec §4 "X reviews · Y min" format isn't
+                      available here. The twin HeatmapTable is the exhaustive channel. */}
                   <div className="font-mono text-xs tabular-nums text-text">
                     {tip.count} review{tip.count > 1 ? 's' : ''}
                   </div>

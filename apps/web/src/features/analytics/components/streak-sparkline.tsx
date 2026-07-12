@@ -11,7 +11,7 @@ export function StreakSparkline({ data, reduce }: { data: number[]; reduce: bool
   const lastIndex = points.length - 1
   return (
     <ResponsiveContainer width="100%" height={28}>
-      <LineChart data={points} margin={{ top: 3, right: 3, bottom: 0, left: 0 }}>
+      <LineChart accessibilityLayer data={points} margin={{ top: 3, right: 3, bottom: 0, left: 0 }}>
         <Line
           dataKey="v"
           stroke={chartInk.faint}
