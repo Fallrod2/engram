@@ -9,8 +9,12 @@
  * mounts a `useHotkeys` MUST appear in `CONTEXT_KEYS` (garde-fou §3.4.1), so the
  * help never silently omits a screen's shortcuts.
  *
- * This module is pure (no React, no icons) so it is trivially unit-testable.
+ * This module is pure (no React, no icons — only a type-only i18n import, erased
+ * at runtime) so it is trivially unit-testable. Labels are i18n keys resolved by
+ * the `ShortcutsDialog` with `t(...)` (spec §9.4).
  */
+
+import type { TKey } from '@/lib/i18n'
 
 export type KeyGroup =
   | 'global'
@@ -27,7 +31,8 @@ export type KeyGroup =
 export interface KeyBinding {
   /** Space-separated key tokens, each rendered as one `<Kbd>` (e.g. `'G D'`). */
   keys: string
-  label: string
+  /** i18n key, resolved with `t(...)` in the `ShortcutsDialog`. */
+  label: TKey
   group: KeyGroup
 }
 
@@ -41,16 +46,17 @@ export interface NavChord {
   /** The second key of the chord (lowercase, single letter). */
   key: string
   to: string
-  label: string
+  /** i18n key, resolved with `t(...)` in the `ShortcutsDialog`. */
+  label: TKey
 }
 
 export const NAV_CHORDS: readonly NavChord[] = [
-  { key: 'd', to: '/', label: 'Aller à Aujourd’hui' },
-  { key: 'r', to: '/review', label: 'Aller à la Session' },
-  { key: 's', to: '/subjects', label: 'Aller aux Matières' },
-  { key: 'p', to: '/planning', label: 'Aller au Planning' },
-  { key: 'a', to: '/analytics', label: 'Aller aux Analytics' },
-  { key: 'i', to: '/import', label: 'Aller à l’Import' },
+  { key: 'd', to: '/', label: 'shortcuts.chords.today' },
+  { key: 'r', to: '/review', label: 'shortcuts.chords.session' },
+  { key: 's', to: '/subjects', label: 'shortcuts.chords.subjects' },
+  { key: 'p', to: '/planning', label: 'shortcuts.chords.planning' },
+  { key: 'a', to: '/analytics', label: 'shortcuts.chords.analytics' },
+  { key: 'i', to: '/import', label: 'shortcuts.chords.import' },
 ]
 
 /** Display form of a chord, e.g. `'d'` → `'G D'`. */
@@ -66,9 +72,9 @@ export function navChordFor(to: string): string | undefined {
 
 /** Non-nav global shortcuts (always active outside a field/session/modal). */
 export const GLOBAL_KEYS: readonly KeyBinding[] = [
-  { keys: '⌘K', label: 'Palette de commandes', group: 'global' },
-  { keys: '?', label: 'Afficher les raccourcis', group: 'global' },
-  { keys: '[', label: 'Réduire / déployer la barre', group: 'global' },
+  { keys: '⌘K', label: 'shortcuts.global.palette', group: 'global' },
+  { keys: '?', label: 'shortcuts.global.showShortcuts', group: 'global' },
+  { keys: '[', label: 'shortcuts.global.toggleSidebar', group: 'global' },
 ]
 
 /** Navigation chords, in display form, for the help dialog. */
@@ -90,16 +96,16 @@ export type ContextId = Extract<
   | 'session'
 >
 
-/** Human label for the "current screen" help section. */
-export const CONTEXT_LABELS: Record<ContextId, string> = {
-  'subjects.index': 'Matières',
-  'subjects.detail': 'Matière — decks',
-  'deck.cards': 'Deck — cartes',
-  'import.index': 'Import',
-  'import.note': 'Note importée',
-  'import.generation': 'Révision des cartes générées',
-  planning: 'Planning',
-  session: 'Session de révision',
+/** i18n key for the "current screen" help section label. */
+export const CONTEXT_LABELS: Record<ContextId, TKey> = {
+  'subjects.index': 'shortcuts.contextLabels.subjectsIndex',
+  'subjects.detail': 'shortcuts.contextLabels.subjectsDetail',
+  'deck.cards': 'shortcuts.contextLabels.deckCards',
+  'import.index': 'shortcuts.contextLabels.importIndex',
+  'import.note': 'shortcuts.contextLabels.importNote',
+  'import.generation': 'shortcuts.contextLabels.importGeneration',
+  planning: 'shortcuts.contextLabels.planning',
+  session: 'shortcuts.contextLabels.session',
 }
 
 /**
@@ -109,63 +115,63 @@ export const CONTEXT_LABELS: Record<ContextId, string> = {
  */
 export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
   'subjects.index': [
-    { keys: 'N', label: 'Nouvelle matière', group: 'subjects.index' },
-    { keys: '/', label: 'Filtrer', group: 'subjects.index' },
-    { keys: 'E', label: 'Éditer la matière', group: 'subjects.index' },
-    { keys: 'A', label: 'Archiver / désarchiver', group: 'subjects.index' },
-    { keys: 'X', label: 'Supprimer', group: 'subjects.index' },
-    { keys: 'J K', label: 'Naviguer dans la liste', group: 'subjects.index' },
-    { keys: 'Entrée', label: 'Ouvrir', group: 'subjects.index' },
+    { keys: 'N', label: 'shortcuts.keys.newSubject', group: 'subjects.index' },
+    { keys: '/', label: 'shortcuts.keys.filter', group: 'subjects.index' },
+    { keys: 'E', label: 'shortcuts.keys.editSubject', group: 'subjects.index' },
+    { keys: 'A', label: 'shortcuts.keys.archive', group: 'subjects.index' },
+    { keys: 'X', label: 'shortcuts.keys.delete', group: 'subjects.index' },
+    { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'subjects.index' },
+    { keys: 'Entrée', label: 'shortcuts.keys.open', group: 'subjects.index' },
   ],
   'subjects.detail': [
-    { keys: 'N', label: 'Nouveau deck', group: 'subjects.detail' },
-    { keys: 'E', label: 'Éditer le deck', group: 'subjects.detail' },
-    { keys: 'X', label: 'Supprimer le deck', group: 'subjects.detail' },
-    { keys: 'J K', label: 'Naviguer dans la liste', group: 'subjects.detail' },
-    { keys: 'Entrée', label: 'Ouvrir', group: 'subjects.detail' },
+    { keys: 'N', label: 'shortcuts.keys.newDeck', group: 'subjects.detail' },
+    { keys: 'E', label: 'shortcuts.keys.editDeck', group: 'subjects.detail' },
+    { keys: 'X', label: 'shortcuts.keys.deleteDeck', group: 'subjects.detail' },
+    { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'subjects.detail' },
+    { keys: 'Entrée', label: 'shortcuts.keys.open', group: 'subjects.detail' },
   ],
   'deck.cards': [
-    { keys: 'N', label: 'Nouvelle carte', group: 'deck.cards' },
-    { keys: 'C', label: 'Composer une carte', group: 'deck.cards' },
-    { keys: 'E', label: 'Éditer la carte', group: 'deck.cards' },
-    { keys: 'X', label: 'Supprimer la carte', group: 'deck.cards' },
-    { keys: 'J K', label: 'Naviguer dans la liste', group: 'deck.cards' },
-    { keys: 'Entrée', label: 'Ouvrir', group: 'deck.cards' },
+    { keys: 'N', label: 'shortcuts.keys.newCard', group: 'deck.cards' },
+    { keys: 'C', label: 'shortcuts.keys.composeCard', group: 'deck.cards' },
+    { keys: 'E', label: 'shortcuts.keys.editCard', group: 'deck.cards' },
+    { keys: 'X', label: 'shortcuts.keys.deleteCard', group: 'deck.cards' },
+    { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'deck.cards' },
+    { keys: 'Entrée', label: 'shortcuts.keys.open', group: 'deck.cards' },
   ],
   'import.index': [
-    { keys: 'E', label: 'Éditer la note', group: 'import.index' },
-    { keys: 'X', label: 'Supprimer la note', group: 'import.index' },
-    { keys: 'J K', label: 'Naviguer dans la liste', group: 'import.index' },
-    { keys: 'Entrée', label: 'Ouvrir la note', group: 'import.index' },
+    { keys: 'E', label: 'shortcuts.keys.editNote', group: 'import.index' },
+    { keys: 'X', label: 'shortcuts.keys.deleteNote', group: 'import.index' },
+    { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'import.index' },
+    { keys: 'Entrée', label: 'shortcuts.keys.openNote', group: 'import.index' },
   ],
   'import.note': [
-    { keys: 'E', label: 'Éditer la note', group: 'import.note' },
-    { keys: 'X', label: 'Supprimer la note', group: 'import.note' },
-    { keys: 'G', label: 'Aller au deck cible', group: 'import.note' },
+    { keys: 'E', label: 'shortcuts.keys.editNote', group: 'import.note' },
+    { keys: 'X', label: 'shortcuts.keys.deleteNote', group: 'import.note' },
+    { keys: 'G', label: 'shortcuts.keys.gotoDeck', group: 'import.note' },
   ],
   'import.generation': [
-    { keys: 'A', label: 'Accepter la carte', group: 'import.generation' },
-    { keys: '⇧ A', label: 'Accepter toutes les cartes', group: 'import.generation' },
-    { keys: 'R', label: 'Rejeter la carte', group: 'import.generation' },
-    { keys: 'E', label: 'Éditer la carte', group: 'import.generation' },
-    { keys: 'U', label: 'Annuler la décision', group: 'import.generation' },
-    { keys: 'J K', label: 'Naviguer carte par carte', group: 'import.generation' },
-    { keys: '⌘ Entrée', label: 'Insérer les cartes retenues', group: 'import.generation' },
+    { keys: 'A', label: 'shortcuts.keys.acceptCard', group: 'import.generation' },
+    { keys: '⇧ A', label: 'shortcuts.keys.acceptAll', group: 'import.generation' },
+    { keys: 'R', label: 'shortcuts.keys.rejectCard', group: 'import.generation' },
+    { keys: 'E', label: 'shortcuts.keys.editCard', group: 'import.generation' },
+    { keys: 'U', label: 'shortcuts.keys.undoDecision', group: 'import.generation' },
+    { keys: 'J K', label: 'shortcuts.keys.cardByCard', group: 'import.generation' },
+    { keys: '⌘ Entrée', label: 'shortcuts.keys.insertCards', group: 'import.generation' },
   ],
   planning: [
-    { keys: 'M', label: 'Vue mois', group: 'planning' },
-    { keys: 'S', label: 'Vue semaine', group: 'planning' },
-    { keys: 'N', label: 'Nouvel examen', group: 'planning' },
-    { keys: 'T', label: 'Revenir à aujourd’hui', group: 'planning' },
-    { keys: 'E', label: 'Éditer l’examen du jour', group: 'planning' },
-    { keys: 'J K', label: 'Naviguer dans les examens', group: 'planning' },
+    { keys: 'M', label: 'shortcuts.keys.viewMonth', group: 'planning' },
+    { keys: 'S', label: 'shortcuts.keys.viewWeek', group: 'planning' },
+    { keys: 'N', label: 'shortcuts.keys.newExam', group: 'planning' },
+    { keys: 'T', label: 'shortcuts.keys.backToToday', group: 'planning' },
+    { keys: 'E', label: 'shortcuts.keys.editExam', group: 'planning' },
+    { keys: 'J K', label: 'shortcuts.keys.examNav', group: 'planning' },
   ],
   session: [
-    { keys: 'Espace', label: 'Révéler la réponse', group: 'session' },
-    { keys: '1 2 3 4', label: 'Noter la carte', group: 'session' },
-    { keys: 'Échap', label: 'Quitter la session', group: 'session' },
-    { keys: 'Q', label: 'Confirmer la sortie', group: 'session' },
-    { keys: 'R', label: 'Recommencer une session', group: 'session' },
+    { keys: 'Espace', label: 'shortcuts.keys.reveal', group: 'session' },
+    { keys: '1 2 3 4', label: 'shortcuts.keys.rate', group: 'session' },
+    { keys: 'Échap', label: 'shortcuts.keys.exitSession', group: 'session' },
+    { keys: 'Q', label: 'shortcuts.keys.confirmExit', group: 'session' },
+    { keys: 'R', label: 'shortcuts.keys.restartSession', group: 'session' },
   ],
 }
 
