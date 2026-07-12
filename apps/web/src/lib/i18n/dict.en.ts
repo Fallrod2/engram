@@ -332,5 +332,21 @@ export const dictEn: Dict = {
     version: 'Version',
     mode: 'Mode',
     modeValue: 'Localhost · single-user',
+    accountTitle: 'Account',
+    accountDesc: 'Session and sign-out.',
+    signOut: 'Sign out',
+  },
+
+  auth: {
+    title: 'engram',
+    subtitle: 'Sign in',
+    email: 'Email',
+    password: 'Password',
+    submit: 'Sign in',
+    submitting: 'Signing in…',
+    error: {
+      invalid: 'Invalid email or password.',
+      generic: 'Sign-in failed. Try again.',
+    },
   },
 }

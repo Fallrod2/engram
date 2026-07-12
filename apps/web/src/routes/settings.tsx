@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { useLang, useT, type Lang } from '@/lib/i18n'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import {
@@ -12,6 +13,8 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { BackupCard } from '@/features/backup/backup-card'
+import { AUTH_ENABLED_WEB } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -84,6 +87,8 @@ function SettingsPage() {
 
       <BackupCard />
 
+      {AUTH_ENABLED_WEB && <AccountCard />}
+
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.aboutTitle')}</CardTitle>
@@ -102,5 +107,25 @@ function SettingsPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/** Session + sign-out (spec §3.5). Rendered only when web auth is enabled. */
+function AccountCard() {
+  const t = useT()
+  const { email, signOut } = useAuth()
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('settings.accountTitle')}</CardTitle>
+        <CardDescription>{t('settings.accountDesc')}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex items-center justify-between gap-4">
+        <span className="truncate font-mono text-xs text-text-muted">{email}</span>
+        <Button variant="outline" onClick={() => void signOut()}>
+          {t('settings.signOut')}
+        </Button>
+      </CardContent>
+    </Card>
   )
 }

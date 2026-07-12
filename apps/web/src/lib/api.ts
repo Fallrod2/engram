@@ -55,19 +55,48 @@ interface RequestOptions<T> {
 async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T> {
   const { method = 'GET', body, schema, signal } = opts
   const init: RequestInit = { method }
+  // Headers are built UNCONDITIONALLY (audit §9): a GET/DELETE/upload used to
+  // leave `init.headers` undefined, so a merged `Authorization` would be lost and
+  // every read would 401. Content-Type is only for JSON (never for FormData —
+  // the browser sets the multipart boundary), but auth is added for ALL methods.
+  const headers: Record<string, string> = {}
   if (body instanceof FormData) {
-    // Multipart (spec §1.3): never set `Content-Type` — the browser writes it
-    // with the correct multipart boundary — and never `JSON.stringify`.
     init.body = body
   } else if (body !== undefined) {
     init.body = JSON.stringify(body)
-    init.headers = { 'Content-Type': 'application/json' }
+    headers['Content-Type'] = 'application/json'
   }
+  Object.assign(headers, authHeader())
+  init.headers = headers
   if (signal) init.signal = signal
   const res = await fetch(`/api${path}`, init)
+  if (res.status === 401) {
+    // A dead/absent session mid-use → sign out + navigate to /login (audit §8).
+    onUnauthorized()
+    throw await toApiError(res)
+  }
   if (!res.ok) throw await toApiError(res)
   if (res.status === 204 || !schema) return undefined as T
   return schema.parse(await res.json())
+}
+
+/**
+ * Auth hooks, injected once at bootstrap (main.tsx) to keep this module free of
+ * a Supabase dependency. `authHeader` returns `{ Authorization }` when a token
+ * exists; `onUnauthorized` handles a 401 (signOut + navigate + clear).
+ */
+let authHeader: () => Record<string, string> = () => ({})
+let onUnauthorized: () => void = () => {}
+
+export function configureAuth(opts: {
+  getAccessToken: () => string | null
+  onUnauthorized: () => void
+}): void {
+  authHeader = () => {
+    const token = opts.getAccessToken()
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
+  onUnauthorized = opts.onUnauthorized
 }
 
 export const api = {
