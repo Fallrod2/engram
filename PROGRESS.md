@@ -21,15 +21,23 @@
 - `phase1-api-spec.md` : 15 routes REST (CRUD subjects/decks/cards, due queue, review, preview, due counts), service FSRS injectable, format d'erreur unique, 59 tests nominatifs. Auditée (8 corrections intégrées).
 - `phase1-ui-spec.md` : écrans Subjects / Subject→Decks / Deck→Cards, due counts sidebar réels, conventions Query/Router, composer clavier (⌘↵), composants DueCount/FsrsStateGlyph/EmptyState…, dépendances dures [DÉP-API] listées.
 
+### Phase 1 (en cours)
+
+- **WS-1A mergé dans `main`** (ff) : 15 routes REST (CRUD subjects/decks/cards + archivage, review transactionnelle + review_log, file de dues triée/filtrée, preview des 4 intervalles, due counts), service FSRS injectable (ts-fsrs, mappers WS-B réutilisés), couche http (enveloppe d'erreur unique, validation zValidator, réponses validées Zod en sortie), +99 lignes de contrat dans `packages/shared/src/domain.ts`. 91 tests verts (36 vitest + 55 bun:test, harness `test-support/` avec DB temp migrée en preload). Review : APPROVE (0 fix, flow complet vérifié au curl sur :3002). Vérifié par l'orchestrateur : gates + create/delete subject en live sur :3001 (enveloppe d'erreur incluse).
+- Note : `app.test.ts` (vitest) remplacé par `app.spec.ts` (bun:test) — app.ts importe bun:sqlite transitivement. Deps ajoutées : `@hono/zod-validator@0.4.3` épinglé + `zod` direct dans apps/server.
+
 ## En cours (Phase 1)
 
-- **WS-1A `feat/phase1-api`** (dev Opus + review Sonnet, worktree isolé) : routes + services FSRS + schémas shared, selon `phase1-api-spec.md`.
-- **Specs Phase 2** (armada) : spec UX de la session de révision (flow clavier, flip, résumé de fin) — en avance de phase.
+- **WS-1B `feat/phase1-ui`** (dev Opus + review Sonnet, worktree isolé) : écrans Subjects / Subject→Decks / Deck→Cards, due counts sidebar réels, composer clavier ⌘↵, optimistic updates — selon `phase1-ui-spec.md`. Vérifications sur :3002/:5174 (dev) et :3003/:5175 (reviewer) ; proxy Vite rendu configurable (`VITE_API_TARGET`).
+- **Specs Phase 3** (armada) : import MD/PDF + génération IA — en avance de phase.
+
+## Specs prêtes (suite)
+
+- `phase2-session-spec.md` : machine à états de session complète (flip espace, rating 1-4 + preview, idle/pause, anti-double-soumission, résumé de fin), 15 findings de critique tracés, API Phase 1 suffisante confirmée.
 
 ## À venir
 
-- **WS-1B `feat/phase1-ui`** : écrans CRUD web selon `phase1-ui-spec.md` — démarre après merge de WS-1A (dépendance dure sur l'API).
-- Fin Phase 1 : gates + vérif navigateur + tag `phase-1`, puis Phase 2 (session de révision).
+- Fin Phase 1 : gates + vérif navigateur du flow CRUD + tag `phase-1`, puis Phase 2 (session de révision, spec prête).
 
 ## Décisions prises
 
