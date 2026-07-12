@@ -75,6 +75,38 @@ export function seedCard(
     .get()
 }
 
+/**
+ * Insert a review_log row directly (bypassing FSRS) so tests can drive
+ * `state`/`rating`/`review`/`durationMs` freely. FSRS-only columns are 0 (the
+ * analytics domain reads none of them). `durationMs` omitted → NULL column
+ * (lets tests exercise the "not measured ≠ 0" contract).
+ */
+export function seedReviewLog(
+  db: DB,
+  cardId: string,
+  o: { rating?: number; state?: number; review?: Date; durationMs?: number | null } = {},
+) {
+  const when = o.review ?? new Date()
+  return db
+    .insert(reviewLog)
+    .values({
+      cardId,
+      rating: o.rating ?? 3,
+      state: o.state ?? 2, // Review by default
+      due: when,
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      lastElapsedDays: 0,
+      scheduledDays: 0,
+      learningSteps: 0,
+      review: when,
+      ...(o.durationMs !== undefined ? { durationMs: o.durationMs } : {}),
+    })
+    .returning()
+    .get()
+}
+
 export function seedExam(
   db: DB,
   subjectIds: string[],
