@@ -27,8 +27,13 @@ function TableRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElem
   return (
     <tr
       className={cn(
-        'group/tr outline-none transition-colors duration-fast',
+        'group/tr relative outline-none transition-colors duration-fast',
         'hover:bg-surface-2 data-[active]:bg-surface-2',
+        // Keyboard selection = surface-2 + a 2px accent edge bar (mirrors the
+        // nav and the EntityRow list — one selection language across screens).
+        'before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2',
+        'before:rounded-full before:bg-accent before:opacity-0 before:transition-opacity before:duration-fast',
+        'data-[active]:before:opacity-100',
         className,
       )}
       {...props}
