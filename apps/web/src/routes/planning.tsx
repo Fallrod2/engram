@@ -123,24 +123,30 @@ function PlanningPage() {
     else examListRef.current?.focus()
   }
 
-  useHotkeys({
-    m: (e) => {
-      e.preventDefault()
-      setView('month')
+  useHotkeys(
+    {
+      m: (e) => {
+        e.preventDefault()
+        setView('month')
+      },
+      s: (e) => {
+        e.preventDefault()
+        setView('week')
+      },
+      n: (e) => {
+        e.preventDefault()
+        openExam('new')
+      },
+      e: (e) => {
+        e.preventDefault()
+        editSelectedDayExam()
+      },
     },
-    s: (e) => {
-      e.preventDefault()
-      setView('week')
-    },
-    n: (e) => {
-      e.preventDefault()
-      openExam('new')
-    },
-    e: (e) => {
-      e.preventDefault()
-      editSelectedDayExam()
-    },
-  })
+    // Mute the grid's global single-key shortcuts while the exam dialog is open,
+    // so keys never leak to the background (view switches, re-edits) during
+    // editing — a modal owns the keyboard while it's up.
+    { enabled: exam === undefined },
+  )
 
   const anchor = parseDayKey(day)
   const periodLabel = view === 'month' ? formatMonthLabel(anchor) : formatWeekLabel(anchor)
