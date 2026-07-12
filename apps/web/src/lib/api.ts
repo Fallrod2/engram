@@ -2,8 +2,15 @@ import { z } from 'zod'
 import {
   apiErrorSchema,
   healthResponseSchema,
+  reviewPreviewSchema,
+  reviewQueueResponseSchema,
+  reviewResultSchema,
   type ApiErrorCode,
   type HealthResponse,
+  type ReviewCard,
+  type ReviewPreview,
+  type ReviewQueueResponse,
+  type ReviewResult,
 } from '@engram/shared'
 
 /**
@@ -81,4 +88,39 @@ export function qs(params: Record<string, string | number | boolean | undefined>
 /** Fetch + validate `GET /api/health` (kept from Phase 0). */
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return api.get('/health', healthResponseSchema, signal)
+}
+
+/** Review-session scope filters (at most one is set in practice). */
+export interface ReviewScope {
+  deckId?: string
+  subjectId?: string
+}
+
+/**
+ * The frozen review queue (spec §13.4). `now` freezes the lot; `limit` bounds it
+ * (500 for a session, 1 for the "review again" probe). Parses the shared schema.
+ */
+export function fetchReviewQueue(
+  params: ReviewScope & { now: string; limit: number },
+  signal?: AbortSignal,
+): Promise<ReviewQueueResponse> {
+  return api.get(`/review/queue${qs({ ...params })}`, reviewQueueResponseSchema, signal)
+}
+
+/** Projected intervals of the 4 grades for a card at `now` (spec §13.4). */
+export function fetchCardPreview(
+  cardId: string,
+  now: string,
+  signal?: AbortSignal,
+): Promise<ReviewPreview> {
+  return api.get(`/cards/${cardId}/preview${qs({ now })}`, reviewPreviewSchema, signal)
+}
+
+/**
+ * Submit a grade (spec §13.4). Not idempotent — each call advances FSRS and
+ * inserts a `review_log`; the caller awaits this ack before advancing. Propagates
+ * `ApiError.status` so a 404 (card deleted in parallel) becomes RATE_SKIP.
+ */
+export function postReview(cardId: string, body: ReviewCard): Promise<ReviewResult> {
+  return api.post(`/cards/${cardId}/review`, body, reviewResultSchema)
 }
