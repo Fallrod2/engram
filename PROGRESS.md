@@ -34,11 +34,17 @@
 - **`feat/phase2-review-session` mergé** : session plein écran 100 % clavier (portal, machine à états pure `session-reducer.ts` + timer d'activité `session-timer.ts`, tous testés), flip 3D 220 ms avec branche crossfade reduced-motion, rating 1-4 avec preview des intervalles (couleurs FSRS), progression, résumé de fin (héros, répartition, temps, réussite), empty-state récompense, dialog de sortie, overlay pause/idle, rendu Markdown sûr (react-markdown + rehype-sanitize), entrées « Réviser » sur matière/deck. 128 tests vitest + 55 bun:test. Review : APPROVE en re-revue #2 (anti-double-soumission vérifié en base réelle). Vérifié par l'orchestrateur : gates + session de démo complète déroulée au clavier en live sur :5173 (seed 2 cartes, résumé exact, données de démo supprimées ensuite).
 - Points connus : course bénigne « première touche » au mount (StrictMode dev uniquement, non corrigée volontairement) ; le vrai Dashboard « Aujourd'hui » n'existe pas encore (`/` → `/subjects`), le CTA global vit dans la sidebar — à traiter en Phase 4/6.
 
-## En cours (Phase 3)
+### Phase 3 — API mergée
 
-- **`feat/phase3-import-api`** (dev Opus + review Sonnet, worktree isolé) : upload MD/PDF, extraction unpdf, routes notes/generations, service IA Anthropic (générateur injectable, prompts versionnés) — selon `phase3-import-api-spec.md`.
-- **Specs Phase 5** (armada) : analytics — en avance de phase.
-- Ensuite : `feat/phase3-import-ui` (web) en parallèle de `feat/phase4-planning-api` (serveur) — fichiers disjoints.
+- **`feat/phase3-import-api` mergé** : upload multipart 10 MiB (`POST /api/notes/upload`, magic bytes %PDF), extraction unpdf, CRUD notes, module IA `apps/server/src/ai/` (claude-sonnet-4-6, tool_choice forcé, registre de générateur injectable get/set/resetCardGenerator, timeout 90 s/appel, chunking, prompt versionné `prompts/cards.v1.ts`), générations fire-and-forget + polling + resolve transactionnel (items avec cardId gelés, `insertFreshCardRow` partagé), 413/503 dans l'enveloppe d'erreur. 148 vitest + 92 bun:test — AUCUN test n'appelle l'API réelle. Review : APPROVE (0 fix). Vérifié orchestrateur en live sur :3001 : upload MD → extraction ✅, génération sans clé → 503 propre ✅, delete ✅.
+- ⚠️ **ANTHROPIC_API_KEY** : à renseigner dans `.env` (jamais commitée) pour la génération réelle ; sans clé, tout le reste fonctionne (503 propre sur la génération uniquement).
+- 💡 Grosse feature : candidate à un `/code-review ultra` manuel par Alex (déclenchement et facturation côté Alex).
+
+## En cours (Phase 3 UI ∥ Phase 4 API — fichiers disjoints)
+
+- **`feat/phase3-import-ui`** (web) : écrans import + review des propositions au clavier (a/e/r/u, j/k), polling, bannière 503. Ports 3002/5174 (dev), 3003/5175 (reviewer).
+- **`feat/phase4-planning-api`** (serveur) : CRUD exams, study-plan forecast (bucketing local, boost exams, overdue par subject), extensions day.ts. Ports 3004 (dev), 3005 (reviewer).
+- **Specs Phase 5** : API analytics finalisée (règle rating ≥ 1 partout, séries rétrospectives sans filtre archivage, dépendance dure : merger Phase 4 avant le dev Phase 5) ; spec UI analytics en reprise après un échec réseau de l'agent.
 
 ## Specs prêtes (suite)
 
