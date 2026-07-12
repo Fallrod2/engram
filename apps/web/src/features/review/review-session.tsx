@@ -33,10 +33,20 @@ export function ReviewSession({ scope }: { scope: ReviewScope }) {
     setSessionActive(true)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    // Trap focus: the full-screen session lives in a body portal, so making the
+    // app shell `inert` removes everything behind it from the tab order and the
+    // accessibility tree — Tab can never escape the session (a11y §3.2). The
+    // shell sits inside `#root`; the portal is a sibling of it, so it stays
+    // interactive. Remember the launching control to restore focus on exit.
+    const trigger = document.activeElement as HTMLElement | null
+    const shell = document.getElementById('app-shell')
+    shell?.setAttribute('inert', '')
     containerRef.current?.focus()
     return () => {
       setSessionActive(false)
       document.body.style.overflow = prev
+      shell?.removeAttribute('inert')
+      if (trigger && document.contains(trigger)) trigger.focus()
     }
   }, [setSessionActive])
 
