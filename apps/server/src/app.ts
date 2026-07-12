@@ -4,6 +4,8 @@ import { HTTPException } from 'hono/http-exception'
 import { ZodError } from 'zod'
 import { healthResponseSchema, type HealthResponse, type ApiErrorCode } from '@engram/shared'
 import { ApiError } from './http/errors'
+import { resolveAuthConfig } from './auth/config'
+import { createAuthMiddleware } from './http/auth'
 import { getCardGenerator, anthropicGenerator } from './ai/generator'
 import { subjectsRouter } from './routes/subjects'
 import { decksRouter } from './routes/decks'
@@ -24,6 +26,10 @@ export const app = new Hono()
 
 // Localhost dev: web (:5173) talks to the server (:3001) cross-origin.
 app.use('/api/*', cors({ origin: 'http://localhost:5173' }))
+// Auth gate (spec §2.6). Mounted AFTER cors (preflight handled first) and BEFORE
+// the routers. It resolves its config PER REQUEST from `process.env` — nothing is
+// read at this module's top level, so importing `app.ts` never throws (audit §6).
+app.use('/api/*', createAuthMiddleware())
 
 app.get('/api/health', (c) => {
   const body: HealthResponse = {
@@ -34,6 +40,10 @@ app.get('/api/health', (c) => {
     // wiring in index.ts ever fails to apply, this stays false and the e2e boot
     // guard aborts the run before any spec can trigger a real Anthropic call.
     fakeAi: getCardGenerator() !== anthropicGenerator,
+    // Self-report of the gate. This call is PURE and never throws — the
+    // fail-closed `misconfigured` case is judged ONLY by the middleware, so the
+    // probe stays readable even on a prod misconfig (reports authEnforced:false).
+    authEnforced: resolveAuthConfig(process.env).enforced,
   }
   // Validate against the shared contract before it leaves the server.
   return c.json(healthResponseSchema.parse(body))
@@ -54,7 +64,7 @@ app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not fou
 
 app.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json(err.toResponse(), err.status as 400 | 404 | 409 | 413 | 503)
+    return c.json(err.toResponse(), err.status as 400 | 401 | 404 | 409 | 413 | 503)
   }
   // Hono-level failures (e.g. malformed JSON body → HTTPException 400) mapped
   // to the single error envelope so they never surface as an opaque 500.

@@ -57,8 +57,23 @@ enabled = false
 [storage]
 enabled = false
 
+# --- Auth (application gate, spec §4.3) -------------------------------------
+# The local stack keeps GoTrue DISABLED so no extra container starts and no local
+# login path is shipped (spec §1.2). The closed-signup posture is committed HERE,
+# in the SAME commit as the server auth middleware (spec §1.2 rule): if a
+# maintainer ever flips `enabled = true` to test auth locally, sign-ups are
+# ALREADY closed — never open them in a separate step (the Supabase local default
+# is OPEN). Cloud sign-ups are closed in the dashboard (spec §1.2).
 [auth]
 enabled = false
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_signup = false # inscriptions fermées (parité prod)
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false # pas de SMTP local
 
 [edge_runtime]
 enabled = false

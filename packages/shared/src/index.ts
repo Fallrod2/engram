@@ -19,6 +19,13 @@ export const healthResponseSchema = z.object({
    * broken wiring can never fall through to a real Anthropic API call.
    */
   fakeAi: z.boolean(),
+  /**
+   * True iff the auth middleware verifies JWTs at runtime (the auth gate is
+   * enforced). Always `true` in production — the deploy check asserts it — and
+   * `false` in local dev / e2e (where the bypass is active). The e2e boot guard
+   * aborts the run if it is not `false`, so the suite never runs with auth ON.
+   */
+  authEnforced: z.boolean(),
 })
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>
