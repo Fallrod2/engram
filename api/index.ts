@@ -1,4 +1,4 @@
-import './tz'
+import './tz.js'
 import { app } from '../apps/server/src/app'
 
 /**
