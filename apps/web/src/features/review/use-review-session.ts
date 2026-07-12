@@ -275,10 +275,20 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     if (state.phase === 'SUMMARY') endSession()
   }, [state.phase, endSession])
 
+  // Whether the session was entered from an in-app navigation (there is an
+  // internal parent to return to). Captured ONCE at mount (spec §3.6, "on
+  // mémorise l'origine au montage"). We use TanStack Router's OWN history
+  // index — `canGoBack()` is `state.__TSR_index !== 0`, and a fresh/direct
+  // entry (bookmark, shared link, new tab) initializes `__TSR_index: 0`. This
+  // is reliable where `window.history.length` is not: the latter also counts
+  // browser entries that precede the SPA load, so a direct entry into /review
+  // could report length > 1 and wrongly `back()` out of the app entirely.
+  const [enteredFromApp] = useState(() => router.history.canGoBack())
+
   const goToOrigin = useCallback(() => {
-    if (window.history.length > 1) router.history.back()
-    else void navigate({ to: '/subjects' })
-  }, [router, navigate])
+    if (enteredFromApp) router.history.back()
+    else void navigate({ to: '/' })
+  }, [enteredFromApp, router, navigate])
 
   useEffect(() => {
     if (!state.exited) return

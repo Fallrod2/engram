@@ -14,7 +14,7 @@ vi.mock('motion/react', () => ({ useReducedMotion: () => false }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }))
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
-  useRouter: () => ({ history: { back: vi.fn() } }),
+  useRouter: () => ({ history: { back: vi.fn(), canGoBack: () => false } }),
 }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
