@@ -40,6 +40,7 @@ function useSubjectListMutation<Vars>(config: {
   errorTitle: string
   invalidateDueCounts?: boolean
   invalidateDecks?: boolean
+  invalidatePlanning?: boolean
 }) {
   const qc = useQueryClient()
   const mutation = useMutation({
@@ -62,6 +63,12 @@ function useSubjectListMutation<Vars>(config: {
       void qc.invalidateQueries({ queryKey: qk.subjects.all })
       if (config.invalidateDueCounts) void qc.invalidateQueries({ queryKey: qk.dueCounts.all })
       if (config.invalidateDecks) void qc.invalidateQueries({ queryKey: qk.decks.all })
+      if (config.invalidatePlanning) {
+        // Archiving/deleting a subject changes the plan load and can shrink an
+        // exam's subject set via the exam_subject FK cascade (Phase 4 §1.4).
+        void qc.invalidateQueries({ queryKey: qk.planning.all })
+        void qc.invalidateQueries({ queryKey: qk.exams.all })
+      }
     },
   })
   return mutation
@@ -124,6 +131,7 @@ export function useArchiveSubject() {
     optimistic: (list, { id, archived }) => list.map((s) => (s.id === id ? { ...s, archived } : s)),
     errorTitle: 'Archivage échoué',
     invalidateDueCounts: true,
+    invalidatePlanning: true,
   })
 }
 
@@ -134,5 +142,6 @@ export function useDeleteSubject() {
     errorTitle: 'Suppression de la matière échouée',
     invalidateDueCounts: true,
     invalidateDecks: true,
+    invalidatePlanning: true,
   })
 }

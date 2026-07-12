@@ -61,6 +61,8 @@ function invalidateCardCounts(
   void qc.invalidateQueries({ queryKey: qk.decks.all })
   void qc.invalidateQueries({ queryKey: qk.subjects.all })
   void qc.invalidateQueries({ queryKey: qk.dueCounts.all })
+  // A New card is due now → it enters the study-plan's "today" bucket (Phase 4 §1.4).
+  void qc.invalidateQueries({ queryKey: qk.planning.all })
 }
 
 export function useCreateCard(deckId: string, subjectId: string) {

@@ -269,6 +269,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     void queryClient.invalidateQueries({ queryKey: qk.subjects.all })
     void queryClient.invalidateQueries({ queryKey: qk.decks.all })
     void queryClient.invalidateQueries({ queryKey: qk.cards.all })
+    // Graded cards shift their `due` → the study-plan load and "today" suggestion
+    // rebalance in real time (Phase 4 §1.4).
+    void queryClient.invalidateQueries({ queryKey: qk.planning.all })
   }, [queryClient])
 
   useEffect(() => {
