@@ -1,3 +1,4 @@
+import './tz'
 import { app } from '../apps/server/src/app'
 
 /**

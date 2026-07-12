@@ -43,11 +43,11 @@ Fichiers ajoutés/modifiés pour Vercel :
 > ⚠️ Aucune valeur réelle n'est committée dans le repo. Renseigner ces variables
 > uniquement dans le dashboard Vercel (ou via `vercel env`).
 
-| Variable            | Requis    | Valeur                                        | Notes                                                                                                                                                                                                    |
-| ------------------- | --------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`      | **Oui**   | Chaîne du **pooler** Supabase (port **6543**) | Le client détecte `:6543` et désactive les prepared statements (`prepare: false`) automatiquement — obligatoire avec le transaction pooler.                                                              |
-| `TZ`                | **Oui**   | `Europe/Zurich`                               | **Critique.** Vercel tourne en **UTC** par défaut. Le bucketing jour local (study-plan, analytics : heatmap, streaks, temps d'étude) dépend du fuseau du process. Sans `TZ`, les journées sont décalées. |
-| `ANTHROPIC_API_KEY` | Optionnel | Clé API Anthropic                             | Sans clé, la génération IA de cartes/quiz renvoie 503 ; le reste de l'app fonctionne.                                                                                                                    |
+| Variable            | Requis    | Valeur                                        | Notes                                                                                                                                                                                                           |
+| ------------------- | --------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | **Oui**   | Chaîne du **pooler** Supabase (port **6543**) | Le client détecte `:6543` et désactive les prepared statements (`prepare: false`) automatiquement — obligatoire avec le transaction pooler.                                                                     |
+| `ENGRAM_TZ`         | **Oui**   | `Europe/Zurich`                               | **Critique.** Vercel tourne en **UTC** par défaut. Le bucketing jour local (study-plan, analytics : heatmap, streaks, temps d'étude) dépend du fuseau du process. Sans `ENGRAM_TZ`, les journées sont décalées. |
+| `ANTHROPIC_API_KEY` | Optionnel | Clé API Anthropic                             | Sans clé, la génération IA de cartes/quiz renvoie 503 ; le reste de l'app fonctionne.                                                                                                                           |
 
 `ENGRAM_FAKE_AI` est réservé aux e2e locaux : **ne jamais** le définir sur Vercel.
 
