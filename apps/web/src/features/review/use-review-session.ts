@@ -73,6 +73,13 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     () => {},
   )
   const lastRateRef = useRef<{ cardId: string; grade: Grade } | null>(null)
+  // Synchronous in-flight guard (finding #9 at the wired-up level): set inside
+  // `rate()` before it returns and cleared only when the mutation settles, so
+  // several rating keydowns dispatched in the SAME tick — before React re-runs
+  // render and refreshes `stateRef` — can never fire more than one POST for the
+  // card. The reducer's SUBMITTING guard alone can't stop this: the network
+  // call is not gated by post-dispatch state, so it would escape the safeguard.
+  const inFlightRef = useRef(false)
   const invalidatedRef = useRef(false)
   const flashTimeoutRef = useRef<number | null>(null)
 
@@ -189,6 +196,11 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
         action: { label: 'Réessayer', onClick: () => retryRef.current() },
       })
     },
+    onSettled: () => {
+      // Mutation resolved (ok/skip/fail) — the card is no longer in flight, so
+      // the next rating (or a retry after a transient failure) may submit.
+      inFlightRef.current = false
+    },
   })
   mutateRef.current = reviewMut.mutate
 
@@ -200,8 +212,14 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   const rate = useCallback((grade: Grade) => {
     const s = stateRef.current
     if (s.phase !== 'REVEALED') return
+    // `stateRef` only refreshes on render; two same-tick rate() calls both read
+    // `phase: REVEALED`, so the phase check alone can't stop a double submit.
+    // This synchronous ref does — it flips to true before the first call ever
+    // returns and is only cleared when the mutation settles (see onSettled).
+    if (inFlightRef.current) return
     const card = s.cards[s.index]
     if (!card) return
+    inFlightRef.current = true
     const durationMs = timerRef.current?.read() ?? 0
     lastRateRef.current = { cardId: card.id, grade }
     setFlashGrade(grade)
