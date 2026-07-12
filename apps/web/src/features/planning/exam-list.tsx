@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useImperativeHandle, useMemo, type Ref } from 'react'
 import { ChevronDown, GraduationCap, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Exam, Subject } from '@engram/shared'
 import { localDayKey } from '@/lib/calendar'
@@ -19,6 +19,9 @@ import { Countdown } from '@/components/countdown'
 import { useRovingList } from '@/lib/use-roving'
 import { isEditableTarget } from '@/lib/use-hotkeys'
 
+/** Imperative handle: move focus into the list (grid `e` fallback, spec §2.4). */
+export type ExamListHandle = { focus: () => void }
+
 /**
  * Upcoming exams with countdowns (spec §6.2). Source = the single exams cache,
  * split client-side into upcoming (`date >= today`, date asc) and a collapsible
@@ -28,6 +31,7 @@ export function ExamList({
   exams,
   subjectsById,
   now,
+  ref,
   onNew,
   onEdit,
   onDelete,
@@ -35,6 +39,7 @@ export function ExamList({
   exams: Exam[]
   subjectsById: Map<string, Subject>
   now: Date
+  ref?: Ref<ExamListHandle>
   onNew: () => void
   onEdit: (exam: Exam) => void
   onDelete: (exam: Exam) => void
@@ -57,6 +62,18 @@ export function ExamList({
     if (e) onEdit(e)
   })
   const active = upcoming[roving.active]
+
+  // Grid `e` with ≠1 exam on the focused day focuses the list: land on the first
+  // upcoming row (no-op when the list holds no upcoming exams to navigate).
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        if (upcoming.length > 0) roving.focusIndex(0)
+      },
+    }),
+    [upcoming.length, roving],
+  )
 
   if (upcoming.length === 0 && past.length === 0) {
     return (

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
@@ -20,6 +20,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
 import { ConfirmDelete } from '@/components/confirm-delete'
 import { PageHeader } from '@/components/page-header'
 import { subjectsListOptions } from '@/features/subjects/queries'
@@ -34,7 +35,7 @@ import { indexDays, subjectsById } from '@/features/planning/plan-utils'
 import { CalendarMonth } from '@/features/planning/calendar-month'
 import { CalendarWeek } from '@/features/planning/calendar-week'
 import { DayDetailPanel } from '@/features/planning/day-detail-panel'
-import { ExamList } from '@/features/planning/exam-list'
+import { ExamList, type ExamListHandle } from '@/features/planning/exam-list'
 import { ExamFormDialog } from '@/features/planning/exam-form-dialog'
 import {
   DayDetailSkeleton,
@@ -69,7 +70,16 @@ export const Route = createFileRoute('/planning')({
   },
   component: PlanningPage,
   pendingComponent: PlanningSkeleton,
+  // Safety net for an unrecoverable failure on first load (spec §10). The loader
+  // is tolerant (Promise.allSettled) and panel errors render inline, so this only
+  // catches a render/throw that would otherwise blank the route.
+  errorComponent: PlanningError,
 })
+
+function PlanningError() {
+  const router = useRouter()
+  return <ErrorState kind="planning" onRetry={() => void router.invalidate()} />
+}
 
 function PlanningPage() {
   const search = Route.useSearch()
@@ -92,6 +102,7 @@ function PlanningPage() {
   const isToday = day === todayKey
 
   const detailRef = useRef<HTMLDivElement>(null)
+  const examListRef = useRef<ExamListHandle>(null)
   const [deleteTarget, setDeleteTarget] = useState<Exam | null>(null)
 
   const createExam = useCreateExam()
@@ -109,7 +120,7 @@ function PlanningPage() {
   const editSelectedDayExam = () => {
     const dayExams = exams.filter((e) => localDayKey(new Date(e.date)) === day)
     if (dayExams.length === 1) openExam(dayExams[0]!.id)
-    else detailRef.current?.focus()
+    else examListRef.current?.focus()
   }
 
   useHotkeys({
@@ -277,6 +288,7 @@ function PlanningPage() {
                 <ExamListSkeleton />
               ) : (
                 <ExamList
+                  ref={examListRef}
                   exams={exams}
                   subjectsById={byId}
                   now={now}
