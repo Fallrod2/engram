@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { HTTPException } from 'hono/http-exception'
 import { ZodError } from 'zod'
-import { healthResponseSchema, type HealthResponse } from '@engram/shared'
+import { healthResponseSchema, type HealthResponse, type ApiErrorCode } from '@engram/shared'
 import { ApiError } from './http/errors'
 import { subjectsRouter } from './routes/subjects'
 import { decksRouter } from './routes/decks'
@@ -37,6 +38,13 @@ app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not fou
 app.onError((err, c) => {
   if (err instanceof ApiError) {
     return c.json(err.toResponse(), err.status as 400 | 404 | 409)
+  }
+  // Hono-level failures (e.g. malformed JSON body → HTTPException 400) mapped
+  // to the single error envelope so they never surface as an opaque 500.
+  if (err instanceof HTTPException) {
+    const code: ApiErrorCode =
+      err.status === 404 ? 'not_found' : err.status === 409 ? 'conflict' : 'validation_error'
+    return c.json({ error: { code, message: err.message } }, err.status)
   }
   // A ZodError here = an OUTPUT `.parse` failed => a server bug (invalid DTO) =>
   // 500, never leaked.

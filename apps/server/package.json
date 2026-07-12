@@ -7,7 +7,7 @@
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test:db": "bun test ./src/db/*.spec.ts",
+    "test:db": "bun test --preload ./src/test-support/db-preload.ts ./src/db/*.spec.ts ./src/services/*.spec.ts ./src/routes/*.spec.ts ./src/*.spec.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:studio": "drizzle-kit studio"
