@@ -32,7 +32,7 @@ export function RatingBar({
   if (!revealed) {
     return (
       <p className="flex items-center justify-center gap-2 font-mono text-sm text-text-faint">
-        <Kbd>Espace</Kbd>
+        <Kbd>{t('session.keySpace')}</Kbd>
         <span>{t('session.revealHint')}</span>
       </p>
     )

@@ -200,7 +200,9 @@ function PlanningPage() {
             variant="ghost"
             size="icon"
             className="text-text-muted"
-            aria-label={effectiveView === 'month' ? 'Mois précédent' : 'Semaine précédente'}
+            aria-label={
+              effectiveView === 'month' ? t('planning.prevMonth') : t('planning.prevWeek')
+            }
             onClick={() => step(-1)}
           >
             <ChevronLeft />
@@ -212,20 +214,22 @@ function PlanningPage() {
             variant="ghost"
             size="icon"
             className="text-text-muted"
-            aria-label={effectiveView === 'month' ? 'Mois suivant' : 'Semaine suivante'}
+            aria-label={
+              effectiveView === 'month' ? t('planning.nextMonth') : t('planning.nextWeek')
+            }
             onClick={() => step(1)}
           >
             <ChevronRight />
           </Button>
         </div>
         <Button variant="secondary" onClick={() => setDay(todayKey)}>
-          Aujourd'hui
+          {t('planning.today')}
           <Kbd className="ml-1">t</Kbd>
         </Button>
         <div className="ml-auto flex items-center gap-2">
           <Button onClick={() => openExam('new')}>
             <Plus />
-            Nouvel examen
+            {t('planning.newExam')}
             <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
           </Button>
           <Tabs
@@ -235,11 +239,11 @@ function PlanningPage() {
           >
             <TabsList>
               <TabsTrigger value="month">
-                Mois
+                {t('planning.month')}
                 <Kbd className="ml-1.5 border-transparent bg-transparent">m</Kbd>
               </TabsTrigger>
               <TabsTrigger value="week">
-                Semaine
+                {t('planning.week')}
                 <Kbd className="ml-1.5 border-transparent bg-transparent">s</Kbd>
               </TabsTrigger>
             </TabsList>

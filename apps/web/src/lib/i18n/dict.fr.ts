@@ -253,6 +253,8 @@ export const dictFr = {
     scopeSubject: 'Matière',
     scopeAll: 'Toutes les cartes',
     exitAria: 'Quitter la session (Échap)',
+    keySpace: 'Espace',
+    keyEnter: 'Entrée',
     revealHint: 'pour révéler',
     revealed: 'Réponse révélée',
     saveError: 'Échec d’enregistrement — appuie de nouveau pour réessayer.',
@@ -274,6 +276,17 @@ export const dictFr = {
       success: 'Réussite',
       reviewAgain: 'Réviser encore',
     },
+  },
+
+  planning: {
+    today: "Aujourd'hui",
+    newExam: 'Nouvel examen',
+    month: 'Mois',
+    week: 'Semaine',
+    prevMonth: 'Mois précédent',
+    nextMonth: 'Mois suivant',
+    prevWeek: 'Semaine précédente',
+    nextWeek: 'Semaine suivante',
   },
 
   settings: {

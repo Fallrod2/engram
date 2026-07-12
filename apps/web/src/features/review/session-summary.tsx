@@ -88,7 +88,9 @@ export function SessionSummary({
       <div className="flex flex-col items-center gap-2">
         <Button autoFocus onClick={onExit}>
           {t('common.backToDashboard')}
-          <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">Entrée</Kbd>
+          <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">
+            {t('session.keyEnter')}
+          </Kbd>
         </Button>
         {canReviewAgain && (
           <Button variant="ghost" onClick={onReviewAgain} className="text-text-muted">

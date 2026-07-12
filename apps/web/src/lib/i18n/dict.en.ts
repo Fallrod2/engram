@@ -249,6 +249,8 @@ export const dictEn: Dict = {
     scopeSubject: 'Subject',
     scopeAll: 'All cards',
     exitAria: 'Exit session (Esc)',
+    keySpace: 'Space',
+    keyEnter: 'Enter',
     revealHint: 'to reveal',
     revealed: 'Answer revealed',
     saveError: 'Save failed — press again to retry.',
@@ -270,6 +272,17 @@ export const dictEn: Dict = {
       success: 'Success',
       reviewAgain: 'Review again',
     },
+  },
+
+  planning: {
+    today: 'Today',
+    newExam: 'New exam',
+    month: 'Month',
+    week: 'Week',
+    prevMonth: 'Previous month',
+    nextMonth: 'Next month',
+    prevWeek: 'Previous week',
+    nextWeek: 'Next week',
   },
 
   settings: {
