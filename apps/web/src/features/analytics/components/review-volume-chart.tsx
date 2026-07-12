@@ -2,6 +2,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -60,6 +61,12 @@ export function ReviewVolumeChart({
 }) {
   const buckets = data?.buckets ?? []
   const empty = data !== undefined && data.totals.total === 0
+  // Selective direct label (spec §5): the total sits on the tallest column only,
+  // never one number per bar.
+  const maxTotalIndex = buckets.reduce(
+    (best, b, i) => (b.total > (buckets[best]?.total ?? -1) ? i : best),
+    0,
+  )
 
   let body: React.ReactNode
   let table: React.ReactNode
@@ -124,7 +131,15 @@ export function ReviewVolumeChart({
                 isAnimationActive={!reduce}
                 animationDuration={180}
                 radius={i === SERIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-              />
+              >
+                {/* Total label on the top segment of the tallest column only. */}
+                {i === SERIES.length - 1 && (
+                  <LabelList
+                    dataKey="total"
+                    content={<MaxTotalLabel targetIndex={maxTotalIndex} />}
+                  />
+                )}
+              </Bar>
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -150,6 +165,36 @@ export function ReviewVolumeChart({
     >
       {body}
     </ChartCard>
+  )
+}
+
+/**
+ * Direct label rendered by Recharts on the tallest column's top segment only
+ * (geometry injected via cloneElement). `viewBox` is the top segment's rect, so
+ * its top edge is the top of the whole stack — the total sits just above it.
+ */
+function MaxTotalLabel(props: {
+  x?: number
+  y?: number
+  width?: number
+  index?: number
+  value?: number
+  targetIndex: number
+}) {
+  const { x, y, width, index, value, targetIndex } = props
+  if (index !== targetIndex || x == null || y == null || width == null || value == null) return null
+  return (
+    <text
+      x={x + width / 2}
+      y={y - 6}
+      textAnchor="middle"
+      fill="var(--color-text)"
+      fontSize={12}
+      fontFamily="var(--font-mono)"
+      className="tabular-nums"
+    >
+      {value}
+    </text>
   )
 }
 

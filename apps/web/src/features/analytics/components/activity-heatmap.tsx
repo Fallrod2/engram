@@ -111,7 +111,14 @@ export function ActivityHeatmap({
         e.preventDefault()
         onYearChange(1)
         break
+      default:
+        return
     }
+    // A keyboard move just happened: drop any stale hover so the focused day's
+    // tooltip wins. `onMouseLeave` only fires on real pointer movement, so
+    // without this the tooltip would keep showing the previously hovered cell
+    // while the focus ring moved elsewhere (spec §4: the focused day's tooltip).
+    setHoverKey(null)
   }
 
   // Tooltip position from the active cell's grid coordinates (pixel-exact).

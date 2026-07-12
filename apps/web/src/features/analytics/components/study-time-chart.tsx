@@ -2,6 +2,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,6 +17,7 @@ import { ChartCard } from './chart-card'
 import { ChartEmpty } from './chart-empty'
 import { ChartTableView, type ChartColumn } from './chart-table-view'
 import { TooltipRow, TooltipShell } from './chart-tooltip'
+import { LowDataNote } from './low-data-note'
 
 const HEIGHT = 240
 
@@ -55,6 +57,13 @@ export function StudyTimeChart({
 }) {
   const buckets = data?.buckets ?? []
   const empty = data !== undefined && data.totalMs === 0
+  // A filled area needs at least two measured days to read as a trend; with one
+  // (or zero) the fill implies a slope the data doesn't support (spec §7). Below
+  // the floor we drop stroke+fill and plot the bare measured point(s) + a note.
+  const measuredPoints = buckets.filter((b) => b.measuredCount > 0).length
+  const lowData = measuredPoints < 2
+  const lastIndex = buckets.length - 1
+  const lastMeasured = buckets.at(-1)
 
   let body: React.ReactNode
   let table: React.ReactNode
@@ -77,49 +86,67 @@ export function StudyTimeChart({
     )
   } else {
     body = (
-      <ResponsiveContainer width="100%" height={HEIGHT}>
-        <AreaChart
-          accessibilityLayer
-          data={buckets}
-          margin={{ top: 8, right: 12, bottom: 0, left: -4 }}
-        >
-          <CartesianGrid stroke={chartInk.grid} vertical={false} />
-          <XAxis
-            dataKey="date"
-            tickLine={false}
-            axisLine={{ stroke: chartInk.axis }}
-            tick={{ fill: chartInk.faint, fontSize: 11 }}
-            tickFormatter={formatAxisDay}
-            minTickGap={24}
-          />
-          <YAxis
-            tickLine={false}
-            axisLine={false}
-            width={48}
-            tick={{ fill: chartInk.faint, fontSize: 11, fontFamily: 'var(--font-mono)' }}
-            tickFormatter={(ms: number) => formatDurationAxis(ms)}
-          />
-          <Tooltip
-            cursor={{ stroke: chartInk.axis, strokeWidth: 1 }}
-            content={renderTooltip}
-            isAnimationActive={false}
-          />
-          <Area
-            dataKey="durationMs"
-            type="monotone"
-            stroke={accentSeries.line}
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            fill={accentSeries.wash}
-            fillOpacity={0.1}
-            dot={false}
-            activeDot={{ r: 4, stroke: chartInk.surface, strokeWidth: 2, fill: accentSeries.line }}
-            isAnimationActive={!reduce}
-            animationDuration={180}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+      <div>
+        <ResponsiveContainer width="100%" height={HEIGHT}>
+          <AreaChart
+            accessibilityLayer
+            data={buckets}
+            margin={{ top: 8, right: 12, bottom: 0, left: -4 }}
+          >
+            <CartesianGrid stroke={chartInk.grid} vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={{ stroke: chartInk.axis }}
+              tick={{ fill: chartInk.faint, fontSize: 11 }}
+              tickFormatter={formatAxisDay}
+              minTickGap={24}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              width={48}
+              tick={{ fill: chartInk.faint, fontSize: 11, fontFamily: 'var(--font-mono)' }}
+              tickFormatter={(ms: number) => formatDurationAxis(ms)}
+            />
+            <Tooltip
+              cursor={{ stroke: chartInk.axis, strokeWidth: 1 }}
+              content={renderTooltip}
+              isAnimationActive={false}
+            />
+            <Area
+              dataKey="durationMs"
+              type="monotone"
+              stroke={lowData ? 'none' : accentSeries.line}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              fill={accentSeries.wash}
+              fillOpacity={lowData ? 0 : 0.1}
+              dot={lowData ? <MeasuredDot /> : false}
+              activeDot={{
+                r: 4,
+                stroke: chartInk.surface,
+                strokeWidth: 2,
+                fill: accentSeries.line,
+              }}
+              isAnimationActive={!reduce}
+              animationDuration={180}
+            >
+              {/* Direct label — selective (spec §7): the value at the last point only. */}
+              {!lowData && lastMeasured && (
+                <LabelList
+                  dataKey="durationMs"
+                  content={<LastPointLabel targetIndex={lastIndex} />}
+                />
+              )}
+            </Area>
+          </AreaChart>
+        </ResponsiveContainer>
+        {lowData && (
+          <LowDataNote>Trop peu de jours mesurés pour tracer une tendance fiable.</LowDataNote>
+        )}
+      </div>
     )
     table = (
       <ChartTableView
@@ -157,5 +184,49 @@ function renderTooltip({ active, payload }: TooltipProps<number, string>) {
         strong
       />
     </TooltipShell>
+  )
+}
+
+/**
+ * Direct label rendered by Recharts at the last point only (geometry injected via
+ * cloneElement). Shows the study duration in mono `text-muted` (spec §7).
+ */
+function LastPointLabel(props: {
+  x?: number
+  y?: number
+  index?: number
+  value?: number
+  targetIndex: number
+}) {
+  const { x, y, index, value, targetIndex } = props
+  if (index !== targetIndex || x == null || y == null || value == null) return null
+  return (
+    <text
+      x={x}
+      y={y - 10}
+      textAnchor="end"
+      fill="var(--color-text-muted)"
+      fontSize={11}
+      fontFamily="var(--font-mono)"
+      className="tabular-nums"
+    >
+      {formatDuration(value)}
+    </text>
+  )
+}
+
+/** Low-data dot: renders a ringed dot only for days that carry a measured duration. */
+function MeasuredDot(props: { cx?: number; cy?: number; payload?: StudyTimeBucket }) {
+  const { cx, cy, payload } = props
+  if (cx == null || cy == null || !payload || payload.measuredCount === 0) return null
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={3}
+      fill={accentSeries.line}
+      stroke={chartInk.surface}
+      strokeWidth={2}
+    />
   )
 }
