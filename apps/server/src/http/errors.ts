@@ -46,3 +46,17 @@ export class ConflictError extends ApiError {
     super(409, 'conflict', message)
   }
 }
+
+/** 413 — an uploaded file exceeds the size limit. */
+export class PayloadTooLargeError extends ApiError {
+  constructor(message: string) {
+    super(413, 'payload_too_large', message)
+  }
+}
+
+/** 503 — a feature is unavailable (e.g. AI generation with no API key configured). */
+export class ServiceUnavailableError extends ApiError {
+  constructor(message: string) {
+    super(503, 'service_unavailable', message)
+  }
+}
