@@ -77,6 +77,7 @@ bun run check        # typecheck (tsc --noEmit) + lint (eslint) + format check (
 bun run test         # vitest (unitaire + rendu web) puis test:db (intégration DB sous bun test)
 bun run test:db      # uniquement les tests d'intégration DB (bun test, PGlite in-process)
 bun run test:db:pg   # opt-in : preuves contre le vrai driver postgres-js (Supabase local requis)
+bun run test:e2e     # end-to-end Playwright (build web + serveurs réels ; Supabase local requis)
 bun run dev:db       # supabase start (stack Postgres locale)
 bun run db:migrate   # migrations Drizzle
 bun run db:reset     # reset schéma local + migrations (garde-fou base locale uniquement)
@@ -85,6 +86,20 @@ bun run db:generate  # génère une migration à partir du schéma
 ```
 
 > Les tests d'intégration base de données tournent sous `bun test` (et non Vitest) et s'exécutent sur **PGlite** (Postgres compilé en WASM, in-process, sans démon). La commande `bun run test` enchaîne les deux. `bun run test:db:pg` est optionnel et rejoue un sous-ensemble ciblé contre le vrai Postgres local (rollback transactionnel, agrégats `bigint`) : il nécessite la stack Supabase démarrée.
+
+### Tests end-to-end (Playwright)
+
+Les parcours critiques (matière → deck → cartes → session de révision ; import → génération IA → review → session) sont couverts par Playwright, en full-stack réel : serveur Hono + bundle web de production (`vite preview`).
+
+```bash
+bunx playwright install chromium   # une fois : télécharge le navigateur
+bun run dev:db                     # la stack Supabase locale doit tourner (Docker)
+bun run test:e2e                   # build web + lance les serveurs + joue les scénarios
+```
+
+- **Base jetable par run** : `e2e/playwright.config.ts` crée une database Postgres dédiée (`engram_e2e_<run>`) sur l'instance Supabase locale, applique les migrations, l'injecte dans les serveurs, puis la supprime en fin de run. La base `data`/`postgres` de dev n'est jamais touchée.
+- **Ports fixes** : API `3100`, web `5273` (hors des plages dev 300x/517x). Une seule invocation `test:e2e` à la fois.
+- **Zéro appel Anthropic réel** : le flag test-only `ENGRAM_FAKE_AI=1` câble un générateur factice déterministe ; un garde-fou de boot échoue le run si `/api/health` ne rapporte pas `fakeAi:true` (jamais activer `ENGRAM_FAKE_AI` hors test).
 
 ## Structure du monorepo
 

@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { ZodError } from 'zod'
 import { healthResponseSchema, type HealthResponse, type ApiErrorCode } from '@engram/shared'
 import { ApiError } from './http/errors'
+import { getCardGenerator, anthropicGenerator } from './ai/generator'
 import { subjectsRouter } from './routes/subjects'
 import { decksRouter } from './routes/decks'
 import { cardsRouter } from './routes/cards'
@@ -28,6 +29,10 @@ app.get('/api/health', (c) => {
     status: 'ok',
     service: 'engram-server',
     timestamp: new Date().toISOString(),
+    // Reflects the RUNTIME generator, not just the env flag: if the fake-AI
+    // wiring in index.ts ever fails to apply, this stays false and the e2e boot
+    // guard aborts the run before any spec can trigger a real Anthropic call.
+    fakeAi: getCardGenerator() !== anthropicGenerator,
   }
   // Validate against the shared contract before it leaves the server.
   return c.json(healthResponseSchema.parse(body))
