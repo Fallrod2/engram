@@ -32,8 +32,12 @@ export default defineConfig({
         // stack (import + AI review only) must never land in the initial paint.
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
-          if (/[\\/]node_modules[\\/]recharts[\\/]/.test(id)) return 'vendor-charts'
-          if (/[\\/]node_modules[\\/]d3-[^\\/]+[\\/]/.test(id)) return 'vendor-charts'
+          // NOTE: recharts is deliberately NOT grouped here. `autoCodeSplitting`
+          // already isolates it in the async /analytics route chunk. Forcing a
+          // `vendor-charts` chunk backfired — a symbol recharts shares with common
+          // code got hoisted into that chunk, so EVERY route imported it and the
+          // ~100 kB chart bundle landed on the dashboard critical path (Phase 7
+          // §2.3). Leaving recharts to route-splitting keeps it off /.
           if (
             /[\\/]node_modules[\\/](react-markdown|remark|remark-[^\\/]+|rehype-[^\\/]+|mdast[^\\/]*|micromark[^\\/]*|hast[^\\/]*|unist[^\\/]*|unified|vfile[^\\/]*|property-information|space-separated-tokens|comma-separated-tokens|hastscript|web-namespaces|zwitch|longest-streak|character-entities[^\\/]*|decode-named-character-reference|trim-lines|bail|is-plain-obj|trough|devlop|estree-util-is-identifier-name)[\\/]/.test(
               id,
