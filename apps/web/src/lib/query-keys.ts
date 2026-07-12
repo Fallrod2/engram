@@ -46,6 +46,20 @@ export const qk = {
     listByNote: (noteId: string) => ['generations', 'list', { noteId }] as const,
     detail: (generationId: string) => ['generations', 'detail', generationId] as const,
   },
+  analytics: {
+    // Everything under `analytics` — a session's end invalidates this prefix.
+    all: ['analytics'] as const,
+    // Streaks are NOT window-scoped (a running fact), so no window in the key.
+    streaks: ['analytics', 'streaks'] as const,
+    // The heatmap is a CALENDAR (a whole year), never a windowed aggregate.
+    heatmap: (year: number) => ['analytics', 'heatmap', year] as const,
+    // The three windowed series/rates. `w` is the AnalyticsWindow preset.
+    volume: (w: string) => ['analytics', 'volume', w] as const,
+    studyTime: (w: string) => ['analytics', 'study-time', w] as const,
+    retention: (w: string) => ['analytics', 'retention', w] as const,
+    // Deltas vs the previous equivalent period (tiles). Null for `all`.
+    deltas: (w: string) => ['analytics', 'deltas', w] as const,
+  },
   review: {
     /**
      * Frozen queue (spec §13.1). `now` (the session's frozen `sessionNow`)

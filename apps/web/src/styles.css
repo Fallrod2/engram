@@ -57,6 +57,15 @@
   --color-subject-7: var(--subj-7);
   --color-subject-8: var(--subj-8);
 
+  /* Rampe séquentielle « activité » (heatmap) — indigo mono, hors des 4 ratings.
+     Une seule teinte (hue 268), L monotone par mode. Exposée en `bg-chart-heat-N`
+     (literals de classe → jamais tree-shakée), re-thémée au toggle sans JS. */
+  --color-chart-heat-0: var(--chart-heat-0);
+  --color-chart-heat-1: var(--chart-heat-1);
+  --color-chart-heat-2: var(--chart-heat-2);
+  --color-chart-heat-3: var(--chart-heat-3);
+  --color-chart-heat-4: var(--chart-heat-4);
+
   /* — Échelle typo — ratio ~1.2, ancrée sur 14px (densité Linear). — */
   --text-2xs: 0.6875rem; /* 11 */
   --text-xs: 0.75rem; /* 12 */
@@ -135,6 +144,14 @@
   --subj-6: oklch(0.7 0.15 40);
   --subj-7: oklch(0.66 0.16 5);
   --subj-8: oklch(0.66 0.15 320);
+
+  /* Heatmap — DARK : L strictement croissante 0.255 → 0.620 (pas ≥ 0.06).
+     heat-0 = vide, à peine au-dessus de surface-2 ; heat-4 = accent (max). */
+  --chart-heat-0: oklch(0.255 0.01 265);
+  --chart-heat-1: oklch(0.315 0.055 268);
+  --chart-heat-2: oklch(0.415 0.095 268);
+  --chart-heat-3: oklch(0.515 0.135 268);
+  --chart-heat-4: oklch(0.62 0.17 268);
 }
 
 /* ==================== LIGHT (miroir de luminance) ==================== */
@@ -180,6 +197,14 @@
   --subj-6: oklch(0.58 0.17 40);
   --subj-7: oklch(0.55 0.18 5);
   --subj-8: oklch(0.53 0.16 320);
+
+  /* Heatmap — LIGHT : L strictement décroissante 0.945 → 0.545 (ancre retournée
+     par mode, règle dataviz). heat-0 = vide (recule vers la surface). */
+  --chart-heat-0: oklch(0.945 0.006 264);
+  --chart-heat-1: oklch(0.88 0.05 268);
+  --chart-heat-2: oklch(0.78 0.1 268);
+  --chart-heat-3: oklch(0.66 0.15 268);
+  --chart-heat-4: oklch(0.545 0.185 268);
 }
 
 /* Respecte la préférence système quand aucun thème n'est forcé.
@@ -227,6 +252,12 @@
     --subj-6: oklch(0.58 0.17 40);
     --subj-7: oklch(0.55 0.18 5);
     --subj-8: oklch(0.53 0.16 320);
+
+    --chart-heat-0: oklch(0.945 0.006 264);
+    --chart-heat-1: oklch(0.88 0.05 268);
+    --chart-heat-2: oklch(0.78 0.1 268);
+    --chart-heat-3: oklch(0.66 0.15 268);
+    --chart-heat-4: oklch(0.545 0.185 268);
   }
 }
 
