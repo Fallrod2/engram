@@ -8,6 +8,23 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable
 }
 
+/**
+ * True when a Radix modal surface (Dialog / AlertDialog) is open. Radix stamps
+ * `data-state="open"` on the content of these roles while they are mounted.
+ *
+ * NOTE: this predicate is intentionally duplicated from `isModalSurfaceOpen` in
+ * `components/shell/shell-context.tsx` — `lib/` must not depend on `shell/`.
+ * Keep the two selectors in sync if either changes (same modal criterion).
+ */
+function isModalSurfaceOpen(): boolean {
+  if (typeof document === 'undefined') return false
+  return (
+    document.querySelector(
+      '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
+    ) !== null
+  )
+}
+
 export interface HotkeyHandler {
   /** Run the action. Return nothing. */
   (e: KeyboardEvent): void
@@ -16,10 +33,13 @@ export interface HotkeyHandler {
 export interface HotkeysOptions {
   enabled?: boolean
   /**
-   * Allow single-key hotkeys to fire while a field is focused. Off by default —
-   * `n`, `e`, `/`, `j`, `k`… are disabled in inputs (spec §1.7). Combos with a
-   * modifier and `Escape` always fire regardless.
+   * Let single-key hotkeys fire while a Radix modal surface (Dialog /
+   * AlertDialog) is open. Off by default: a screen's local single-key
+   * shortcuts (`a`, `e`, `n`…) must not leak to the background while a dialog
+   * owns the keyboard, even when focus sits on a button (not an editable
+   * field). Modifier combos (`mod+…`) and `Escape` always fire regardless.
    */
+  allowInModal?: boolean
   target?: Window | HTMLElement | null
 }
 
@@ -30,7 +50,7 @@ export interface HotkeysOptions {
  * `escape` and any `mod+` combo.
  */
 export function useHotkeys(map: Record<string, HotkeyHandler>, options: HotkeysOptions = {}): void {
-  const { enabled = true } = options
+  const { enabled = true, allowInModal = false } = options
 
   // Navigation-aware guard (spec §1.7, §4). TanStack Router keeps the previous
   // route's component — and therefore its `window` keydown listener — mounted
@@ -56,6 +76,11 @@ export function useHotkeys(map: Record<string, HotkeyHandler>, options: HotkeysO
         if (wantKey !== key) continue
         // Single-key bindings are muted inside fields (except Escape).
         if (!wantsMod && key !== 'escape' && isEditableTarget(e.target)) continue
+        // Single-key bindings are muted while a modal surface is open, so a
+        // screen's local shortcuts never fire "through" a dialog whose focus
+        // sits on a button. Modifier combos, Escape, and opt-in (`allowInModal`)
+        // handlers still fire.
+        if (!wantsMod && key !== 'escape' && !allowInModal && isModalSurfaceOpen()) continue
         handler(e)
         return
       }
@@ -63,5 +88,5 @@ export function useHotkeys(map: Record<string, HotkeyHandler>, options: HotkeysO
 
     el.addEventListener('keydown', onKeyDown)
     return () => el.removeEventListener('keydown', onKeyDown)
-  }, [map, enabled, navigating, options.target])
+  }, [map, enabled, allowInModal, navigating, options.target])
 }
