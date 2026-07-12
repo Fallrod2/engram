@@ -115,7 +115,10 @@
 
   --text: oklch(0.96 0.004 265);
   --text-muted: oklch(0.72 0.01 264);
-  --text-faint: oklch(0.56 0.012 263);
+  /* L raised 0.56→0.62 so the 11px semibold labels styled with `text-faint`
+     clear WCAG AA (4.5:1) on bg/surface-1/surface-2, not just AA-large — L-only,
+     hue/chroma unchanged, hierarchy (faint < muted 0.72) preserved (Phase 7 §3.4). */
+  --text-faint: oklch(0.62 0.012 263);
 
   --accent: oklch(0.62 0.17 268);
   --accent-hover: oklch(0.67 0.175 268);
@@ -168,7 +171,9 @@
 
   --text: oklch(0.24 0.012 265);
   --text-muted: oklch(0.47 0.012 264);
-  --text-faint: oklch(0.62 0.012 263);
+  /* L lowered 0.62→0.545 so light-mode `text-faint` labels clear WCAG AA (4.5:1)
+     on bg/surface-1 (see Phase 7 §3.4); L-only, hierarchy (faint > muted 0.47). */
+  --text-faint: oklch(0.545 0.012 263);
 
   --accent: oklch(0.545 0.185 268);
   --accent-hover: oklch(0.5 0.185 268);
@@ -223,7 +228,8 @@
 
     --text: oklch(0.24 0.012 265);
     --text-muted: oklch(0.47 0.012 264);
-    --text-faint: oklch(0.62 0.012 263);
+    /* AA fix, see the `[data-theme='light']` block above (Phase 7 §3.4). */
+    --text-faint: oklch(0.545 0.012 263);
 
     --accent: oklch(0.545 0.185 268);
     --accent-hover: oklch(0.5 0.185 268);
