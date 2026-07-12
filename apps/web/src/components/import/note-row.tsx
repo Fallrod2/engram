@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Note } from '@engram/shared'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -38,14 +37,13 @@ export function NoteRow({
   onEdit: (note: Note) => void
   onDelete: (note: Note) => void
 }) {
-  const optimistic = note.id.startsWith('optimistic:')
   return (
     <EntityRow>
       <Link
         {...rowProps}
         to="/import/$noteId"
         params={{ noteId: note.id }}
-        className={entityRowClass(cn('pr-10', optimistic && 'pointer-events-none opacity-60'))}
+        className={entityRowClass('pr-10')}
       >
         <span className="inline-flex h-4 min-w-8 items-center justify-center rounded-xs bg-surface-3 px-1 font-mono text-2xs uppercase text-text-muted">
           {note.sourceType}

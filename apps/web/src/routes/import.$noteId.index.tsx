@@ -171,6 +171,9 @@ function NotePage() {
 
   if (!note) return null
 
+  // Captured const so TS narrows it through the guard + closure below (no `as`).
+  const noteSubjectId = note.subjectId
+
   return (
     <div>
       <PageHeader
@@ -303,14 +306,14 @@ function NotePage() {
           void navigate({ to: '/import' })
         }}
       />
-      {note.subjectId && (
+      {noteSubjectId && (
         <DeckFormDialog
           open={newDeckOpen}
           onOpenChange={setNewDeckOpen}
           onSubmit={(values) =>
             createDeck.mutate(
               {
-                subjectId: note.subjectId as string,
+                subjectId: noteSubjectId,
                 name: values.name,
                 description: values.description,
               },

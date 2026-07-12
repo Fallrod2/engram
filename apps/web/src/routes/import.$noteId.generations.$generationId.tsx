@@ -510,10 +510,16 @@ function ReviewBoard({ generation, deck }: { generation: Generation; deck: Deck 
             onEdit={(front, back) => {
               dispatch({ type: 'edit', id: item.id, front, back })
               setEditingId(null)
+              // Restore focus to the card so j/k/↑/↓ roving keeps working
+              // (leaving the textarea would drop focus onto <body>, spec §4.8).
+              roving.focusIndex(i)
             }}
             onUndo={() => dispatch({ type: 'undo', id: item.id })}
             onStartEdit={() => setEditingId(item.id)}
-            onCancelEdit={() => setEditingId(null)}
+            onCancelEdit={() => {
+              setEditingId(null)
+              roving.focusIndex(i)
+            }}
           />
         ))}
       </div>
