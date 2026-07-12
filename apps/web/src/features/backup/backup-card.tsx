@@ -104,6 +104,10 @@ export function BackupCard() {
             type="file"
             accept="application/json,.json"
             className="sr-only"
+            // Triggered by the button above; give it an accessible name and keep
+            // it out of the tab order so it is not a nameless duplicate stop (a11y).
+            aria-label={t('settings.dataImportAction')}
+            tabIndex={-1}
             onChange={onFilePicked}
           />
         </div>
