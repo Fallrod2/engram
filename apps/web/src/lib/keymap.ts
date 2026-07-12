@@ -111,7 +111,8 @@ export const CONTEXT_LABELS: Record<ContextId, TKey> = {
 /**
  * Per-screen hotkeys — the documentary mirror of each route's `useHotkeys`
  * (verified against the code at implementation time, spec §3.4.1). Roving lists
- * (`j / k` + `Entrée`) are documented where the screen mounts `useRovingList`.
+ * (`j / k` + `Enter`) are documented where the screen mounts `useRovingList`.
+ * The `Enter` token is a canonical key name localized by the `ShortcutsDialog`.
  */
 export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
   'subjects.index': [
@@ -121,14 +122,14 @@ export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
     { keys: 'A', label: 'shortcuts.keys.archive', group: 'subjects.index' },
     { keys: 'X', label: 'shortcuts.keys.delete', group: 'subjects.index' },
     { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'subjects.index' },
-    { keys: 'Entrée', label: 'shortcuts.keys.open', group: 'subjects.index' },
+    { keys: 'Enter', label: 'shortcuts.keys.open', group: 'subjects.index' },
   ],
   'subjects.detail': [
     { keys: 'N', label: 'shortcuts.keys.newDeck', group: 'subjects.detail' },
     { keys: 'E', label: 'shortcuts.keys.editDeck', group: 'subjects.detail' },
     { keys: 'X', label: 'shortcuts.keys.deleteDeck', group: 'subjects.detail' },
     { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'subjects.detail' },
-    { keys: 'Entrée', label: 'shortcuts.keys.open', group: 'subjects.detail' },
+    { keys: 'Enter', label: 'shortcuts.keys.open', group: 'subjects.detail' },
   ],
   'deck.cards': [
     { keys: 'N', label: 'shortcuts.keys.newCard', group: 'deck.cards' },
@@ -136,13 +137,13 @@ export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
     { keys: 'E', label: 'shortcuts.keys.editCard', group: 'deck.cards' },
     { keys: 'X', label: 'shortcuts.keys.deleteCard', group: 'deck.cards' },
     { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'deck.cards' },
-    { keys: 'Entrée', label: 'shortcuts.keys.open', group: 'deck.cards' },
+    { keys: 'Enter', label: 'shortcuts.keys.open', group: 'deck.cards' },
   ],
   'import.index': [
     { keys: 'E', label: 'shortcuts.keys.editNote', group: 'import.index' },
     { keys: 'X', label: 'shortcuts.keys.deleteNote', group: 'import.index' },
     { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'import.index' },
-    { keys: 'Entrée', label: 'shortcuts.keys.openNote', group: 'import.index' },
+    { keys: 'Enter', label: 'shortcuts.keys.openNote', group: 'import.index' },
   ],
   'import.note': [
     { keys: 'E', label: 'shortcuts.keys.editNote', group: 'import.note' },
@@ -156,7 +157,7 @@ export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
     { keys: 'E', label: 'shortcuts.keys.editCard', group: 'import.generation' },
     { keys: 'U', label: 'shortcuts.keys.undoDecision', group: 'import.generation' },
     { keys: 'J K', label: 'shortcuts.keys.cardByCard', group: 'import.generation' },
-    { keys: '⌘ Entrée', label: 'shortcuts.keys.insertCards', group: 'import.generation' },
+    { keys: '⌘ Enter', label: 'shortcuts.keys.insertCards', group: 'import.generation' },
   ],
   planning: [
     { keys: 'M', label: 'shortcuts.keys.viewMonth', group: 'planning' },

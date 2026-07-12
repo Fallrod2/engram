@@ -11,16 +11,26 @@ import {
   contextForPathname,
   type KeyBinding,
 } from '@/lib/keymap'
-import { useT, type TFunction } from '@/lib/i18n'
+import { useT, type TFunction, type TKey } from '@/lib/i18n'
 import { useShell } from './shell-context'
 
+/**
+ * Word key-tokens that must follow the UI language (the physical Enter key),
+ * mapped to their dict key. Glyph tokens (⌘/⇧/⌫) are universal and rendered
+ * verbatim; letters and chord displays (`N`, `G D`) carry no locale.
+ */
+const KEY_TOKEN_LABELS: Record<string, TKey> = {
+  Enter: 'session.keyEnter',
+}
+
 /** Render a binding's space-separated tokens, one `<Kbd>` each. */
-function Keys({ keys }: { keys: string }) {
+function Keys({ keys, t }: { keys: string; t: TFunction }) {
   return (
     <span className="flex items-center gap-1">
-      {keys.split(' ').map((token, i) => (
-        <Kbd key={i}>{token}</Kbd>
-      ))}
+      {keys.split(' ').map((token, i) => {
+        const dictKey = KEY_TOKEN_LABELS[token]
+        return <Kbd key={i}>{dictKey ? t(dictKey) : token}</Kbd>
+      })}
     </span>
   )
 }
@@ -43,7 +53,7 @@ function Section({
         {bindings.map((b, i) => (
           <div key={i} className="contents">
             <span className="text-sm text-text">{t(b.label)}</span>
-            <Keys keys={b.keys} />
+            <Keys keys={b.keys} t={t} />
           </div>
         ))}
       </div>
