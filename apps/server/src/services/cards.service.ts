@@ -8,7 +8,7 @@ import type {
   ReviewPreview,
   UpdateCard,
 } from '@engram/shared'
-import type { DB } from '../db/client'
+import type { DB, Tx } from '../db/client'
 import { card } from '../db/schema'
 import { cardToDto } from '../db/dto'
 import { fsrsCardToColumns, toFsrsCard } from '../db/mappers'
@@ -48,6 +48,29 @@ export function getCard(db: DB, id: string): Card {
   return cardToDto(requireCardRow(db, id))
 }
 
+/**
+ * Low-level insert of a brand-new card (fresh FSRS seed), shared by `createCard`
+ * and `resolveGeneration`. Accepts either the `db` handle or a transaction
+ * handle so a caller can insert several cards atomically. Performs NO deck/subject
+ * validation — the caller validates the deck first (once).
+ */
+export function insertFreshCardRow(
+  dbOrTx: DB | Tx,
+  values: { deckId: string; front: string; back: string },
+): string {
+  const row = dbOrTx
+    .insert(card)
+    .values({
+      deckId: values.deckId,
+      front: values.front,
+      back: values.back,
+      ...fsrsCardToColumns(freshFsrsCard(new Date())),
+    })
+    .returning()
+    .get()
+  return row.id
+}
+
 export function createCard(db: DB, input: CreateCard): Card {
   // 404 if the deck is missing; 409 if its subject is archived.
   const deckRow = requireDeckRow(db, input.deckId)
@@ -55,17 +78,12 @@ export function createCard(db: DB, input: CreateCard): Card {
   if (subjectRow.archived) {
     throw new ConflictError('cannot create a card under an archived subject')
   }
-  const row = db
-    .insert(card)
-    .values({
-      deckId: input.deckId,
-      front: input.front,
-      back: input.back,
-      ...fsrsCardToColumns(freshFsrsCard(new Date())),
-    })
-    .returning()
-    .get()
-  return cardToDto(row)
+  const id = insertFreshCardRow(db, {
+    deckId: input.deckId,
+    front: input.front,
+    back: input.back,
+  })
+  return getCard(db, id)
 }
 
 export function updateCard(db: DB, id: string, patch: UpdateCard): Card {

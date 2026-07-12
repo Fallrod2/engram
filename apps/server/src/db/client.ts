@@ -11,3 +11,10 @@ sqlite.exec('PRAGMA busy_timeout = 5000;')
 
 export const db = drizzle(sqlite, { schema })
 export type DB = typeof db
+
+/**
+ * The transaction handle passed to `db.transaction((tx) => …)`. Structurally it
+ * shares the query-builder surface with `DB` but omits members like `$client`,
+ * so functions that must accept both a `db` and a `tx` type against `DB | Tx`.
+ */
+export type Tx = Parameters<Parameters<DB['transaction']>[0]>[0]
