@@ -47,7 +47,7 @@ export function DayLoad({
       <span className={cn('font-mono tabular-nums', week ? 'text-base' : 'text-xs', tone)}>
         {value}
       </span>
-      <LoadMeter value={value} max={max} className={week ? 'max-w-16' : 'max-w-10'} />
+      <LoadMeter value={value} max={max} className={week ? 'max-w-16' : 'w-10'} />
     </span>
   )
 }
