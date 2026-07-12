@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useRouterState } from '@tanstack/react-router'
 
 /** True when the event target is a text-entry surface (input/textarea/CE). */
 export function isEditableTarget(target: EventTarget | null): boolean {
@@ -31,8 +32,16 @@ export interface HotkeysOptions {
 export function useHotkeys(map: Record<string, HotkeyHandler>, options: HotkeysOptions = {}): void {
   const { enabled = true } = options
 
+  // Navigation-aware guard (spec §1.7, §4). TanStack Router keeps the previous
+  // route's component — and therefore its `window` keydown listener — mounted
+  // while the next route's loader is in flight. Without this, a single-key
+  // shortcut typed mid-navigation would fire the *old* screen's handler (e.g.
+  // creating a subject while entering a deck). Suppress every screen's hotkeys
+  // while a navigation is pending so only the settled route can act.
+  const navigating = useRouterState({ select: (s) => s.status !== 'idle' })
+
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || navigating) return
     const el: Window | HTMLElement = options.target ?? window
 
     const onKeyDown = (ev: Event) => {
@@ -54,5 +63,5 @@ export function useHotkeys(map: Record<string, HotkeyHandler>, options: HotkeysO
 
     el.addEventListener('keydown', onKeyDown)
     return () => el.removeEventListener('keydown', onKeyDown)
-  }, [map, enabled, options.target])
+  }, [map, enabled, navigating, options.target])
 }
