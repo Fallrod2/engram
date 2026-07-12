@@ -485,6 +485,143 @@ export const studyTodayResponseSchema = z.object({
   subjects: z.array(studyTodaySubjectSchema),
 })
 
+// --- Analytics (Phase 5) ---------------------------------------------------
+
+/**
+ * Shared shape of the optional local-day window (`from`/`to` together, or
+ * neither). The "both-or-none" rule and the size/order guards are enforced in
+ * the analytics service, not in Zod.
+ */
+const analyticsWindowShape = { from: localDaySchema.optional(), to: localDaySchema.optional() }
+const analyticsGranularitySchema = z.enum(['day', 'week']).default('day')
+
+// --- heatmap ---
+export const heatmapQuerySchema = z.object({ ...analyticsWindowShape, now: iso.optional() })
+export const heatmapDaySchema = z.object({
+  date: localDaySchema,
+  count: z.number().int().nonnegative(),
+})
+export const heatmapResponseSchema = z.object({
+  from: localDaySchema,
+  to: localDaySchema,
+  total: z.number().int().nonnegative(),
+  activeDays: z.number().int().nonnegative(),
+  max: z.number().int().nonnegative(),
+  days: z.array(heatmapDaySchema), // dense: one item per day of [from, to]
+})
+
+// --- streaks ---
+export const streaksQuerySchema = z.object({ now: iso.optional() })
+export const streaksResponseSchema = z.object({
+  now: iso,
+  current: z.number().int().nonnegative(),
+  longest: z.number().int().nonnegative(),
+  includesToday: z.boolean(),
+  lastStudyDay: localDaySchema.nullable(),
+  totalStudyDays: z.number().int().nonnegative(),
+})
+
+// --- study-time ---
+export const studyTimeQuerySchema = z.object({
+  ...analyticsWindowShape,
+  granularity: analyticsGranularitySchema,
+  now: iso.optional(),
+})
+export const studyTimeBucketSchema = z.object({
+  date: localDaySchema, // a day, or the Monday of the week
+  daysInBucket: z.number().int().min(1).max(7), // 1 in day; 1..7 in week (partial edge)
+  durationMs: z.number().int().nonnegative(), // Σ of non-null durations
+  reviewCount: z.number().int().nonnegative(),
+  measuredCount: z.number().int().nonnegative(),
+  avgMs: z.number().int().nonnegative().nullable(), // Math.round; null if measuredCount === 0
+})
+export const studyTimeResponseSchema = z.object({
+  from: localDaySchema,
+  to: localDaySchema,
+  granularity: z.enum(['day', 'week']),
+  totalMs: z.number().int().nonnegative(),
+  totalReviews: z.number().int().nonnegative(),
+  measuredReviews: z.number().int().nonnegative(),
+  buckets: z.array(studyTimeBucketSchema),
+})
+
+// --- review-volume ---
+export const reviewVolumeQuerySchema = z.object({
+  ...analyticsWindowShape,
+  granularity: analyticsGranularitySchema,
+  now: iso.optional(),
+})
+const ratingCounts = {
+  again: z.number().int().nonnegative(),
+  hard: z.number().int().nonnegative(),
+  good: z.number().int().nonnegative(),
+  easy: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+}
+export const reviewVolumeBucketSchema = z.object({
+  date: localDaySchema,
+  daysInBucket: z.number().int().min(1).max(7),
+  ...ratingCounts,
+})
+export const reviewVolumeResponseSchema = z.object({
+  from: localDaySchema,
+  to: localDaySchema,
+  granularity: z.enum(['day', 'week']),
+  totals: z.object(ratingCounts),
+  buckets: z.array(reviewVolumeBucketSchema),
+})
+
+// --- retention (per subject) ---
+export const retentionQuerySchema = z.object({ ...analyticsWindowShape })
+export const retentionSubjectSchema = z.object({
+  subjectId: z.string(),
+  // Denominator name is DISTINCT from deckSuccess.reviewed (all states): here
+  // only reviews in state=Review count (mature cards).
+  maturedReviewed: z.number().int().nonnegative(),
+  recalled: z.number().int().nonnegative(), // rating >= 2 among those
+  retention: z.number().min(0).max(1).nullable(), // null if maturedReviewed < minSample
+})
+export const retentionResponseSchema = z.object({
+  from: localDaySchema.nullable(),
+  to: localDaySchema.nullable(),
+  minSample: z.number().int().positive(),
+  subjects: z.array(retentionSubjectSchema),
+})
+
+// --- deck-success (per deck) ---
+export const deckSuccessQuerySchema = z.object({ ...analyticsWindowShape })
+export const deckSuccessSchema = z.object({
+  deckId: z.string(),
+  subjectId: z.string(),
+  reviewed: z.number().int().nonnegative(), // all states
+  passed: z.number().int().nonnegative(), // rating >= 2
+  successRate: z.number().min(0).max(1).nullable(),
+})
+export const deckSuccessResponseSchema = z.object({
+  from: localDaySchema.nullable(),
+  to: localDaySchema.nullable(),
+  minSample: z.number().int().positive(),
+  decks: z.array(deckSuccessSchema),
+})
+
+export type HeatmapQuery = z.infer<typeof heatmapQuerySchema>
+export type HeatmapDay = z.infer<typeof heatmapDaySchema>
+export type HeatmapResponse = z.infer<typeof heatmapResponseSchema>
+export type StreaksQuery = z.infer<typeof streaksQuerySchema>
+export type StreaksResponse = z.infer<typeof streaksResponseSchema>
+export type StudyTimeQuery = z.infer<typeof studyTimeQuerySchema>
+export type StudyTimeBucket = z.infer<typeof studyTimeBucketSchema>
+export type StudyTimeResponse = z.infer<typeof studyTimeResponseSchema>
+export type ReviewVolumeQuery = z.infer<typeof reviewVolumeQuerySchema>
+export type ReviewVolumeBucket = z.infer<typeof reviewVolumeBucketSchema>
+export type ReviewVolumeResponse = z.infer<typeof reviewVolumeResponseSchema>
+export type RetentionQuery = z.infer<typeof retentionQuerySchema>
+export type RetentionSubject = z.infer<typeof retentionSubjectSchema>
+export type RetentionResponse = z.infer<typeof retentionResponseSchema>
+export type DeckSuccessQuery = z.infer<typeof deckSuccessQuerySchema>
+export type DeckSuccess = z.infer<typeof deckSuccessSchema>
+export type DeckSuccessResponse = z.infer<typeof deckSuccessResponseSchema>
+
 export type ListExamsQuery = z.infer<typeof listExamsQuerySchema>
 export type StudyPlanQuery = z.infer<typeof studyPlanQuerySchema>
 export type StudyPlanSubjectLoad = z.infer<typeof studyPlanSubjectLoadSchema>
