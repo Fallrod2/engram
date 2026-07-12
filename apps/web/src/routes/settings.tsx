@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { BackupCard } from '@/features/backup/backup-card'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -80,6 +81,8 @@ function SettingsPage() {
           </Select>
         </CardContent>
       </Card>
+
+      <BackupCard />
 
       <Card>
         <CardHeader>
