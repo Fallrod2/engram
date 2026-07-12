@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMediaQuery } from '@/lib/use-media-query'
 import { FLAT_NAV } from './nav'
@@ -13,6 +13,11 @@ interface ShellContextValue {
   toggleCollapse: () => void
   commandOpen: boolean
   setCommandOpen: (open: boolean) => void
+  /**
+   * True while a full-screen review session is mounted (spec §4.1). The global
+   * shortcut handler early-returns so ⌘K / `[` / ⌘1…9 never fire mid-review.
+   */
+  setSessionActive: (active: boolean) => void
 }
 
 const ShellContext = createContext<ShellContextValue | null>(null)
@@ -39,6 +44,12 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const [pref, setPref] = useState<boolean | null>(readCollapsePref)
   const [commandOpen, setCommandOpen] = useState(false)
+  // A ref, not state: the session flag only gates the keydown handler and must
+  // not re-subscribe the listener when it flips.
+  const sessionActiveRef = useRef(false)
+  const setSessionActive = useCallback((active: boolean) => {
+    sessionActiveRef.current = active
+  }, [])
 
   // No stored choice → auto: expanded when wide, collapsed when narrower.
   const collapsed = pref ?? !isWide
@@ -56,6 +67,8 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
   // Global shortcuts: ⌘K (palette), [ (collapse), ⌘1…9 (jump to nav item).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // A full-screen session owns the keyboard (spec §4.1).
+      if (sessionActiveRef.current) return
       const mod = e.metaKey || e.ctrlKey
 
       if (mod && e.key.toLowerCase() === 'k') {
@@ -89,8 +102,9 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
       toggleCollapse,
       commandOpen,
       setCommandOpen,
+      setSessionActive,
     }),
-    [collapsed, isDesktop, toggleCollapse, commandOpen],
+    [collapsed, isDesktop, toggleCollapse, commandOpen, setSessionActive],
   )
 
   return <ShellContext value={value}>{children}</ShellContext>

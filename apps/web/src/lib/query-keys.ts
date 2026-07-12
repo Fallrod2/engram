@@ -23,4 +23,19 @@ export const qk = {
   dueCounts: {
     all: ['due-counts'] as const,
   },
+  review: {
+    /**
+     * Frozen queue (spec §13.1). `now` (the session's frozen `sessionNow`)
+     * enters the key, so every session entry is its own lot and two sessions
+     * never share a cached queue.
+     */
+    queue: (scope: { deckId?: string; subjectId?: string; now: string }) =>
+      ['review', 'queue', scope] as const,
+    /**
+     * Interval preview of a card at a given `now` (finding #5). `now` MUST be in
+     * the key: two prefetches of the same card at different `now` would
+     * otherwise collide and the second be silently dropped.
+     */
+    preview: (cardId: string, now: string) => ['review', 'preview', cardId, now] as const,
+  },
 } as const
