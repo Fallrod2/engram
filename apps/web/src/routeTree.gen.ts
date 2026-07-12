@@ -9,18 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SubjectsRouteImport } from './routes/subjects'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as PlanningRouteImport } from './routes/planning'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SubjectsIndexRouteImport } from './routes/subjects.index'
+import { Route as SubjectsSubjectIdIndexRouteImport } from './routes/subjects.$subjectId.index'
+import { Route as SubjectsSubjectIdDecksDeckIdRouteImport } from './routes/subjects.$subjectId.decks.$deckId'
 
-const SubjectsRoute = SubjectsRouteImport.update({
-  id: '/subjects',
-  path: '/subjects',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -46,6 +43,22 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubjectsIndexRoute = SubjectsIndexRouteImport.update({
+  id: '/subjects/',
+  path: '/subjects/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubjectsSubjectIdIndexRoute = SubjectsSubjectIdIndexRouteImport.update({
+  id: '/subjects/$subjectId/',
+  path: '/subjects/$subjectId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubjectsSubjectIdDecksDeckIdRoute =
+  SubjectsSubjectIdDecksDeckIdRouteImport.update({
+    id: '/subjects/$subjectId/decks/$deckId',
+    path: '/subjects/$subjectId/decks/$deckId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,7 +66,9 @@ export interface FileRoutesByFullPath {
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
-  '/subjects': typeof SubjectsRoute
+  '/subjects/': typeof SubjectsIndexRoute
+  '/subjects/$subjectId/': typeof SubjectsSubjectIdIndexRoute
+  '/subjects/$subjectId/decks/$deckId': typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -61,7 +76,9 @@ export interface FileRoutesByTo {
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
-  '/subjects': typeof SubjectsRoute
+  '/subjects': typeof SubjectsIndexRoute
+  '/subjects/$subjectId': typeof SubjectsSubjectIdIndexRoute
+  '/subjects/$subjectId/decks/$deckId': typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -70,14 +87,31 @@ export interface FileRoutesById {
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
-  '/subjects': typeof SubjectsRoute
+  '/subjects/': typeof SubjectsIndexRoute
+  '/subjects/$subjectId/': typeof SubjectsSubjectIdIndexRoute
+  '/subjects/$subjectId/decks/$deckId': typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/analytics' | '/planning' | '/review' | '/settings' | '/subjects'
+    | '/'
+    | '/analytics'
+    | '/planning'
+    | '/review'
+    | '/settings'
+    | '/subjects/'
+    | '/subjects/$subjectId/'
+    | '/subjects/$subjectId/decks/$deckId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analytics' | '/planning' | '/review' | '/settings' | '/subjects'
+  to:
+    | '/'
+    | '/analytics'
+    | '/planning'
+    | '/review'
+    | '/settings'
+    | '/subjects'
+    | '/subjects/$subjectId'
+    | '/subjects/$subjectId/decks/$deckId'
   id:
     | '__root__'
     | '/'
@@ -85,7 +119,9 @@ export interface FileRouteTypes {
     | '/planning'
     | '/review'
     | '/settings'
-    | '/subjects'
+    | '/subjects/'
+    | '/subjects/$subjectId/'
+    | '/subjects/$subjectId/decks/$deckId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,18 +130,13 @@ export interface RootRouteChildren {
   PlanningRoute: typeof PlanningRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
-  SubjectsRoute: typeof SubjectsRoute
+  SubjectsIndexRoute: typeof SubjectsIndexRoute
+  SubjectsSubjectIdIndexRoute: typeof SubjectsSubjectIdIndexRoute
+  SubjectsSubjectIdDecksDeckIdRoute: typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/subjects': {
-      id: '/subjects'
-      path: '/subjects'
-      fullPath: '/subjects'
-      preLoaderRoute: typeof SubjectsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -141,6 +172,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/subjects/': {
+      id: '/subjects/'
+      path: '/subjects'
+      fullPath: '/subjects/'
+      preLoaderRoute: typeof SubjectsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subjects/$subjectId/': {
+      id: '/subjects/$subjectId/'
+      path: '/subjects/$subjectId'
+      fullPath: '/subjects/$subjectId/'
+      preLoaderRoute: typeof SubjectsSubjectIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subjects/$subjectId/decks/$deckId': {
+      id: '/subjects/$subjectId/decks/$deckId'
+      path: '/subjects/$subjectId/decks/$deckId'
+      fullPath: '/subjects/$subjectId/decks/$deckId'
+      preLoaderRoute: typeof SubjectsSubjectIdDecksDeckIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -150,7 +202,9 @@ const rootRouteChildren: RootRouteChildren = {
   PlanningRoute: PlanningRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
-  SubjectsRoute: SubjectsRoute,
+  SubjectsIndexRoute: SubjectsIndexRoute,
+  SubjectsSubjectIdIndexRoute: SubjectsSubjectIdIndexRoute,
+  SubjectsSubjectIdDecksDeckIdRoute: SubjectsSubjectIdDecksDeckIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
