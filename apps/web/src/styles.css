@@ -303,6 +303,17 @@
   }
 }
 
+/* Barre de progression indéterminée (génération IA, Phase 3 §4.2) : un segment
+   accent qui glisse calmement, jamais anxiogène. Coupé sous reduced-motion. */
+@keyframes engram-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 /* prefers-reduced-motion : coupe toutes les durées (le flip Phase 2 devient
    cross-fade géré côté composant, la respiration du streak est supprimée). */
 @media (prefers-reduced-motion: reduce) {

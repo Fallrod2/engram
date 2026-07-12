@@ -15,8 +15,11 @@ import { Route as PlanningRouteImport } from './routes/planning'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsIndexRouteImport } from './routes/subjects.index'
+import { Route as ImportIndexRouteImport } from './routes/import.index'
 import { Route as SubjectsSubjectIdIndexRouteImport } from './routes/subjects.$subjectId.index'
+import { Route as ImportNoteIdIndexRouteImport } from './routes/import.$noteId.index'
 import { Route as SubjectsSubjectIdDecksDeckIdRouteImport } from './routes/subjects.$subjectId.decks.$deckId'
+import { Route as ImportNoteIdGenerationsGenerationIdRouteImport } from './routes/import.$noteId.generations.$generationId'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -48,15 +51,31 @@ const SubjectsIndexRoute = SubjectsIndexRouteImport.update({
   path: '/subjects/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ImportIndexRoute = ImportIndexRouteImport.update({
+  id: '/import/',
+  path: '/import/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubjectsSubjectIdIndexRoute = SubjectsSubjectIdIndexRouteImport.update({
   id: '/subjects/$subjectId/',
   path: '/subjects/$subjectId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportNoteIdIndexRoute = ImportNoteIdIndexRouteImport.update({
+  id: '/import/$noteId/',
+  path: '/import/$noteId/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubjectsSubjectIdDecksDeckIdRoute =
   SubjectsSubjectIdDecksDeckIdRouteImport.update({
     id: '/subjects/$subjectId/decks/$deckId',
     path: '/subjects/$subjectId/decks/$deckId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ImportNoteIdGenerationsGenerationIdRoute =
+  ImportNoteIdGenerationsGenerationIdRouteImport.update({
+    id: '/import/$noteId/generations/$generationId',
+    path: '/import/$noteId/generations/$generationId',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -66,8 +85,11 @@ export interface FileRoutesByFullPath {
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
+  '/import/$noteId/': typeof ImportNoteIdIndexRoute
   '/subjects/$subjectId/': typeof SubjectsSubjectIdIndexRoute
+  '/import/$noteId/generations/$generationId': typeof ImportNoteIdGenerationsGenerationIdRoute
   '/subjects/$subjectId/decks/$deckId': typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 export interface FileRoutesByTo {
@@ -76,8 +98,11 @@ export interface FileRoutesByTo {
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/import': typeof ImportIndexRoute
   '/subjects': typeof SubjectsIndexRoute
+  '/import/$noteId': typeof ImportNoteIdIndexRoute
   '/subjects/$subjectId': typeof SubjectsSubjectIdIndexRoute
+  '/import/$noteId/generations/$generationId': typeof ImportNoteIdGenerationsGenerationIdRoute
   '/subjects/$subjectId/decks/$deckId': typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 export interface FileRoutesById {
@@ -87,8 +112,11 @@ export interface FileRoutesById {
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
+  '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
+  '/import/$noteId/': typeof ImportNoteIdIndexRoute
   '/subjects/$subjectId/': typeof SubjectsSubjectIdIndexRoute
+  '/import/$noteId/generations/$generationId': typeof ImportNoteIdGenerationsGenerationIdRoute
   '/subjects/$subjectId/decks/$deckId': typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 export interface FileRouteTypes {
@@ -99,8 +127,11 @@ export interface FileRouteTypes {
     | '/planning'
     | '/review'
     | '/settings'
+    | '/import/'
     | '/subjects/'
+    | '/import/$noteId/'
     | '/subjects/$subjectId/'
+    | '/import/$noteId/generations/$generationId'
     | '/subjects/$subjectId/decks/$deckId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -109,8 +140,11 @@ export interface FileRouteTypes {
     | '/planning'
     | '/review'
     | '/settings'
+    | '/import'
     | '/subjects'
+    | '/import/$noteId'
     | '/subjects/$subjectId'
+    | '/import/$noteId/generations/$generationId'
     | '/subjects/$subjectId/decks/$deckId'
   id:
     | '__root__'
@@ -119,8 +153,11 @@ export interface FileRouteTypes {
     | '/planning'
     | '/review'
     | '/settings'
+    | '/import/'
     | '/subjects/'
+    | '/import/$noteId/'
     | '/subjects/$subjectId/'
+    | '/import/$noteId/generations/$generationId'
     | '/subjects/$subjectId/decks/$deckId'
   fileRoutesById: FileRoutesById
 }
@@ -130,8 +167,11 @@ export interface RootRouteChildren {
   PlanningRoute: typeof PlanningRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
+  ImportIndexRoute: typeof ImportIndexRoute
   SubjectsIndexRoute: typeof SubjectsIndexRoute
+  ImportNoteIdIndexRoute: typeof ImportNoteIdIndexRoute
   SubjectsSubjectIdIndexRoute: typeof SubjectsSubjectIdIndexRoute
+  ImportNoteIdGenerationsGenerationIdRoute: typeof ImportNoteIdGenerationsGenerationIdRoute
   SubjectsSubjectIdDecksDeckIdRoute: typeof SubjectsSubjectIdDecksDeckIdRoute
 }
 
@@ -179,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubjectsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/import/': {
+      id: '/import/'
+      path: '/import'
+      fullPath: '/import/'
+      preLoaderRoute: typeof ImportIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/subjects/$subjectId/': {
       id: '/subjects/$subjectId/'
       path: '/subjects/$subjectId'
@@ -186,11 +233,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubjectsSubjectIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/import/$noteId/': {
+      id: '/import/$noteId/'
+      path: '/import/$noteId'
+      fullPath: '/import/$noteId/'
+      preLoaderRoute: typeof ImportNoteIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/subjects/$subjectId/decks/$deckId': {
       id: '/subjects/$subjectId/decks/$deckId'
       path: '/subjects/$subjectId/decks/$deckId'
       fullPath: '/subjects/$subjectId/decks/$deckId'
       preLoaderRoute: typeof SubjectsSubjectIdDecksDeckIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/import/$noteId/generations/$generationId': {
+      id: '/import/$noteId/generations/$generationId'
+      path: '/import/$noteId/generations/$generationId'
+      fullPath: '/import/$noteId/generations/$generationId'
+      preLoaderRoute: typeof ImportNoteIdGenerationsGenerationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -202,8 +263,12 @@ const rootRouteChildren: RootRouteChildren = {
   PlanningRoute: PlanningRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
+  ImportIndexRoute: ImportIndexRoute,
   SubjectsIndexRoute: SubjectsIndexRoute,
+  ImportNoteIdIndexRoute: ImportNoteIdIndexRoute,
   SubjectsSubjectIdIndexRoute: SubjectsSubjectIdIndexRoute,
+  ImportNoteIdGenerationsGenerationIdRoute:
+    ImportNoteIdGenerationsGenerationIdRoute,
   SubjectsSubjectIdDecksDeckIdRoute: SubjectsSubjectIdDecksDeckIdRoute,
 }
 export const routeTree = rootRouteImport

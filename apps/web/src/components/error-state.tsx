@@ -13,6 +13,9 @@ const MESSAGES = {
   decks: 'Impossible de charger les decks.',
   deck: 'Impossible de charger ce deck.',
   cards: 'Impossible de charger les cartes.',
+  notes: 'Impossible de charger les notes.',
+  note: 'Impossible de charger cette note.',
+  generation: 'Impossible de charger cette génération.',
 } as const
 
 export function ErrorState({

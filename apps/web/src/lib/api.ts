@@ -55,7 +55,11 @@ interface RequestOptions<T> {
 async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T> {
   const { method = 'GET', body, schema, signal } = opts
   const init: RequestInit = { method }
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    // Multipart (spec §1.3): never set `Content-Type` — the browser writes it
+    // with the correct multipart boundary — and never `JSON.stringify`.
+    init.body = body
+  } else if (body !== undefined) {
     init.body = JSON.stringify(body)
     init.headers = { 'Content-Type': 'application/json' }
   }
@@ -74,6 +78,9 @@ export const api = {
   patch: <T>(path: string, body: unknown, schema: z.ZodType<T>) =>
     request<T>(path, { method: 'PATCH', body, schema }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
+  /** Multipart POST (file upload). `body` is a `FormData`; parsed via `schema`. */
+  upload: <T>(path: string, body: FormData, schema: z.ZodType<T>) =>
+    request<T>(path, { method: 'POST', body, schema }),
 }
 
 /** Build a query string from defined params only. */
