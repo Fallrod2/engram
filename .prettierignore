@@ -8,6 +8,9 @@ bun.lock
 test-results
 playwright-report
 
+# Generated Vercel function bundle
+api/app.bundle.mjs
+
 # Fichiers générés par drizzle-kit — format imposé par l'outil
 apps/server/drizzle/
 

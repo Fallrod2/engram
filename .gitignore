@@ -38,3 +38,6 @@ supabase/.temp
 
 # OS / editor cruft
 .DS_Store
+
+# Generated Vercel function bundle
+api/app.bundle.mjs
