@@ -35,6 +35,7 @@ import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { CardsIllustration } from '@/components/illustrations'
 import { CardsTableSkeleton } from '@/components/skeletons'
+import { Skeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/page-header'
 import { SubjectDot } from '@/components/subject-dot'
 import { FsrsStateGlyph } from '@/components/fsrs-state-glyph'
@@ -46,6 +47,7 @@ import { formatDateTime, formatDue, formatReps } from '@/lib/format'
 import { subjectDetailOptions } from '@/features/subjects/queries'
 import { deckDetailOptions, useDeleteDeck, useUpdateDeck } from '@/features/decks/queries'
 import {
+  CARD_PAGE_LIMIT,
   cardsListOptions,
   useCreateCard,
   useDeleteCard,
@@ -56,11 +58,16 @@ import { CardEditDialog } from '@/features/cards/card-edit-dialog'
 import { DeckFormDialog } from '@/features/decks/deck-form-dialog'
 
 export const Route = createFileRoute('/subjects/$subjectId/decks/$deckId')({
+  // The loader blocks only on the subject + deck (fast, usually already cached
+  // from the parent route). The card LIST is intentionally NOT awaited here: it
+  // streams in via `useQuery` inside the page so the composer — the phase's
+  // headline interaction (spec §4) — mounts ONCE and stays stable while the
+  // table loads. Awaiting it here would force a `pendingComponent` swap that
+  // remounts the composer and can drop a fast first submit (Phase 7 §4).
   loader: ({ context, params }) =>
     Promise.all([
       context.queryClient.ensureQueryData(subjectDetailOptions(params.subjectId)),
       context.queryClient.ensureQueryData(deckDetailOptions(params.deckId)),
-      context.queryClient.ensureQueryData(cardsListOptions(params.deckId)),
     ]),
   component: CardsPage,
   pendingComponent: CardsPending,
@@ -68,19 +75,14 @@ export const Route = createFileRoute('/subjects/$subjectId/decks/$deckId')({
 })
 
 /**
- * Cold-cache loading state (spec §4): the composer — the phase's headline
- * interaction — is available immediately, independent of the table, so a fast
- * keyboard user can start typing cards before the list resolves. The table
- * below it shows a 10-row skeleton until the loader settles.
+ * Cold-cache loading state (spec §4): shown only while the subject + deck load
+ * (rare — they are usually cached from the parent route). No live composer here
+ * so there is exactly ONE composer instance across the whole page lifecycle.
  */
 function CardsPending() {
-  const { subjectId, deckId } = Route.useParams()
-  const createCard = useCreateCard(deckId, subjectId)
   return (
     <div>
-      <div className="mb-4">
-        <CardComposer onAdd={(front, back) => createCard.mutate({ deckId, front, back })} />
-      </div>
+      <Skeleton className="mb-4 h-44 rounded-md" />
       <CardsTableSkeleton />
     </div>
   )
@@ -115,7 +117,15 @@ function CardsPage() {
 
   const subject = useQuery(subjectDetailOptions(subjectId)).data
   const deck = useQuery(deckDetailOptions(deckId)).data
-  const cards = useQuery(cardsListOptions(deckId)).data ?? []
+  // Cards stream in here (not via the route loader) so the composer stays mounted
+  // once while the table loads (Phase 7 §4).
+  const cardsQuery = useQuery(cardsListOptions(deckId))
+  const cardsPage = cardsQuery.data
+  const cards = cardsPage?.cards ?? []
+  // The list fetches a single capped page; surface — never hide — the overflow
+  // when a deck holds more cards than the page cap (Phase 7 §2.4).
+  const total = cardsPage?.total ?? cards.length
+  const truncated = total > cards.length
 
   const [sort, setSort] = useState<Sort>('createdDesc')
   const [editCard, setEditCard] = useState<Card | null>(null)
@@ -248,7 +258,11 @@ function CardsPage() {
         />
       </div>
 
-      {sorted.length === 0 ? (
+      {cardsQuery.isError ? (
+        <ErrorState kind="cards" onRetry={() => void cardsQuery.refetch()} />
+      ) : cardsQuery.isPending ? (
+        <CardsTableSkeleton />
+      ) : sorted.length === 0 ? (
         <EmptyState
           illustration={<CardsIllustration />}
           title={t('empty.cardsTitle')}
@@ -356,6 +370,12 @@ function CardsPage() {
               })}
             </TableBody>
           </Table>
+          {truncated && (
+            <p role="status" className="mt-2 px-3 text-xs text-text-muted">
+              Affichage limité aux {CARD_PAGE_LIMIT} premières cartes sur {total}. Scindez ce deck
+              pour tout consulter.
+            </p>
+          )}
         </div>
       )}
 
@@ -393,8 +413,7 @@ function CardsPage() {
         description={
           <>
             Supprime définitivement ce deck, ses{' '}
-            <strong className="text-text">{cards.length} cartes</strong> et leur historique.
-            Irréversible.
+            <strong className="text-text">{total} cartes</strong> et leur historique. Irréversible.
           </>
         }
         onConfirm={() => {

@@ -16,19 +16,27 @@ import { mergeDefined } from '@/lib/utils'
  * Cards of a deck. The API is offset-paginated and ordered by createdAt asc;
  * for personal-tool deck sizes we fetch a single page (limit 500) and sort
  * client-side, which keeps optimistic prepend (the composer's core loop) simple.
+ * We keep the server `total` alongside the loaded page so the UI can flag — never
+ * silently — a deck larger than the page cap (Phase 7 §2.4).
  */
-const CARD_PAGE_LIMIT = 500
+export const CARD_PAGE_LIMIT = 500
+
+/** The loaded page plus the server-side total (drives the truncation notice). */
+export interface CardsPage {
+  cards: Card[]
+  total: number
+}
 
 export function cardsListOptions(deckId: string) {
   return queryOptions({
     queryKey: qk.cards.listByDeck(deckId),
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal }): Promise<CardsPage> => {
       const page = await api.get(
         `/cards${qs({ deckId, limit: CARD_PAGE_LIMIT })}`,
         listCardsResponseSchema,
         signal,
       )
-      return page.cards
+      return { cards: page.cards, total: page.total }
     },
   })
 }
@@ -74,7 +82,7 @@ export function useCreateCard(deckId: string, subjectId: string) {
     mutationFn: (input: CreateCard) => api.post('/cards', input, cardSchema),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: key })
-      const previous = qc.getQueryData<Card[]>(key)
+      const previous = qc.getQueryData<CardsPage>(key)
       const now = new Date().toISOString()
       const optimistic: Card = {
         id: `optimistic:${crypto.randomUUID()}`,
@@ -85,7 +93,10 @@ export function useCreateCard(deckId: string, subjectId: string) {
         createdAt: now,
         updatedAt: now,
       }
-      qc.setQueryData<Card[]>(key, (old) => [...(old ?? []), optimistic])
+      qc.setQueryData<CardsPage>(key, (old) => ({
+        cards: [...(old?.cards ?? []), optimistic],
+        total: (old?.total ?? 0) + 1,
+      }))
       return { previous, tempId: optimistic.id }
     },
     onError: (_err, input, ctx) => {
@@ -95,8 +106,10 @@ export function useCreateCard(deckId: string, subjectId: string) {
       })
     },
     onSuccess: (created, _input, ctx) => {
-      qc.setQueryData<Card[]>(key, (old) =>
-        (old ?? []).map((c) => (c.id === ctx?.tempId ? created : c)),
+      qc.setQueryData<CardsPage>(key, (old) =>
+        old
+          ? { ...old, cards: old.cards.map((c) => (c.id === ctx?.tempId ? created : c)) }
+          : { cards: [created], total: 1 },
       )
     },
     onSettled: () => invalidateCardCounts(qc, deckId, subjectId),
@@ -112,9 +125,11 @@ export function useUpdateCard(deckId: string) {
       api.patch(`/cards/${id}`, patch, cardSchema),
     onMutate: async ({ id, patch }) => {
       await qc.cancelQueries({ queryKey: key })
-      const previous = qc.getQueryData<Card[]>(key)
-      qc.setQueryData<Card[]>(key, (old) =>
-        (old ?? []).map((c) => (c.id === id ? mergeDefined(c, patch) : c)),
+      const previous = qc.getQueryData<CardsPage>(key)
+      qc.setQueryData<CardsPage>(key, (old) =>
+        old
+          ? { ...old, cards: old.cards.map((c) => (c.id === id ? mergeDefined(c, patch) : c)) }
+          : old,
       )
       return { previous }
     },
@@ -137,8 +152,12 @@ export function useDeleteCard(deckId: string, subjectId: string) {
     mutationFn: ({ id }: { id: string }) => api.delete(`/cards/${id}`),
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: key })
-      const previous = qc.getQueryData<Card[]>(key)
-      qc.setQueryData<Card[]>(key, (old) => (old ?? []).filter((c) => c.id !== id))
+      const previous = qc.getQueryData<CardsPage>(key)
+      qc.setQueryData<CardsPage>(key, (old) =>
+        old
+          ? { cards: old.cards.filter((c) => c.id !== id), total: Math.max(0, old.total - 1) }
+          : old,
+      )
       return { previous }
     },
     onError: (_err, vars, ctx) => {
