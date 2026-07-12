@@ -1,5 +1,7 @@
+import { Link } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useMediaQuery } from '@/lib/use-media-query'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { ThemeToggle } from './theme-toggle'
@@ -12,6 +14,9 @@ import { useShell } from './shell-context'
  */
 export function Header({ title, scrolled }: { title: string; scrolled: boolean }) {
   const { setCommandOpen } = useShell()
+  // Mobile has no sidebar, so the header title doubles as the way back to the
+  // dashboard `/` (spec §5.5); on desktop the sidebar owns navigation.
+  const isMobile = !useMediaQuery('(min-width: 768px)')
 
   return (
     <header
@@ -23,7 +28,19 @@ export function Header({ title, scrolled }: { title: string; scrolled: boolean }
           : 'border-b border-transparent bg-transparent',
       )}
     >
-      <h1 className="truncate text-xl font-semibold tracking-[-0.02em] text-text">{title}</h1>
+      <h1 className="min-w-0 truncate text-xl font-semibold tracking-[-0.02em] text-text">
+        {isMobile ? (
+          <Link
+            to="/"
+            className="transition-colors duration-fast hover:text-text-muted"
+            aria-label={`${title} — aller au tableau de bord`}
+          >
+            {title}
+          </Link>
+        ) : (
+          title
+        )}
+      </h1>
 
       <div className="ml-auto flex items-center gap-1 md:hidden">
         <Button

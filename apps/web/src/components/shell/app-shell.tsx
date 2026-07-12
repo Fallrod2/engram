@@ -5,6 +5,8 @@ import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { MobileTabBar } from './mobile-tab-bar'
 import { CommandMenu } from './command-menu'
+import { CreateHost } from './command-actions'
+import { ShortcutsDialog } from './shortcuts-dialog'
 import { ShellProvider } from './shell-context'
 import { getPageTitle } from './page-title'
 
@@ -53,6 +55,10 @@ function ShellInner() {
 
       <MobileTabBar />
       <CommandMenu />
+      {/* Shell-level hosts (spec §3.4, §4.3): the help dialog and the global
+          create dialogs the palette drives from any route. */}
+      <ShortcutsDialog />
+      <CreateHost />
     </div>
   )
 }

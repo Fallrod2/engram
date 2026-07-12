@@ -5,6 +5,11 @@ import { cn } from '@/lib/utils'
  * In-content screen header: an optional breadcrumb line, the entity title, and
  * right-aligned actions. The global shell header carries the section name; this
  * carries the specific page (spec §2/§3/§4).
+ *
+ * `title` is optional (spec §4.1): a section-root screen (planning, analytics,
+ * subjects/import lists, dashboard) must NOT render an in-page `<h1>` equal to
+ * the section title the global header already shows. Such a screen may still use
+ * `PageHeader` actions-only (no `title`) to carry a right-aligned action bar.
  */
 export function PageHeader({
   breadcrumb,
@@ -13,7 +18,7 @@ export function PageHeader({
   className,
 }: {
   breadcrumb?: ReactNode
-  title: ReactNode
+  title?: ReactNode
   actions?: ReactNode
   className?: string
 }) {
@@ -21,9 +26,11 @@ export function PageHeader({
     <div className={cn('mb-6 flex items-start gap-3', className)}>
       <div className="min-w-0">
         {breadcrumb && <div className="mb-1 flex items-center gap-1.5 text-xs">{breadcrumb}</div>}
-        <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-[-0.02em] text-text">
-          {title}
-        </h1>
+        {title !== undefined && (
+          <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-[-0.02em] text-text">
+            {title}
+          </h1>
+        )}
       </div>
       {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
     </div>
