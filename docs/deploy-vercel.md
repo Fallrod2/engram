@@ -74,9 +74,13 @@ le travail Anthropic tourne en arrière-plan, maintenu vivant par `waitUntil`. L
 fonction doit donc pouvoir vivre assez longtemps :
 
 - `vercel.json` fixe `maxDuration: 300` (5 min) pour `api/index.ts`.
-- **300 s nécessite un plan Pro** (le plan Hobby plafonne à 60 s). Sur Hobby,
-  abaisser à `60` — attention, une génération multi-chunk peut alors être
-  tronquée (le timeout par appel Anthropic est de 90 s).
+- Avec **Fluid compute** (activé par défaut sur tout nouveau projet Vercel depuis
+  avril 2025, et rien ici ne le désactive), le plan **Hobby** autorise déjà 300 s
+  — identique au plan Pro. Aucun réglage à baisser dans ce cas.
+- Si Fluid compute est **désactivé** (fonctions classiques), le plafond retombe à
+  60 s sur Hobby : abaisser alors `maxDuration` à `60`, en gardant à l'esprit
+  qu'une génération multi-chunk peut être tronquée (le timeout par appel Anthropic
+  est de 90 s).
 - Si la génération IA n'est pas utilisée (`ANTHROPIC_API_KEY` absente), la valeur
   n'a aucun impact.
 
