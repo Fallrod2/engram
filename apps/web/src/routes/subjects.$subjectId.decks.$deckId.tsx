@@ -8,7 +8,6 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  SquareStack,
   Trash2,
 } from 'lucide-react'
 import type { Card } from '@engram/shared'
@@ -33,6 +32,7 @@ import {
 } from '@/components/ui/table'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { CardsIllustration } from '@/components/illustrations'
 import { CardsTableSkeleton } from '@/components/skeletons'
 import { PageHeader } from '@/components/page-header'
 import { SubjectDot } from '@/components/subject-dot'
@@ -248,7 +248,7 @@ function CardsPage() {
 
       {sorted.length === 0 ? (
         <EmptyState
-          icon={SquareStack}
+          illustration={<CardsIllustration />}
           title="Aucune carte"
           meta="Saisissez un recto/verso ci-dessus et ⌘↵ pour enchaîner."
         />
