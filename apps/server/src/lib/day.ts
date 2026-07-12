@@ -20,3 +20,14 @@ export function localDayKey(d: Date): string {
 export function localMidnight(year: number, monthIndex: number, day: number): Date {
   return new Date(year, monthIndex, day)
 }
+
+/**
+ * Whole local calendar days from `a` to `b` (b − a). Both instants are reduced
+ * to their local midnight so a partial DST day (23h/25h) still counts as one
+ * day — `Math.round` absorbs the ±1h. E.g. `daysUntil = localDayDiff(now, exam)`.
+ */
+export function localDayDiff(a: Date, b: Date): number {
+  const am = localMidnight(a.getFullYear(), a.getMonth(), a.getDate()).getTime()
+  const bm = localMidnight(b.getFullYear(), b.getMonth(), b.getDate()).getTime()
+  return Math.round((bm - am) / 86_400_000)
+}
