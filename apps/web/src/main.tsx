@@ -9,6 +9,7 @@ import '@fontsource-variable/jetbrains-mono'
 import './styles.css'
 
 import { ThemeProvider } from '@/lib/theme'
+import { LangProvider } from '@/lib/i18n'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import { createQueryClient } from '@/lib/query-client'
@@ -39,12 +40,14 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={200} skipDelayDuration={300}>
-          <RouterProvider router={router} />
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <LangProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+            <RouterProvider router={router} />
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </LangProvider>
     </ThemeProvider>
   </StrictMode>,
 )

@@ -7,6 +7,19 @@ import { addDays, dayDiff, parseDayKey, startOfWeekMonday } from './calendar'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/**
+ * Active locale for date/number formatting (spec §9.3). Set by the i18n
+ * `LangProvider` via `setLocale`; defaults to `fr-FR` so the pure functions stay
+ * unit-testable without a provider (the existing tests assert the FR output).
+ * This module stays free of the i18n dict (no React, no cycle): the few textual
+ * words switch on the locale prefix here.
+ */
+let currentLocale = 'fr-FR'
+export function setLocale(locale: string): void {
+  currentLocale = locale
+}
+const isEn = (): boolean => currentLocale.startsWith('en')
+
 /** Start-of-day epoch for a date (local time). */
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
@@ -24,15 +37,15 @@ export function formatDue(dueIso: string, now: Date = new Date()): string {
   const diffDays = Math.round((startOfDay(due) - startOfDay(now)) / DAY_MS)
   if (diffDays < 0) {
     const late = Math.abs(diffDays)
-    return `en retard ${late}j`
+    return isEn() ? `${late}d late` : `en retard ${late}j`
   }
-  if (diffDays === 0) return 'auj.'
-  return `J+${diffDays}`
+  if (diffDays === 0) return isEn() ? 'today' : 'auj.'
+  return isEn() ? `+${diffDays}d` : `J+${diffDays}`
 }
 
 /** Exact date/time for a tooltip, e.g. `12 juil. 2026, 14:03`. */
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
+  return new Date(iso).toLocaleString(currentLocale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -55,9 +68,9 @@ export function formatReps(reps: number, lapses: number): string {
  */
 export function formatCountdown(dateIso: string, now: Date = new Date()): string {
   const diff = dayDiff(now, new Date(dateIso))
-  if (diff > 0) return `J-${diff}`
-  if (diff === 0) return "aujourd'hui"
-  return 'passé'
+  if (diff > 0) return isEn() ? `${diff}d left` : `J-${diff}`
+  if (diff === 0) return isEn() ? 'today' : "aujourd'hui"
+  return isEn() ? 'past' : 'passé'
 }
 
 /**
@@ -66,16 +79,17 @@ export function formatCountdown(dateIso: string, now: Date = new Date()): string
  */
 export function formatRelativeDay(dayKey: string, now: Date = new Date()): string {
   const diff = dayDiff(now, parseDayKey(dayKey))
-  if (diff === 0) return "aujourd'hui"
-  if (diff === 1) return 'demain'
-  if (diff === -1) return 'hier'
-  if (diff > 1) return `dans ${diff} jours`
-  return `il y a ${Math.abs(diff)} jours`
+  if (diff === 0) return isEn() ? 'today' : "aujourd'hui"
+  if (diff === 1) return isEn() ? 'tomorrow' : 'demain'
+  if (diff === -1) return isEn() ? 'yesterday' : 'hier'
+  if (diff > 1) return isEn() ? `in ${diff} days` : `dans ${diff} jours`
+  const ago = Math.abs(diff)
+  return isEn() ? `${ago} days ago` : `il y a ${ago} jours`
 }
 
 /** Long day label for a day KEY, e.g. `dim. 12 juil. 2026`. */
 export function formatLongDay(dayKey: string): string {
-  return parseDayKey(dayKey).toLocaleDateString('fr-FR', {
+  return parseDayKey(dayKey).toLocaleDateString(currentLocale, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -85,7 +99,7 @@ export function formatLongDay(dayKey: string): string {
 
 /** Month + year label for the month toolbar, e.g. `juillet 2026`. */
 export function formatMonthLabel(anchor: Date): string {
-  return anchor.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  return anchor.toLocaleDateString(currentLocale, { month: 'long', year: 'numeric' })
 }
 
 /** Compact week span for the week toolbar, e.g. `6–12 juil. 2026`. */
@@ -93,7 +107,7 @@ export function formatWeekLabel(anchor: Date): string {
   const monday = startOfWeekMonday(anchor)
   const sunday = addDays(monday, 6)
   const year = sunday.getFullYear()
-  const monShort = (d: Date) => d.toLocaleDateString('fr-FR', { month: 'short' })
+  const monShort = (d: Date) => d.toLocaleDateString(currentLocale, { month: 'short' })
   if (monday.getMonth() === sunday.getMonth()) {
     return `${monday.getDate()}–${sunday.getDate()} ${monShort(sunday)} ${year}`
   }

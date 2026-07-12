@@ -1,0 +1,295 @@
+/**
+ * French dictionary — the SOURCE OF TRUTH for the i18n key shape (spec §9.2).
+ * `type Dict = typeof dictFr`; `dict.en.ts` is typed `Dict`, so TypeScript fails
+ * the build if any key is missing in English. Scope is the high-visibility chrome
+ * of the v1 périmètre (spec §9.4); deep feature strings stay FR as documented
+ * debt (§9.5).
+ *
+ * Interpolation: `{name}` placeholders are replaced by `t('…', { name })`.
+ * Pluralised phrases use explicit `_one` / `_other` leaf keys, chosen by the
+ * caller (no ICU runtime — keeps the infra minimal and fully typed).
+ */
+export const dictFr = {
+  common: {
+    new: 'Nouveau',
+    edit: 'Éditer',
+    delete: 'Supprimer',
+    archive: 'Archiver',
+    cancel: 'Annuler',
+    retry: 'Réessayer',
+    save: 'Enregistrer',
+    close: 'Fermer',
+    open: 'Ouvrir',
+    reviewNow: 'Réviser maintenant',
+    backToDashboard: 'Retour au tableau de bord',
+    unavailable: 'Indisponible pour le moment.',
+  },
+
+  nav: {
+    groups: {
+      review: 'Réviser',
+      subjects: 'Matières',
+      tools: 'Outils',
+    },
+    items: {
+      today: "Aujourd'hui",
+      session: 'Session de révision',
+      allSubjects: 'Toutes les matières',
+      planning: 'Planning',
+      analytics: 'Analytics',
+      import: 'Import',
+    },
+    aria: {
+      mainNav: 'Navigation principale',
+      mobileNav: 'Navigation mobile',
+    },
+  },
+
+  pageTitle: {
+    today: "Aujourd'hui",
+    session: 'Session de révision',
+    subjects: 'Matières',
+    planning: 'Planning',
+    analytics: 'Analytics',
+    import: 'Import',
+    settings: 'Réglages',
+    fallback: 'engram',
+  },
+
+  sidebar: {
+    search: 'Rechercher',
+    searchPlaceholder: 'Rechercher…',
+    settings: 'Réglages',
+    collapse: 'Réduire',
+    collapseAria: 'Réduire la barre latérale',
+    expand: 'Déployer',
+    expandAria: 'Déployer la barre latérale',
+  },
+
+  header: {
+    search: 'Rechercher',
+    backToDashboardAria: '{title} — aller au tableau de bord',
+  },
+
+  tabbar: {
+    review: 'Réviser',
+    subjects: 'Matières',
+    planning: 'Planning',
+    stats: 'Stats',
+  },
+
+  cmd: {
+    placeholder: 'Rechercher ou aller à…',
+    filterPlaceholder: 'Filtrer…',
+    empty: 'Aucun résultat.',
+    back: '⌫ retour',
+    groups: {
+      navigation: 'Navigation',
+      create: 'Créer',
+      review: 'Réviser',
+      preferences: 'Préférences',
+      subjects: 'Matières',
+      decks: 'Decks',
+    },
+    actions: {
+      newSubject: 'Nouvelle matière',
+      newDeck: 'Nouveau deck…',
+      newCard: 'Nouvelle carte…',
+      newExam: 'Nouvel examen',
+      importNotes: 'Importer des notes',
+      reviewAll: 'Réviser tout',
+      reviewSubject: 'Réviser « {name} »',
+      toggleTheme: 'Basculer le thème',
+      showShortcuts: 'Afficher les raccourcis',
+    },
+    themeLight: 'Clair',
+    themeDark: 'Sombre',
+    step: {
+      deckSubject: 'Nouveau deck — choisir la matière',
+      cardSubject: 'Nouvelle carte — choisir la matière',
+      cardDeck: 'Nouvelle carte — choisir le deck',
+    },
+    noSubjects: "Aucune matière — crée-en une d'abord.",
+    noDecks: 'Aucun deck dans cette matière.',
+  },
+
+  shortcuts: {
+    title: 'Raccourcis clavier',
+    sectionGlobal: 'Globaux',
+    sectionNav: 'Navigation',
+    sectionScreen: 'Écran — {name}',
+    global: {
+      palette: 'Palette de commandes',
+      showShortcuts: 'Afficher les raccourcis',
+      toggleSidebar: 'Réduire / déployer la barre',
+    },
+    chords: {
+      today: 'Aller à Aujourd’hui',
+      session: 'Aller à la Session',
+      subjects: 'Aller aux Matières',
+      planning: 'Aller au Planning',
+      analytics: 'Aller aux Analytics',
+      import: 'Aller à l’Import',
+    },
+    contextLabels: {
+      subjectsIndex: 'Matières',
+      subjectsDetail: 'Matière — decks',
+      deckCards: 'Deck — cartes',
+      importIndex: 'Import',
+      importNote: 'Note importée',
+      importGeneration: 'Révision des cartes générées',
+      planning: 'Planning',
+      session: 'Session de révision',
+    },
+    keys: {
+      newSubject: 'Nouvelle matière',
+      filter: 'Filtrer',
+      editSubject: 'Éditer la matière',
+      archive: 'Archiver / désarchiver',
+      delete: 'Supprimer',
+      listNav: 'Naviguer dans la liste',
+      open: 'Ouvrir',
+      newDeck: 'Nouveau deck',
+      editDeck: 'Éditer le deck',
+      deleteDeck: 'Supprimer le deck',
+      newCard: 'Nouvelle carte',
+      composeCard: 'Composer une carte',
+      editCard: 'Éditer la carte',
+      deleteCard: 'Supprimer la carte',
+      editNote: 'Éditer la note',
+      deleteNote: 'Supprimer la note',
+      openNote: 'Ouvrir la note',
+      gotoDeck: 'Aller au deck cible',
+      acceptCard: 'Accepter la carte',
+      acceptAll: 'Accepter toutes les cartes',
+      rejectCard: 'Rejeter la carte',
+      undoDecision: 'Annuler la décision',
+      cardByCard: 'Naviguer carte par carte',
+      insertCards: 'Insérer les cartes retenues',
+      viewMonth: 'Vue mois',
+      viewWeek: 'Vue semaine',
+      newExam: 'Nouvel examen',
+      backToToday: 'Revenir à aujourd’hui',
+      editExam: 'Éditer l’examen du jour',
+      examNav: 'Naviguer dans les examens',
+      reveal: 'Révéler la réponse',
+      rate: 'Noter la carte',
+      exitSession: 'Quitter la session',
+      confirmExit: 'Confirmer la sortie',
+      restartSession: 'Recommencer une session',
+    },
+  },
+
+  dashboard: {
+    toReviewToday: 'à réviser aujourd’hui',
+    noCardsTitle: 'Ajoute des cartes pour commencer',
+    noCardsBody:
+      'Tes matières sont prêtes — crée un deck et des cartes pour lancer ta première session.',
+    viewMySubjects: 'Voir mes matières',
+    streak: {
+      label: 'Série',
+      daysStreak_one: 'jour de suite',
+      daysStreak_other: 'jours de suite',
+      record: 'record {longest} · {days} jours étudiés',
+      keepUp: 'Révise aujourd’hui pour ne pas casser ta série.',
+    },
+    exams: {
+      label: 'Prochains examens',
+      none: 'Aucun examen à venir.',
+      plan: 'Planifier un examen',
+    },
+    activity: {
+      label: 'Activité récente',
+      viewAnalytics: 'Voir les analytics',
+      tooltip_one: '{date} · {count} review',
+      tooltip_other: '{date} · {count} reviews',
+      summary_one: '{total} review · {active}/{days} jours actifs',
+      summary_other: '{total} reviews · {active}/{days} jours actifs',
+    },
+  },
+
+  today: {
+    nothingTitle: 'Rien à réviser aujourd’hui.',
+    nothingBody: 'Tout est à jour.',
+    toReviewToday: 'à réviser aujourd’hui',
+    overdue: 'dont {n} en retard',
+    examPrompt: 'Examen',
+    examPriorise: '. Priorise {names}.',
+  },
+
+  onboarding: {
+    exampleLoaded: 'Exemple chargé',
+    exampleFailed: "Le chargement de l'exemple a échoué",
+    welcomeTitle: 'Bienvenue dans engram.',
+    welcomeBody: 'Crée ta première matière, ou charge un exemple pour explorer.',
+    createSubject: 'Créer une matière',
+    importNotes: 'Importer des notes',
+    loadExample: 'Charger un exemple',
+  },
+
+  empty: {
+    subjectsTitle: 'Aucune matière',
+    subjectsMeta: 'Créez votre première matière pour commencer à réviser.',
+    decksTitle: 'Aucun deck',
+    decksMeta: 'Ajoutez un deck pour commencer à créer des cartes.',
+    cardsTitle: 'Aucune carte',
+    cardsMeta: 'Saisissez un recto/verso ci-dessus et ⌘↵ pour enchaîner.',
+    importTitle: 'Aucune note importée',
+    importMeta: 'Déposez un .md ou un .pdf ci-dessus pour générer des cartes.',
+    planningTitle: 'Rien à planifier pour l’instant.',
+    planningMeta: '0 examen · 0 review prévue',
+    analyticsTitle: 'Rien à analyser pour l’instant.',
+    analyticsMeta: '0 review enregistrée',
+    sessionTitle: 'Rien à réviser — tout est à jour.',
+    sessionMeta: '0 carte due',
+    sessionErrorTitle: 'File indisponible.',
+    sessionErrorMeta: 'Impossible de charger la session',
+  },
+
+  session: {
+    scopeDeck: 'Deck',
+    scopeSubject: 'Matière',
+    scopeAll: 'Toutes les cartes',
+    exitAria: 'Quitter la session (Échap)',
+    revealHint: 'pour révéler',
+    revealed: 'Réponse révélée',
+    saveError: 'Échec d’enregistrement — appuie de nouveau pour réessayer.',
+    footerHint: 'Espace révéler · 1-4 noter · Échap quitter',
+    ratings: {
+      again: 'Encore',
+      hard: 'Difficile',
+      good: 'Bien',
+      easy: 'Facile',
+    },
+    summary: {
+      done: 'Session terminée',
+      cardsViewed_one: 'carte vue',
+      cardsViewed_other: 'cartes vues',
+      time: 'Temps',
+      avgPerCard: 'Moy./carte',
+      success: 'Réussite',
+      reviewAgain: 'Réviser encore',
+    },
+  },
+
+  settings: {
+    appearanceTitle: 'Apparence',
+    appearanceDesc: 'Thème de l’interface. « Système » suit ton OS.',
+    theme: 'Thème',
+    themeSystem: 'Système',
+    themeDark: 'Sombre',
+    themeLight: 'Clair',
+    languageTitle: 'Langue',
+    languageDesc: 'Langue de l’interface.',
+    language: 'Langue',
+    langFr: 'Français',
+    langEn: 'English',
+    aboutTitle: 'À propos',
+    aboutDesc: 'Dashboard de révision self-hosted (FSRS).',
+    version: 'Version',
+    mode: 'Mode',
+    modeValue: 'Localhost · mono-utilisateur',
+  },
+}
+
+export type Dict = typeof dictFr
