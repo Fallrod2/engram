@@ -2,7 +2,7 @@
 
 > État vivant du projet. Mis à jour et commité à chaque cycle orchestrateur.
 
-## Phase courante : **Phase 4 — Planning** (Phases 0-3 terminées, tags `phase-0` → `phase-3`)
+## Phase courante : **Phase 5 — Analytics** (Phases 0-4 terminées, tags `phase-0` → `phase-4`)
 
 ## Fait
 
@@ -47,14 +47,24 @@
 - Vérifié orchestrateur : gates sur main (180 vitest + 155 bun:test), /import inspecté dans Chrome, endpoints planning smoke-testés en live.
 - **Specs Phase 5 prêtes** : API (2 passes d'audit) + UI (validateur dataviz exécuté : pigments subjects non CVD-safe en paires → identité jamais portée par la couleur seule, small multiples, heatmap grille CSS custom avec ramp indigo `--chart-heat-0..4`).
 
-## En cours (Phase 4 UI ∥ Phase 5 API — fichiers disjoints)
+### Phase 4 ✅ (tag `phase-4`) + Phase 5 API mergée
 
-- **`feat/phase4-planning-ui`** (web) : /planning mois/semaine, grille clavier 2D, meter monochrome, exams + countdown, TodayPanel. Handoff API : invalider study-plan/today après une session ; jamais `new Date('YYYY-MM-DD')` côté client (parser par composantes) ; libeller « charge estimée ». Ports 3002/5174 (dev), 3003/5175 (reviewer).
-- **`feat/phase5-analytics-api`** (serveur) : 5 endpoints /api/analytics/*, règle rating ≥ 1 partout, rétrospectives sans filtre archivage, `daysInBucket`, avgMs arrondi entier, 1 requête par endpoint (test spy), log TZ au boot. Ports 3004 (dev), 3005 (reviewer).
+- **`feat/phase4-planning-ui` mergé** : /planning (mois/semaine, grille role=grid clavier 2D, LoadMeter monochrome, exams + Countdown mono, DayDetailPanel, TodayPanel, ExamFormDialog avec date-picker maison — zéro dep ajoutée), helpers calendar.ts purs testés (parse par composantes, jamais new Date('YYYY-MM-DD')), invalidations transverses (session/cards/subjects → planning). APPROVE (2 fix). Bug UTC « exam créé demain s'affiche demain » explicitement vérifié.
+- **`feat/phase5-analytics-api` mergé** : 6 requêtes analytics (heatmap, streaks, study-time, review-volume, retention `maturedReviewed`, deck-success), RATING_MIN_COUNTED ≥ 1 prouvé de bout en bout par le reviewer (ligne Manual(0) SQL directe exclue partout), rétrospectives sans filtre archivage, null sous MIN_RATE_SAMPLE=10, 1 requête/endpoint (test spy), TZ loguée au boot. APPROVE (0 fix). 405 tests sur la branche.
+- Vérifié orchestrateur : gates main (220 vitest + 219 bun:test), /planning inspecté dans Chrome (empty state), /api/analytics/heatmap smoke-testé.
 
-## À venir
+## En cours (Phase 5 UI + specs 6/7)
 
-- Merge des deux → tag `phase-4`, puis `feat/phase5-analytics-ui` (Recharts + heatmap custom), tag `phase-5`, puis Phase 6 (polish : cmd+K enrichi, raccourcis globaux, transitions, onboarding, i18n FR/EN) et Phase 7 (hardening : e2e Playwright, perf, a11y, backup/export JSON).
+- **`feat/phase5-analytics-ui`** (web) : écran Analytics (stat tiles, heatmap grille CSS custom ramp indigo, graphes Recharts, small multiples par matière, table-view jumelle). Ports 3002/5174 (dev), 3003/5175 (reviewer).
+- **Specs Phases 6 + 7** (armada, lecture seule) : polish (cmd+K enrichi, raccourcis globaux, transitions, onboarding, i18n FR/EN, vrai Dashboard « Aujourd'hui ») et hardening (e2e Playwright, perf, a11y, backup/export JSON).
+
+## Backlog polish/hardening accumulé (à verser dans les specs 6/7)
+
+- Doublon de titre « Planning » (header global + heading in-page).
+- Vrai Dashboard sur `/` (aujourd'hui, TodayPanel, CTA session) — remplace le redirect `/subjects`.
+- Responsive planning < 768 : Sheet bas + bascule auto semaine (spec non implémentée, nice-to-have).
+- Perf : fan-out N+1 client `cardCount` (agrégats serveur ?), page unique limit 500 cartes/deck, bundle ~700 kB (manualChunks), course bénigne « première touche » session (StrictMode dev only — note QA).
+- shadcn `calendar`/`hover-card` non installés (date-picker maison à la place) — choix à confirmer ou standardiser.
 
 ## Specs prêtes (suite)
 
