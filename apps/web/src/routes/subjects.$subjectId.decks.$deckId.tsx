@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   ArrowDown,
   ArrowUp,
@@ -110,6 +111,17 @@ function CardsError({ error }: { error: Error }) {
 
 type Sort = 'createdDesc' | 'dueAsc' | 'state'
 
+// Above this many rows the table body is windowed with `@tanstack/react-virtual`
+// so a large deck never mounts more than a screenful of <tr> (Phase 7 §2.4).
+// Below it, render every row directly — keeps the DOM simple for the common case.
+// The list itself is still capped server-side at CARD_PAGE_LIMIT (500), so the
+// window operates over at most 500 in-memory rows.
+const VIRTUALIZE_THRESHOLD = 150
+// Measured row height (px): `py-2` (16) + one line of `text-sm` (~24). The
+// virtualizer measures real rows after mount; this is only the pre-measure
+// estimate used for the initial scrollbar size.
+const ROW_ESTIMATE = 41
+
 function CardsPage() {
   const { subjectId, deckId } = Route.useParams()
   const navigate = useNavigate()
@@ -155,6 +167,24 @@ function CardsPage() {
   })
   const activeCard = sorted[roving.active]
 
+  // Virtualize the body only for large decks (Phase 7 §2.4). The virtualizer is
+  // always instantiated (hooks must run unconditionally) but only drives the DOM
+  // in the windowed branch; in the direct branch `scrollRef` stays null and it
+  // is inert.
+  const virtualized = sorted.length > VIRTUALIZE_THRESHOLD
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const rowVirtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_ESTIMATE,
+    overscan: 8,
+  })
+  // Keep the roving-selected row mounted so keyboard focus can land on it even
+  // when it is scrolled out of the window.
+  useEffect(() => {
+    if (virtualized) rowVirtualizer.scrollToIndex(roving.active)
+  }, [virtualized, roving.active, rowVirtualizer])
+
   useHotkeys({
     // preventDefault stops the trigger key from leaking into the composer/dialog input.
     n: (e) => {
@@ -178,6 +208,77 @@ function CardsPage() {
       if (activeCard) setDeleteCard(activeCard)
     },
   })
+
+  // Row renderer shared by the direct and virtualized branches (Phase 7 §2.4) so
+  // both paths stay byte-identical in markup — only which rows are mounted differs.
+  const renderRow = (c: Card, i: number) => {
+    const optimistic = c.id.startsWith('optimistic:')
+    return (
+      <TableRow
+        key={c.id}
+        {...roving.getItemProps(i)}
+        onClick={() => setEditCard(c)}
+        className={cn('cursor-pointer', optimistic && 'opacity-60')}
+      >
+        <TableCell>
+          <FsrsStateGlyph fsrs={c.fsrs} />
+        </TableCell>
+        <TableCell className="max-w-0">
+          <span className="block truncate text-text" title={c.front}>
+            {flattenMarkdown(c.front)}
+          </span>
+        </TableCell>
+        <TableCell className="hidden max-w-0 md:table-cell">
+          <span className="block truncate text-xs text-text-muted" title={c.back}>
+            {flattenMarkdown(c.back)}
+          </span>
+        </TableCell>
+        <TableCell>
+          <span
+            className="font-mono text-xs tabular-nums text-text-muted"
+            title={formatDateTime(c.fsrs.due)}
+          >
+            {formatDue(c.fsrs.due)}
+          </span>
+        </TableCell>
+        <TableCell className="hidden xl:table-cell">
+          <span className="font-mono text-2xs tabular-nums text-text-faint">
+            {formatReps(c.fsrs.reps, c.fsrs.lapses)}
+          </span>
+        </TableCell>
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <div className="opacity-0 transition-opacity duration-fast group-hover/tr:opacity-100 [&:has(:focus-visible)]:opacity-100">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-text-muted"
+                  aria-label="Actions de la carte"
+                >
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setEditCard(c)}>
+                  <Pencil />
+                  Éditer
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-danger [&_svg]:text-danger"
+                  onSelect={() => setDeleteCard(c)}
+                >
+                  <Trash2 />
+                  Supprimer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </TableCell>
+      </TableRow>
+    )
+  }
 
   if (!deck || !subject) return null
 
@@ -269,114 +370,80 @@ function CardsPage() {
           meta={t('empty.cardsMeta')}
         />
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-8">
-                  <SortButton
-                    label="État"
-                    active={sort === 'state'}
-                    onClick={() => setSort('state')}
-                  />
-                </TableHead>
-                <TableHead>
-                  <SortButton
-                    label="Recto"
-                    active={sort === 'createdDesc'}
-                    onClick={() => setSort('createdDesc')}
-                  />
-                </TableHead>
-                <TableHead className="hidden md:table-cell">Verso</TableHead>
-                <TableHead className="w-24">
-                  <SortButton
-                    label="Dû"
-                    active={sort === 'dueAsc'}
-                    onClick={() => setSort('dueAsc')}
-                  />
-                </TableHead>
-                <TableHead className="hidden w-16 xl:table-cell">Reps</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody onKeyDown={roving.onKeyDown}>
-              {sorted.map((c, i) => {
-                const optimistic = c.id.startsWith('optimistic:')
-                return (
-                  <TableRow
-                    key={c.id}
-                    {...roving.getItemProps(i)}
-                    onClick={() => setEditCard(c)}
-                    className={cn('cursor-pointer', optimistic && 'opacity-60')}
-                  >
-                    <TableCell>
-                      <FsrsStateGlyph fsrs={c.fsrs} />
-                    </TableCell>
-                    <TableCell className="max-w-0">
-                      <span className="block truncate text-text" title={c.front}>
-                        {flattenMarkdown(c.front)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden max-w-0 md:table-cell">
-                      <span className="block truncate text-xs text-text-muted" title={c.back}>
-                        {flattenMarkdown(c.back)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className="font-mono text-xs tabular-nums text-text-muted"
-                        title={formatDateTime(c.fsrs.due)}
-                      >
-                        {formatDue(c.fsrs.due)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell">
-                      <span className="font-mono text-2xs tabular-nums text-text-faint">
-                        {formatReps(c.fsrs.reps, c.fsrs.lapses)}
-                      </span>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="opacity-0 transition-opacity duration-fast group-hover/tr:opacity-100 [&:has(:focus-visible)]:opacity-100">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-7 text-text-muted"
-                              aria-label="Actions de la carte"
-                            >
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setEditCard(c)}>
-                              <Pencil />
-                              Éditer
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-danger [&_svg]:text-danger"
-                              onSelect={() => setDeleteCard(c)}
-                            >
-                              <Trash2 />
-                              Supprimer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+        <>
+          <div
+            ref={virtualized ? scrollRef : undefined}
+            className={cn('overflow-x-auto', virtualized && 'max-h-[70vh] overflow-y-auto')}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-8">
+                    <SortButton
+                      label="État"
+                      active={sort === 'state'}
+                      onClick={() => setSort('state')}
+                    />
+                  </TableHead>
+                  <TableHead>
+                    <SortButton
+                      label="Recto"
+                      active={sort === 'createdDesc'}
+                      onClick={() => setSort('createdDesc')}
+                    />
+                  </TableHead>
+                  <TableHead className="hidden md:table-cell">Verso</TableHead>
+                  <TableHead className="w-24">
+                    <SortButton
+                      label="Dû"
+                      active={sort === 'dueAsc'}
+                      onClick={() => setSort('dueAsc')}
+                    />
+                  </TableHead>
+                  <TableHead className="hidden w-16 xl:table-cell">Reps</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody onKeyDown={roving.onKeyDown}>
+                {virtualized
+                  ? (() => {
+                      const items = rowVirtualizer.getVirtualItems()
+                      const first = items[0]
+                      const last = items[items.length - 1]
+                      const paddingTop = first ? first.start : 0
+                      const paddingBottom = last ? rowVirtualizer.getTotalSize() - last.end : 0
+                      return (
+                        <>
+                          {/* Spacer rows preserve table column alignment while
+                            keeping only the visible window of <tr> mounted. */}
+                          {paddingTop > 0 && (
+                            <tr aria-hidden="true">
+                              <td colSpan={6} style={{ height: paddingTop }} />
+                            </tr>
+                          )}
+                          {items.map((vi) => {
+                            const c = sorted[vi.index]
+                            return c ? renderRow(c, vi.index) : null
+                          })}
+                          {paddingBottom > 0 && (
+                            <tr aria-hidden="true">
+                              <td colSpan={6} style={{ height: paddingBottom }} />
+                            </tr>
+                          )}
+                        </>
+                      )
+                    })()
+                  : sorted.map((c, i) => renderRow(c, i))}
+              </TableBody>
+            </Table>
+          </div>
           {truncated && (
             <p role="status" className="mt-2 px-3 text-xs text-text-muted">
               Affichage limité aux {CARD_PAGE_LIMIT} premières cartes sur {total}. Scindez ce deck
               pour tout consulter.
             </p>
           )}
-        </div>
+        </>
       )}
 
       <CardEditDialog
