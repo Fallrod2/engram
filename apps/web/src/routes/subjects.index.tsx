@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { SubjectsIllustration } from '@/components/illustrations'
 import { SubjectsSkeleton } from '@/components/skeletons'
@@ -269,16 +270,17 @@ function SubjectsBody({
   onDelete: (s: Subject) => void
   onClearFilter: () => void
 }) {
+  const t = useT()
   if (subjects.filter((s) => !s.archived).length === 0 && tab === 'active' && filter === '') {
     return (
       <EmptyState
         illustration={<SubjectsIllustration />}
-        title="Aucune matière"
-        meta="Créez votre première matière pour commencer à réviser."
+        title={t('empty.subjectsTitle')}
+        meta={t('empty.subjectsMeta')}
         action={
           <Button onClick={onNew}>
             <Plus />
-            Nouvelle matière
+            {t('cmd.actions.newSubject')}
             <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
           </Button>
         }

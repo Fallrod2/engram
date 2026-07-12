@@ -48,7 +48,19 @@ interface LangContextValue {
   t: TFunction
 }
 
-const LangContext = createContext<LangContextValue | null>(null)
+/**
+ * Default context when no `<LangProvider>` is mounted: the FR dictionary, a
+ * no-op setter. This keeps `useT` from throwing in provider-free unit tests
+ * (components render with the default `fr` strings) while the real app always
+ * mounts the provider in `main.tsx`.
+ */
+const DEFAULT_VALUE: LangContextValue = {
+  lang: 'fr',
+  setLang: () => {},
+  t: (key, vars) => interpolate(resolve(dictFr, key), vars),
+}
+
+const LangContext = createContext<LangContextValue>(DEFAULT_VALUE)
 
 function readStoredLang(): Lang {
   if (typeof localStorage === 'undefined') return 'fr'
@@ -80,9 +92,7 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
 }
 
 function useLangContext(): LangContextValue {
-  const ctx = useContext(LangContext)
-  if (!ctx) throw new Error('useT / useLang must be used within <LangProvider>')
-  return ctx
+  return useContext(LangContext)
 }
 
 /** The translator. `t('common.save')`, `t('cmd.actions.reviewSubject', { name })`. */

@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useT } from '@/lib/i18n'
 import { subjectDetailOptions } from '@/features/subjects/queries'
 import { deckDetailOptions } from '@/features/decks/queries'
 import type { ReviewScope } from '@/lib/api'
 
 /** Resolve the scope label from the (already-warm) cache; never blocking. */
 function useScopeLabel(scope: ReviewScope): string {
+  const t = useT()
   const subject = useQuery({
     ...subjectDetailOptions(scope.subjectId ?? ''),
     enabled: !!scope.subjectId,
@@ -15,9 +17,9 @@ function useScopeLabel(scope: ReviewScope): string {
     ...deckDetailOptions(scope.deckId ?? ''),
     enabled: !!scope.deckId,
   })
-  if (scope.deckId) return deck.data?.name ?? 'Deck'
-  if (scope.subjectId) return subject.data?.name ?? 'Matière'
-  return 'Toutes les cartes'
+  if (scope.deckId) return deck.data?.name ?? t('session.scopeDeck')
+  if (scope.subjectId) return subject.data?.name ?? t('session.scopeSubject')
+  return t('session.scopeAll')
 }
 
 /**
@@ -38,6 +40,7 @@ export function SessionHeader({
   onExit: () => void
 }) {
   const label = useScopeLabel(scope)
+  const t = useT()
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 px-4">
       <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{label}</span>
@@ -50,7 +53,7 @@ export function SessionHeader({
         variant="ghost"
         size="icon"
         onClick={onExit}
-        aria-label="Quitter la session (Échap)"
+        aria-label={t('session.exitAria')}
         className="text-text-muted"
       >
         <X className="size-4" />

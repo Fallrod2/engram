@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { DecksIllustration } from '@/components/illustrations'
 import { DecksSkeleton } from '@/components/skeletons'
@@ -70,6 +71,7 @@ function DecksError({ error }: { error: Error }) {
 function DecksPage() {
   const { subjectId } = Route.useParams()
   const navigate = useNavigate()
+  const t = useT()
 
   const subject = useQuery(subjectDetailOptions(subjectId)).data
   const decks = useQuery(decksListOptions(subjectId)).data ?? []
@@ -226,12 +228,12 @@ function DecksPage() {
       {sorted.length === 0 ? (
         <EmptyState
           illustration={<DecksIllustration />}
-          title="Aucun deck"
-          meta="Ajoutez un deck pour commencer à créer des cartes."
+          title={t('empty.decksTitle')}
+          meta={t('empty.decksMeta')}
           action={
             <Button onClick={() => setCreateOpen(true)}>
               <Plus />
-              Nouveau deck
+              {t('shortcuts.keys.newDeck')}
               <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
             </Button>
           }

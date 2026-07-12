@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import type { ReviewPreview } from '@engram/shared'
+import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
 import type { Grade } from './session-reducer'
 import { PREVIEW_KEY, RATINGS } from './labels'
@@ -27,11 +28,12 @@ export function RatingBar({
   reduce: boolean
   onRate: (grade: Grade) => void
 }) {
+  const t = useT()
   if (!revealed) {
     return (
       <p className="flex items-center justify-center gap-2 font-mono text-sm text-text-faint">
         <Kbd>Espace</Kbd>
-        <span>pour révéler</span>
+        <span>{t('session.revealHint')}</span>
       </p>
     )
   }

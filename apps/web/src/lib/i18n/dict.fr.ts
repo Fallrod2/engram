@@ -21,6 +21,7 @@ export const dictFr = {
     close: 'Fermer',
     open: 'Ouvrir',
     reviewNow: 'Réviser maintenant',
+    startSession: 'Lancer une session',
     backToDashboard: 'Retour au tableau de bord',
     unavailable: 'Indisponible pour le moment.',
     skipToContent: 'Aller au contenu',
@@ -262,6 +263,8 @@ export const dictFr = {
       good: 'Bien',
       easy: 'Facile',
     },
+    ratingAriaNext: '{label} — prochaine révision dans {interval}',
+    ratingAriaRate: '{label} — noter cette carte',
     summary: {
       done: 'Session terminée',
       cardsViewed_one: 'carte vue',

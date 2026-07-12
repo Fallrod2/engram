@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { CardsIllustration } from '@/components/illustrations'
 import { CardsTableSkeleton } from '@/components/skeletons'
@@ -110,6 +111,7 @@ type Sort = 'createdDesc' | 'dueAsc' | 'state'
 function CardsPage() {
   const { subjectId, deckId } = Route.useParams()
   const navigate = useNavigate()
+  const t = useT()
 
   const subject = useQuery(subjectDetailOptions(subjectId)).data
   const deck = useQuery(deckDetailOptions(deckId)).data
@@ -249,8 +251,8 @@ function CardsPage() {
       {sorted.length === 0 ? (
         <EmptyState
           illustration={<CardsIllustration />}
-          title="Aucune carte"
-          meta="Saisissez un recto/verso ci-dessus et ⌘↵ pour enchaîner."
+          title={t('empty.cardsTitle')}
+          meta={t('empty.cardsMeta')}
         />
       ) : (
         <div className="overflow-x-auto">

@@ -17,6 +17,7 @@ export const dictEn: Dict = {
     close: 'Close',
     open: 'Open',
     reviewNow: 'Review now',
+    startSession: 'Start a session',
     backToDashboard: 'Back to dashboard',
     unavailable: 'Unavailable right now.',
     skipToContent: 'Skip to content',
@@ -258,6 +259,8 @@ export const dictEn: Dict = {
       good: 'Good',
       easy: 'Easy',
     },
+    ratingAriaNext: '{label} — next review in {interval}',
+    ratingAriaRate: '{label} — rate this card',
     summary: {
       done: 'Session complete',
       cardsViewed_one: 'card seen',

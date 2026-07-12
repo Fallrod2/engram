@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { ConfirmDelete } from '@/components/confirm-delete'
 import { PlanningIllustration } from '@/components/illustrations'
@@ -86,6 +87,7 @@ function PlanningError() {
 function PlanningPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const t = useT()
   const { view, day, exam } = search
 
   // Stable "now" for the session so today/countdowns don't drift per render.
@@ -248,12 +250,12 @@ function PlanningPage() {
       {planEmpty ? (
         <EmptyState
           illustration={<PlanningIllustration />}
-          title="Rien à planifier pour l'instant."
-          meta="0 examen · 0 review prévue"
+          title={t('empty.planningTitle')}
+          meta={t('empty.planningMeta')}
           action={
             <Button onClick={() => openExam('new')}>
               <Plus />
-              Nouvel examen
+              {t('shortcuts.keys.newExam')}
             </Button>
           }
         />
