@@ -7,4 +7,4 @@ import type { ZodSchema, infer as ZInfer } from 'zod'
  * (non-leaking) 500 — an anti-drift guard that also runs in production.
  */
 export const ok = <S extends ZodSchema>(c: Context, schema: S, dto: ZInfer<S>, status = 200) =>
-  c.json(schema.parse(dto), status as 200 | 201)
+  c.json(schema.parse(dto), status as 200 | 201 | 202)

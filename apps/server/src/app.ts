@@ -8,6 +8,8 @@ import { subjectsRouter } from './routes/subjects'
 import { decksRouter } from './routes/decks'
 import { cardsRouter } from './routes/cards'
 import { reviewRouter } from './routes/review'
+import { notesRouter } from './routes/notes'
+import { generationsRouter } from './routes/generations'
 
 /**
  * The Hono application, exported without a server binding so it can be
@@ -32,12 +34,14 @@ app.route('/api/subjects', subjectsRouter)
 app.route('/api/decks', decksRouter)
 app.route('/api/cards', cardsRouter) // includes POST /:id/review, GET /:id/preview
 app.route('/api/review', reviewRouter) // /queue, /counts
+app.route('/api/notes', notesRouter) // upload/import + CRUD
+app.route('/api/generations', generationsRouter) // AI card generation + review
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
 
 app.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json(err.toResponse(), err.status as 400 | 404 | 409)
+    return c.json(err.toResponse(), err.status as 400 | 404 | 409 | 413 | 503)
   }
   // Hono-level failures (e.g. malformed JSON body → HTTPException 400) mapped
   // to the single error envelope so they never surface as an opaque 500.

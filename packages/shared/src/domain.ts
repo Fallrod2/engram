@@ -287,6 +287,8 @@ export const apiErrorCodeSchema = z.enum([
   'validation_error',
   'not_found',
   'conflict',
+  'payload_too_large', // 413 — uploaded file exceeds the size limit
+  'service_unavailable', // 503 — AI generation unavailable (no ANTHROPIC_API_KEY)
   'internal_error',
 ])
 export const apiErrorSchema = z.object({
@@ -316,6 +318,8 @@ export const listCardsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 })
+export const listNotesQuerySchema = z.object({ subjectId: z.string().optional() })
+export const listGenerationsQuerySchema = z.object({ noteId: z.string().optional() })
 export const previewQuerySchema = z.object({ now: iso.optional() })
 export const reviewQueueQuerySchema = z.object({
   deckId: z.string().optional(),
@@ -325,6 +329,8 @@ export const reviewQueueQuerySchema = z.object({
 })
 export const reviewCountsQuerySchema = z.object({ now: iso.optional() })
 
+export type ListNotesQuery = z.infer<typeof listNotesQuerySchema>
+export type ListGenerationsQuery = z.infer<typeof listGenerationsQuerySchema>
 export type ListSubjectsQuery = z.infer<typeof listSubjectsQuerySchema>
 export type ListDecksQuery = z.infer<typeof listDecksQuerySchema>
 export type ListCardsQuery = z.infer<typeof listCardsQuerySchema>
@@ -338,6 +344,20 @@ export const listCardsResponseSchema = z.object({
   total: z.number().int().nonnegative(),
   cards: z.array(cardSchema),
 })
+export const listNotesResponseSchema = z.object({ notes: z.array(noteSchema) })
+export const listGenerationsResponseSchema = z.object({
+  generations: z.array(generationSchema),
+})
+
+/**
+ * Text fields of the `POST /api/notes/upload` multipart body (the binary file
+ * itself is validated outside Zod). Parsed manually in the route.
+ */
+export const uploadNoteMetaSchema = z.object({
+  title: z.string().min(1).optional(),
+  subjectId: z.string().min(1).optional(),
+})
+export type UploadNoteMeta = z.infer<typeof uploadNoteMetaSchema>
 export const reviewQueueResponseSchema = z.object({
   now: iso,
   total: z.number().int().nonnegative(),
@@ -374,6 +394,8 @@ export const reviewPreviewSchema = z.object({
 })
 
 export type ListCardsResponse = z.infer<typeof listCardsResponseSchema>
+export type ListNotesResponse = z.infer<typeof listNotesResponseSchema>
+export type ListGenerationsResponse = z.infer<typeof listGenerationsResponseSchema>
 export type ReviewQueueResponse = z.infer<typeof reviewQueueResponseSchema>
 export type ReviewResult = z.infer<typeof reviewResultSchema>
 export type DueCounts = z.infer<typeof dueCountsSchema>
