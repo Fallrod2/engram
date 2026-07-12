@@ -393,6 +393,16 @@ export const dueCountsSchema = z.object({
   ),
 })
 
+/**
+ * Aggregate card totals for every non-empty deck — `GET /api/decks/card-counts`.
+ * One `GROUP BY deck_id` query replaces the per-deck `limit=1` fan-out (Phase 7
+ * §2.2). Decks with zero cards are ABSENT from `byDeck` (the client defaults a
+ * missing deck to 0), so the payload stays proportional to non-empty decks.
+ */
+export const deckCardCountsSchema = z.object({
+  byDeck: z.array(z.object({ deckId: z.string(), cardCount: z.number().int().nonnegative() })),
+})
+
 /** Projected outcome of a single grade (read-only preview of the 4 buttons). */
 export const gradePreviewSchema = z.object({
   due: iso,
@@ -415,6 +425,7 @@ export type ListGenerationsResponse = z.infer<typeof listGenerationsResponseSche
 export type ReviewQueueResponse = z.infer<typeof reviewQueueResponseSchema>
 export type ReviewResult = z.infer<typeof reviewResultSchema>
 export type DueCounts = z.infer<typeof dueCountsSchema>
+export type DeckCardCounts = z.infer<typeof deckCardCountsSchema>
 export type GradePreview = z.infer<typeof gradePreviewSchema>
 export type ReviewPreview = z.infer<typeof reviewPreviewSchema>
 

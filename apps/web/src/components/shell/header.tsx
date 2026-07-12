@@ -13,12 +13,26 @@ import { useShell } from './shell-context'
  * scroll. Title left; contextual actions right (mobile gets search + theme,
  * since the sidebar footer is hidden below `md`).
  */
-export function Header({ title, scrolled }: { title: string; scrolled: boolean }) {
+export function Header({
+  title,
+  scrolled,
+  asHeading,
+}: {
+  title: string
+  scrolled: boolean
+  /**
+   * Render the title as the page `<h1>`. On detail routes the in-content
+   * `PageHeader` owns the `<h1>`, so the shell renders a non-heading `<p>` (same
+   * styling) to keep exactly one `<h1>` per route (Phase 7 §3.1).
+   */
+  asHeading: boolean
+}) {
   const { setCommandOpen } = useShell()
   const t = useT()
   // Mobile has no sidebar, so the header title doubles as the way back to the
   // dashboard `/` (spec §5.5); on desktop the sidebar owns navigation.
   const isMobile = !useMediaQuery('(min-width: 768px)')
+  const TitleTag = asHeading ? 'h1' : 'p'
 
   return (
     <header
@@ -30,7 +44,7 @@ export function Header({ title, scrolled }: { title: string; scrolled: boolean }
           : 'border-b border-transparent bg-transparent',
       )}
     >
-      <h1 className="min-w-0 truncate text-xl font-semibold tracking-[-0.02em] text-text">
+      <TitleTag className="min-w-0 truncate text-xl font-semibold tracking-[-0.02em] text-text">
         {isMobile ? (
           <Link
             to="/"
@@ -42,7 +56,7 @@ export function Header({ title, scrolled }: { title: string; scrolled: boolean }
         ) : (
           title
         )}
-      </h1>
+      </TitleTag>
 
       <div className="ml-auto flex items-center gap-1 md:hidden">
         <Button

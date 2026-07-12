@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import {
   createDeckSchema,
+  deckCardCountsSchema,
   deckSchema,
   idParamSchema,
   listDecksQuerySchema,
@@ -10,12 +11,24 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
-import { createDeck, deleteDeck, getDeck, listDecks, updateDeck } from '../services/decks.service'
+import {
+  cardCountsByDeck,
+  createDeck,
+  deleteDeck,
+  getDeck,
+  listDecks,
+  updateDeck,
+} from '../services/decks.service'
 
 export const decksRouter = new Hono()
 
 decksRouter.get('/', zValidator('query', listDecksQuerySchema), async (c) => {
   return ok(c, z.array(deckSchema), await listDecks(db, c.req.valid('query').subjectId))
+})
+
+// MUST precede `/:id` — otherwise `card-counts` is captured as an `:id` param.
+decksRouter.get('/card-counts', async (c) => {
+  return ok(c, deckCardCountsSchema, await cardCountsByDeck(db))
 })
 
 decksRouter.post('/', zValidator('json', createDeckSchema), async (c) => {

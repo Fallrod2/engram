@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useRouterState } from '@tanstack/react-router'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { MobileTabBar } from './mobile-tab-bar'
@@ -8,7 +8,7 @@ import { CommandMenu } from './command-menu'
 import { CreateHost } from './command-actions'
 import { ShortcutsDialog } from './shortcuts-dialog'
 import { ShellProvider } from './shell-context'
-import { getPageTitleKey } from './page-title'
+import { getPageTitleKey, shellOwnsHeading } from './page-title'
 import { useT } from '@/lib/i18n'
 
 function ShellInner() {
@@ -18,7 +18,7 @@ function ShellInner() {
   const [scrolled, setScrolled] = useState(false)
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-bg text-text">
+    <div id="app-shell" className="flex h-dvh w-full overflow-hidden bg-bg text-text">
       {/* Skip link (a11y) — first in tab order. */}
       <a
         href="#main-content"
@@ -32,7 +32,11 @@ function ShellInner() {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header title={t(getPageTitleKey(pathname))} scrolled={scrolled} />
+        <Header
+          title={t(getPageTitleKey(pathname))}
+          scrolled={scrolled}
+          asHeading={shellOwnsHeading(pathname)}
+        />
         <main
           id="main-content"
           tabIndex={-1}
@@ -40,17 +44,22 @@ function ShellInner() {
           className="flex-1 overflow-y-auto scroll-pt-12 outline-none"
         >
           <div className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 md:px-8 md:pb-8">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={pathname}
-                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
-                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
+            {/*
+              Page transition: a keyed enter-only animation. It deliberately does
+              NOT use `AnimatePresence mode="wait"` — with an async router, the
+              exit-before-enter cycle remounted the freshly-navigated route a beat
+              after it mounted, silently discarding in-progress form state (the
+              card composer's first submit right after landing, Phase 7 §4). A
+              plain keyed `motion.div` mounts the new route exactly once.
+            */}
+            <motion.div
+              key={pathname}
+              initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Outlet />
+            </motion.div>
           </div>
         </main>
       </div>

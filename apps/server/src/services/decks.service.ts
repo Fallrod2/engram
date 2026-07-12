@@ -1,10 +1,23 @@
-import { asc, eq } from 'drizzle-orm'
-import type { CreateDeck, Deck, UpdateDeck } from '@engram/shared'
+import { asc, count, eq } from 'drizzle-orm'
+import type { CreateDeck, Deck, DeckCardCounts, UpdateDeck } from '@engram/shared'
 import type { DB } from '../db/client'
-import { deck } from '../db/schema'
+import { card, deck } from '../db/schema'
 import { deckToDto } from '../db/dto'
 import { NotFoundError, ConflictError } from '../http/errors'
 import { requireSubjectRow } from './subjects.service'
+
+/**
+ * Card totals grouped by deck in ONE query (Phase 7 §2.2), replacing the client
+ * fan-out of one `limit=1` probe per deck. Decks with no cards produce no row —
+ * they are simply absent from `byDeck`, and the client defaults them to 0.
+ */
+export async function cardCountsByDeck(db: DB): Promise<DeckCardCounts> {
+  const rows = await db
+    .select({ deckId: card.deckId, cardCount: count(card.id) })
+    .from(card)
+    .groupBy(card.deckId)
+  return { byDeck: rows.map((r) => ({ deckId: r.deckId, cardCount: r.cardCount })) }
+}
 
 /** Fetch a raw deck row or throw 404. Exported for cross-service guards. */
 export async function requireDeckRow(db: DB, id: string) {

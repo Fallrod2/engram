@@ -61,17 +61,14 @@ export async function addCards(page: Page, cards: ReadonlyArray<[string, string]
   await expect(front).toBeVisible()
   for (const [f, b] of cards) {
     const row = page.getByRole('row', { name: new RegExp(escapeRegExp(f)) })
-    // Idempotent retry: the very first submit right after landing on the deck
-    // can be dropped by a first-render race, so re-fill + re-click until the row
-    // appears. Short-circuits if a prior (slow) submit already added it, so no
-    // duplicate is ever created.
-    await expect(async () => {
-      if ((await row.count()) > 0) return
-      await front.fill(f)
-      await back.fill(b)
-      await addBtn.click()
-      await expect(row).toBeVisible({ timeout: 2000 })
-    }).toPass({ timeout: 15_000 })
+    // No retry: the first submit right after landing on the deck is reliable now
+    // that the page transition no longer remounts the route (which discarded the
+    // composer's just-typed fields, Phase 7 §4). A dropped first submit here
+    // would be a real regression.
+    await front.fill(f)
+    await back.fill(b)
+    await addBtn.click()
+    await expect(row).toBeVisible()
   }
   await expect(page.locator('tbody tr')).toHaveCount(cards.length)
 }

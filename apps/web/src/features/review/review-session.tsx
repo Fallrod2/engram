@@ -33,10 +33,31 @@ export function ReviewSession({ scope }: { scope: ReviewScope }) {
     setSessionActive(true)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    // Trap focus: the full-screen session lives in a body portal, so making the
+    // app shell `inert` removes everything behind it from the tab order and the
+    // accessibility tree — Tab can never escape the session (a11y §3.2). The
+    // shell sits inside `#root`; the portal is a sibling of it, so it stays
+    // interactive.
+    const shell = document.getElementById('app-shell')
+    shell?.setAttribute('inert', '')
     containerRef.current?.focus()
     return () => {
       setSessionActive(false)
       document.body.style.overflow = prev
+      shell?.removeAttribute('inert')
+      // Restore focus on exit (a11y §3.2, "retour de focus en sortie"). We do
+      // NOT capture the launching control: `/review` is a top-level route, so
+      // the launch page (e.g. the deck view's "Réviser" button) has already
+      // unmounted by the time this session mounts — `document.activeElement` is
+      // `<body>` at that point — and `router.history.back()` REMOUNTS that page
+      // with fresh DOM nodes, so any captured node is stale (and the button may
+      // no longer render at all once the deck's due count drops to 0). Instead
+      // move focus to the persistent `#main-content` landmark, which lives in
+      // the shell and never unmounts: focus lands on a real, focusable region
+      // (`tabIndex=-1`) rather than falling to `<body>`. Focus it AFTER clearing
+      // `inert` (an inert element cannot receive focus) and while the overlay is
+      // still mounted, so the portal's removal does not bounce focus to `<body>`.
+      document.getElementById('main-content')?.focus()
     }
   }, [setSessionActive])
 

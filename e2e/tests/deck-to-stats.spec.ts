@@ -100,4 +100,12 @@ test('Échap quits an ungraded session', async ({ page }) => {
   // Nothing graded yet → Escape exits without a confirm dialog.
   await page.keyboard.press('Escape')
   await expect(page).not.toHaveURL(/\/review/)
+
+  // Focus is restored to a real landmark on exit (a11y §3.2), not left on
+  // <body>. Since /review is a top-level route the launch button's DOM node is
+  // gone after the remount, so the session refocuses the persistent
+  // #main-content region rather than letting focus fall to the document body.
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.id ?? ''))
+    .toBe('main-content')
 })

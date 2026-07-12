@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
-import { deckSchema } from '@engram/shared'
+import { deckCardCountsSchema, deckSchema } from '@engram/shared'
 import { app } from '../app'
 import { db } from '../db/client'
-import { resetDb, seedDeck, seedSubject } from '../test-support/harness'
+import { resetDb, seedCard, seedDeck, seedSubject } from '../test-support/harness'
 
 beforeEach(() => resetDb(db))
 
@@ -60,5 +60,30 @@ describe('decks routes', () => {
     expect(filtered).toHaveLength(1)
 
     expect((await app.request(`/api/decks/${d.id}`, { method: 'DELETE' })).status).toBe(204)
+  })
+
+  it('GET /api/decks/card-counts aggregates per deck; empty decks are absent', async () => {
+    const s = await seedSubject(db)
+    const d1 = await seedDeck(db, s.id)
+    const d2 = await seedDeck(db, s.id)
+    await seedDeck(db, s.id) // d3: no cards → must be absent from the payload
+    await seedCard(db, d1.id)
+    await seedCard(db, d1.id)
+    await seedCard(db, d2.id)
+
+    const res = await app.request('/api/decks/card-counts')
+    expect(res.status).toBe(200)
+    const body = deckCardCountsSchema.parse(await res.json())
+    const map = new Map(body.byDeck.map((r) => [r.deckId, r.cardCount]))
+    expect(map.get(d1.id)).toBe(2)
+    expect(map.get(d2.id)).toBe(1)
+    // The empty deck contributes no row (client defaults it to 0).
+    expect(map.size).toBe(2)
+  })
+
+  it('GET /api/decks/card-counts is not shadowed by the :id route', async () => {
+    // "card-counts" must resolve to the aggregate handler, never as a deck id.
+    const res = await app.request('/api/decks/card-counts')
+    expect(res.status).toBe(200)
   })
 })
