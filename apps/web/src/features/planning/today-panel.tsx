@@ -19,10 +19,17 @@ import { studyTodayOptions } from './queries'
 export function TodayPanel({
   subjectsById,
   now,
+  hideTotal = false,
   className,
 }: {
   subjectsById: Map<string, Subject>
   now?: Date
+  /**
+   * Hide the internal `2xl` total line (spec §5.3.A). The Dashboard renders the
+   * single héroïque `3xl` counter itself, so the panel must not double it. The
+   * planning `DayDetailPanel` usage keeps the default `false` — unchanged.
+   */
+  hideTotal?: boolean
   className?: string
 }) {
   const counts = useQuery(dueCountsOptions()).data
@@ -69,10 +76,12 @@ export function TodayPanel({
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      <div className="flex items-baseline gap-2">
-        <span className="font-mono text-2xl font-medium tabular-nums text-text">{total}</span>
-        <span className="text-sm text-text-muted">à réviser aujourd'hui</span>
-      </div>
+      {!hideTotal && (
+        <div className="flex items-baseline gap-2">
+          <span className="font-mono text-2xl font-medium tabular-nums text-text">{total}</span>
+          <span className="text-sm text-text-muted">à réviser aujourd'hui</span>
+        </div>
+      )}
       {overdue > 0 && (
         <p className="-mt-1 font-mono text-xs tabular-nums text-text-muted">
           dont {overdue} en retard
