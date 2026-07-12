@@ -101,8 +101,12 @@ export function useCreateExam() {
         sortExams((old ?? []).map((e) => (e.id === ctx?.tempId ? created : e))),
       )
     },
-    // An exam is a deadline, never a card → it moves no load: invalidate exams only.
-    onSettled: () => void qc.invalidateQueries({ queryKey: qk.exams.all }),
+    // An exam moves no card, but the study-plan response carries the per-day exam
+    // list the grid chips render from → invalidate the plan too, not exams alone.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.exams.all })
+      void qc.invalidateQueries({ queryKey: qk.planning.all })
+    },
   })
   return mutation
 }
@@ -129,6 +133,7 @@ export function useUpdateExam() {
     onSettled: (_data, _err, vars) => {
       void qc.invalidateQueries({ queryKey: qk.exams.all })
       void qc.invalidateQueries({ queryKey: qk.exams.detail(vars.id) })
+      void qc.invalidateQueries({ queryKey: qk.planning.all })
     },
   })
   return mutation
@@ -150,7 +155,10 @@ export function useDeleteExam() {
         action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
       })
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: qk.exams.all }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.exams.all })
+      void qc.invalidateQueries({ queryKey: qk.planning.all })
+    },
   })
   return mutation
 }
