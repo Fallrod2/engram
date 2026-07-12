@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
+import { useT, type TKey } from '@/lib/i18n'
 import { navChordFor } from '@/lib/keymap'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import { allDecksOptions } from '@/features/decks/queries'
@@ -38,7 +39,8 @@ import {
 type Page = 'root' | 'deck:subject' | 'card:subject' | 'card:deck'
 
 interface NavAction {
-  label: string
+  /** i18n key for the label; keywords stay bilingual for fuzzy match. */
+  label: TKey
   to: string
   icon: LucideIcon
   keywords: string
@@ -47,33 +49,43 @@ interface NavAction {
 /** Navigation actions (spec §2.3.1). Shortcuts come from `keymap.ts` (in sync). */
 const NAV_ACTIONS: NavAction[] = [
   {
-    label: "Aujourd'hui",
+    label: 'nav.items.today',
     to: '/',
     icon: LayoutDashboard,
     keywords: 'dashboard accueil home today',
   },
   {
-    label: 'Session de révision',
+    label: 'nav.items.session',
     to: '/review',
     icon: GraduationCap,
     keywords: 'review réviser session study',
   },
-  { label: 'Matières', to: '/subjects', icon: Layers, keywords: 'subjects matieres decks cartes' },
   {
-    label: 'Planning',
+    label: 'pageTitle.subjects',
+    to: '/subjects',
+    icon: Layers,
+    keywords: 'subjects matieres decks cartes',
+  },
+  {
+    label: 'nav.items.planning',
     to: '/planning',
     icon: CalendarDays,
     keywords: 'planning calendrier calendar examens',
   },
   {
-    label: 'Analytics',
+    label: 'nav.items.analytics',
     to: '/analytics',
     icon: ChartColumn,
     keywords: 'analytics stats statistiques progression',
   },
-  { label: 'Import', to: '/import', icon: Upload, keywords: 'import upload notes pdf markdown' },
   {
-    label: 'Réglages',
+    label: 'nav.items.import',
+    to: '/import',
+    icon: Upload,
+    keywords: 'import upload notes pdf markdown',
+  },
+  {
+    label: 'pageTitle.settings',
     to: '/settings',
     icon: Settings,
     keywords: 'settings reglages preferences options',
@@ -90,6 +102,7 @@ export function CommandMenu() {
   const { commandOpen, setCommandOpen, openCreate, setShortcutsOpen } = useShell()
   const navigate = useNavigate()
   const { resolved, toggle } = useTheme()
+  const t = useT()
 
   const [page, setPage] = useState<Page>('root')
   const [search, setSearch] = useState('')
@@ -144,17 +157,17 @@ export function CommandMenu() {
 
   const stepHint =
     page === 'deck:subject'
-      ? 'Nouveau deck — choisir la matière'
+      ? t('cmd.step.deckSubject')
       : page === 'card:subject'
-        ? 'Nouvelle carte — choisir la matière'
+        ? t('cmd.step.cardSubject')
         : page === 'card:deck'
-          ? 'Nouvelle carte — choisir le deck'
+          ? t('cmd.step.cardDeck')
           : null
 
   return (
     <CommandDialog open={commandOpen} onOpenChange={onOpenChange}>
       <CommandInput
-        placeholder={page === 'root' ? 'Rechercher ou aller à…' : 'Filtrer…'}
+        placeholder={page === 'root' ? t('cmd.placeholder') : t('cmd.filterPlaceholder')}
         value={search}
         onValueChange={setSearch}
         onKeyDown={onInputKeyDown}
@@ -163,23 +176,23 @@ export function CommandMenu() {
         <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5 text-2xs text-text-faint">
           <span>{stepHint}</span>
           <span aria-hidden>·</span>
-          <span>⌫ retour</span>
+          <span>{t('cmd.back')}</span>
         </div>
       )}
       <CommandList>
-        <CommandEmpty>Aucun résultat.</CommandEmpty>
+        <CommandEmpty>{t('cmd.empty')}</CommandEmpty>
 
         {page === 'root' && (
           <>
-            <CommandGroup heading="Navigation">
+            <CommandGroup heading={t('cmd.groups.navigation')}>
               {NAV_ACTIONS.map((item) => (
                 <CommandItem
                   key={item.to}
-                  value={`${item.label} ${item.keywords}`}
+                  value={`${t(item.label)} ${item.keywords}`}
                   onSelect={() => go(item.to)}
                 >
                   <item.icon />
-                  {item.label}
+                  {t(item.label)}
                   {navChordFor(item.to) && (
                     <CommandShortcut>{navChordFor(item.to)}</CommandShortcut>
                   )}
@@ -188,76 +201,77 @@ export function CommandMenu() {
             </CommandGroup>
 
             <CommandSeparator />
-            <CommandGroup heading="Créer">
+            <CommandGroup heading={t('cmd.groups.create')}>
               <CommandItem
-                value="Nouvelle matière créer ajouter subject new add"
+                value={`${t('cmd.actions.newSubject')} créer ajouter subject new add`}
                 onSelect={() => {
                   close()
                   openCreate('subject')
                 }}
               >
                 <Layers />
-                Nouvelle matière
+                {t('cmd.actions.newSubject')}
               </CommandItem>
               <CommandItem
-                value="Nouveau deck créer ajouter deck new add"
+                value={`${t('cmd.actions.newDeck')} créer ajouter deck new add`}
                 onSelect={() => {
                   setSearch('')
                   setPage('deck:subject')
                 }}
               >
                 <SquareStack />
-                Nouveau deck…
+                {t('cmd.actions.newDeck')}
               </CommandItem>
               <CommandItem
-                value="Nouvelle carte créer ajouter card flashcard new add"
+                value={`${t('cmd.actions.newCard')} créer ajouter card flashcard new add`}
                 onSelect={() => {
                   setSearch('')
                   setPage('card:subject')
                 }}
               >
                 <SquarePen />
-                Nouvelle carte…
+                {t('cmd.actions.newCard')}
               </CommandItem>
               <CommandItem
-                value="Nouvel examen créer ajouter exam new add"
+                value={`${t('cmd.actions.newExam')} créer ajouter exam new add`}
                 onSelect={() => {
                   close()
                   openCreate('exam')
                 }}
               >
                 <GraduationCap />
-                Nouvel examen
+                {t('cmd.actions.newExam')}
               </CommandItem>
               <CommandItem
-                value="Importer des notes upload import pdf markdown"
+                value={`${t('cmd.actions.importNotes')} upload import pdf markdown`}
                 onSelect={() => go('/import')}
               >
                 <Upload />
-                Importer des notes
+                {t('cmd.actions.importNotes')}
               </CommandItem>
             </CommandGroup>
 
             {totalDue > 0 && (
               <>
                 <CommandSeparator />
-                <CommandGroup heading="Réviser">
+                <CommandGroup heading={t('cmd.groups.review')}>
                   <CommandItem
-                    value="Réviser tout toutes les cartes review all"
+                    value={`${t('cmd.actions.reviewAll')} review all`}
                     onSelect={() => go('/review')}
                   >
                     <GraduationCap />
-                    Réviser tout
+                    {t('cmd.actions.reviewAll')}
                     <CommandShortcut>{totalDue}</CommandShortcut>
                   </CommandItem>
                   {dueSubjects.map(({ subject, due }) => (
                     <CommandItem
                       key={subject.id}
-                      value={`Réviser ${subject.name} review`}
+                      value={`${t('cmd.actions.reviewSubject', { name: subject.name })} review`}
                       onSelect={() => reviewSubject(subject.id)}
                     >
                       <SubjectDot color={subject.color} />
-                      Réviser « {subject.name} »<CommandShortcut>{due}</CommandShortcut>
+                      {t('cmd.actions.reviewSubject', { name: subject.name })}
+                      <CommandShortcut>{due}</CommandShortcut>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -265,27 +279,29 @@ export function CommandMenu() {
             )}
 
             <CommandSeparator />
-            <CommandGroup heading="Préférences">
+            <CommandGroup heading={t('cmd.groups.preferences')}>
               <CommandItem
-                value="Basculer le thème theme clair sombre dark light"
+                value={`${t('cmd.actions.toggleTheme')} theme clair sombre dark light`}
                 onSelect={() => {
                   toggle()
                   close()
                 }}
               >
                 {resolved === 'dark' ? <Sun /> : <Moon />}
-                Basculer le thème
-                <CommandShortcut>{resolved === 'dark' ? 'Clair' : 'Sombre'}</CommandShortcut>
+                {t('cmd.actions.toggleTheme')}
+                <CommandShortcut>
+                  {resolved === 'dark' ? t('cmd.themeLight') : t('cmd.themeDark')}
+                </CommandShortcut>
               </CommandItem>
               <CommandItem
-                value="Afficher les raccourcis clavier keyboard shortcuts aide help"
+                value={`${t('cmd.actions.showShortcuts')} keyboard shortcuts aide help`}
                 onSelect={() => {
                   close()
                   setShortcutsOpen(true)
                 }}
               >
                 <Keyboard />
-                Afficher les raccourcis
+                {t('cmd.actions.showShortcuts')}
                 <CommandShortcut>?</CommandShortcut>
               </CommandItem>
             </CommandGroup>
@@ -293,10 +309,10 @@ export function CommandMenu() {
         )}
 
         {(page === 'deck:subject' || page === 'card:subject') && (
-          <CommandGroup heading="Matières">
+          <CommandGroup heading={t('cmd.groups.subjects')}>
             {subjects.length === 0 && (
               <CommandItem value="aucune matière" disabled>
-                Aucune matière — crée-en une d'abord.
+                {t('cmd.noSubjects')}
               </CommandItem>
             )}
             {subjects.map((s) => (
@@ -322,10 +338,10 @@ export function CommandMenu() {
         )}
 
         {page === 'card:deck' && (
-          <CommandGroup heading="Decks">
+          <CommandGroup heading={t('cmd.groups.decks')}>
             {cardDecks.length === 0 && (
               <CommandItem value="aucun deck" disabled>
-                Aucun deck dans cette matière.
+                {t('cmd.noDecks')}
               </CommandItem>
             )}
             {cardDecks.map((d) => (

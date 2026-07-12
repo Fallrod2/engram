@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { Exam, Subject } from '@engram/shared'
 import { localDayKey } from '@/lib/calendar'
+import { useT } from '@/lib/i18n'
 import { SubjectDot } from '@/components/subject-dot'
 import { Countdown } from '@/components/countdown'
 
@@ -21,6 +22,7 @@ export function UpcomingExams({
   subjectsById: Map<string, Subject>
   now: Date
 }) {
+  const t = useT()
   const todayKey = localDayKey(now)
   const upcoming = useMemo(
     () =>
@@ -34,16 +36,16 @@ export function UpcomingExams({
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border bg-surface-1 p-4">
       <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-        Prochains examens
+        {t('dashboard.exams.label')}
       </p>
       {upcoming.length === 0 ? (
         <div className="flex flex-col items-start gap-1 py-1">
-          <p className="text-sm text-text-muted">Aucun examen à venir.</p>
+          <p className="text-sm text-text-muted">{t('dashboard.exams.none')}</p>
           <Link
             to="/planning"
             className="text-xs text-text-faint transition-colors hover:text-accent"
           >
-            Planifier un examen
+            {t('dashboard.exams.plan')}
           </Link>
         </div>
       ) : (

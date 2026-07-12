@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import { RewardIllustration } from '@/components/illustrations'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useT, type TFunction } from '@/lib/i18n'
 import { useShell } from '@/components/shell/shell-context'
 import type { ReviewScope } from '@/lib/api'
 import { useReviewSession } from './use-review-session'
@@ -55,16 +56,17 @@ export function ReviewSession({ scope }: { scope: ReviewScope }) {
 }
 
 function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
-  if (api.phase === 'LOADING') return <LoadingView onExit={api.requestExit} />
+  const t = useT()
+  if (api.phase === 'LOADING') return <LoadingView onExit={api.requestExit} t={t} />
 
   if (api.phase === 'ERROR') {
     return (
-      <TerminalView onExit={api.requestExit}>
+      <TerminalView onExit={api.requestExit} t={t}>
         <EmptyState
           icon={CloudOff}
-          title="File indisponible."
-          meta="Impossible de charger la session"
-          action={<Button onClick={api.retryQueue}>Réessayer</Button>}
+          title={t('empty.sessionErrorTitle')}
+          meta={t('empty.sessionErrorMeta')}
+          action={<Button onClick={api.retryQueue}>{t('common.retry')}</Button>}
         />
       </TerminalView>
     )
@@ -72,12 +74,12 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
   if (api.phase === 'EMPTY') {
     return (
-      <TerminalView onExit={api.requestExit}>
+      <TerminalView onExit={api.requestExit} t={t}>
         <EmptyState
           illustration={<RewardIllustration />}
-          title="Rien à réviser — tout est à jour."
-          meta="0 carte due"
-          action={<Button onClick={api.requestExit}>Retour au tableau de bord</Button>}
+          title={t('empty.sessionTitle')}
+          meta={t('empty.sessionMeta')}
+          action={<Button onClick={api.requestExit}>{t('common.backToDashboard')}</Button>}
         />
       </TerminalView>
     )
@@ -103,6 +105,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 }
 
 function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
+  const t = useT()
   const current = api.current
   return (
     <>
@@ -140,7 +143,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
       {/* Screen-reader announcement of the reveal (spec §15). */}
       <div aria-live="polite" className="sr-only">
-        {api.revealed ? 'Réponse révélée' : ''}
+        {api.revealed ? t('session.revealed') : ''}
       </div>
 
       <div className="flex flex-col items-center gap-3 px-4 pb-6">
@@ -154,13 +157,11 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
             onRate={api.rate}
           />
           {api.submitError && (
-            <p className="mt-2 text-center text-xs text-danger">
-              Échec d'enregistrement — appuie de nouveau pour réessayer.
-            </p>
+            <p className="mt-2 text-center text-xs text-danger">{t('session.saveError')}</p>
           )}
         </div>
         <p className="text-2xs uppercase tracking-[0.08em] text-text-faint">
-          Espace révéler · 1-4 noter · Échap quitter
+          {t('session.footerHint')}
         </p>
       </div>
     </>
@@ -168,14 +169,14 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 }
 
 /** A close affordance for the terminal load states (Échap also exits). */
-function CloseButton({ onExit }: { onExit: () => void }) {
+function CloseButton({ onExit, t }: { onExit: () => void; t: TFunction }) {
   return (
     <div className="flex h-12 shrink-0 items-center justify-end px-4">
       <Button
         variant="ghost"
         size="icon"
         onClick={onExit}
-        aria-label="Quitter la session (Échap)"
+        aria-label={t('session.exitAria')}
         className="text-text-muted"
       >
         <X className="size-4" />
@@ -184,20 +185,28 @@ function CloseButton({ onExit }: { onExit: () => void }) {
   )
 }
 
-function TerminalView({ children, onExit }: { children: React.ReactNode; onExit: () => void }) {
+function TerminalView({
+  children,
+  onExit,
+  t,
+}: {
+  children: React.ReactNode
+  onExit: () => void
+  t: TFunction
+}) {
   return (
     <>
-      <CloseButton onExit={onExit} />
+      <CloseButton onExit={onExit} t={t} />
       <div className="flex flex-1 items-center justify-center">{children}</div>
     </>
   )
 }
 
-function LoadingView({ onExit }: { onExit: () => void }) {
+function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
   return (
     <>
       <div className="h-0.5 w-full bg-surface-2" />
-      <CloseButton onExit={onExit} />
+      <CloseButton onExit={onExit} t={t} />
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4">
         <Skeleton className="h-[280px] w-full max-w-[680px] rounded-lg" />
         <div className="grid w-full max-w-[680px] grid-cols-2 gap-2 sm:grid-cols-4">

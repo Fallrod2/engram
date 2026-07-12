@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Layers, Loader2, Sparkles, Upload } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { WelcomeIllustration } from '@/components/illustrations'
 import { seedExample } from './seed'
@@ -15,15 +16,16 @@ import { seedExample } from './seed'
  */
 export function WelcomePanel({ onCreateSubject }: { onCreateSubject: () => void }) {
   const qc = useQueryClient()
+  const t = useT()
   const [seeding, setSeeding] = useState(false)
 
   async function loadExample() {
     setSeeding(true)
     try {
       await seedExample(qc)
-      toast.success('Exemple chargé')
+      toast.success(t('onboarding.exampleLoaded'))
     } catch {
-      toast.error("Le chargement de l'exemple a échoué")
+      toast.error(t('onboarding.exampleFailed'))
     } finally {
       setSeeding(false)
     }
@@ -36,27 +38,25 @@ export function WelcomePanel({ onCreateSubject }: { onCreateSubject: () => void 
       </span>
       <div className="flex max-w-md flex-col gap-1.5">
         <h2 className="text-lg font-semibold tracking-[-0.01em] text-text">
-          Bienvenue dans engram.
+          {t('onboarding.welcomeTitle')}
         </h2>
-        <p className="text-sm text-text-muted">
-          Crée ta première matière, ou charge un exemple pour explorer.
-        </p>
+        <p className="text-sm text-text-muted">{t('onboarding.welcomeBody')}</p>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         <Button onClick={onCreateSubject}>
           <Layers />
-          Créer une matière
+          {t('onboarding.createSubject')}
         </Button>
         <Button variant="secondary" asChild>
           <Link to="/import">
             <Upload />
-            Importer des notes
+            {t('onboarding.importNotes')}
           </Link>
         </Button>
         <Button variant="ghost" onClick={() => void loadExample()} disabled={seeding}>
           {seeding ? <Loader2 className="animate-spin" /> : <Sparkles />}
-          Charger un exemple
+          {t('onboarding.loadExample')}
         </Button>
       </div>
     </section>

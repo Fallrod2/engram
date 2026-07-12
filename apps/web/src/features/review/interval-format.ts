@@ -1,17 +1,20 @@
+import { isEn } from '@/lib/format'
+
 /**
  * Format a projected FSRS interval for a rating button (spec §3.4). Pure, mono
- * `tabular-nums`-friendly output. Unit-tested (spec §16.1 items 10–11).
+ * `tabular-nums`-friendly output, locale-aware via `format.ts` (spec §9.3).
+ * Unit-tested (spec §16.1 items 10–11).
  *
- * - `scheduledDays >= 1` → days/months/years:
+ * - `scheduledDays >= 1` → days/months/years (FR `j`/`mo`/`a`, EN `d`/`mo`/`y`):
  *     1–29 → `X j` · 30–364 → `X mo` (round(d/30)) · ≥365 → `X a` (round(d/365)).
  * - `scheduledDays === 0` (learning/relearning steps) → derived from `due − now`:
  *     < 60 s → `< 1 min` · < 60 min → `X min` · else → `X h`.
  */
 export function formatInterval(due: string, now: string, scheduledDays: number): string {
   if (scheduledDays >= 1) {
-    if (scheduledDays < 30) return `${scheduledDays} j`
+    if (scheduledDays < 30) return `${scheduledDays} ${isEn() ? 'd' : 'j'}`
     if (scheduledDays < 365) return `${Math.round(scheduledDays / 30)} mo`
-    return `${Math.round(scheduledDays / 365)} a`
+    return `${Math.round(scheduledDays / 365)} ${isEn() ? 'y' : 'a'}`
   }
 
   const diffMs = new Date(due).getTime() - new Date(now).getTime()

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { Note, Subject } from '@engram/shared'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { ImportIllustration } from '@/components/illustrations'
 import { ImportSkeleton } from '@/components/skeletons'
@@ -67,6 +68,7 @@ interface SubjectGroup {
 
 function ImportPage() {
   const navigate = useNavigate()
+  const t = useT()
   const notes = useQuery(notesListOptions()).data ?? []
   const subjects = useQuery(subjectsListOptions()).data ?? []
   const generations = useQuery(allGenerationsOptions()).data
@@ -210,8 +212,8 @@ function ImportPage() {
         {isEmpty ? (
           <EmptyState
             illustration={<ImportIllustration />}
-            title="Aucune note importée"
-            meta="Déposez un .md ou un .pdf ci-dessus pour générer des cartes."
+            title={t('empty.importTitle')}
+            meta={t('empty.importMeta')}
           />
         ) : (
           <ul className="flex flex-col gap-6" onKeyDown={roving.onKeyDown}>

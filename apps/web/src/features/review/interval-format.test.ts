@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setLocale } from '@/lib/format'
 import { formatDurationClock, formatInterval, formatSeconds } from './interval-format'
 
 const NOW = '2026-07-12T10:00:00.000Z'
@@ -37,6 +38,24 @@ describe('formatInterval — day/month/year scale (§16.1 item 11)', () => {
     expect(formatInterval(plus(29 * 86_400), NOW, 29)).toBe('29 j')
     expect(formatInterval(plus(30 * 86_400), NOW, 30)).toBe('1 mo')
     expect(formatInterval(plus(365 * 86_400), NOW, 365)).toBe('1 a')
+  })
+})
+
+describe('formatInterval — English locale units (spec §9.3)', () => {
+  afterEach(() => setLocale('fr-FR'))
+
+  it('day/month/year switch to d/mo/y under en', () => {
+    setLocale('en-US')
+    expect(formatInterval(plus(3 * 86_400), NOW, 3)).toBe('3 d')
+    expect(formatInterval(plus(45 * 86_400), NOW, 45)).toBe('2 mo')
+    expect(formatInterval(plus(400 * 86_400), NOW, 400)).toBe('1 y')
+  })
+
+  it('sub-day steps stay language-neutral under en', () => {
+    setLocale('en-US')
+    expect(formatInterval(plus(40), NOW, 0)).toBe('< 1 min')
+    expect(formatInterval(plus(6 * 60), NOW, 0)).toBe('6 min')
+    expect(formatInterval(plus(90 * 60), NOW, 0)).toBe('2 h')
   })
 })
 

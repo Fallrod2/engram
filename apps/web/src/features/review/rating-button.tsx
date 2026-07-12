@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
 import type { RatingMeta } from './labels'
 
@@ -53,10 +54,12 @@ export function RatingButton({
   flash: boolean
   onRate: () => void
 }) {
-  const t = TOKENS[meta.token]
+  const t = useT()
+  const tokenCls = TOKENS[meta.token]
+  const ratingLabel = t(meta.a11y)
   const label = interval
-    ? `${meta.a11y} — prochaine révision dans ${interval}`
-    : `${meta.a11y} — noter cette carte`
+    ? t('session.ratingAriaNext', { label: ratingLabel, interval })
+    : t('session.ratingAriaRate', { label: ratingLabel })
   return (
     <button
       type="button"
@@ -67,16 +70,19 @@ export function RatingButton({
       className={cn(
         'flex h-16 flex-col items-center justify-center gap-1 rounded-md border bg-surface-2',
         'transition-colors duration-fast ease-out disabled:pointer-events-none',
-        flash ? t.flash : 'border-border',
-        !flash && t.hover,
+        flash ? tokenCls.flash : 'border-border',
+        !flash && tokenCls.hover,
       )}
     >
       <span className="flex items-center gap-1.5">
         <Kbd>{meta.grade}</Kbd>
-        <span className="text-sm font-medium text-text">{meta.label}</span>
+        <span className="text-sm font-medium text-text">{t(meta.label)}</span>
       </span>
       <span
-        className={cn('font-mono text-xs tabular-nums', interval ? t.interval : 'text-text-faint')}
+        className={cn(
+          'font-mono text-xs tabular-nums',
+          interval ? tokenCls.interval : 'text-text-faint',
+        )}
       >
         {interval ?? '·'}
       </span>

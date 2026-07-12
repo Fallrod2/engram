@@ -11,20 +11,39 @@ import {
   contextForPathname,
   type KeyBinding,
 } from '@/lib/keymap'
+import { useT, type TFunction, type TKey } from '@/lib/i18n'
 import { useShell } from './shell-context'
 
+/**
+ * Word key-tokens that must follow the UI language (the physical Enter key),
+ * mapped to their dict key. Glyph tokens (⌘/⇧/⌫) are universal and rendered
+ * verbatim; letters and chord displays (`N`, `G D`) carry no locale.
+ */
+const KEY_TOKEN_LABELS: Record<string, TKey> = {
+  Enter: 'session.keyEnter',
+}
+
 /** Render a binding's space-separated tokens, one `<Kbd>` each. */
-function Keys({ keys }: { keys: string }) {
+function Keys({ keys, t }: { keys: string; t: TFunction }) {
   return (
     <span className="flex items-center gap-1">
-      {keys.split(' ').map((token, i) => (
-        <Kbd key={i}>{token}</Kbd>
-      ))}
+      {keys.split(' ').map((token, i) => {
+        const dictKey = KEY_TOKEN_LABELS[token]
+        return <Kbd key={i}>{dictKey ? t(dictKey) : token}</Kbd>
+      })}
     </span>
   )
 }
 
-function Section({ title, bindings }: { title: string; bindings: readonly KeyBinding[] }) {
+function Section({
+  title,
+  bindings,
+  t,
+}: {
+  title: string
+  bindings: readonly KeyBinding[]
+  t: TFunction
+}) {
   return (
     <div>
       <p className="mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
@@ -33,8 +52,8 @@ function Section({ title, bindings }: { title: string; bindings: readonly KeyBin
       <div className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5">
         {bindings.map((b, i) => (
           <div key={i} className="contents">
-            <span className="text-sm text-text">{b.label}</span>
-            <Keys keys={b.keys} />
+            <span className="text-sm text-text">{t(b.label)}</span>
+            <Keys keys={b.keys} t={t} />
           </div>
         ))}
       </div>
@@ -50,6 +69,7 @@ function Section({ title, bindings }: { title: string; bindings: readonly KeyBin
  */
 export function ShortcutsDialog() {
   const { shortcutsOpen, setShortcutsOpen } = useShell()
+  const t = useT()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const ctx = contextForPathname(pathname)
 
@@ -79,16 +99,20 @@ export function ShortcutsDialog() {
     <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Raccourcis clavier</DialogTitle>
+          <DialogTitle>{t('shortcuts.title')}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
-          <Section title="Globaux" bindings={GLOBAL_KEYS} />
+          <Section title={t('shortcuts.sectionGlobal')} bindings={GLOBAL_KEYS} t={t} />
           <Separator />
-          <Section title="Navigation" bindings={NAV_KEYS} />
+          <Section title={t('shortcuts.sectionNav')} bindings={NAV_KEYS} t={t} />
           {ctx && (
             <>
               <Separator />
-              <Section title={`Écran — ${CONTEXT_LABELS[ctx]}`} bindings={CONTEXT_KEYS[ctx]} />
+              <Section
+                title={t('shortcuts.sectionScreen', { name: t(CONTEXT_LABELS[ctx]) })}
+                bindings={CONTEXT_KEYS[ctx]}
+                t={t}
+              />
             </>
           )}
         </div>

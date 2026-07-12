@@ -2,6 +2,7 @@ import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
+import { useT, usePlural } from '@/lib/i18n'
 import { RATINGS } from './labels'
 import type { SessionSummary as Summary } from './summary'
 import { formatDurationClock, formatSeconds } from './interval-format'
@@ -36,18 +37,22 @@ export function SessionSummary({
   onExit: () => void
   onReviewAgain: () => void
 }) {
+  const t = useT()
+  const plural = usePlural()
   const { viewed, byGrade, totalMs, avgMs, successRate } = summary
 
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col items-center gap-7 px-6 text-center">
       <div className="flex flex-col items-center gap-1">
         <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-          Session terminée
+          {t('session.summary.done')}
         </p>
         <p className="font-mono text-3xl font-medium tabular-nums leading-none tracking-[-0.02em] text-text">
           {viewed}
         </p>
-        <p className="text-sm text-text-muted">{viewed > 1 ? 'cartes vues' : 'carte vue'}</p>
+        <p className="text-sm text-text-muted">
+          {t(`session.summary.cardsViewed_${plural(viewed)}`)}
+        </p>
       </div>
 
       {/* 1–4 distribution */}
@@ -67,7 +72,7 @@ export function SessionSummary({
         <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums">
           {RATINGS.map((r) => (
             <span key={r.grade} className="flex items-center gap-1">
-              <span className="text-text-muted">{r.label}</span>
+              <span className="text-text-muted">{t(r.label)}</span>
               <span className={SEG_TEXT[r.token]}>{byGrade[r.grade]}</span>
             </span>
           ))}
@@ -76,20 +81,22 @@ export function SessionSummary({
 
       {/* Time + success */}
       <div className="grid w-full grid-cols-3 gap-2">
-        <Stat label="Temps" value={formatDurationClock(totalMs)} />
-        <Stat label="Moy./carte" value={formatSeconds(avgMs)} />
-        <Stat label="Réussite" value={`${successRate} %`} />
+        <Stat label={t('session.summary.time')} value={formatDurationClock(totalMs)} />
+        <Stat label={t('session.summary.avgPerCard')} value={formatSeconds(avgMs)} />
+        <Stat label={t('session.summary.success')} value={`${successRate} %`} />
       </div>
 
       <div className="flex flex-col items-center gap-2">
         <Button autoFocus onClick={onExit}>
-          Retour au tableau de bord
-          <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">Entrée</Kbd>
+          {t('common.backToDashboard')}
+          <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">
+            {t('session.keyEnter')}
+          </Kbd>
         </Button>
         {canReviewAgain && (
           <Button variant="ghost" onClick={onReviewAgain} className="text-text-muted">
             <RotateCcw className="size-4" />
-            Réviser encore
+            {t('session.summary.reviewAgain')}
             <Kbd className="ml-1">R</Kbd>
           </Button>
         )}

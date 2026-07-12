@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { ConfirmDelete } from '@/components/confirm-delete'
 import { PlanningIllustration } from '@/components/illustrations'
@@ -86,6 +87,7 @@ function PlanningError() {
 function PlanningPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
+  const t = useT()
   const { view, day, exam } = search
 
   // Stable "now" for the session so today/countdowns don't drift per render.
@@ -198,7 +200,9 @@ function PlanningPage() {
             variant="ghost"
             size="icon"
             className="text-text-muted"
-            aria-label={effectiveView === 'month' ? 'Mois précédent' : 'Semaine précédente'}
+            aria-label={
+              effectiveView === 'month' ? t('planning.prevMonth') : t('planning.prevWeek')
+            }
             onClick={() => step(-1)}
           >
             <ChevronLeft />
@@ -210,20 +214,22 @@ function PlanningPage() {
             variant="ghost"
             size="icon"
             className="text-text-muted"
-            aria-label={effectiveView === 'month' ? 'Mois suivant' : 'Semaine suivante'}
+            aria-label={
+              effectiveView === 'month' ? t('planning.nextMonth') : t('planning.nextWeek')
+            }
             onClick={() => step(1)}
           >
             <ChevronRight />
           </Button>
         </div>
         <Button variant="secondary" onClick={() => setDay(todayKey)}>
-          Aujourd'hui
+          {t('planning.today')}
           <Kbd className="ml-1">t</Kbd>
         </Button>
         <div className="ml-auto flex items-center gap-2">
           <Button onClick={() => openExam('new')}>
             <Plus />
-            Nouvel examen
+            {t('planning.newExam')}
             <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
           </Button>
           <Tabs
@@ -233,11 +239,11 @@ function PlanningPage() {
           >
             <TabsList>
               <TabsTrigger value="month">
-                Mois
+                {t('planning.month')}
                 <Kbd className="ml-1.5 border-transparent bg-transparent">m</Kbd>
               </TabsTrigger>
               <TabsTrigger value="week">
-                Semaine
+                {t('planning.week')}
                 <Kbd className="ml-1.5 border-transparent bg-transparent">s</Kbd>
               </TabsTrigger>
             </TabsList>
@@ -248,12 +254,12 @@ function PlanningPage() {
       {planEmpty ? (
         <EmptyState
           illustration={<PlanningIllustration />}
-          title="Rien à planifier pour l'instant."
-          meta="0 examen · 0 review prévue"
+          title={t('empty.planningTitle')}
+          meta={t('empty.planningMeta')}
           action={
             <Button onClick={() => openExam('new')}>
               <Plus />
-              Nouvel examen
+              {t('shortcuts.keys.newExam')}
             </Button>
           }
         />
@@ -263,7 +269,7 @@ function PlanningPage() {
           <div className="min-w-0 flex-1">
             {planQuery.isError ? (
               <PanelError
-                message="Impossible de charger la charge prévue."
+                message={t('planning.planError')}
                 onRetry={() => void planQuery.refetch()}
               />
             ) : (
@@ -438,6 +444,7 @@ function PlanningRail({
   onNewExam: () => void
   onRetryExams: () => void
 }) {
+  const t = useT()
   return (
     <>
       <div className="rounded-lg border border-border bg-surface-1 p-4">
@@ -461,12 +468,12 @@ function PlanningRail({
       <div className="rounded-lg border border-border bg-surface-1 p-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-            Examens à venir
+            {t('dashboard.exams.label')}
           </p>
         </div>
         <Separator className="mb-2" />
         {examsError ? (
-          <PanelError message="Impossible de charger les examens." onRetry={onRetryExams} />
+          <PanelError message={t('planning.examsError')} onRetry={onRetryExams} />
         ) : examsLoading ? (
           <ExamListSkeleton />
         ) : (
@@ -487,11 +494,12 @@ function PlanningRail({
 
 /** Inline per-panel error (never blanks the screen). */
 function PanelError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useT()
   return (
     <div className="flex flex-col items-start gap-2 rounded-md border border-border bg-surface-2 p-4">
       <p className="text-sm text-text-muted">{message}</p>
       <Button variant="secondary" size="sm" onClick={onRetry}>
-        Réessayer
+        {t('common.retry')}
       </Button>
     </div>
   )

@@ -7,6 +7,7 @@ import { GraduationCap } from 'lucide-react'
 import type { HeatmapResponse } from '@engram/shared'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { AnalyticsIllustration } from '@/components/illustrations'
 import { localDayKey } from '@/lib/calendar'
@@ -87,6 +88,7 @@ function AnalyticsPending() {
 function AnalyticsPage() {
   const { window: win } = Route.useSearch()
   const navigate = Route.useNavigate()
+  const t = useT()
   const reduce = !!useReducedMotion()
 
   const [now] = useState(() => new Date())
@@ -115,13 +117,13 @@ function AnalyticsPage() {
         <PageHeaderRow />
         <EmptyState
           illustration={<AnalyticsIllustration />}
-          title="Rien à analyser pour l'instant."
-          meta="0 review enregistrée"
+          title={t('empty.analyticsTitle')}
+          meta={t('empty.analyticsMeta')}
           action={
             <Button asChild>
               <Link to="/review">
                 <GraduationCap className="size-4" />
-                Lancer une session
+                {t('common.startSession')}
               </Link>
             </Button>
           }
