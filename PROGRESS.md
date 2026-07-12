@@ -2,7 +2,7 @@
 
 > État vivant du projet. Mis à jour et commité à chaque cycle orchestrateur.
 
-## Phase courante : **Phase 2 — Session de révision** (Phases 0 et 1 terminées, tags `phase-0`, `phase-1`)
+## Phase courante : **Phase 3 — Import + IA** (Phases 0-2 terminées, tags `phase-0`, `phase-1`, `phase-2`)
 
 ## Fait
 
@@ -29,10 +29,16 @@
 - **WS-1B mergé dans `main`** (merge commit) : écrans Subjects / Subject→Decks / Deck→Cards (table dense, composer ⌘↵ enchaînable, glyphes FSRS), sidebar dynamique (vraies matières + due counts réels, refetch + invalidations exactes), factory `qk`, optimistic updates + rollback, RHF + alert-dialog (ajoutés en round de review), redirect `/` → `/subjects` (Phase 1), proxy Vite configurable `VITE_API_TARGET`, vitest racine étendu (jsdom + alias `@`) pour les tests de rendu web. 70 tests vitest + 55 bun:test. Review : APPROVE après 2 rounds (vérifs live par le reviewer, dark+light). Tag `phase-1`.
 - Points non bloquants notés par la review : fan-out N+1 côté client pour `cardCount` (faute d'agrégats serveur — candidat Phase 4/5), page unique limit 500 pour les cartes d'un deck (pas d'infinite scroll, à revoir si besoin).
 
-## En cours (Phase 2)
+### Phase 2 ✅ (tag `phase-2`)
 
-- **`feat/phase2-review-session`** (dev Opus + review Sonnet, worktree isolé) : écran de session selon `phase2-session-spec.md` (machine à états, espace/1-4, preview des intervalles, flip, résumé de fin).
-- **Specs Phase 4** (armada) : planning + exams — en avance de phase.
+- **`feat/phase2-review-session` mergé** : session plein écran 100 % clavier (portal, machine à états pure `session-reducer.ts` + timer d'activité `session-timer.ts`, tous testés), flip 3D 220 ms avec branche crossfade reduced-motion, rating 1-4 avec preview des intervalles (couleurs FSRS), progression, résumé de fin (héros, répartition, temps, réussite), empty-state récompense, dialog de sortie, overlay pause/idle, rendu Markdown sûr (react-markdown + rehype-sanitize), entrées « Réviser » sur matière/deck. 128 tests vitest + 55 bun:test. Review : APPROVE en re-revue #2 (anti-double-soumission vérifié en base réelle). Vérifié par l'orchestrateur : gates + session de démo complète déroulée au clavier en live sur :5173 (seed 2 cartes, résumé exact, données de démo supprimées ensuite).
+- Points connus : course bénigne « première touche » au mount (StrictMode dev uniquement, non corrigée volontairement) ; le vrai Dashboard « Aujourd'hui » n'existe pas encore (`/` → `/subjects`), le CTA global vit dans la sidebar — à traiter en Phase 4/6.
+
+## En cours (Phase 3)
+
+- **`feat/phase3-import-api`** (dev Opus + review Sonnet, worktree isolé) : upload MD/PDF, extraction unpdf, routes notes/generations, service IA Anthropic (générateur injectable, prompts versionnés) — selon `phase3-import-api-spec.md`.
+- **Specs Phase 5** (armada) : analytics — en avance de phase.
+- Ensuite : `feat/phase3-import-ui` (web) en parallèle de `feat/phase4-planning-api` (serveur) — fichiers disjoints.
 
 ## Specs prêtes (suite)
 
