@@ -2,7 +2,7 @@
 
 > État vivant du projet. Mis à jour et commité à chaque cycle orchestrateur.
 
-## Phase courante : **Phase 3 — Import + IA** (Phases 0-2 terminées, tags `phase-0`, `phase-1`, `phase-2`)
+## Phase courante : **Phase 4 — Planning** (Phases 0-3 terminées, tags `phase-0` → `phase-3`)
 
 ## Fait
 
@@ -40,11 +40,21 @@
 - ⚠️ **ANTHROPIC_API_KEY** : à renseigner dans `.env` (jamais commitée) pour la génération réelle ; sans clé, tout le reste fonctionne (503 propre sur la génération uniquement).
 - 💡 Grosse feature : candidate à un `/code-review ultra` manuel par Alex (déclenchement et facturation côté Alex).
 
-## En cours (Phase 3 UI ∥ Phase 4 API — fichiers disjoints)
+### Phase 3 UI ✅ (tag `phase-3`) + Phase 4 API mergée
 
-- **`feat/phase3-import-ui`** (web) : écrans import + review des propositions au clavier (a/e/r/u, j/k), polling, bannière 503. Ports 3002/5174 (dev), 3003/5175 (reviewer).
-- **`feat/phase4-planning-api`** (serveur) : CRUD exams, study-plan forecast (bucketing local, boost exams, overdue par subject), extensions day.ts. Ports 3004 (dev), 3005 (reviewer).
-- **Specs Phase 5** : API analytics finalisée (règle rating ≥ 1 partout, séries rétrospectives sans filtre archivage, dépendance dure : merger Phase 4 avant le dev Phase 5) ; spec UI analytics en reprise après un échec réseau de l'agent.
+- **`feat/phase3-import-ui` mergé** : /import (dropzone drag&drop + clavier, notes par matière, imports optimistes), /import/$noteId (Markdown rendu, panneau génération, historique, bannière clé API), écran de review (a/e/r/u + Shift+A, j/k, édition inline ⌘↵/Échap, machine locale pure testée, insertion groupée → cartes réelles), polling avec failsafe 90 s, accept/reject monochrome+luminance. Review : APPROVE (1 fix : propagation clavier de l'édition inline). 176 tests vitest.
+- **`feat/phase4-planning-api` mergé** : CRUD exams (junction, garde patch vide, 1 requête IN), GET /api/study-plan + /today (bucketing jour local, retard agrégé + ventilé par subject, boost exams ceil(n/7) sur [today, exam-1], filtre subjectId, invariant croisé testé), localDaySchema calendaire (rejette 2026-02-30), localDayDiff robuste DST. Review : APPROVE (0 fix, heuristique reproduite « bit-for-bit » au curl). 307 tests sur la branche.
+- Vérifié orchestrateur : gates sur main (180 vitest + 155 bun:test), /import inspecté dans Chrome, endpoints planning smoke-testés en live.
+- **Specs Phase 5 prêtes** : API (2 passes d'audit) + UI (validateur dataviz exécuté : pigments subjects non CVD-safe en paires → identité jamais portée par la couleur seule, small multiples, heatmap grille CSS custom avec ramp indigo `--chart-heat-0..4`).
+
+## En cours (Phase 4 UI ∥ Phase 5 API — fichiers disjoints)
+
+- **`feat/phase4-planning-ui`** (web) : /planning mois/semaine, grille clavier 2D, meter monochrome, exams + countdown, TodayPanel. Handoff API : invalider study-plan/today après une session ; jamais `new Date('YYYY-MM-DD')` côté client (parser par composantes) ; libeller « charge estimée ». Ports 3002/5174 (dev), 3003/5175 (reviewer).
+- **`feat/phase5-analytics-api`** (serveur) : 5 endpoints /api/analytics/*, règle rating ≥ 1 partout, rétrospectives sans filtre archivage, `daysInBucket`, avgMs arrondi entier, 1 requête par endpoint (test spy), log TZ au boot. Ports 3004 (dev), 3005 (reviewer).
+
+## À venir
+
+- Merge des deux → tag `phase-4`, puis `feat/phase5-analytics-ui` (Recharts + heatmap custom), tag `phase-5`, puis Phase 6 (polish : cmd+K enrichi, raccourcis globaux, transitions, onboarding, i18n FR/EN) et Phase 7 (hardening : e2e Playwright, perf, a11y, backup/export JSON).
 
 ## Specs prêtes (suite)
 
