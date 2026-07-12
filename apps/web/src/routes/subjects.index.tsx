@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Archive,
@@ -43,7 +43,7 @@ import {
   useArchiveSubject,
   useDeleteSubject,
 } from '@/features/subjects/queries'
-import { allDecksOptions } from '@/features/decks/queries'
+import { allDecksOptions, deckCardCountOptions } from '@/features/decks/queries'
 import { dueCountsOptions, bySubjectMap } from '@/features/due-counts/queries'
 import { SubjectFormDialog } from '@/features/subjects/subject-form-dialog'
 
@@ -82,6 +82,25 @@ function SubjectsPage() {
     for (const d of allDecks ?? []) m.set(d.subjectId, (m.get(d.subjectId) ?? 0) + 1)
     return m
   }, [allDecks])
+
+  // Aggregate a card total per subject (spec §2 CARTES column) by replicating
+  // the per-deck count probe used on the Decks screen. A subject's total is
+  // `undefined` (→ skeleton) until every one of its decks has reported.
+  const cardCountQueries = useQueries({
+    queries: (allDecks ?? []).map((d) => deckCardCountOptions(d.id)),
+  })
+  const cardTotalBySubject = useMemo(() => {
+    const m = new Map<string, number | undefined>()
+    if (allDecks === undefined) return m
+    for (const s of subjects) m.set(s.id, 0)
+    allDecks.forEach((d, i) => {
+      const count = cardCountQueries[i]?.data
+      const prev = m.get(d.subjectId)
+      m.set(d.subjectId, count === undefined || prev === undefined ? undefined : prev + count)
+    })
+    return m
+  }, [subjects, allDecks, cardCountQueries])
+
   const dueMap = useMemo(() => bySubjectMap(dueCounts), [dueCounts])
 
   const visible = useMemo(() => {
@@ -186,6 +205,7 @@ function SubjectsPage() {
         roving={roving}
         deckCountBySubject={deckCountBySubject}
         deckCountsReady={allDecks !== undefined}
+        cardTotalBySubject={cardTotalBySubject}
         dueMap={dueMap}
         onNew={() => setCreateOpen(true)}
         onEdit={setEditSubject}
@@ -234,6 +254,7 @@ function SubjectsBody({
   roving,
   deckCountBySubject,
   deckCountsReady,
+  cardTotalBySubject,
   dueMap,
   onNew,
   onEdit,
@@ -248,6 +269,7 @@ function SubjectsBody({
   roving: ReturnType<typeof useRovingList<HTMLAnchorElement>>
   deckCountBySubject: Map<string, number>
   deckCountsReady: boolean
+  cardTotalBySubject: Map<string, number | undefined>
   dueMap: Map<string, number>
   onNew: () => void
   onEdit: (s: Subject) => void
@@ -293,9 +315,10 @@ function SubjectsBody({
   return (
     <div>
       {/* List header labels */}
-      <div className="grid grid-cols-[1fr_72px_96px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
+      <div className="grid grid-cols-[1fr_64px_72px_88px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
         <span>Matière</span>
         <span className="text-right">Decks</span>
+        <span className="text-right">Cartes</span>
         <span className="text-right">Dues</span>
         <span />
       </div>
@@ -307,7 +330,7 @@ function SubjectsBody({
               {...roving.getItemProps(i)}
               to="/subjects/$subjectId"
               params={{ subjectId: s.id }}
-              className={entityRowClass('grid grid-cols-[1fr_72px_96px_40px] items-center')}
+              className={entityRowClass('grid grid-cols-[1fr_64px_72px_88px_40px] items-center')}
             >
               <span className="flex min-w-0 items-center gap-2">
                 <SubjectDot color={s.color} muted={s.archived} />
@@ -323,6 +346,7 @@ function SubjectsBody({
                 value={deckCountsReady ? (deckCountBySubject.get(s.id) ?? 0) : undefined}
                 className="justify-self-end"
               />
+              <CountStat value={cardTotalBySubject.get(s.id)} className="justify-self-end" />
               <DueCount
                 value={dueMap.get(s.id) ?? 0}
                 colorHex={s.color}
