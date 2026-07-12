@@ -4,6 +4,10 @@ coverage
 data
 bun.lock
 
+# Playwright e2e artifacts
+test-results
+playwright-report
+
 # Fichiers générés par drizzle-kit — format imposé par l'outil
 apps/server/drizzle/
 

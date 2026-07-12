@@ -16,6 +16,11 @@ build/
 coverage/
 *.tsbuildinfo
 
+# Playwright e2e artifacts
+test-results/
+playwright-report/
+.playwright/
+
 # local database (legacy sqlite, kept ignored — no effect)
 data/
 
