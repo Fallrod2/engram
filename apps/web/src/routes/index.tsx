@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Layers } from 'lucide-react'
+import { useT, type TFunction } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/error-state'
 import { subjectsById as buildSubjectsById } from '@/features/planning/plan-utils'
@@ -43,6 +44,7 @@ export const Route = createFileRoute('/')({
 
 function DashboardPage() {
   const router = useRouter()
+  const t = useT()
   const [now] = useState(() => new Date())
   const [createOpen, setCreateOpen] = useState(false)
   const createSubject = useCreateSubject()
@@ -81,7 +83,7 @@ function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-8">
             {noCardsYet ? (
-              <NoCardsHero />
+              <NoCardsHero t={t} />
             ) : total === 0 ? (
               <HeroCard>
                 {/* Cards exist, queue is clear → the legitimate reward. */}
@@ -93,7 +95,7 @@ function DashboardPage() {
                   <span className="font-mono text-3xl font-medium leading-none tabular-nums text-text">
                     {total}
                   </span>
-                  <span className="text-sm text-text-muted">à réviser aujourd'hui</span>
+                  <span className="text-sm text-text-muted">{t('dashboard.toReviewToday')}</span>
                 </div>
                 <TodayPanel subjectsById={byId} now={now} hideTotal />
               </HeroCard>
@@ -101,11 +103,15 @@ function DashboardPage() {
           </div>
 
           <div className="flex flex-col gap-4 lg:col-span-4">
-            {streaks ? <StreakCard streaks={streaks} /> : <BlockUnavailable label="Série" />}
+            {streaks ? (
+              <StreakCard streaks={streaks} />
+            ) : (
+              <BlockUnavailable label={t('dashboard.streak.label')} t={t} />
+            )}
             {examsQuery.isSuccess ? (
               <UpcomingExams exams={examsQuery.data} subjectsById={byId} now={now} />
             ) : (
-              <BlockUnavailable label="Prochains examens" />
+              <BlockUnavailable label={t('dashboard.exams.label')} t={t} />
             )}
           </div>
 
@@ -133,21 +139,19 @@ function HeroCard({ children }: { children: React.ReactNode }) {
 }
 
 /** Subjects exist but no deck/card yet (§5.4-ii) — a boot prompt, not the reward. */
-function NoCardsHero() {
+function NoCardsHero({ t }: { t: TFunction }) {
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-1 p-6">
       <div className="flex flex-col gap-1">
         <p className="text-lg font-semibold tracking-[-0.01em] text-text">
-          Ajoute des cartes pour commencer
+          {t('dashboard.noCardsTitle')}
         </p>
-        <p className="text-sm text-text-muted">
-          Tes matières sont prêtes — crée un deck et des cartes pour lancer ta première session.
-        </p>
+        <p className="text-sm text-text-muted">{t('dashboard.noCardsBody')}</p>
       </div>
       <Button variant="secondary" asChild className="self-start">
         <Link to="/subjects">
           <Layers />
-          Voir mes matières
+          {t('dashboard.viewMySubjects')}
         </Link>
       </Button>
     </div>
@@ -155,11 +159,11 @@ function NoCardsHero() {
 }
 
 /** Calm inline fallback for a rail block whose data failed to load (tolerant §5.6.6). */
-function BlockUnavailable({ label }: { label: string }) {
+function BlockUnavailable({ label, t }: { label: string; t: TFunction }) {
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border bg-surface-1 p-4">
       <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">{label}</p>
-      <p className="text-sm text-text-muted">Indisponible pour le moment.</p>
+      <p className="text-sm text-text-muted">{t('common.unavailable')}</p>
     </section>
   )
 }

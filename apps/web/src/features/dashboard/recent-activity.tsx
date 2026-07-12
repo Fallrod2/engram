@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { HeatmapResponse } from '@engram/shared'
 import { addDays, localDayKey } from '@/lib/calendar'
+import { useT } from '@/lib/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { heatLevel, HEAT_BG_CLASS } from '@/features/analytics/heat-scale'
 
@@ -14,6 +15,7 @@ const DAYS = 14
  * absent (RECENT_ACTIVITY_ENABLED), so it never blocks the screen.
  */
 export function RecentActivity({ heatmap, now }: { heatmap: HeatmapResponse; now: Date }) {
+  const t = useT()
   const cells = useMemo(() => {
     const byDate = new Map(heatmap.days.map((d) => [d.date, d.count]))
     const out: { date: string; count: number }[] = []
@@ -31,13 +33,13 @@ export function RecentActivity({ heatmap, now }: { heatmap: HeatmapResponse; now
     <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface-1 p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-          Activité récente
+          {t('dashboard.activity.label')}
         </p>
         <Link
           to="/analytics"
           className="text-xs text-text-faint transition-colors hover:text-accent"
         >
-          Voir les analytics
+          {t('dashboard.activity.viewAnalytics')}
         </Link>
       </div>
       <div className="flex items-end gap-1">
@@ -51,14 +53,26 @@ export function RecentActivity({ heatmap, now }: { heatmap: HeatmapResponse; now
             </TooltipTrigger>
             <TooltipContent>
               <span className="font-mono text-2xs tabular-nums">
-                {c.date} · {c.count} review{c.count > 1 ? 's' : ''}
+                {t(
+                  c.count > 1
+                    ? 'dashboard.activity.tooltip_other'
+                    : 'dashboard.activity.tooltip_one',
+                  {
+                    date: c.date,
+                    count: c.count,
+                  },
+                )}
               </span>
             </TooltipContent>
           </Tooltip>
         ))}
       </div>
       <p className="font-mono text-xs tabular-nums text-text-faint">
-        {total} review{total > 1 ? 's' : ''} · {activeDays}/{DAYS} jours actifs
+        {t(total > 1 ? 'dashboard.activity.summary_other' : 'dashboard.activity.summary_one', {
+          total,
+          active: activeDays,
+          days: DAYS,
+        })}
       </p>
     </section>
   )
