@@ -15,7 +15,9 @@ afterEach(() => {
   t.cleanup()
 })
 
-const NOW = new Date('2026-07-12T10:00:00.000Z')
+// Dynamique : queue_new_cards_are_due sème une carte dont le due par défaut
+// est l'heure réelle de création — une date figée devient fausse avec le temps.
+const NOW = new Date()
 const ago = (ms: number) => new Date(NOW.getTime() - ms)
 const ahead = (ms: number) => new Date(NOW.getTime() + ms)
 const HOUR = 3_600_000
