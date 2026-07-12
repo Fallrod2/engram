@@ -13,6 +13,7 @@ import { SubjectDot } from '@/components/subject-dot'
 import { DueBadge, DueCount } from '@/components/due-count'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import { dueCountsOptions, bySubjectMap } from '@/features/due-counts/queries'
+import { streaksOptions } from '@/features/analytics/queries'
 import { useShell } from './shell-context'
 import { NAV_GROUPS, type NavItem } from './nav'
 import { StreakPill } from './streak-pill'
@@ -25,6 +26,11 @@ export function Sidebar() {
   const subjectsQuery = useQuery(subjectsListOptions())
   const dueQuery = useQuery(dueCountsOptions())
   const dueLoading = dueQuery.isPending
+
+  // Real streak for the footer pill (was hard-coded `days={0}`, spec §5.3bis).
+  // A stable `now` keeps the query from churning across renders.
+  const [streakNow] = useState(() => new Date())
+  const streak = useQuery(streaksOptions(streakNow)).data
 
   const subjects = useMemo(
     () =>
@@ -240,7 +246,11 @@ export function Sidebar() {
             </Link>
           )}
           <div className={cn('ml-auto flex items-center gap-1', collapsed && 'ml-0 flex-col')}>
-            <StreakPill days={0} collapsed={collapsed} />
+            <StreakPill
+              current={streak?.current ?? 0}
+              includesToday={streak?.includesToday ?? false}
+              collapsed={collapsed}
+            />
             {canToggleCollapse && collapsed && (
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { DecksIllustration } from '@/components/illustrations'
 import { DecksSkeleton } from '@/components/skeletons'
 import { PageHeader } from '@/components/page-header'
 import { EntityRow, RowActions, entityRowClass } from '@/components/entity-row'
@@ -224,7 +225,7 @@ function DecksPage() {
 
       {sorted.length === 0 ? (
         <EmptyState
-          icon={Layers}
+          illustration={<DecksIllustration />}
           title="Aucun deck"
           meta="Ajoutez un deck pour commencer à créer des cartes."
           action={

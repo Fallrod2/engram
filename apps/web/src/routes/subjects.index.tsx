@@ -2,16 +2,7 @@ import { useMemo, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import {
-  Archive,
-  ArchiveRestore,
-  Layers,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from 'lucide-react'
+import { Archive, ArchiveRestore, MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import type { Subject } from '@engram/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { SubjectsIllustration } from '@/components/illustrations'
 import { SubjectsSkeleton } from '@/components/skeletons'
 import { EntityRow, RowActions, entityRowClass } from '@/components/entity-row'
 import { SubjectDot } from '@/components/subject-dot'
@@ -280,7 +272,7 @@ function SubjectsBody({
   if (subjects.filter((s) => !s.archived).length === 0 && tab === 'active' && filter === '') {
     return (
       <EmptyState
-        icon={Layers}
+        illustration={<SubjectsIllustration />}
         title="Aucune matière"
         meta="Créez votre première matière pour commencer à réviser."
         action={

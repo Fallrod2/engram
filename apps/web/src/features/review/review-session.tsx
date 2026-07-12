@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { CloudOff, Sparkles, X } from 'lucide-react'
+import { CloudOff, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
+import { RewardIllustration } from '@/components/illustrations'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useShell } from '@/components/shell/shell-context'
 import type { ReviewScope } from '@/lib/api'
@@ -73,7 +74,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
     return (
       <TerminalView onExit={api.requestExit}>
         <EmptyState
-          icon={Sparkles}
+          illustration={<RewardIllustration />}
           title="Rien à réviser — tout est à jour."
           meta="0 carte due"
           action={<Button onClick={api.requestExit}>Retour au tableau de bord</Button>}

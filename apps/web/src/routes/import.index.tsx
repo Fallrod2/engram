@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { FileUp } from 'lucide-react'
 import type { Note, Subject } from '@engram/shared'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { ImportIllustration } from '@/components/illustrations'
 import { ImportSkeleton } from '@/components/skeletons'
 import { SubjectDot } from '@/components/subject-dot'
 import { ConfirmDelete } from '@/components/confirm-delete'
@@ -209,7 +209,7 @@ function ImportPage() {
 
         {isEmpty ? (
           <EmptyState
-            icon={FileUp}
+            illustration={<ImportIllustration />}
             title="Aucune note importée"
             meta="Déposez un .md ou un .pdf ci-dessus pour générer des cartes."
           />
