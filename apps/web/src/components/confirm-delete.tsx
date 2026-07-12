@@ -1,19 +1,20 @@
 import type { ReactNode } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 /**
- * Destructive confirmation (spec §1.10). Cascade warning in the description,
- * `destructive` confirm button. Cancel is first in the DOM so it takes initial
- * focus (safe default) — the user must deliberately move to the destructive
- * action before `Enter` confirms.
+ * Destructive confirmation (spec §1.10), built on the shadcn `alert-dialog`.
+ * Cascade warning in the description, `destructive` confirm button. Radix
+ * `AlertDialog` puts initial focus on Cancel (safe default) — the user must
+ * deliberately move to the destructive action before `Enter` confirms.
  */
 export function ConfirmDelete({
   open,
@@ -31,27 +32,17 @@ export function ConfirmDelete({
   onConfirm: () => void
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" role="alertdialog">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Annuler
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => {
-              onConfirm()
-              onOpenChange(false)
-            }}
-          >
-            {confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuler</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>{confirmLabel}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

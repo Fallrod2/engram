@@ -1,32 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { createSubjectSchema, type CreateSubject, type Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { EntityFormDialog } from '@/components/entity-form-dialog'
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Kbd } from '@/components/ui/kbd'
 import { SubjectDot } from '@/components/subject-dot'
 import { SubjectIconPicker } from '@/components/subject-icon'
 import { SUBJECT_PIGMENTS, DEFAULT_PIGMENT } from '@/lib/pigments'
 
-interface Values {
-  name: string
-  color: string
-  icon: string
-}
-
 /**
- * Create/edit a subject (spec §2). RHF-free: validation is the shared
- * `createSubjectSchema` (single source), applied on submit. `⌘/Ctrl+Enter`
- * submits, `Esc` closes, focus lands on the name field.
+ * Form schema derived from the shared `createSubjectSchema` (single source of the
+ * color/icon rules); only the `name` message is localized. Validation is the RHF
+ * Zod resolver — no hand-rolled rules.
  */
+const subjectFormSchema = createSubjectSchema
+  .pick({ name: true, color: true, icon: true })
+  .extend({ name: z.string().trim().min(1, 'Le nom est requis.') })
+
+type SubjectFormValues = z.infer<typeof subjectFormSchema>
+
+/** Create/edit a subject (spec §2). `⌘/Ctrl+Enter` submits, `Esc` closes. */
 export function SubjectFormDialog({
   open,
   onOpenChange,
@@ -39,72 +35,59 @@ export function SubjectFormDialog({
   subject?: Subject
   onSubmit: (values: CreateSubject) => void
 }) {
-  const [values, setValues] = useState<Values>(() => initial(subject))
-  const [error, setError] = useState<string | null>(null)
+  const form = useForm<SubjectFormValues>({
+    resolver: zodResolver(subjectFormSchema),
+    defaultValues: initial(subject),
+  })
 
   // Reset whenever the dialog (re)opens for a given subject.
   useEffect(() => {
-    if (open) {
-      setValues(initial(subject))
-      setError(null)
-    }
-  }, [open, subject])
-
-  function submit() {
-    const parsed = createSubjectSchema.safeParse({
-      name: values.name.trim(),
-      color: values.color,
-      icon: values.icon,
-    })
-    if (!parsed.success) {
-      setError('Le nom est requis.')
-      return
-    }
-    onSubmit(parsed.data)
-    onOpenChange(false)
-  }
+    if (open) form.reset(initial(subject))
+  }, [open, subject, form])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-md"
-        onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-            e.preventDefault()
-            submit()
-          }
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>{subject ? 'Modifier la matière' : 'Nouvelle matière'}</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="subject-name">Nom</Label>
+    <EntityFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={subject ? 'Modifier la matière' : 'Nouvelle matière'}
+      form={form}
+      onSubmit={onSubmit}
+      contentClassName="max-w-md"
+    >
+      <FormField
+        control={form.control}
+        name="name"
+        render={({ field, fieldState }) => (
+          <FormItem>
+            <FormLabel>Nom</FormLabel>
             <div className="flex items-center gap-2">
-              <SubjectIconPicker
-                value={values.icon}
-                onChange={(icon) => setValues((v) => ({ ...v, icon }))}
+              <FormField
+                control={form.control}
+                name="icon"
+                render={({ field: iconField }) => (
+                  <SubjectIconPicker value={iconField.value} onChange={iconField.onChange} />
+                )}
               />
-              <Input
-                id="subject-name"
-                autoFocus
-                value={values.name}
-                onChange={(e) => {
-                  setValues((v) => ({ ...v, name: e.target.value }))
-                  if (error) setError(null)
-                }}
-                placeholder="ex. Théorie des langages"
-                aria-invalid={error ? true : undefined}
-                className={cn(error && 'border-danger')}
-              />
+              <FormControl>
+                <Input
+                  autoFocus
+                  placeholder="ex. Théorie des langages"
+                  className={cn(fieldState.error && 'border-danger')}
+                  {...field}
+                />
+              </FormControl>
             </div>
-            {error && <p className="text-2xs text-danger">{error}</p>}
-          </div>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Couleur</Label>
+      <FormField
+        control={form.control}
+        name="color"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Couleur</FormLabel>
             <div
               role="radiogroup"
               aria-label="Couleur de la matière"
@@ -112,17 +95,17 @@ export function SubjectFormDialog({
               onKeyDown={(e) => {
                 if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
                 e.preventDefault()
-                const idx = SUBJECT_PIGMENTS.findIndex((p) => p.hex === values.color)
+                const idx = SUBJECT_PIGMENTS.findIndex((p) => p.hex === field.value)
                 const delta = e.key === 'ArrowRight' ? 1 : -1
                 const next =
                   SUBJECT_PIGMENTS[
                     (idx + delta + SUBJECT_PIGMENTS.length) % SUBJECT_PIGMENTS.length
                   ]
-                if (next) setValues((v) => ({ ...v, color: next.hex }))
+                if (next) field.onChange(next.hex)
               }}
             >
               {SUBJECT_PIGMENTS.map((p) => {
-                const selected = p.hex === values.color
+                const selected = p.hex === field.value
                 return (
                   <button
                     key={p.hex}
@@ -131,7 +114,7 @@ export function SubjectFormDialog({
                     aria-checked={selected}
                     aria-label={p.label}
                     tabIndex={selected ? 0 : -1}
-                    onClick={() => setValues((v) => ({ ...v, color: p.hex }))}
+                    onClick={() => field.onChange(p.hex)}
                     className={cn(
                       'flex size-7 items-center justify-center rounded-full transition-transform duration-fast',
                       selected && 'ring-2 ring-accent ring-offset-2 ring-offset-surface-3',
@@ -142,24 +125,14 @@ export function SubjectFormDialog({
                 )
               })}
             </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Annuler
-          </Button>
-          <Button onClick={submit}>
-            Enregistrer{' '}
-            <Kbd className="ml-1.5 border-accent-fg/30 bg-transparent text-accent-fg">⌘↵</Kbd>
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </FormItem>
+        )}
+      />
+    </EntityFormDialog>
   )
 }
 
-function initial(subject?: Subject): Values {
+function initial(subject?: Subject): SubjectFormValues {
   return {
     name: subject?.name ?? '',
     color: subject?.color ?? DEFAULT_PIGMENT.hex,
