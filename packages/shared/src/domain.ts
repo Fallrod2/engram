@@ -311,6 +311,22 @@ const boolParam = z.enum(['true', 'false']).transform((v) => v === 'true')
 /** Single definition of the `:id` path param (a missing/malformed id 404s, not 400). */
 export const idParamSchema = z.object({ id: z.string().min(1) })
 
+/**
+ * Local calendar day `YYYY-MM-DD` (a window bound / bucket key, never an
+ * instant). Validated CALENDARICALLY, not just by format: the round-trip
+ * through a local `Date` rejects impossible dates (`2026-02-30`, `2026-13-01`)
+ * that the `Date` constructor would otherwise silently normalize into a shifted
+ * window. This aligns the rigor with `iso`.
+ */
+export const localDaySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
+  .refine((s) => {
+    const [y, m, d] = s.split('-').map(Number) as [number, number, number]
+    const dt = new Date(y, m - 1, d) // local components (never Date.UTC)
+    return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
+  }, 'invalid calendar date')
+
 export const listSubjectsQuerySchema = z.object({ includeArchived: boolParam.optional() })
 export const listDecksQuerySchema = z.object({ subjectId: z.string().optional() })
 export const listCardsQuerySchema = z.object({
@@ -401,3 +417,80 @@ export type ReviewResult = z.infer<typeof reviewResultSchema>
 export type DueCounts = z.infer<typeof dueCountsSchema>
 export type GradePreview = z.infer<typeof gradePreviewSchema>
 export type ReviewPreview = z.infer<typeof reviewPreviewSchema>
+
+// --- Planning: exams queries + study-plan ---------------------------------
+
+/** Filter `GET /api/exams` to exams linked to a given subject. */
+export const listExamsQuerySchema = z.object({ subjectId: z.string().optional() })
+
+/**
+ * `GET /api/study-plan` — projected review load over a local-day window.
+ * `from`/`to` are calendar days (inclusive); `now` is the instant used to place
+ * "today" and to fold overdue cards. `subjectId` scopes dues + boost.
+ */
+export const studyPlanQuerySchema = z.object({
+  from: localDaySchema,
+  to: localDaySchema,
+  subjectId: z.string().optional(),
+  now: iso.optional(),
+})
+
+export const studyPlanSubjectLoadSchema = z.object({
+  subjectId: z.string(),
+  dueCount: z.number().int().nonnegative(),
+  overdueCount: z.number().int().nonnegative(),
+  examBoost: z.number().int().nonnegative(),
+})
+export const studyPlanDayExamSchema = z.object({
+  examId: z.string(),
+  title: z.string(),
+  subjectIds: z.array(z.string()),
+})
+export const studyPlanDaySchema = z.object({
+  date: localDaySchema,
+  isToday: z.boolean(),
+  dueCount: z.number().int().nonnegative(),
+  overdueCount: z.number().int().nonnegative(),
+  examBoost: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  bySubject: z.array(studyPlanSubjectLoadSchema),
+  exams: z.array(studyPlanDayExamSchema),
+})
+export const studyPlanResponseSchema = z.object({
+  now: iso,
+  from: localDaySchema,
+  to: localDaySchema,
+  days: z.array(studyPlanDaySchema),
+})
+
+/** `GET /api/study-plan/today` — prioritized "what to review today". */
+export const studyTodayQuerySchema = z.object({ now: iso.optional() })
+export const studyTodaySubjectSchema = z.object({
+  subjectId: z.string(),
+  dueCount: z.number().int().nonnegative(),
+  nextExam: z
+    .object({
+      examId: z.string(),
+      title: z.string(),
+      date: iso,
+      daysUntil: z.number().int(),
+    })
+    .nullable(),
+  priority: z.number(),
+})
+export const studyTodayResponseSchema = z.object({
+  now: iso,
+  total: z.number().int().nonnegative(),
+  overdueCount: z.number().int().nonnegative(),
+  subjects: z.array(studyTodaySubjectSchema),
+})
+
+export type ListExamsQuery = z.infer<typeof listExamsQuerySchema>
+export type StudyPlanQuery = z.infer<typeof studyPlanQuerySchema>
+export type StudyPlanSubjectLoad = z.infer<typeof studyPlanSubjectLoadSchema>
+export type StudyPlanDayExam = z.infer<typeof studyPlanDayExamSchema>
+export type StudyPlanDay = z.infer<typeof studyPlanDaySchema>
+export type StudyPlanResponse = z.infer<typeof studyPlanResponseSchema>
+export type StudyTodayQuery = z.infer<typeof studyTodayQuerySchema>
+export type StudyTodaySubject = z.infer<typeof studyTodaySubjectSchema>
+export type StudyTodayResponse = z.infer<typeof studyTodayResponseSchema>
