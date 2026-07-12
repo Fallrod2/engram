@@ -12,6 +12,7 @@ import { notesRouter } from './routes/notes'
 import { generationsRouter } from './routes/generations'
 import { examsRouter } from './routes/exams'
 import { studyPlanRouter } from './routes/study-plan'
+import { analyticsRouter } from './routes/analytics'
 
 /**
  * The Hono application, exported without a server binding so it can be
@@ -40,6 +41,7 @@ app.route('/api/notes', notesRouter) // upload/import + CRUD
 app.route('/api/generations', generationsRouter) // AI card generation + review
 app.route('/api/exams', examsRouter) // exam deadlines CRUD
 app.route('/api/study-plan', studyPlanRouter) // projected load + "today" suggestions
+app.route('/api/analytics', analyticsRouter) // heatmap, streaks, study-time, volume, retention, deck-success
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
 
