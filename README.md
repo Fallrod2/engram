@@ -14,24 +14,25 @@ engram est un outil personnel de révision qui repose sur un vrai moteur de rép
 
 ## Stack technique
 
-| Domaine                   | Choix                                                                            |
-| ------------------------- | -------------------------------------------------------------------------------- |
-| Runtime / tooling / tests | Bun (runtime, package manager, test runner)                                      |
-| Backend                   | Hono (REST)                                                                      |
-| Base de données           | SQLite via Drizzle ORM (`data/engram.db`), migrations Drizzle                    |
-| Répétition espacée        | ts-fsrs (FSRS v5+)                                                               |
-| Frontend                  | React 19 + Vite                                                                  |
-| Routing / data            | TanStack Router (file-based) + TanStack Query                                    |
-| UI                        | Tailwind CSS v4, shadcn/ui, `motion` (animations), Recharts (graphes)            |
-| Validation / types        | Zod — schémas partagés dans `packages/shared` (source de vérité unique de l'API) |
-| IA                        | API Anthropic côté serveur uniquement (`claude-sonnet-4-6`)                      |
-| Extraction PDF            | unpdf                                                                            |
+| Domaine                   | Choix                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| Runtime / tooling / tests | Bun (runtime, package manager, test runner)                                          |
+| Backend                   | Hono (REST)                                                                          |
+| Base de données           | Postgres via Drizzle ORM, Supabase local en dev (`DATABASE_URL`), migrations Drizzle |
+| Répétition espacée        | ts-fsrs (FSRS v5+)                                                                   |
+| Frontend                  | React 19 + Vite                                                                      |
+| Routing / data            | TanStack Router (file-based) + TanStack Query                                        |
+| UI                        | Tailwind CSS v4, shadcn/ui, `motion` (animations), Recharts (graphes)                |
+| Validation / types        | Zod — schémas partagés dans `packages/shared` (source de vérité unique de l'API)     |
+| IA                        | API Anthropic côté serveur uniquement (`claude-sonnet-4-6`)                          |
+| Extraction PDF            | unpdf                                                                                |
 
 ## Démarrage
 
 ### Prérequis
 
 - [Bun](https://bun.sh) (le projet a été développé sous Bun 1.3.x)
+- [Docker](https://docs.docker.com/get-docker/) (démon actif) et la [CLI Supabase](https://supabase.com/docs/guides/cli) — pour la base Postgres locale en dev
 
 ### Installation
 
@@ -48,13 +49,18 @@ cp .env.example .env
 ```
 
 - `ANTHROPIC_API_KEY` — **optionnelle**. Sans elle, tout fonctionne (import, sessions, planning, analytics) ; seule la génération de cartes par IA renvoie une erreur propre (503). Renseignez-la pour activer la génération réelle. Ne jamais la committer.
-- `ENGRAM_DB_PATH` — override optionnel du chemin de la base SQLite (par défaut `data/engram.db`), surtout utilisé par les tests et l'outillage.
+- `DATABASE_URL` — chaîne de connexion Postgres. **Optionnelle en local** : si elle n'est pas renseignée, le serveur pointe automatiquement sur la base Supabase locale (`postgresql://postgres:postgres@127.0.0.1:54322/postgres`). Ne jamais committer une URL cloud.
 
 ### Base de données
 
+Démarrez la stack Supabase locale (Postgres + Studio, via Docker), puis appliquez les migrations Drizzle :
+
 ```bash
-bun run db:migrate   # applique les migrations Drizzle (crée data/engram.db)
+bun run dev:db       # supabase start (Docker requis) — API :54321, DB :54322, Studio :54323
+bun run db:migrate   # applique les migrations Drizzle sur la base locale
 ```
+
+`bun run db:reset` (garde-fou : base locale uniquement) rejoue un schéma propre puis les migrations — utile après une régénération de baseline. `supabase stop` arrête la stack.
 
 ### Lancer en développement
 
@@ -68,14 +74,17 @@ L'application est alors accessible sur http://localhost:5173.
 
 ```bash
 bun run check        # typecheck (tsc --noEmit) + lint (eslint) + format check (prettier)
-bun run test         # vitest (unitaire + rendu web) puis test:db (intégration SQLite sous bun test)
-bun run test:db      # uniquement les tests d'intégration DB (bun test, bun:sqlite)
+bun run test         # vitest (unitaire + rendu web) puis test:db (intégration DB sous bun test)
+bun run test:db      # uniquement les tests d'intégration DB (bun test, PGlite in-process)
+bun run test:db:pg   # opt-in : preuves contre le vrai driver postgres-js (Supabase local requis)
+bun run dev:db       # supabase start (stack Postgres locale)
 bun run db:migrate   # migrations Drizzle
+bun run db:reset     # reset schéma local + migrations (garde-fou base locale uniquement)
 bun run db:studio    # Drizzle Studio (exploration de la base)
 bun run db:generate  # génère une migration à partir du schéma
 ```
 
-> Les tests d'intégration base de données tournent sous `bun test` (et non Vitest) car ils utilisent `bun:sqlite`, indisponible sous Node. La commande `bun run test` enchaîne les deux.
+> Les tests d'intégration base de données tournent sous `bun test` (et non Vitest) et s'exécutent sur **PGlite** (Postgres compilé en WASM, in-process, sans démon). La commande `bun run test` enchaîne les deux. `bun run test:db:pg` est optionnel et rejoue un sous-ensemble ciblé contre le vrai Postgres local (rollback transactionnel, agrégats `bigint`) : il nécessite la stack Supabase démarrée.
 
 ## Structure du monorepo
 
@@ -97,7 +106,7 @@ engram/
 │           ├── components/  # shell, ui (shadcn), import…
 │           └── lib/
 ├── packages/shared/     # schémas Zod + types API (contrat unique)
-└── data/                # SQLite (engram.db, gitignored)
+└── supabase/            # config.toml de la stack Postgres locale (Supabase CLI)
 ```
 
 ## Raccourcis clavier principaux
@@ -152,7 +161,7 @@ Planning :
 
 ## Notes
 
-- **Localhost uniquement**, application web, **mono-utilisateur, sans authentification** : aucune donnée ne quitte la machine.
-- Les données vivent dans `data/engram.db` (SQLite, **gitignored**). Sauvegardez ce fichier pour conserver votre historique.
+- **Localhost uniquement**, application web, **mono-utilisateur, sans authentification** : aucune donnée ne quitte la machine (la base Postgres tourne en local via Supabase/Docker).
+- Les données vivent dans la base Postgres locale. La sauvegarde/restauration se fait par export JSON (Phase 7 hardening), et non plus par copie d'un fichier SQLite.
 - La clé `ANTHROPIC_API_KEY` n'est jamais committée ; elle n'est utilisée que côté serveur.
 - La construction est jalonnée par des tags git `phase-0` → `phase-5` (fondations, cœur FSRS, session de révision, import + IA, planning, analytics), qui correspondent aux phases du projet.
