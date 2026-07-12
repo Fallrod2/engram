@@ -7,6 +7,7 @@ describe('healthResponseSchema', () => {
       status: 'ok',
       service: 'engram-server',
       timestamp: new Date().toISOString(),
+      fakeAi: false,
     })
     expect(result.success).toBe(true)
   })

@@ -12,6 +12,13 @@ export const healthResponseSchema = z.object({
   service: z.literal('engram-server'),
   /** ISO-8601 timestamp, produced server-side. */
   timestamp: z.string().datetime(),
+  /**
+   * True iff the test-only fake AI generator is wired at runtime (via the
+   * `ENGRAM_FAKE_AI` env flag). Always `false` in production — the e2e boot
+   * guard aborts the run if it is not `true` during the end-to-end suite, so a
+   * broken wiring can never fall through to a real Anthropic API call.
+   */
+  fakeAi: z.boolean(),
 })
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>
