@@ -10,6 +10,8 @@ import { cardsRouter } from './routes/cards'
 import { reviewRouter } from './routes/review'
 import { notesRouter } from './routes/notes'
 import { generationsRouter } from './routes/generations'
+import { examsRouter } from './routes/exams'
+import { studyPlanRouter } from './routes/study-plan'
 
 /**
  * The Hono application, exported without a server binding so it can be
@@ -36,6 +38,8 @@ app.route('/api/cards', cardsRouter) // includes POST /:id/review, GET /:id/prev
 app.route('/api/review', reviewRouter) // /queue, /counts
 app.route('/api/notes', notesRouter) // upload/import + CRUD
 app.route('/api/generations', generationsRouter) // AI card generation + review
+app.route('/api/exams', examsRouter) // exam deadlines CRUD
+app.route('/api/study-plan', studyPlanRouter) // projected load + "today" suggestions
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
 
