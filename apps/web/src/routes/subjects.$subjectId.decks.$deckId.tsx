@@ -53,9 +53,28 @@ export const Route = createFileRoute('/subjects/$subjectId/decks/$deckId')({
       context.queryClient.ensureQueryData(cardsListOptions(params.deckId)),
     ]),
   component: CardsPage,
-  pendingComponent: () => <CardsTableSkeleton />,
+  pendingComponent: CardsPending,
   errorComponent: CardsError,
 })
+
+/**
+ * Cold-cache loading state (spec §4): the composer — the phase's headline
+ * interaction — is available immediately, independent of the table, so a fast
+ * keyboard user can start typing cards before the list resolves. The table
+ * below it shows a 10-row skeleton until the loader settles.
+ */
+function CardsPending() {
+  const { subjectId, deckId } = Route.useParams()
+  const createCard = useCreateCard(deckId, subjectId)
+  return (
+    <div>
+      <div className="mb-4">
+        <CardComposer onAdd={(front, back) => createCard.mutate({ deckId, front, back })} />
+      </div>
+      <CardsTableSkeleton />
+    </div>
+  )
+}
 
 function CardsError({ error }: { error: Error }) {
   const router = useRouter()
