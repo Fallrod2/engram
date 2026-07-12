@@ -248,6 +248,18 @@ export const dictFr = {
     sessionErrorMeta: 'Impossible de charger la session',
   },
 
+  errorState: {
+    subjects: 'Impossible de charger les matières.',
+    subject: 'Impossible de charger cette matière.',
+    decks: 'Impossible de charger les decks.',
+    deck: 'Impossible de charger ce deck.',
+    cards: 'Impossible de charger les cartes.',
+    notes: 'Impossible de charger les notes.',
+    note: 'Impossible de charger cette note.',
+    generation: 'Impossible de charger cette génération.',
+    planning: 'Impossible de charger le planning.',
+  },
+
   session: {
     scopeDeck: 'Deck',
     scopeSubject: 'Matière',
@@ -287,6 +299,8 @@ export const dictFr = {
     nextMonth: 'Mois suivant',
     prevWeek: 'Semaine précédente',
     nextWeek: 'Semaine suivante',
+    examsError: 'Impossible de charger les examens.',
+    planError: 'Impossible de charger la charge prévue.',
   },
 
   settings: {

@@ -269,7 +269,7 @@ function PlanningPage() {
           <div className="min-w-0 flex-1">
             {planQuery.isError ? (
               <PanelError
-                message="Impossible de charger la charge prévue."
+                message={t('planning.planError')}
                 onRetry={() => void planQuery.refetch()}
               />
             ) : (
@@ -444,6 +444,7 @@ function PlanningRail({
   onNewExam: () => void
   onRetryExams: () => void
 }) {
+  const t = useT()
   return (
     <>
       <div className="rounded-lg border border-border bg-surface-1 p-4">
@@ -467,12 +468,12 @@ function PlanningRail({
       <div className="rounded-lg border border-border bg-surface-1 p-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-            Examens à venir
+            {t('dashboard.exams.label')}
           </p>
         </div>
         <Separator className="mb-2" />
         {examsError ? (
-          <PanelError message="Impossible de charger les examens." onRetry={onRetryExams} />
+          <PanelError message={t('planning.examsError')} onRetry={onRetryExams} />
         ) : examsLoading ? (
           <ExamListSkeleton />
         ) : (
@@ -493,11 +494,12 @@ function PlanningRail({
 
 /** Inline per-panel error (never blanks the screen). */
 function PanelError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useT()
   return (
     <div className="flex flex-col items-start gap-2 rounded-md border border-border bg-surface-2 p-4">
       <p className="text-sm text-text-muted">{message}</p>
       <Button variant="secondary" size="sm" onClick={onRetry}>
-        Réessayer
+        {t('common.retry')}
       </Button>
     </div>
   )

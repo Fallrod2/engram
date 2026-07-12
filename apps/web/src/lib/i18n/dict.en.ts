@@ -244,6 +244,18 @@ export const dictEn: Dict = {
     sessionErrorMeta: 'Could not load the session',
   },
 
+  errorState: {
+    subjects: 'Could not load subjects.',
+    subject: 'Could not load this subject.',
+    decks: 'Could not load decks.',
+    deck: 'Could not load this deck.',
+    cards: 'Could not load cards.',
+    notes: 'Could not load notes.',
+    note: 'Could not load this note.',
+    generation: 'Could not load this generation.',
+    planning: 'Could not load the planning.',
+  },
+
   session: {
     scopeDeck: 'Deck',
     scopeSubject: 'Subject',
@@ -283,6 +295,8 @@ export const dictEn: Dict = {
     nextMonth: 'Next month',
     prevWeek: 'Previous week',
     nextWeek: 'Next week',
+    examsError: 'Could not load exams.',
+    planError: 'Could not load the forecast.',
   },
 
   settings: {
