@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Archive, ArchiveRestore, MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import type { Subject } from '@engram/shared'
@@ -36,7 +36,7 @@ import {
   useArchiveSubject,
   useDeleteSubject,
 } from '@/features/subjects/queries'
-import { allDecksOptions, deckCardCountOptions } from '@/features/decks/queries'
+import { allDecksOptions, deckCardCountsOptions } from '@/features/decks/queries'
 import { dueCountsOptions, bySubjectMap } from '@/features/due-counts/queries'
 import { SubjectFormDialog } from '@/features/subjects/subject-form-dialog'
 
@@ -76,23 +76,23 @@ function SubjectsPage() {
     return m
   }, [allDecks])
 
-  // Aggregate a card total per subject (spec §2 CARTES column) by replicating
-  // the per-deck count probe used on the Decks screen. A subject's total is
-  // `undefined` (→ skeleton) until every one of its decks has reported.
-  const cardCountQueries = useQueries({
-    queries: (allDecks ?? []).map((d) => deckCardCountOptions(d.id)),
-  })
+  // Aggregate a card total per subject (spec §2 CARTES column) from ONE
+  // `GET /decks/card-counts` request (Phase 7 §2.2) instead of a per-deck probe
+  // fan-out. A subject's total is `undefined` (→ skeleton) until both the deck
+  // list and the aggregate counts have loaded.
+  const cardCounts = useQuery(deckCardCountsOptions()).data
   const cardTotalBySubject = useMemo(() => {
     const m = new Map<string, number | undefined>()
-    if (allDecks === undefined) return m
+    if (allDecks === undefined || cardCounts === undefined) {
+      for (const s of subjects) m.set(s.id, undefined)
+      return m
+    }
     for (const s of subjects) m.set(s.id, 0)
-    allDecks.forEach((d, i) => {
-      const count = cardCountQueries[i]?.data
-      const prev = m.get(d.subjectId)
-      m.set(d.subjectId, count === undefined || prev === undefined ? undefined : prev + count)
-    })
+    for (const d of allDecks) {
+      m.set(d.subjectId, (m.get(d.subjectId) ?? 0) + (cardCounts.get(d.id) ?? 0))
+    }
     return m
-  }, [subjects, allDecks, cardCountQueries])
+  }, [subjects, allDecks, cardCounts])
 
   const dueMap = useMemo(() => bySubjectMap(dueCounts), [dueCounts])
 

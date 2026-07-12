@@ -56,7 +56,9 @@ function invalidateCardCounts(
   subjectId: string,
 ) {
   void qc.invalidateQueries({ queryKey: qk.cards.listByDeck(deckId) })
-  void qc.invalidateQueries({ queryKey: qk.decks.cardCount(deckId) })
+  // The per-deck totals shown on the Subjects screens now come from one
+  // aggregate query (Phase 7 §2.2) — invalidate that single key, not N probes.
+  void qc.invalidateQueries({ queryKey: qk.decks.cardCountsAll })
   void qc.invalidateQueries({ queryKey: qk.decks.listBySubject(subjectId) })
   void qc.invalidateQueries({ queryKey: qk.decks.all })
   void qc.invalidateQueries({ queryKey: qk.subjects.all })

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { GraduationCap, Layers, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { Deck } from '@engram/shared'
@@ -35,7 +35,7 @@ import {
 } from '@/features/subjects/queries'
 import {
   decksListOptions,
-  deckCardCountOptions,
+  deckCardCountsOptions,
   useCreateDeck,
   useDeleteDeck,
   useUpdateDeck,
@@ -77,14 +77,15 @@ function DecksPage() {
   const decks = useQuery(decksListOptions(subjectId)).data ?? []
   const dueCounts = useQuery(dueCountsOptions()).data
 
-  const cardCountQueries = useQueries({
-    queries: decks.map((d) => deckCardCountOptions(d.id)),
-  })
+  // Per-deck card totals from ONE aggregate request (Phase 7 §2.2) — no more
+  // per-deck `limit=1` probe fan-out. Undefined until loaded (→ skeleton); a
+  // deck absent from the payload has 0 cards.
+  const cardCounts = useQuery(deckCardCountsOptions()).data
   const cardCountByDeck = useMemo(() => {
     const m = new Map<string, number | undefined>()
-    decks.forEach((d, i) => m.set(d.id, cardCountQueries[i]?.data))
+    for (const d of decks) m.set(d.id, cardCounts ? (cardCounts.get(d.id) ?? 0) : undefined)
     return m
-  }, [decks, cardCountQueries])
+  }, [decks, cardCounts])
 
   const dueByDeck = useMemo(() => byDeckMap(dueCounts), [dueCounts])
   const subjectDue = useMemo(

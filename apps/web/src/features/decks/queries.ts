@@ -2,8 +2,8 @@ import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query
 import { z } from 'zod'
 import { toast } from 'sonner'
 import {
+  deckCardCountsSchema,
   deckSchema,
-  listCardsResponseSchema,
   type CreateDeck,
   type Deck,
   type UpdateDeck,
@@ -37,17 +37,18 @@ export function deckDetailOptions(deckId: string) {
   })
 }
 
-/** Total card count of a deck (cheap `limit=1` probe → `total`). */
-export function deckCardCountOptions(deckId: string) {
+/**
+ * Card totals for every deck in ONE request (Phase 7 §2.2). Returns a
+ * `Map<deckId, count>` so screens read `map.get(id) ?? 0` — decks with no cards
+ * are absent from the payload and default to 0. This replaces the previous
+ * per-deck `limit=1` probe fan-out (O(decks) requests → 1).
+ */
+export function deckCardCountsOptions() {
   return queryOptions({
-    queryKey: qk.decks.cardCount(deckId),
+    queryKey: qk.decks.cardCountsAll,
     queryFn: async ({ signal }) => {
-      const page = await api.get(
-        `/cards${qs({ deckId, limit: 1 })}`,
-        listCardsResponseSchema,
-        signal,
-      )
-      return page.total
+      const { byDeck } = await api.get('/decks/card-counts', deckCardCountsSchema, signal)
+      return new Map(byDeck.map((r) => [r.deckId, r.cardCount] as const))
     },
   })
 }
@@ -81,7 +82,11 @@ function useDeckMutation<Vars>(
       void qc.invalidateQueries({ queryKey: key })
       void qc.invalidateQueries({ queryKey: qk.decks.all })
       void qc.invalidateQueries({ queryKey: qk.subjects.all })
-      if (config.invalidateDueCounts) void qc.invalidateQueries({ queryKey: qk.dueCounts.all })
+      if (config.invalidateDueCounts) {
+        void qc.invalidateQueries({ queryKey: qk.dueCounts.all })
+        // Deleting a deck removes its cards → the aggregate totals shift.
+        void qc.invalidateQueries({ queryKey: qk.decks.cardCountsAll })
+      }
     },
   })
   return mutation

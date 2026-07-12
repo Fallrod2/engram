@@ -13,7 +13,9 @@ export const qk = {
     all: ['decks'] as const,
     listBySubject: (subjectId: string) => ['decks', 'list', { subjectId }] as const,
     detail: (deckId: string) => ['decks', 'detail', deckId] as const,
-    cardCount: (deckId: string) => ['decks', 'card-count', deckId] as const,
+    // Aggregate card totals for every deck in one request (Phase 7 §2.2) —
+    // replaces the per-deck `limit=1` probe fan-out on the Subjects screens.
+    cardCountsAll: ['decks', 'card-counts'] as const,
   },
   cards: {
     all: ['cards'] as const,
