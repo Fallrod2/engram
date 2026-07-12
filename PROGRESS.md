@@ -2,7 +2,7 @@
 
 > État vivant du projet. Mis à jour et commité à chaque cycle orchestrateur.
 
-## Phase courante : **Phase 5 — Analytics** (Phases 0-4 terminées, tags `phase-0` → `phase-4`)
+## Phase courante : **Phase 6 — Polish** (Phases 0-5 terminées, tags `phase-0` → `phase-5`, tout est pushé sur origin)
 
 ## Fait
 
@@ -53,10 +53,19 @@
 - **`feat/phase5-analytics-api` mergé** : 6 requêtes analytics (heatmap, streaks, study-time, review-volume, retention `maturedReviewed`, deck-success), RATING_MIN_COUNTED ≥ 1 prouvé de bout en bout par le reviewer (ligne Manual(0) SQL directe exclue partout), rétrospectives sans filtre archivage, null sous MIN_RATE_SAMPLE=10, 1 requête/endpoint (test spy), TZ loguée au boot. APPROVE (0 fix). 405 tests sur la branche.
 - Vérifié orchestrateur : gates main (220 vitest + 219 bun:test), /planning inspecté dans Chrome (empty state), /api/analytics/heatmap smoke-testé.
 
-## En cours (Phase 5 UI + specs 6/7)
+### Phase 5 ✅ (tag `phase-5`)
 
-- **`feat/phase5-analytics-ui`** (web) : écran Analytics (stat tiles, heatmap grille CSS custom ramp indigo, graphes Recharts, small multiples par matière, table-view jumelle). Ports 3002/5174 (dev), 3003/5175 (reviewer).
-- **Specs Phases 6 + 7** (armada, lecture seule) : polish (cmd+K enrichi, raccourcis globaux, transitions, onboarding, i18n FR/EN, vrai Dashboard « Aujourd'hui ») et hardening (e2e Playwright, perf, a11y, backup/export JSON).
+- **`feat/phase5-analytics-ui` mergé** : /analytics — 4 stat tiles (deltas neutres ▲/▼, masqués si période précédente vide), heatmap CSS custom (ramp `--chart-heat-0..4`, roving clavier, tooltip focus), volume empilé par rating (4 tokens FSRS), temps d'étude, rétention par matière (SubjectDot+nom+valeur, « pas encore assez de données » sous 10 reviews), table-view jumelle partout (`t`), WindowFilter URL, invalidation analytics en fin de session. recharts@2.15.4 seule dep ajoutée. APPROVE en re-revue #2 (cas 3-reviews fabriqué et vérifié, zéro couleur en dur au grep). Vérifié orchestrateur : gates + empty state global inspecté en live.
+- Reste à faire noté : table deck-success (endpoint prêt, UI optionnelle glissée), piste fantôme cosmétique rétention, studyMs manquant dans heatmapResponseSchema (API) pour le tooltip complet.
+- **Consigne d'Alex : push régulier** — `git push origin main --tags` après chaque merge/tag (fait jusqu'ici).
+
+## En cours (Phase 6 : 6A ∥ 6B, + README)
+
+- **`feat/phase6-palette-keymap`** (6A) : palette ⌘K enrichie, keymap.ts + g-chords + garde modale partagée, dialog « ? » contextuel, chrome (titres, lien header → / mobile, transitions). Ports 3002/5174 (dev), 3003/5175 (reviewer).
+- **`feat/phase6-dashboard-polish`** (6B) : vrai Dashboard /, onboarding DB vide, empty states, StreakPill réel + respiration, planning (hotkey t manquant, responsive, doublons de titres planning/analytics). Ports 3004/5176 (dev), 3005/5177 (reviewer).
+- Matrice de propriété par fichier (§1.2 de la spec) : un fichier = un propriétaire ; violation = REQUEST_CHANGES.
+- **README** : workflow draft Opus → fact-check Sonnet → final (dans le scratchpad, placé/commité par l'orchestrateur).
+- Ensuite : **6C i18n FR/EN** (séquentiel, réécrit des chaînes partout), tag `phase-6`, puis Phase 7 (spec prête : e2e Playwright avec garde fake-AI au boot, perf, a11y, backup/export).
 
 ## Backlog polish/hardening accumulé (à verser dans les specs 6/7)
 
