@@ -1,47 +1,78 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { PanelLeftClose, PanelLeftOpen, Search, Settings } from 'lucide-react'
+import type { Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { Kbd } from '@/components/ui/kbd'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
+import { SubjectDot } from '@/components/subject-dot'
+import { DueBadge, DueCount } from '@/components/due-count'
+import { subjectsListOptions } from '@/features/subjects/queries'
+import { dueCountsOptions, bySubjectMap } from '@/features/due-counts/queries'
 import { useShell } from './shell-context'
-import { FLAT_NAV, NAV_GROUPS, SUBJECT_PREVIEW, type NavItem } from './nav'
-import { SubjectDot } from './subject-dot'
-import { DueCount } from './due-count'
+import { NAV_GROUPS, type NavItem } from './nav'
 import { StreakPill } from './streak-pill'
 import { ThemeToggle } from './theme-toggle'
 import { ApiStatus } from './api-status'
 
-/** Flat index of a nav item, for roving tabindex + ⌘1…9 parity. */
-function flatIndexOf(item: NavItem): number {
-  return FLAT_NAV.findIndex((n) => n.to === item.to)
-}
-
 export function Sidebar() {
   const { collapsed, canToggleCollapse, toggleCollapse, setCommandOpen } = useShell()
+
+  const subjectsQuery = useQuery(subjectsListOptions())
+  const dueQuery = useQuery(dueCountsOptions())
+  const dueLoading = dueQuery.isPending
+
+  const subjects = useMemo(
+    () =>
+      (subjectsQuery.data ?? [])
+        .filter((s) => !s.archived)
+        .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
+    [subjectsQuery.data],
+  )
+  const dueMap = useMemo(() => bySubjectMap(dueQuery.data), [dueQuery.data])
+  const totalDue = dueQuery.data?.total
+
+  // Ordered list of every focusable entry (nav items + real subjects) → roving.
+  const focusKeys = useMemo(() => {
+    const keys: string[] = []
+    for (const g of NAV_GROUPS) {
+      for (const it of g.items) keys.push(`nav:${it.to}`)
+      if (g.id === 'subjects') for (const s of subjects) keys.push(`subj:${s.id}`)
+    }
+    return keys
+  }, [subjects])
+
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([])
   const [rovingIndex, setRovingIndex] = useState(0)
-
-  // Roving tabindex: arrows move focus within the nav; Enter follows the link.
-  const onNavKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
-    const count = FLAT_NAV.length
-    let next: number | null = null
-    if (e.key === 'ArrowDown') next = (rovingIndexRef.current + 1) % count
-    else if (e.key === 'ArrowUp') next = (rovingIndexRef.current - 1 + count) % count
-    else if (e.key === 'Home') next = 0
-    else if (e.key === 'End') next = count - 1
-    if (next === null) return
-    e.preventDefault()
-    rovingIndexRef.current = next
-    setRovingIndex(next)
-    linkRefs.current[next]?.focus()
-  }, [])
-
-  // Keep a ref mirror so the stable keydown handler reads the latest index.
   const rovingIndexRef = useRef(0)
   rovingIndexRef.current = rovingIndex
+
+  const onNavKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLElement>) => {
+      const count = focusKeys.length
+      if (count === 0) return
+      let next: number | null = null
+      if (e.key === 'ArrowDown') next = (rovingIndexRef.current + 1) % count
+      else if (e.key === 'ArrowUp') next = (rovingIndexRef.current - 1 + count) % count
+      else if (e.key === 'Home') next = 0
+      else if (e.key === 'End') next = count - 1
+      if (next === null) return
+      e.preventDefault()
+      rovingIndexRef.current = next
+      setRovingIndex(next)
+      linkRefs.current[next]?.focus()
+    },
+    [focusKeys.length],
+  )
+
+  const registerFocus = (idx: number) => () => {
+    rovingIndexRef.current = idx
+    setRovingIndex(idx)
+  }
 
   return (
     <aside
@@ -133,53 +164,46 @@ export function Sidebar() {
               )}
 
               {group.items.map((item) => {
-                const idx = flatIndexOf(item)
+                const idx = focusKeys.indexOf(`nav:${item.to}`)
                 return (
                   <NavLink
                     key={item.to}
                     item={item}
                     collapsed={collapsed}
+                    count={item.to === '/review' ? totalDue : undefined}
+                    countLoading={item.to === '/review' && dueLoading}
                     tabIndex={idx === rovingIndex ? 0 : -1}
                     ref={(el) => {
                       linkRefs.current[idx] = el
                     }}
-                    onFocus={() => {
-                      rovingIndexRef.current = idx
-                      setRovingIndex(idx)
-                    }}
+                    onFocus={registerFocus(idx)}
                   />
                 )
               })}
 
-              {/* Subject preview rows (static, Phase 0). */}
+              {/* Real subjects (spec §5 item 4). */}
               {group.id === 'subjects' &&
-                SUBJECT_PREVIEW.map((s) =>
-                  collapsed ? (
-                    <Tooltip key={s.label}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="flex h-8 items-center justify-center rounded-sm"
-                          aria-hidden
-                        >
-                          <SubjectDot subject={s.subject} />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{s.label}</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <div
-                      key={s.label}
-                      className="flex h-8 items-center gap-2 rounded-sm px-2 text-text-muted"
-                      aria-hidden
-                    >
-                      <SubjectDot subject={s.subject} />
-                      <span className="truncate text-sm">{s.label}</span>
-                      <span className="ml-auto">
-                        <DueCount count={s.count} subject={s.subject} />
-                      </span>
-                    </div>
-                  ),
-                )}
+                (subjectsQuery.isPending
+                  ? Array.from({ length: 3 }).map((_, i) => (
+                      <SubjectRowSkeleton key={i} collapsed={collapsed} />
+                    ))
+                  : subjects.map((s) => {
+                      const idx = focusKeys.indexOf(`subj:${s.id}`)
+                      return (
+                        <SubjectNavRow
+                          key={s.id}
+                          subject={s}
+                          due={dueMap.get(s.id) ?? 0}
+                          dueLoading={dueLoading}
+                          collapsed={collapsed}
+                          tabIndex={idx === rovingIndex ? 0 : -1}
+                          ref={(el) => {
+                            linkRefs.current[idx] = el
+                          }}
+                          onFocus={registerFocus(idx)}
+                        />
+                      )
+                    }))}
             </div>
           ))}
         </nav>
@@ -244,15 +268,16 @@ export function Sidebar() {
 interface NavLinkProps {
   item: NavItem
   collapsed: boolean
+  count: number | undefined
+  countLoading: boolean
   tabIndex: number
   onFocus: () => void
   ref: (el: HTMLAnchorElement | null) => void
 }
 
-/** A single nav row: active = accent-subtle + 2px indigo edge bar (spec §5). */
-function NavLink({ item, collapsed, tabIndex, onFocus, ref }: NavLinkProps) {
+/** A static nav row: active = accent-subtle + 2px indigo edge bar (spec §5). */
+function NavLink({ item, collapsed, count, countLoading, tabIndex, onFocus, ref }: NavLinkProps) {
   const Icon = item.icon
-
   const row = (
     <Link
       ref={ref}
@@ -267,43 +292,120 @@ function NavLink({ item, collapsed, tabIndex, onFocus, ref }: NavLinkProps) {
         collapsed ? 'justify-center px-0' : 'gap-2 px-2',
       )}
     >
-      {/* Active edge bar */}
       <span
         className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent opacity-0 transition-opacity duration-fast group-data-[status=active]/nav:opacity-100"
         aria-hidden
       />
       <span className="relative flex items-center justify-center">
-        {item.subject ? (
-          <SubjectDot subject={item.subject} />
-        ) : (
-          <Icon className="size-4 shrink-0" />
-        )}
-        {/* Collapsed: due count becomes a micro badge (spec §5). */}
-        {collapsed && item.count != null && item.count > 0 && (
-          <span className="absolute -right-2 -top-2 flex min-w-3.5 items-center justify-center rounded-full bg-accent px-1 font-mono text-[9px] leading-none text-accent-fg">
-            {item.count}
-          </span>
+        <Icon className="size-4 shrink-0" />
+        {collapsed && count != null && (
+          <DueBadge value={count} className="absolute -right-2 -top-2" />
         )}
       </span>
       {!collapsed && (
         <>
           <span className="truncate">{item.label}</span>
-          {item.count != null && (
+          {count != null && (
             <span className="ml-auto">
-              <DueCount count={item.count} subject={item.subject} />
+              {countLoading ? <CountShimmer /> : <DueCount value={count} />}
             </span>
           )}
         </>
       )}
     </Link>
   )
-
   if (!collapsed) return row
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>{row}</TooltipTrigger>
       <TooltipContent side="right">{item.label}</TooltipContent>
     </Tooltip>
+  )
+}
+
+interface SubjectNavRowProps {
+  subject: Subject
+  due: number
+  dueLoading: boolean
+  collapsed: boolean
+  tabIndex: number
+  onFocus: () => void
+  ref: (el: HTMLAnchorElement | null) => void
+}
+
+/** A real subject row in the Matières group (spec §5 item 4). */
+function SubjectNavRow({
+  subject,
+  due,
+  dueLoading,
+  collapsed,
+  tabIndex,
+  onFocus,
+  ref,
+}: SubjectNavRowProps) {
+  const row = (
+    <Link
+      ref={ref}
+      to="/subjects/$subjectId"
+      params={{ subjectId: subject.id }}
+      tabIndex={tabIndex}
+      onFocus={onFocus}
+      aria-label={collapsed ? subject.name : undefined}
+      className={cn(
+        'group/nav relative flex h-8 items-center rounded-sm text-sm text-text-muted',
+        'transition-colors duration-fast hover:bg-surface-2 hover:text-text',
+        'data-[status=active]:bg-accent-subtle data-[status=active]:text-text',
+        collapsed ? 'justify-center px-0' : 'gap-2 px-2',
+      )}
+    >
+      <span
+        className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent opacity-0 transition-opacity duration-fast group-data-[status=active]/nav:opacity-100"
+        aria-hidden
+      />
+      <span className="relative flex items-center justify-center">
+        <SubjectDot color={subject.color} />
+        {collapsed && <DueBadge value={due} className="absolute -right-2 -top-2" />}
+      </span>
+      {!collapsed && (
+        <>
+          <span className="truncate">{subject.name}</span>
+          <span className="ml-auto">
+            {dueLoading ? <CountShimmer /> : <DueCount value={due} colorHex={subject.color} />}
+          </span>
+        </>
+      )}
+    </Link>
+  )
+  if (!collapsed) return row
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{row}</TooltipTrigger>
+      <TooltipContent side="right">{subject.name}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** 12×10px mini shimmer for a pending due count (spec §1.6). */
+function CountShimmer() {
+  return <Skeleton className="h-2.5 w-3 rounded-sm" />
+}
+
+function SubjectRowSkeleton({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div
+      className={cn(
+        'flex h-8 items-center rounded-sm',
+        collapsed ? 'justify-center' : 'gap-2 px-2',
+      )}
+      aria-hidden
+    >
+      <Skeleton className="size-2 rounded-full" />
+      {!collapsed && (
+        <>
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="ml-auto h-2.5 w-3" />
+        </>
+      )}
+    </div>
   )
 }
