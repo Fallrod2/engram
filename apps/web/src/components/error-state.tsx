@@ -16,6 +16,7 @@ const MESSAGES = {
   notes: 'Impossible de charger les notes.',
   note: 'Impossible de charger cette note.',
   generation: 'Impossible de charger cette génération.',
+  planning: 'Impossible de charger le planning.',
 } as const
 
 export function ErrorState({
