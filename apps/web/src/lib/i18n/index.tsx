@@ -69,10 +69,18 @@ function readStoredLang(): Lang {
 }
 
 export function LangProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(readStoredLang)
+  // Lazy init also primes the format.ts locale so the FIRST render is already
+  // localized — otherwise the pure formatters (relative dates, countdown, month
+  // labels) would flash `fr-FR` output when `engram-lang=en` is persisted, since
+  // the module-variable mutation below doesn't itself trigger a re-render.
+  const [lang, setLangState] = useState<Lang>(() => {
+    const initial = readStoredLang()
+    setLocale(LOCALES[initial])
+    return initial
+  })
 
-  // Reflect the language onto `<html lang>` (a11y) and the format.ts locale, and
-  // persist it. `setLocale` runs synchronously so the first render is localized.
+  // Reflect subsequent changes onto `<html lang>` (a11y) and the format.ts
+  // locale, and persist. (The very first paint is handled by the lazy init.)
   useEffect(() => {
     document.documentElement.lang = lang
     setLocale(LOCALES[lang])
@@ -104,4 +112,22 @@ export function useT(): TFunction {
 export function useLang(): { lang: Lang; setLang: (lang: Lang) => void } {
   const { lang, setLang } = useLangContext()
   return { lang, setLang }
+}
+
+/** The two plural forms our dictionaries carry (`{key}_one` / `{key}_other`). */
+export type PluralCategory = 'one' | 'other'
+
+/**
+ * Locale-correct plural selector (spec §9.2). Returns the `_one`/`_other` suffix
+ * for a count under the active locale's CLDR rules via `Intl.PluralRules`:
+ * English → `one` only for exactly 1 (so `0 reviews`, `2 reviews`); French →
+ * `one` for 0 and 1 (`0 jour`, `1 jour`), `other` from 2. A bare `count === 1`
+ * would be wrong for FR at 0, and `count > 1` wrong for EN at 0.
+ */
+export function usePlural(): (count: number) => PluralCategory {
+  const { lang } = useLangContext()
+  return useMemo(() => {
+    const rules = new Intl.PluralRules(LOCALES[lang])
+    return (count: number) => (rules.select(count) === 'one' ? 'one' : 'other')
+  }, [lang])
 }
