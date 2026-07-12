@@ -2,7 +2,7 @@
 
 > État vivant du projet. Mis à jour et commité à chaque cycle orchestrateur.
 
-## Phase courante : **Phase 1 — Cœur FSRS** (Phase 0 terminée, tag `phase-0`)
+## Phase courante : **Phase 2 — Session de révision** (Phases 0 et 1 terminées, tags `phase-0`, `phase-1`)
 
 ## Fait
 
@@ -26,18 +26,22 @@
 - **WS-1A mergé dans `main`** (ff) : 15 routes REST (CRUD subjects/decks/cards + archivage, review transactionnelle + review_log, file de dues triée/filtrée, preview des 4 intervalles, due counts), service FSRS injectable (ts-fsrs, mappers WS-B réutilisés), couche http (enveloppe d'erreur unique, validation zValidator, réponses validées Zod en sortie), +99 lignes de contrat dans `packages/shared/src/domain.ts`. 91 tests verts (36 vitest + 55 bun:test, harness `test-support/` avec DB temp migrée en preload). Review : APPROVE (0 fix, flow complet vérifié au curl sur :3002). Vérifié par l'orchestrateur : gates + create/delete subject en live sur :3001 (enveloppe d'erreur incluse).
 - Note : `app.test.ts` (vitest) remplacé par `app.spec.ts` (bun:test) — app.ts importe bun:sqlite transitivement. Deps ajoutées : `@hono/zod-validator@0.4.3` épinglé + `zod` direct dans apps/server.
 
-## En cours (Phase 1)
+- **WS-1B mergé dans `main`** (merge commit) : écrans Subjects / Subject→Decks / Deck→Cards (table dense, composer ⌘↵ enchaînable, glyphes FSRS), sidebar dynamique (vraies matières + due counts réels, refetch + invalidations exactes), factory `qk`, optimistic updates + rollback, RHF + alert-dialog (ajoutés en round de review), redirect `/` → `/subjects` (Phase 1), proxy Vite configurable `VITE_API_TARGET`, vitest racine étendu (jsdom + alias `@`) pour les tests de rendu web. 70 tests vitest + 55 bun:test. Review : APPROVE après 2 rounds (vérifs live par le reviewer, dark+light). Tag `phase-1`.
+- Points non bloquants notés par la review : fan-out N+1 côté client pour `cardCount` (faute d'agrégats serveur — candidat Phase 4/5), page unique limit 500 pour les cartes d'un deck (pas d'infinite scroll, à revoir si besoin).
 
-- **WS-1B `feat/phase1-ui`** (dev Opus + review Sonnet, worktree isolé) : écrans Subjects / Subject→Decks / Deck→Cards, due counts sidebar réels, composer clavier ⌘↵, optimistic updates — selon `phase1-ui-spec.md`. Vérifications sur :3002/:5174 (dev) et :3003/:5175 (reviewer) ; proxy Vite rendu configurable (`VITE_API_TARGET`).
-- **Specs Phase 3** (armada) : import MD/PDF + génération IA — en avance de phase.
+## En cours (Phase 2)
+
+- **`feat/phase2-review-session`** (dev Opus + review Sonnet, worktree isolé) : écran de session selon `phase2-session-spec.md` (machine à états, espace/1-4, preview des intervalles, flip, résumé de fin).
+- **Specs Phase 4** (armada) : planning + exams — en avance de phase.
 
 ## Specs prêtes (suite)
 
-- `phase2-session-spec.md` : machine à états de session complète (flip espace, rating 1-4 + preview, idle/pause, anti-double-soumission, résumé de fin), 15 findings de critique tracés, API Phase 1 suffisante confirmée.
+- `phase2-session-spec.md` : machine à états complète (flip espace, rating 1-4 + preview, idle/pause, anti-double-soumission, résumé de fin), 15 findings tracés, API Phase 1 suffisante confirmée.
+- `phase3-import-api-spec.md` / `phase3-import-ui-spec.md` : import MD/PDF (unpdf), génération Anthropic (claude-sonnet-4-6, tool use, générateur injectable — tests sans API réelle), polling, review clavier a/e/r/u + j/k, aucun changement de schéma DB requis.
 
 ## À venir
 
-- Fin Phase 1 : gates + vérif navigateur du flow CRUD + tag `phase-1`, puis Phase 2 (session de révision, spec prête).
+- Fin Phase 2 : gates + vérif navigateur du flow session + tag `phase-2`, puis Phase 3 (import + IA, specs prêtes — WS API et UI parallélisables, fichiers disjoints).
 
 ## Décisions prises
 
