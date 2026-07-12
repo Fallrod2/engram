@@ -17,15 +17,15 @@ const NOW = '2026-07-12T10:00:00.000Z'
 const past = new Date(Date.parse(NOW) - 3_600_000)
 const future = new Date(Date.parse(NOW) + 3_600_000)
 
-function newDeck() {
-  return seedDeck(db, seedSubject(db).id).id
+async function newDeck() {
+  return (await seedDeck(db, (await seedSubject(db)).id)).id
 }
 
 describe('review routes', () => {
   it('GET /api/review/queue → contract-valid, now-deterministic', async () => {
-    const deckId = newDeck()
-    seedCard(db, deckId, { due: past })
-    seedCard(db, deckId, { due: future })
+    const deckId = await newDeck()
+    await seedCard(db, deckId, { due: past })
+    await seedCard(db, deckId, { due: future })
     const res = await app.request(`/api/review/queue?now=${NOW}`)
     const body = reviewQueueResponseSchema.parse(await res.json())
     expect(body.now).toBe(NOW)
@@ -34,7 +34,7 @@ describe('review routes', () => {
   })
 
   it('POST /api/cards/:id/review reschedules the card', async () => {
-    const c = seedCard(db, newDeck(), { due: past })
+    const c = await seedCard(db, await newDeck(), { due: past })
     const res = await postJson(`/api/cards/${c.id}/review`, { grade: 3, durationMs: 4200 })
     expect(res.status).toBe(200)
     const result = reviewResultSchema.parse(await res.json())
@@ -47,7 +47,7 @@ describe('review routes', () => {
   })
 
   it('POST /api/cards/:id/review invalid grades → 400', async () => {
-    const c = seedCard(db, newDeck())
+    const c = await seedCard(db, await newDeck())
     for (const grade of [0, 5, 'x']) {
       expect((await postJson(`/api/cards/${c.id}/review`, { grade })).status).toBe(400)
     }
@@ -58,7 +58,7 @@ describe('review routes', () => {
   })
 
   it('POST /api/cards/:id/review rejects incoherent reviewedAt', async () => {
-    const c = seedCard(db, newDeck())
+    const c = await seedCard(db, await newDeck())
     const far = new Date(Date.now() + 5 * 60_000).toISOString()
     expect(
       (await postJson(`/api/cards/${c.id}/review`, { grade: 3, reviewedAt: far })).status,
@@ -72,10 +72,10 @@ describe('review routes', () => {
   })
 
   it('GET /api/review/counts is contract-valid and consistent with the queue', async () => {
-    const deckId = newDeck()
-    seedCard(db, deckId, { due: past })
-    seedCard(db, deckId, { due: past })
-    seedCard(db, deckId, { due: future })
+    const deckId = await newDeck()
+    await seedCard(db, deckId, { due: past })
+    await seedCard(db, deckId, { due: past })
+    await seedCard(db, deckId, { due: future })
     const counts = dueCountsSchema.parse(
       await (await app.request(`/api/review/counts?now=${NOW}`)).json(),
     )

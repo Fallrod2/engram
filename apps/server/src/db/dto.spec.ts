@@ -25,11 +25,11 @@ import { fsrsCardToColumns, fsrsLogToRow, toFsrsCard } from './mappers'
 
 let t: TestDb
 
-beforeEach(() => {
-  t = createTestDb()
+beforeEach(async () => {
+  t = await createTestDb()
 })
-afterEach(() => {
-  t.cleanup()
+afterEach(async () => {
+  await t.cleanup()
 })
 
 describe('row → DTO conforms to shared Zod schemas (anti-drift)', () => {

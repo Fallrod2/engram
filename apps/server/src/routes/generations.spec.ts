@@ -21,8 +21,8 @@ const fakeGen: CardGenerator = {
 
 const ORIGINAL_KEY = process.env.ANTHROPIC_API_KEY
 
-beforeEach(() => {
-  resetDb(db)
+beforeEach(async () => {
+  await resetDb(db)
   setCardGenerator(fakeGen)
   // A non-empty placeholder — NEVER a real key — so the 503 guard passes.
   process.env.ANTHROPIC_API_KEY = 'test-placeholder-not-a-real-key'
@@ -40,19 +40,20 @@ const postJson = (path: string, body: unknown) =>
     body: JSON.stringify(body),
   })
 
-function seedNote(content = 'quelques notes de cours'): string {
-  return db.insert(note).values({ title: 'N', sourceType: 'md', content }).returning().get().id
+async function seedNote(content = 'quelques notes de cours'): Promise<string> {
+  const [row] = await db.insert(note).values({ title: 'N', sourceType: 'md', content }).returning()
+  return row!.id
 }
 
 describe('generations routes', () => {
   it('POST without a key → 503, no row created', async () => {
     delete process.env.ANTHROPIC_API_KEY
-    const noteId = seedNote()
+    const noteId = await seedNote()
     const res = await postJson('/api/generations', { noteId, kind: 'cards' })
     expect(res.status).toBe(503)
     const body = (await res.json()) as { error: { code: string } }
     expect(body.error.code).toBe('service_unavailable')
-    expect(db.select().from(generation).all()).toHaveLength(0)
+    expect(await db.select().from(generation)).toHaveLength(0)
   })
 
   it('POST unknown noteId → 404', async () => {
@@ -60,14 +61,14 @@ describe('generations routes', () => {
   })
 
   it('POST into an archived-subject deck → 409', async () => {
-    const noteId = seedNote()
-    const deck = seedDeck(db, seedSubject(db, { archived: true }).id)
+    const noteId = await seedNote()
+    const deck = await seedDeck(db, (await seedSubject(db, { archived: true })).id)
     const res = await postJson('/api/generations', { noteId, kind: 'cards', deckId: deck.id })
     expect(res.status).toBe(409)
   })
 
   it('POST valid → 202, status pending, items []', async () => {
-    const noteId = seedNote()
+    const noteId = await seedNote()
     const res = await postJson('/api/generations', { noteId, kind: 'cards' })
     expect(res.status).toBe(202)
     const g = generationSchema.parse(await res.json())
@@ -76,7 +77,7 @@ describe('generations routes', () => {
   })
 
   it('GET /:id reflects status after the job runs (succeeded, items)', async () => {
-    const noteId = seedNote()
+    const noteId = await seedNote()
     const g = generationSchema.parse(
       await (await postJson('/api/generations', { noteId, kind: 'cards' })).json(),
     )
@@ -89,7 +90,7 @@ describe('generations routes', () => {
   })
 
   it('GET ?noteId= lists a note generations', async () => {
-    const noteId = seedNote()
+    const noteId = await seedNote()
     await postJson('/api/generations', { noteId, kind: 'cards' })
     const list = listGenerationsResponseSchema.parse(
       await (await app.request(`/api/generations?noteId=${noteId}`)).json(),
@@ -99,8 +100,8 @@ describe('generations routes', () => {
   })
 
   it('POST /:id/resolve applies decisions and inserts accepted cards', async () => {
-    const noteId = seedNote()
-    const deck = seedDeck(db, seedSubject(db).id)
+    const noteId = await seedNote()
+    const deck = await seedDeck(db, (await seedSubject(db)).id)
     const g = generationSchema.parse(
       await (await postJson('/api/generations', { noteId, kind: 'cards', deckId: deck.id })).json(),
     )
@@ -122,8 +123,8 @@ describe('generations routes', () => {
   })
 
   it('POST /:id/resolve twice → no duplicate cards', async () => {
-    const noteId = seedNote()
-    const deck = seedDeck(db, seedSubject(db).id)
+    const noteId = await seedNote()
+    const deck = await seedDeck(db, (await seedSubject(db)).id)
     const g = generationSchema.parse(
       await (await postJson('/api/generations', { noteId, kind: 'cards', deckId: deck.id })).json(),
     )
@@ -148,7 +149,7 @@ describe('generations routes', () => {
   })
 
   it('DELETE /:id → 204', async () => {
-    const noteId = seedNote()
+    const noteId = await seedNote()
     const g = generationSchema.parse(
       await (await postJson('/api/generations', { noteId, kind: 'cards' })).json(),
     )

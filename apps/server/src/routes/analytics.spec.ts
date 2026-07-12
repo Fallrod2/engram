@@ -16,18 +16,22 @@ beforeEach(() => resetDb(db))
 const NOW_ISO = new Date(2026, 6, 12, 10, 0).toISOString()
 const nowParam = `now=${encodeURIComponent(NOW_ISO)}`
 
-function seedReviews(state = 2, rating = 3, n = 12): { subjectId: string; deckId: string } {
-  const s = seedSubject(db)
-  const d = seedDeck(db, s.id)
-  const c = seedCard(db, d.id)
+async function seedReviews(
+  state = 2,
+  rating = 3,
+  n = 12,
+): Promise<{ subjectId: string; deckId: string }> {
+  const s = await seedSubject(db)
+  const d = await seedDeck(db, s.id)
+  const c = await seedCard(db, d.id)
   for (let i = 0; i < n; i++)
-    seedReviewLog(db, c.id, { state, rating, review: new Date(2026, 6, 12 - i, 12) })
+    await seedReviewLog(db, c.id, { state, rating, review: new Date(2026, 6, 12 - i, 12) })
   return { subjectId: s.id, deckId: d.id }
 }
 
 describe('analytics routes — contract validity', () => {
   it('GET /api/analytics/heatmap → 200 contract-valid', async () => {
-    seedReviews()
+    await seedReviews()
     const res = await app.request(
       `/api/analytics/heatmap?from=2026-06-13&to=2026-07-12&${nowParam}`,
     )
@@ -43,14 +47,14 @@ describe('analytics routes — contract validity', () => {
   })
 
   it('GET /api/analytics/streaks → 200 contract-valid', async () => {
-    seedReviews()
+    await seedReviews()
     const res = await app.request(`/api/analytics/streaks?${nowParam}`)
     expect(res.status).toBe(200)
     expect(streaksResponseSchema.safeParse(await res.json()).success).toBe(true)
   })
 
   it('GET /api/analytics/study-time?granularity=week → 200 weekly buckets', async () => {
-    seedReviews()
+    await seedReviews()
     const res = await app.request(
       `/api/analytics/study-time?from=2026-06-13&to=2026-07-12&granularity=week&${nowParam}`,
     )
@@ -61,7 +65,7 @@ describe('analytics routes — contract validity', () => {
   })
 
   it('GET /api/analytics/review-volume → 200 contract-valid', async () => {
-    seedReviews()
+    await seedReviews()
     const res = await app.request(
       `/api/analytics/review-volume?from=2026-07-01&to=2026-07-12&${nowParam}`,
     )
@@ -70,9 +74,9 @@ describe('analytics routes — contract validity', () => {
   })
 
   it('GET /api/analytics/retention → 200, below-threshold subject has null', async () => {
-    const s = seedSubject(db)
-    const c = seedCard(db, seedDeck(db, s.id).id)
-    for (let i = 0; i < 3; i++) seedReviewLog(db, c.id, { state: 2, rating: 3 })
+    const s = await seedSubject(db)
+    const c = await seedCard(db, (await seedDeck(db, s.id)).id)
+    for (let i = 0; i < 3; i++) await seedReviewLog(db, c.id, { state: 2, rating: 3 })
     const res = await app.request('/api/analytics/retention')
     expect(res.status).toBe(200)
     const body = retentionResponseSchema.parse(await res.json())
@@ -82,7 +86,7 @@ describe('analytics routes — contract validity', () => {
   })
 
   it('GET /api/analytics/deck-success → 200 contract-valid', async () => {
-    seedReviews()
+    await seedReviews()
     const res = await app.request('/api/analytics/deck-success')
     expect(res.status).toBe(200)
     expect(deckSuccessResponseSchema.safeParse(await res.json()).success).toBe(true)
