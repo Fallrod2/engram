@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useCreateNote } from '@/features/notes/queries'
 import { useExtractImage } from './queries'
 import { classifyExtractError, describeExtractError } from './errors'
-import { getExtractionConcurrency, initOcrState, ocrReducer } from './state'
+import { getExtractionConcurrency, hasAnySegment, initOcrState, ocrReducer } from './state'
 
 const NO_SUBJECT = '__none__'
 
@@ -136,7 +136,11 @@ export function PhotoImport({
     dispatch({ type: 'remove', id })
   }
 
-  const canCreate = state.assembledText.trim().length > 0 && !createNote.isPending
+  // OCR spec §3.3: enabled only when the textarea has content AND at least one
+  // page extracted successfully — manual text alone (no successful extraction)
+  // must not allow creating a note.
+  const canCreate =
+    state.assembledText.trim().length > 0 && hasAnySegment(state.pages) && !createNote.isPending
   const allFailed = state.pages.length > 0 && state.pages.every((p) => p.status === 'error')
 
   function create() {

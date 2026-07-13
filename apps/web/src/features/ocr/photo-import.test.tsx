@@ -103,6 +103,23 @@ describe('<PhotoImport> flow', () => {
   })
 })
 
+describe('<PhotoImport> create guard (§3.3)', () => {
+  it('keeps "Créer la note" disabled until at least one extraction succeeds', async () => {
+    renderTwoPhotos()
+    await waitFor(() => expect(extractCalls).toHaveLength(2))
+
+    // Manual text typed before any page resolves → the textarea is non-empty but
+    // no segment has succeeded yet, so creation must stay disabled.
+    fireEvent.change(textarea(), { target: { value: 'Notes tapées à la main' } })
+    const button = () => screen.getByRole('button', { name: 'Créer la note' }) as HTMLButtonElement
+    expect(button().disabled).toBe(true)
+
+    // A page resolves successfully → creation is now allowed.
+    await resolvePage(0, 'Page A')
+    expect(button().disabled).toBe(false)
+  })
+})
+
 describe('<PhotoImport> provider banner', () => {
   it('clears the no-vision-provider banner once a retry extracts successfully', async () => {
     // First extraction fails with a 503 → banner shows.
