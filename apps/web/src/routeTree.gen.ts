@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as ReviewRouteImport } from './routes/review'
@@ -24,6 +25,11 @@ import { Route as ImportNoteIdIndexRouteImport } from './routes/import.$noteId.i
 import { Route as SubjectsSubjectIdDecksDeckIdRouteImport } from './routes/subjects.$subjectId.decks.$deckId'
 import { Route as ImportNoteIdGenerationsGenerationIdRouteImport } from './routes/import.$noteId.generations.$generationId'
 
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import': typeof ImportIndexRoute
   '/subjects': typeof SubjectsIndexRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/welcome'
     | '/import/photo'
     | '/import/'
     | '/subjects/'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/welcome'
     | '/import/photo'
     | '/import'
     | '/subjects'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/welcome'
     | '/import/photo'
     | '/import/'
     | '/subjects/'
@@ -205,6 +217,7 @@ export interface RootRouteChildren {
   ReviewRoute: typeof ReviewRoute
   SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
+  WelcomeRoute: typeof WelcomeRoute
   ImportPhotoRoute: typeof ImportPhotoRoute
   ImportIndexRoute: typeof ImportIndexRoute
   SubjectsIndexRoute: typeof SubjectsIndexRoute
@@ -216,6 +229,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -325,6 +345,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewRoute: ReviewRoute,
   SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
+  WelcomeRoute: WelcomeRoute,
   ImportPhotoRoute: ImportPhotoRoute,
   ImportIndexRoute: ImportIndexRoute,
   SubjectsIndexRoute: SubjectsIndexRoute,

@@ -303,17 +303,26 @@ export function sanitizeRedirect(value: string | undefined | null): string {
 /**
  * Router guard (spec §3.4), extracted for a unit test (audit §3/§8). Assumes the
  * caller has already `await`ed `auth.ready`, so the store is never `loading`.
- * `/login` is exempt (anti-loop).
+ * `/login` is exempt (anti-loop). `/` and `/welcome` are exempt too so an
+ * unauthenticated visitor lands on the public landing page instead of being
+ * bounced to /login (landing spec §1). Deep links stay guarded.
  */
 export function requireAuth(opts: {
   auth: AuthLike
   pathname: string
   href: string
 }): { to: '/login'; search: { redirect: string } } | undefined {
-  // Anti-loop: both bare auth screens are exempt. `/login` (audit §8) and
-  // `/set-password` (invite/recovery flow) render outside the shell and manage
-  // their own redirects — never bounce them back here.
-  if (opts.pathname === '/login' || opts.pathname === '/set-password') return undefined
+  // Anti-loop / public routes exempt. `/login` (audit §8) and `/set-password`
+  // (invite/recovery flow) render bare and manage their own redirects; `/` and
+  // `/welcome` are the public landing (the route component itself shows the
+  // dashboard once authenticated) — never bounce any of them back here.
+  if (
+    opts.pathname === '/login' ||
+    opts.pathname === '/set-password' ||
+    opts.pathname === '/' ||
+    opts.pathname === '/welcome'
+  )
+    return undefined
   if (opts.auth.getState().status !== 'authenticated') {
     // Defense in depth: only ever stash a same-origin relative return path.
     return { to: '/login', search: { redirect: sanitizeRedirect(opts.href) } }

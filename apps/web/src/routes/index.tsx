@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Layers } from 'lucide-react'
+import { useAuth } from '@/lib/auth'
 import { useT, type TFunction } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/error-state'
@@ -19,14 +20,26 @@ import { RecentActivity } from '@/features/dashboard/recent-activity'
 import { DashboardSkeleton } from '@/features/dashboard/dashboard-skeleton'
 import { WelcomePanel } from '@/features/onboarding/welcome-panel'
 
+// Public landing lives in its OWN async chunk (not inlined here), so it never
+// weighs on the dashboard's critical path (landing spec §5.4). `/welcome` imports
+// the same module, so Vite dedupes it into a single shared chunk.
+const LandingPage = lazy(() => import('@/features/landing/landing-page'))
+
 /**
- * Dashboard `/` (spec §5) — replaces the Phase 1 redirect. The header names the
- * section ("Aujourd'hui"), so there is NO in-page `<h1>` (§4.1). Tolerant
- * loader: one failing panel never blanks the screen; a safe default is always
- * the "all caught up" reward, never a white page.
+ * `/` is public (landing spec §1): the marketing landing for a signed-out
+ * visitor, the dashboard once signed in. The header names the section
+ * ("Aujourd'hui"), so there is NO in-page `<h1>` (§4.1). Tolerant loader: one
+ * failing panel never blanks the screen; a safe default is always the "all
+ * caught up" reward, never a white page.
  */
 export const Route = createFileRoute('/')({
   loader: ({ context }) => {
+    // Signed-out visitor (auth ON): show the landing and DO NOT fan out the
+    // dashboard queries — each would 401 → forceSignOut → redirect to /login, so
+    // the landing would never render (landing spec §1). Safe because the root
+    // `beforeLoad` already awaited `auth.ready`. In dev/e2e auth is forced
+    // `authenticated`, so this branch is skipped and the loader runs unchanged.
+    if (context.auth.getState().status !== 'authenticated') return null
     const now = new Date()
     return Promise.allSettled([
       context.queryClient.ensureQueryData(dueCountsOptions()),
@@ -38,9 +51,22 @@ export const Route = createFileRoute('/')({
       context.queryClient.ensureQueryData(heatmapOptions(now.getFullYear())),
     ])
   },
-  component: DashboardPage,
+  component: IndexRoute,
   pendingComponent: DashboardSkeleton,
 })
+
+/** Branch on the live auth status: the public landing, or the real dashboard. */
+function IndexRoute() {
+  const { status } = useAuth()
+  if (status === 'unauthenticated') {
+    return (
+      <Suspense fallback={null}>
+        <LandingPage />
+      </Suspense>
+    )
+  }
+  return <DashboardPage />
+}
 
 function DashboardPage() {
   const router = useRouter()
