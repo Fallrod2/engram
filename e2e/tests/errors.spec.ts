@@ -18,7 +18,7 @@ test('no AI provider configured → 503 → provider banner in the launch panel'
   await page.goto('/import')
   await page.getByRole('combobox', { name: 'Ranger les imports dans une matière' }).click()
   await page.getByRole('option', { name: subject }).click()
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.locator('input[type="file"]:not([capture])').setInputFiles({
     name: 'key-note.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('Q :: R\n'),
@@ -47,10 +47,12 @@ test('no AI provider configured → 503 → provider banner in the launch panel'
 
 test('unsupported upload type → toast', async ({ page }) => {
   await page.goto('/import')
-  await page.locator('input[type="file"]').setInputFiles({
-    name: 'image.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+  // Images (.png/.jpg/.webp) are now a supported PHOTO flow, so use a genuinely
+  // unsupported extension to exercise the rejection toast.
+  await page.locator('input[type="file"]:not([capture])').setInputFiles({
+    name: 'archive.zip',
+    mimeType: 'application/zip',
+    buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04]),
   })
   await expect(page.getByText('Type de fichier non supporté')).toBeVisible()
 })
