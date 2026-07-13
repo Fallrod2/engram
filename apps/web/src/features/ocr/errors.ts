@@ -14,8 +14,9 @@ export type OcrErrorKind =
   | 'generic' // everything else → per-page retry
 
 export function classifyExtractError(err: unknown): OcrErrorKind {
-  // Client-side downscale failures never round-trip.
+  // Client-side downscale / pre-flight failures never round-trip.
   if (err instanceof DownscaleError) {
+    if (err.code === 'heic') return 'heic'
     return err.code === 'tooLarge' ? 'tooLarge' : 'unsupported'
   }
   if (err instanceof ApiError) {

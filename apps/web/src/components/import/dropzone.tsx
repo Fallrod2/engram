@@ -5,6 +5,8 @@ import { Kbd } from '@/components/ui/kbd'
 
 /** Photo extensions (OCR spec §3.1). Downscaled + OCR'd, not uploaded as docs. */
 export const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const
+/** iPhone default photo formats — rejected with an actionable message (§1.1). */
+export const HEIC_EXTENSIONS = ['.heic', '.heif'] as const
 /** Accepted upload extensions (docs mirror `detectSourceType` + photos). */
 export const ACCEPT_EXTENSIONS = ['.md', '.markdown', '.txt', '.pdf', ...IMAGE_EXTENSIONS] as const
 /** Client-side size cap, aligned with the server's 10 MiB limit (docs). */
@@ -20,6 +22,17 @@ export function hasAcceptedExtension(name: string): boolean {
 export function isImageFile(name: string): boolean {
   const lower = name.toLowerCase()
   return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/**
+ * True iff the filename is a HEIC/HEIF photo (iPhone default). Recognized so the
+ * caller can surface the actionable HEIC message (§1.1) instead of the generic
+ * "unsupported type" toast — the vision APIs and the canvas downscale can't
+ * decode it, so it's rejected before any upload.
+ */
+export function isHeicFile(name: string): boolean {
+  const lower = name.toLowerCase()
+  return HEIC_EXTENSIONS.some((ext) => lower.endsWith(ext))
 }
 
 /**

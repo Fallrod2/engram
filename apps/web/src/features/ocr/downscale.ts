@@ -17,7 +17,7 @@ export const MAX_BYTES = 4 * 1024 * 1024
 /** Encode quality steps: try high, then fall back once before giving up. */
 const QUALITY_STEPS = [0.85, 0.7] as const
 
-export type DownscaleErrorCode = 'unsupportedImage' | 'tooLarge'
+export type DownscaleErrorCode = 'unsupportedImage' | 'tooLarge' | 'heic'
 
 export class DownscaleError extends Error {
   readonly code: DownscaleErrorCode

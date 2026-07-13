@@ -34,6 +34,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: ReactNode }) => children,
 }))
 
+import { ApiError } from '@/lib/api'
 import { PhotoImport } from './photo-import'
 
 beforeAll(() => {
@@ -99,6 +100,24 @@ describe('<PhotoImport> flow', () => {
     expect(mutateAsync).toHaveBeenCalledTimes(2)
     fireEvent.click(screen.getAllByLabelText('Réextraire cette page')[0]!)
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(3))
+  })
+})
+
+describe('<PhotoImport> provider banner', () => {
+  it('clears the no-vision-provider banner once a retry extracts successfully', async () => {
+    // First extraction fails with a 503 → banner shows.
+    mutateAsync.mockRejectedValueOnce(new ApiError(503, 'x', 'service_unavailable'))
+    const f1 = new File(['1'], 'page1.jpg', { type: 'image/jpeg' })
+    render(<PhotoImport files={[f1]} subjects={[]} />)
+
+    await waitFor(() => expect(screen.getByText('Aucun modèle de vision configuré')).toBeTruthy())
+
+    // Provider fixed elsewhere → retry now succeeds → banner disappears.
+    fireEvent.click(screen.getByLabelText('Réextraire cette page'))
+    await waitFor(() => expect(extractCalls).toHaveLength(1))
+    await resolvePage(0, 'Page A')
+
+    expect(screen.queryByText('Aucun modèle de vision configuré')).toBeNull()
   })
 })
 

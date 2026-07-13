@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { Dropzone, hasAcceptedExtension, isImageFile } from './dropzone'
+import { Dropzone, hasAcceptedExtension, isHeicFile, isImageFile } from './dropzone'
 
 afterEach(cleanup)
 
@@ -19,6 +19,13 @@ describe('dropzone helpers', () => {
     expect(hasAcceptedExtension('a.png')).toBe(true)
     expect(hasAcceptedExtension('a.pdf')).toBe(true)
     expect(hasAcceptedExtension('a.heic')).toBe(false)
+  })
+
+  it('isHeicFile detects HEIC/HEIF (iPhone default) case-insensitively', () => {
+    expect(isHeicFile('IMG_1234.HEIC')).toBe(true)
+    expect(isHeicFile('photo.heif')).toBe(true)
+    expect(isHeicFile('cours.jpg')).toBe(false)
+    expect(isHeicFile('notes.pdf')).toBe(false)
   })
 })
 

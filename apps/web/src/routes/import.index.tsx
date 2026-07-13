@@ -20,10 +20,13 @@ import {
 import {
   Dropzone,
   hasAcceptedExtension,
+  isHeicFile,
   isImageFile,
   MAX_UPLOAD_BYTES,
 } from '@/components/import/dropzone'
 import { setPendingPhotos } from '@/features/ocr/pending'
+import { DownscaleError } from '@/features/ocr/downscale'
+import { describeExtractError } from '@/features/ocr/errors'
 import { NoteRow } from '@/components/import/note-row'
 import { ImportingRow } from '@/components/import/importing-row'
 import { useHotkeys } from '@/lib/use-hotkeys'
@@ -144,6 +147,15 @@ function ImportPage() {
     const subjectId = fileInSubject === NO_SUBJECT ? undefined : fileInSubject
     const images: File[] = []
     for (const file of files) {
+      // HEIC/HEIF (iPhone default) is rejected with an actionable message BEFORE
+      // the generic check — neither the vision APIs nor the canvas downscale can
+      // decode it (§1.1). Reuse the shared client-side classification/message.
+      if (isHeicFile(file.name)) {
+        toast.error(describeExtractError(new DownscaleError('heic')), {
+          description: file.name,
+        })
+        continue
+      }
       if (!hasAcceptedExtension(file.name)) {
         toast.error('Type de fichier non supporté', {
           description: `${file.name} — .md, .pdf ou photo`,

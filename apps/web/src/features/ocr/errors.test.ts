@@ -42,6 +42,11 @@ describe('classifyExtractError', () => {
     expect(classifyExtractError(new DownscaleError('tooLarge'))).toBe('tooLarge')
   })
 
+  it('client DownscaleError(heic) → heic (no round-trip)', () => {
+    expect(classifyExtractError(new DownscaleError('heic'))).toBe('heic')
+    expect(describeExtractError(new DownscaleError('heic'))).toMatch(/HEIC/)
+  })
+
   it('unknown error → generic', () => {
     expect(classifyExtractError(new Error('boom'))).toBe('generic')
   })

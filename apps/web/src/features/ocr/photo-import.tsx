@@ -102,6 +102,9 @@ export function PhotoImport({
     async (item: PhotoItem) => {
       try {
         const res = await extractMut(item.file)
+        // A page extracted successfully → the provider/vision config is working
+        // now (e.g. fixed in another tab), so clear a stale 503 banner.
+        setProviderError(false)
         dispatch({ type: 'resolved', id: item.id, segment: res.markdown, warnings: res.warnings })
       } catch (e) {
         if (classifyExtractError(e) === 'noVisionProvider') setProviderError(true)
