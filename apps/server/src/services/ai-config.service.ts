@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import {
+  aiOcrSettingsSchema,
   aiProviderConfigSchema,
   aiSettingsSchema,
   type AiProviderId,
@@ -17,13 +18,20 @@ import type { ResolvedProviderConfig } from '../ai/providers/types'
 /** The single key under which the AI config blob lives in `app_settings`. */
 const AI_KEY = 'ai'
 
-export const PROVIDER_IDS: AiProviderId[] = ['anthropic', 'openrouter', 'ollama', 'openai-compat']
+export const PROVIDER_IDS: AiProviderId[] = [
+  'anthropic',
+  'openrouter',
+  'ollama',
+  'openai-compat',
+  'mistral',
+]
 
 /** Optional env-var fallback per provider (retro-compat + convenience). */
 const ENV_KEY_VAR: Partial<Record<AiProviderId, string>> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openrouter: 'OPENROUTER_API_KEY',
   'openai-compat': 'OPENAI_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
 }
 
 /** Coded defaults, used when `app_settings['ai']` is absent. */
@@ -34,7 +42,11 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
     openrouter: { model: 'anthropic/claude-3.5-sonnet' },
     ollama: { baseUrl: 'http://localhost:11434', model: 'llama3.1' },
     'openai-compat': { baseUrl: '', model: '' },
+    mistral: { model: 'mistral-small-latest' },
   },
+  // `mode: 'same'` → OCR follows the active generation provider (historical
+  // behaviour). Custom mode defaults to Mistral's dedicated OCR API.
+  ocr: { mode: 'same', provider: 'mistral', model: 'mistral-ocr-latest' },
 }
 
 // --- reading / writing the non-secret settings blob ------------------------
@@ -43,7 +55,7 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
 function coerceSettings(raw: unknown): AiSettings {
   const base: AiSettings = structuredClone(DEFAULT_AI_SETTINGS)
   if (!raw || typeof raw !== 'object') return base
-  const r = raw as { activeProvider?: unknown; providers?: unknown }
+  const r = raw as { activeProvider?: unknown; providers?: unknown; ocr?: unknown }
   if (
     typeof r.activeProvider === 'string' &&
     (PROVIDER_IDS as string[]).includes(r.activeProvider)
@@ -57,6 +69,10 @@ function coerceSettings(raw: unknown): AiSettings {
       if (parsed.success) base.providers[p] = parsed.data
     }
   }
+  // The OCR slot is additive: a blob absent/partial/invalid falls back to the
+  // default (mode 'same') — no store migration is ever needed.
+  const ocr = aiOcrSettingsSchema.safeParse(r.ocr)
+  if (ocr.success) base.ocr = ocr.data
   return base
 }
 
@@ -136,6 +152,7 @@ function isUsable(
   switch (provider) {
     case 'anthropic':
     case 'openrouter':
+    case 'mistral':
       return hasKey
     case 'ollama':
       return hasBase
@@ -172,11 +189,46 @@ export async function isAiConfigured(db: DB): Promise<boolean> {
   return (await resolveActiveProvider(db)) !== null
 }
 
+/** The provider id effectively used by the OCR slot (spec §1.1). */
+function ocrProviderId(settings: AiSettings): AiProviderId {
+  return settings.ocr.mode === 'same' ? settings.activeProvider : settings.ocr.provider
+}
+
+/**
+ * Resolve the OCR provider into a full config, or `null` if it is not usable
+ * (→ the 503 in `/api/notes/extract-image`). In `mode: 'same'` this is exactly
+ * `resolveActiveProvider` (OCR follows generation); in `mode: 'custom'` it uses
+ * the dedicated `(ocr.provider, ocr.model)` couple with THAT provider's stored
+ * key + base URL. This is what makes the OCR provider independent of generation.
+ */
+export async function resolveOcrProvider(db: DB): Promise<ResolvedProviderConfig | null> {
+  const settings = await readSettings(db)
+  if (settings.ocr.mode === 'same') return resolveActiveProvider(db)
+
+  const provider = settings.ocr.provider
+  const pc = settings.providers[provider]
+  const appSecret = provider === 'ollama' ? undefined : await getCredentialSecret(db, provider)
+  const { secret, keySource } = resolveSecret(provider, appSecret)
+  const model = settings.ocr.model.trim()
+  const baseUrl = pc.baseUrl?.trim() || undefined
+
+  if (!isUsable(provider, model, keySource !== null, baseUrl)) return null
+
+  return {
+    providerId: provider,
+    model,
+    keySource,
+    ...(baseUrl ? { baseUrl } : {}),
+    ...(secret !== undefined ? { secret } : {}),
+  }
+}
+
 // --- status surface (write-only: never carries a secret) -------------------
 
 async function providerStatuses(db: DB): Promise<AiProviderStatus[]> {
   const settings = await readSettings(db)
   const keyed = await keyedProviders(db)
+  const ocrProvider = ocrProviderId(settings)
   return PROVIDER_IDS.map((provider) => {
     const pc = settings.providers[provider]
     let hasKey = false
@@ -198,6 +250,7 @@ async function providerStatuses(db: DB): Promise<AiProviderStatus[]> {
       model: pc.model.length > 0 ? pc.model : null,
       ...(pc.baseUrl !== undefined ? { baseUrl: pc.baseUrl } : {}),
       active: settings.activeProvider === provider,
+      ocrActive: ocrProvider === provider,
     }
   })
 }
@@ -233,6 +286,13 @@ export async function updateAiSettings(
   const next: AiSettings = {
     activeProvider: input.activeProvider ?? current.activeProvider,
     providers: mergeProviders(current.providers, input.providers),
+    // Deep-merge the OCR slot so a PATCH that omits `ocr` leaves it untouched
+    // (and one touching a single OCR field keeps the others).
+    ocr: {
+      mode: input.ocr?.mode ?? current.ocr.mode,
+      provider: input.ocr?.provider ?? current.ocr.provider,
+      model: input.ocr?.model ?? current.ocr.model,
+    },
   }
   // Validate (URLs, shape) before persisting — a bad base URL is a 400.
   await writeSettings(db, aiSettingsSchema.parse(next))

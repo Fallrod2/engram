@@ -16,7 +16,7 @@ import { ok } from '../http/respond'
 import { PayloadTooLargeError, ServiceUnavailableError, ValidationError } from '../http/errors'
 import { detectImageMedia, detectSourceType, extractText } from '../services/extract'
 import { createNote, deleteNote, getNote, listNotes, updateNote } from '../services/notes.service'
-import { resolveActiveProvider } from '../services/ai-config.service'
+import { resolveOcrProvider } from '../services/ai-config.service'
 import { computeOcrWarnings, getVisionExtractor } from '../ai/vision'
 import { OCR_INSTRUCTION, OCR_SYSTEM_PROMPT } from '../ai/prompts/ocr.v1'
 
@@ -114,9 +114,12 @@ notesRouter.post('/extract-image', async (c) => {
   }
 
   // Capacity guard BEFORE any call (mirror of the generations.ts provider guard).
-  const cfg = await resolveActiveProvider(db)
+  // Resolves the OCR slot — the SAME provider as generation, or a dedicated one.
+  const cfg = await resolveOcrProvider(db)
   if (!cfg) {
-    throw new ServiceUnavailableError('Extraction indisponible : aucun fournisseur IA configuré.')
+    throw new ServiceUnavailableError(
+      'Extraction indisponible : aucun fournisseur IA configuré pour l’OCR.',
+    )
   }
   const extractor = getVisionExtractor()
   if (!extractor.supportsVision(cfg)) {

@@ -67,8 +67,8 @@ export const configuredVisionExtractor: VisionExtractor = {
     let cfg = args.provider
     if (!cfg) {
       const { db } = await import('../db/client')
-      const { resolveActiveProvider } = await import('../services/ai-config.service')
-      cfg = (await resolveActiveProvider(db)) ?? undefined
+      const { resolveOcrProvider } = await import('../services/ai-config.service')
+      cfg = (await resolveOcrProvider(db)) ?? undefined
     }
     if (!cfg) throw new Error('vision extraction unavailable: no provider configured')
     const adapter = PROVIDERS[cfg.providerId]

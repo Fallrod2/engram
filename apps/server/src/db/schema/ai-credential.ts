@@ -12,17 +12,17 @@ import { createdAt, updatedAt } from './columns'
 export const aiCredential = pgTable(
   'ai_credential',
   {
-    provider: text('provider').primaryKey(), // 'anthropic' | 'openrouter' | 'openai-compat'
+    provider: text('provider').primaryKey(), // 'anthropic' | 'openrouter' | 'openai-compat' | 'mistral'
     secret: text('secret').notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     // Aligned with the codebase convention (generation.kind/status have checks):
-    // only the three key-bearing providers; ollama is excluded (no key stored).
+    // only the key-bearing providers; ollama is excluded (no key stored).
     check(
       'ai_credential_provider_ck',
-      sql`${t.provider} in ('anthropic','openrouter','openai-compat')`,
+      sql`${t.provider} in ('anthropic','openrouter','openai-compat','mistral')`,
     ),
   ],
 )
