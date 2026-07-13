@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as PlanningRouteImport } from './routes/planning'
 import { Route as LoginRouteImport } from './routes/login'
@@ -25,6 +26,11 @@ import { Route as ImportNoteIdGenerationsGenerationIdRouteImport } from './route
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetPasswordRoute = SetPasswordRouteImport.update({
+  id: '/set-password',
+  path: '/set-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
+  '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
+  '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/import': typeof ImportIndexRoute
   '/subjects': typeof SubjectsIndexRoute
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
+  '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/planning'
     | '/review'
+    | '/set-password'
     | '/settings'
     | '/import/'
     | '/subjects/'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/planning'
     | '/review'
+    | '/set-password'
     | '/settings'
     | '/import'
     | '/subjects'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/planning'
     | '/review'
+    | '/set-password'
     | '/settings'
     | '/import/'
     | '/subjects/'
@@ -179,6 +191,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PlanningRoute: typeof PlanningRoute
   ReviewRoute: typeof ReviewRoute
+  SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   ImportIndexRoute: typeof ImportIndexRoute
   SubjectsIndexRoute: typeof SubjectsIndexRoute
@@ -195,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/set-password': {
+      id: '/set-password'
+      path: '/set-password'
+      fullPath: '/set-password'
+      preLoaderRoute: typeof SetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -283,6 +303,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PlanningRoute: PlanningRoute,
   ReviewRoute: ReviewRoute,
+  SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
   ImportIndexRoute: ImportIndexRoute,
   SubjectsIndexRoute: SubjectsIndexRoute,
