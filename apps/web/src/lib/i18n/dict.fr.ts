@@ -497,6 +497,92 @@ export const dictFr = {
       backToLogin: 'Retour à la connexion',
     },
   },
+
+  landing: {
+    meta: {
+      title: 'engram — révision par répétition espacée, cartes générées par IA',
+      description:
+        'engram programme tes révisions par répétition espacée (FSRS) et génère des cartes depuis tes notes et tes photos de cours. Self-hosted, open source, gratuit.',
+    },
+    nav: {
+      signIn: 'Se connecter',
+      githubAria: 'Code source sur GitHub',
+    },
+    hero: {
+      eyebrow: 'Répétition espacée · FSRS v5',
+      title: 'Retiens plus, en révisant moins.',
+      subtitle:
+        'engram programme chaque révision au bon moment et transforme tes notes — Markdown, PDF ou photo de cours — en cartes prêtes à réviser.',
+      cta: 'Se connecter',
+      demoCta: 'Essayer la démo',
+      note: 'Gratuit, self-hosted, open source.',
+      shotAlt:
+        'Tableau de bord d’engram : cartes dues du jour, série de révision et activité récente.',
+    },
+    rhythm: {
+      label: 'Le rythme de la mémoire',
+      today: 'Aujourd’hui',
+      unit: 'j',
+      caption:
+        'Chaque bonne réponse repousse la carte plus loin. Tu la revois pile avant de l’oublier — jamais trop tôt, jamais trop tard.',
+    },
+    pillars: {
+      label: 'Trois gestes, un seul outil',
+      review: {
+        title: 'Session 100 % clavier',
+        body: 'Espace pour révéler, 1 à 4 pour noter. L’ordonnancement FSRS choisit la prochaine carte. Aucune souris, aucune friction.',
+      },
+      import: {
+        title: 'Import intelligent',
+        body: 'Dépose un Markdown, un PDF ou la photo d’un cours manuscrit : l’IA transcrit et propose des cartes que tu valides une à une.',
+      },
+      analytics: {
+        title: 'Planning & analytics',
+        body: 'Charge de révision prévisionnelle, heatmap d’activité, rétention par matière et compte à rebours des examens.',
+      },
+    },
+    showcase: {
+      label: 'Vu de l’intérieur',
+      review: {
+        title: 'La session de révision',
+        caption: 'Le seul écran où tu passes du temps — pensé pour y rester au clavier.',
+        alt: 'Session de révision engram : une carte retournée avec les quatre notes Encore, Difficile, Bien, Facile.',
+      },
+      analytics: {
+        title: 'Ta progression, en clair',
+        caption: 'Séries, rétention et heatmap façon contribution — de quoi tenir le rythme.',
+        alt: 'Écran analytics d’engram : heatmap d’activité annuelle et rétention par matière.',
+      },
+    },
+    how: {
+      label: 'Comment ça marche',
+      step1: {
+        title: 'Importe tes cours',
+        body: 'Un fichier, ou une photo de tes notes manuscrites. engram en extrait le texte.',
+      },
+      step2: {
+        title: 'Valide les cartes générées',
+        body: 'L’IA propose recto/verso ; tu acceptes, édites ou rejettes carte par carte.',
+      },
+      step3: {
+        title: 'Révise ce qui est dû',
+        body: 'engram te présente les cartes du jour, pile quand c’est le bon moment.',
+      },
+    },
+    providers: {
+      label: 'IA multi-provider',
+      title: 'Ton IA, ta clé.',
+      body: 'La génération de cartes fonctionne avec Anthropic, Mistral, OpenRouter, un Ollama en local ou n’importe quel endpoint compatible OpenAI. Tu apportes ta propre clé.',
+      local: 'local',
+      openaiCompat: 'Compatible OpenAI',
+    },
+    footer: {
+      tagline: 'engram — construit pour apprendre.',
+      github: 'GitHub',
+      language: 'Langue',
+      theme: 'Thème',
+    },
+  },
 }
 
 export type Dict = typeof dictFr

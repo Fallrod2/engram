@@ -493,4 +493,89 @@ export const dictEn: Dict = {
       backToLogin: 'Back to sign in',
     },
   },
+
+  landing: {
+    meta: {
+      title: 'engram — spaced-repetition review with AI-generated cards',
+      description:
+        'engram schedules your reviews with spaced repetition (FSRS) and turns your notes and lecture photos into cards. Self-hosted, open source, free.',
+    },
+    nav: {
+      signIn: 'Sign in',
+      githubAria: 'Source code on GitHub',
+    },
+    hero: {
+      eyebrow: 'Spaced repetition · FSRS v5',
+      title: 'Remember more, review less.',
+      subtitle:
+        'engram schedules every review at the right time and turns your notes — Markdown, PDF or a photo of a lecture — into cards ready to study.',
+      cta: 'Sign in',
+      demoCta: 'Try the demo',
+      note: 'Free, self-hosted, open source.',
+      shotAlt: 'engram dashboard: cards due today, review streak and recent activity.',
+    },
+    rhythm: {
+      label: 'The rhythm of memory',
+      today: 'Today',
+      unit: 'd',
+      caption:
+        'Every correct answer pushes the card further out. You see it again right before you would forget — never too early, never too late.',
+    },
+    pillars: {
+      label: 'Three moves, one tool',
+      review: {
+        title: '100% keyboard sessions',
+        body: 'Space to reveal, 1 to 4 to grade. FSRS scheduling picks the next card. No mouse, no friction.',
+      },
+      import: {
+        title: 'Smart import',
+        body: 'Drop a Markdown file, a PDF or a photo of handwritten notes: the AI transcribes it and proposes cards you approve one by one.',
+      },
+      analytics: {
+        title: 'Planning & analytics',
+        body: 'Projected review load, activity heatmap, retention per subject and a countdown to every exam.',
+      },
+    },
+    showcase: {
+      label: 'A look inside',
+      review: {
+        title: 'The review session',
+        caption: 'The one screen you actually live in — built to keep you on the keyboard.',
+        alt: 'engram review session: a flipped card with the four grades Again, Hard, Good, Easy.',
+      },
+      analytics: {
+        title: 'Your progress, made clear',
+        caption: 'Streaks, retention and a contribution-style heatmap to keep the pace.',
+        alt: 'engram analytics screen: yearly activity heatmap and retention per subject.',
+      },
+    },
+    how: {
+      label: 'How it works',
+      step1: {
+        title: 'Import your notes',
+        body: 'A file, or a photo of your handwriting. engram pulls out the text.',
+      },
+      step2: {
+        title: 'Approve the generated cards',
+        body: 'The AI proposes front/back; you accept, edit or reject card by card.',
+      },
+      step3: {
+        title: 'Review what is due',
+        body: 'engram shows you today’s cards, exactly when the time is right.',
+      },
+    },
+    providers: {
+      label: 'Multi-provider AI',
+      title: 'Your AI, your key.',
+      body: 'Card generation works with Anthropic, Mistral, OpenRouter, a local Ollama or any OpenAI-compatible endpoint. You bring your own key.',
+      local: 'local',
+      openaiCompat: 'OpenAI-compatible',
+    },
+    footer: {
+      tagline: 'engram — built to learn.',
+      github: 'GitHub',
+      language: 'Language',
+      theme: 'Theme',
+    },
+  },
 }
