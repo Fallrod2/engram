@@ -197,7 +197,13 @@ export type Exam = z.infer<typeof examSchema>
 // Single source of truth for the AI settings surface. NO schema here ever
 // carries a secret: keys are write-only end to end (sent, never read back).
 
-export const aiProviderIdSchema = z.enum(['anthropic', 'openrouter', 'ollama', 'openai-compat'])
+export const aiProviderIdSchema = z.enum([
+  'anthropic',
+  'openrouter',
+  'ollama',
+  'openai-compat',
+  'mistral',
+])
 
 /**
  * Non-secret per-provider config (model + optional base URL). `baseUrl` accepts
@@ -219,11 +225,33 @@ export const aiProvidersSchema = z.object({
   openrouter: aiProviderConfigSchema,
   ollama: aiProviderConfigSchema,
   'openai-compat': aiProviderConfigSchema,
+  mistral: aiProviderConfigSchema,
+})
+
+/**
+ * OCR provider slot (spec: "Provider OCR séparé"). The photo-OCR path can use a
+ * DIFFERENT provider/model than card generation. `mode: 'same'` (the default)
+ * makes the OCR path follow the active generation provider — this preserves the
+ * historical behaviour for every existing settings blob. `mode: 'custom'` uses
+ * the `(provider, model)` couple below; the KEY and BASE URL stay per-provider
+ * (shared with generation — only the model differs).
+ */
+export const aiOcrSettingsSchema = z.object({
+  // No `.default()` here on purpose: it would make `mode` optional on the input
+  // type but required on the output type, so the DTO would not round-trip
+  // cleanly through the client's request typing. The default `'same'` lives in
+  // `DEFAULT_AI_SETTINGS`; a partial/absent stored blob falls back to it.
+  mode: z.enum(['same', 'custom']),
+  /** Provider used ONLY when `mode === 'custom'`. */
+  provider: aiProviderIdSchema,
+  /** Dedicated OCR model (may differ from the same provider's generation model). */
+  model: z.string(),
 })
 
 export const aiSettingsSchema = z.object({
   activeProvider: aiProviderIdSchema,
   providers: aiProvidersSchema,
+  ocr: aiOcrSettingsSchema,
 })
 
 /** Per-provider status — derived, NEVER contains a secret. */
@@ -235,6 +263,8 @@ export const aiProviderStatusSchema = z.object({
   model: z.string().nullable(),
   baseUrl: z.string().optional(),
   active: z.boolean(),
+  /** True for the provider effectively used by the OCR slot (spec §1.1). */
+  ocrActive: z.boolean(),
 })
 
 export const aiSettingsResponseSchema = z.object({
@@ -256,9 +286,12 @@ export const updateAiSettingsSchema = z.object({
       openrouter: partialProviderConfigSchema,
       ollama: partialProviderConfigSchema,
       'openai-compat': partialProviderConfigSchema,
+      mistral: partialProviderConfigSchema,
     })
     .partial()
     .optional(),
+  /** OCR slot patch — a deep partial merged over the current OCR config. */
+  ocr: aiOcrSettingsSchema.partial().optional(),
 })
 
 /** PUT key body — the only place a key is accepted (write-only). */
@@ -299,6 +332,7 @@ export const providerParamSchema = z.object({ provider: aiProviderIdSchema })
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
+export type AiOcrSettings = z.infer<typeof aiOcrSettingsSchema>
 export type AiSettings = z.infer<typeof aiSettingsSchema>
 export type AiProviderStatus = z.infer<typeof aiProviderStatusSchema>
 export type AiSettingsResponse = z.infer<typeof aiSettingsResponseSchema>

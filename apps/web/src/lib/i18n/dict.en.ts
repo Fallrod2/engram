@@ -345,6 +345,7 @@ export const dictEn: Dict = {
       providerOpenrouter: 'OpenRouter',
       providerOllama: 'Ollama',
       providerOpenaiCompat: 'OpenAI-compatible',
+      providerMistral: 'Mistral',
       localBadge: 'local · free',
       activeBadge: 'Active',
       baseUrl: 'Base URL',
@@ -377,6 +378,16 @@ export const dictEn: Dict = {
       noModels: 'No models detected. Check the URL and refresh.',
       claudeHint:
         'For Claude without a direct Anthropic key: pick OpenRouter with an “anthropic/claude-*” model, or run “ant auth login” on the machine then test the Anthropic connection.',
+      ocr: {
+        title: 'OCR / Photo import',
+        desc: 'Provider used to transcribe photos. Same as card generation by default.',
+        mode: 'OCR provider',
+        modeSame: 'Same as generation',
+        modeCustom: 'Dedicated provider',
+        provider: 'Provider',
+        model: 'OCR model',
+        keyShared: 'This provider’s API key and URL are shared with generation.',
+      },
     },
   },
 

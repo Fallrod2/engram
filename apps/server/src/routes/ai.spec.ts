@@ -8,7 +8,12 @@ import { app } from '../app'
 import { db } from '../db/client'
 import { resetDb } from '../test-support/harness'
 
-const ENV_VARS = ['ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY'] as const
+const ENV_VARS = [
+  'ANTHROPIC_API_KEY',
+  'OPENROUTER_API_KEY',
+  'OPENAI_API_KEY',
+  'MISTRAL_API_KEY',
+] as const
 const ORIGINAL_ENV = Object.fromEntries(ENV_VARS.map((k) => [k, process.env[k]]))
 const ORIGINAL_FETCH = globalThis.fetch
 
@@ -51,11 +56,52 @@ describe('GET /api/ai/settings', () => {
     expect(r.status).toBe(200)
     const parsed = aiSettingsResponseSchema.parse(await r.json())
     expect(parsed.settings.activeProvider).toBe('anthropic')
-    expect(parsed.statuses).toHaveLength(4)
+    expect(parsed.statuses).toHaveLength(5)
     const ollama = parsed.statuses.find((s) => s.provider === 'ollama')!
     expect(ollama.requiresKey).toBe(false)
+    // Mistral is now a first-class provider (requires a key like anthropic).
+    const mistral = parsed.statuses.find((s) => s.provider === 'mistral')!
+    expect(mistral.requiresKey).toBe(true)
+    // Default OCR mode is 'same' → the OCR slot follows the active provider.
+    expect(parsed.settings.ocr.mode).toBe('same')
+    const anthropic = parsed.statuses.find((s) => s.provider === 'anthropic')!
+    expect(anthropic.ocrActive).toBe(true)
+    expect(mistral.ocrActive).toBe(false)
     // No status object carries a `secret`.
     for (const s of parsed.statuses) expect('secret' in s).toBe(false)
+  })
+
+  it('reflects the OCR/generation split: a custom OCR provider is ocrActive but not active', async () => {
+    await json('/api/ai/settings', 'PATCH', { activeProvider: 'ollama' })
+    await json('/api/ai/settings', 'PATCH', {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    const parsed = aiSettingsResponseSchema.parse(
+      await (await app.request('/api/ai/settings')).json(),
+    )
+    expect(parsed.settings.ocr.provider).toBe('mistral')
+    const mistral = parsed.statuses.find((s) => s.provider === 'mistral')!
+    expect(mistral.ocrActive).toBe(true)
+    expect(mistral.active).toBe(false)
+  })
+})
+
+describe('POST /api/ai/providers/mistral/test', () => {
+  it('validates the key via GET /v1/models without calling /v1/ocr', async () => {
+    let ocrCalled = false
+    mockFetch((url) => {
+      if (url.endsWith('/ocr')) ocrCalled = true
+      return res({ data: [{ id: 'mistral-ocr-latest' }] })
+    })
+    const r = await json('/api/ai/providers/mistral/test', 'POST', {
+      key: 'mist-candidate',
+      model: 'mistral-ocr-latest',
+    })
+    expect(r.status).toBe(200)
+    const parsed = testConnectionResponseSchema.parse(await r.json())
+    expect(parsed.ok).toBe(true)
+    expect(ocrCalled).toBe(false)
+    expect(JSON.stringify(parsed)).not.toContain('mist-candidate')
   })
 })
 

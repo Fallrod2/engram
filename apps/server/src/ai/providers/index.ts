@@ -3,6 +3,7 @@ import { anthropicAdapter } from './anthropic.provider'
 import { openRouterAdapter } from './openrouter.provider'
 import { ollamaAdapter } from './ollama.provider'
 import { openAiCompatAdapter } from './openai-compat.provider'
+import { mistralAdapter } from './mistral.provider'
 
 /**
  * Internal adapter registry (NOT the e2e `CardGenerator` registry). Maps a
@@ -14,6 +15,7 @@ export const PROVIDERS: Record<ProviderId, ProviderAdapter> = {
   openrouter: openRouterAdapter,
   ollama: ollamaAdapter,
   'openai-compat': openAiCompatAdapter,
+  mistral: mistralAdapter,
 }
 
 export type { ProviderAdapter, ProviderId } from './types'

@@ -3,7 +3,7 @@ import { extractImageResponseSchema } from '@engram/shared'
 import { app } from '../app'
 import { db } from '../db/client'
 import { resetDb } from '../test-support/harness'
-import { updateAiSettings } from '../services/ai-config.service'
+import { setAiKey, updateAiSettings } from '../services/ai-config.service'
 import { resetVisionExtractor, setVisionExtractor, type VisionExtractor } from '../ai/vision'
 
 // Magic-byte prefixes for the multipart bodies.
@@ -137,5 +137,39 @@ describe('POST /api/notes/extract-image', () => {
     const res = await extract(imageFile(JPEG))
     expect(res.status).toBe(400)
     expect((await errorOf(res)).message).toContain('aucun texte extrait')
+  })
+})
+
+describe('POST /api/notes/extract-image — OCR provider split (custom mode)', () => {
+  it('uses the DEDICATED OCR provider/model, not the generation provider', async () => {
+    // Generation = ollama; OCR slot = a distinct mistral OCR model with its key.
+    await updateAiSettings(db, { activeProvider: 'ollama' })
+    await setAiKey(db, 'mistral', 'mistral-app-key')
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    const res = await extract(imageFile(JPEG))
+    expect(res.status).toBe(200)
+    // The route resolved the OCR slot (mistral) and handed it to the extractor —
+    // proof the OCR path is independent of the active generation provider.
+    const passed = (lastArgs as { provider: { providerId: string; model: string } }).provider
+    expect(passed.providerId).toBe('mistral')
+    expect(passed.model).toBe('mistral-ocr-latest')
+    expect(calls).toBe(1)
+  })
+
+  it('503 when the custom OCR provider is unusable EVEN IF generation is usable', async () => {
+    // Generation (ollama) stays usable, but the OCR mistral has no key → 503.
+    await updateAiSettings(db, { activeProvider: 'ollama' })
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    const res = await extract(imageFile(JPEG))
+    expect(res.status).toBe(503)
+    const err = await errorOf(res)
+    expect(err.code).toBe('service_unavailable')
+    expect(err.message).toContain('aucun fournisseur')
+    // Guard runs before any extraction attempt.
+    expect(calls).toBe(0)
   })
 })

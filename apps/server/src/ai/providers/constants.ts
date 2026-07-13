@@ -21,6 +21,8 @@ export function toBase64(bytes: Uint8Array): string {
 /** Default base URLs (used when the stored config leaves them empty). */
 export const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 export const OLLAMA_DEFAULT_BASE_URL = 'http://localhost:11434'
+/** Mistral's OpenAI-compatible base — already includes `/v1` (→ `${base}/ocr`). */
+export const MISTRAL_DEFAULT_BASE_URL = 'https://api.mistral.ai/v1'
 
 /**
  * Actionable error thrown when, after all attempts, a model returned neither a

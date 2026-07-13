@@ -38,10 +38,10 @@ export const generation = pgTable(
     index('generation_deck_idx').on(t.deckId),
     check('generation_kind_ck', sql`${t.kind} in ('cards','quiz')`),
     check('generation_status_ck', sql`${t.status} in ('pending','succeeded','failed')`),
-    // Nullable (historical rows are null); otherwise one of the 4 providers.
+    // Nullable (historical rows are null); otherwise one of the 5 providers.
     check(
       'generation_provider_ck',
-      sql`${t.provider} is null or ${t.provider} in ('anthropic','openrouter','ollama','openai-compat')`,
+      sql`${t.provider} is null or ${t.provider} in ('anthropic','openrouter','ollama','openai-compat','mistral')`,
     ),
   ],
 )
