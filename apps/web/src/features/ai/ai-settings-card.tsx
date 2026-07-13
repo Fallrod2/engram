@@ -492,7 +492,9 @@ export function OcrSettingsSection({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium text-text">{t('settings.ai.ocr.title')}</h3>
+        {/* Non-heading (like CardTitle, a div) to keep the page's heading order
+            intact — the page exposes only the h1 in its PageHeader. */}
+        <p className="text-sm font-medium text-text">{t('settings.ai.ocr.title')}</p>
         <p className="text-xs leading-relaxed text-text-muted">{t('settings.ai.ocr.desc')}</p>
       </div>
 
