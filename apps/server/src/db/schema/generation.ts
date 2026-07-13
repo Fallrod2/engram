@@ -20,7 +20,7 @@ export const generation = pgTable(
       .notNull()
       .references(() => note.id, { onDelete: 'cascade' }),
     deckId: text('deck_id').references(() => deck.id, { onDelete: 'set null' }), // nullable
-    kind: text('kind').notNull(), // 'cards' | 'quiz'
+    kind: text('kind').notNull(), // 'cards' | 'quiz' | 'mixed'
     status: text('status').notNull().default('pending'), // 'pending' | 'succeeded' | 'failed'
     model: text('model').notNull(), // e.g. 'claude-sonnet-4-6'
     provider: text('provider'), // nullable: rows created before multi-provider are null
@@ -38,7 +38,7 @@ export const generation = pgTable(
     index('generation_note_idx').on(t.noteId),
     index('generation_deck_idx').on(t.deckId),
     index('generation_user_idx').on(t.userId),
-    check('generation_kind_ck', sql`${t.kind} in ('cards','quiz')`),
+    check('generation_kind_ck', sql`${t.kind} in ('cards','quiz','mixed')`),
     check('generation_status_ck', sql`${t.status} in ('pending','succeeded','failed')`),
     // Nullable (historical rows are null); otherwise one of the 5 providers.
     check(

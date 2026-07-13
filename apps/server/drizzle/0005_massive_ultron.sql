@@ -1,0 +1,2 @@
+ALTER TABLE "generation" DROP CONSTRAINT "generation_kind_ck";--> statement-breakpoint
+ALTER TABLE "generation" ADD CONSTRAINT "generation_kind_ck" CHECK ("generation"."kind" in ('cards','quiz','mixed'));
