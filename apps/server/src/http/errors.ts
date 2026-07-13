@@ -33,6 +33,13 @@ export class ValidationError extends ApiError {
   }
 }
 
+/** 401 — access token absent, malformed, invalid or expired (auth gate). */
+export class UnauthorizedError extends ApiError {
+  constructor(message: string) {
+    super(401, 'unauthorized', message)
+  }
+}
+
 /** 404 — the path resource, or a foreign id referenced in the body, does not exist. */
 export class NotFoundError extends ApiError {
   constructor(message: string) {

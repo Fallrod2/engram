@@ -56,6 +56,11 @@ export default defineConfig({
         PORT: String(PORTS.api),
         DATABASE_URL: runDb.url,
         ENGRAM_FAKE_AI: '1',
+        // Belt-and-suspenders: keep the auth gate OFF for the default suite so
+        // the direct API calls in deck-to-stats.spec.ts pass without a token
+        // (spec §6.3). Explicit, like ENGRAM_FAKE_AI. The web server does NOT set
+        // VITE_SUPABASE_URL, so the web guard is a no-op too.
+        ENGRAM_AUTH_DISABLED: '1',
         // Non-empty placeholder so the route's key guard passes; the fake
         // generator answers, so this is NEVER sent to Anthropic.
         ANTHROPIC_API_KEY: 'e2e-fake-key',

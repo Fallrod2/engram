@@ -10,7 +10,18 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite'
 // an alternate server instance (e.g. a throwaway port for verification).
 const apiTarget = process.env.VITE_API_TARGET ?? 'http://localhost:3001'
 
+// Bridge the Supabase integration's un-prefixed vars onto the VITE_* names Vite
+// exposes (spec §4.2). On Vercel the integration injects `SUPABASE_URL` /
+// `SUPABASE_ANON_KEY`; folding them here avoids a manual duplication in the
+// dashboard. Locally both are empty ⇒ `supabase = null` ⇒ web auth is OFF.
+const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
+const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? ''
+
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
+    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnon),
+  },
   plugins: [
     // Router codegen must run before the React plugin.
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),

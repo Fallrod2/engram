@@ -57,6 +57,28 @@ enabled = false
 [storage]
 enabled = false
 
+# --- Auth (application gate, spec §4.3) -------------------------------------
+# The local stack keeps GoTrue DISABLED so no extra container starts and no local
+# login path is shipped (spec §1.2). Cloud sign-ups are closed in the dashboard.
+#
+# This milestone is DOCUMENTED, NOT APPLIED by default (spec §4.3 / §7.5): the
+# block below is left commented so a routine `supabase stop && supabase start`
+# brings up the same minimal Postgres-only stack as before this branch.
+#
+# RULE (spec §1.2): if a maintainer ever flips `enabled = true` to test auth
+# locally, `enable_signup = false` must land in the SAME edit — never open
+# sign-ups in a separate step (the Supabase local default is OPEN).
+#
+# [auth]
+# enabled = true
+# site_url = "http://localhost:5173"
+# additional_redirect_urls = ["http://localhost:5173"]
+# jwt_expiry = 3600
+# enable_signup = false # inscriptions fermées (parité prod)
+#
+# [auth.email]
+# enable_signup = false
+# enable_confirmations = false # pas de SMTP local
 [auth]
 enabled = false
 

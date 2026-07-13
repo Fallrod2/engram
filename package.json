@@ -18,6 +18,8 @@
     "check": "bun run typecheck && bun run lint && bun run format:check",
     "test": "vitest run && bun run test:db",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:auth": "playwright test -c e2e/playwright.auth.config.ts",
+    "gate:bundle": "bunx esbuild api/app-entry.ts --bundle --platform=node --format=esm --outfile=api/app.bundle.mjs && SUPABASE_JWT_SECRET=gate-secret bun -e \"const { app } = await import('./api/app.bundle.mjs'); const r = await app.request('/api/subjects', { headers: { Authorization: 'Bearer garbage' } }); if (r.status !== 401) throw new Error('bundle gate: expected 401, got ' + r.status); const h = await app.request('/api/health'); const b = await h.json(); if (typeof b.authEnforced !== 'boolean') throw new Error('bundle gate: missing authEnforced'); console.log('bundle gate OK — jose bundled+executed (401), health authEnforced:', b.authEnforced)\"",
     "test:db": "bun run --filter @engram/server test:db",
     "test:db:pg": "bun run --filter @engram/server test:db:pg",
     "dev:db": "supabase start",

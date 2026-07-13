@@ -336,6 +336,22 @@ export const dictFr = {
     version: 'Version',
     mode: 'Mode',
     modeValue: 'Localhost · mono-utilisateur',
+    accountTitle: 'Compte',
+    accountDesc: 'Session et déconnexion.',
+    signOut: 'Se déconnecter',
+  },
+
+  auth: {
+    title: 'engram',
+    subtitle: 'Connexion',
+    email: 'E-mail',
+    password: 'Mot de passe',
+    submit: 'Se connecter',
+    submitting: 'Connexion…',
+    error: {
+      invalid: 'E-mail ou mot de passe incorrect.',
+      generic: 'Connexion impossible. Réessaie.',
+    },
   },
 }
 
