@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { BackupCard } from '@/features/backup/backup-card'
+import { AiSettingsCard } from '@/features/ai/ai-settings-card'
 import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 
@@ -95,6 +96,8 @@ function SettingsPage() {
           </Select>
         </CardContent>
       </Card>
+
+      <AiSettingsCard />
 
       <BackupCard />
 

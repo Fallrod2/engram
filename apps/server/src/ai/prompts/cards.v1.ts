@@ -29,32 +29,43 @@ export const QUIZ_INSTRUCTIONS = `Format QUIZ (QCM) : pour chaque carte, le RECT
 /** Kind-specific instruction for 'cards' (classic front/back). */
 export const CARDS_INSTRUCTIONS = `Format CARTES (recto/verso) : question au recto, réponse concise au verso. Pas d'options à choix multiple.`
 
+/** Description shared by the tool wrapper and the OpenAI `function` wrapper. */
+export const EMIT_CARDS_DESCRIPTION =
+  "Émet la liste des flashcards générées à partir de l'extrait. Chaque carte a un recto (front) et un verso (back) en Markdown."
+
 /**
- * Structured-output tool definition. We FORCE this tool (tool_choice) so the
- * model returns reliable JSON; we then validate it with Zod (parse.ts).
+ * The NAKED JSON Schema of the cards payload — the single source of truth,
+ * wrapped differently per provider: Anthropic tool `input_schema`, OpenAI
+ * `function.parameters`, OpenAI `response_format.json_schema.schema`, Ollama
+ * `format`. Whatever the model returns is re-validated by `parse.ts` (Zod).
+ */
+export const EMIT_CARDS_JSON_SCHEMA = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    cards: {
+      type: 'array',
+      description: 'Les flashcards générées, atomiques et sans doublon (max 24).',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          front: { type: 'string', description: 'Recto : question précise, Markdown.' },
+          back: { type: 'string', description: 'Verso : réponse concise, Markdown.' },
+        },
+        required: ['front', 'back'],
+      },
+    },
+  },
+  required: ['cards'],
+}
+
+/**
+ * Anthropic structured-output tool definition. We FORCE this tool (tool_choice)
+ * so the model returns reliable JSON; we then validate it with Zod (parse.ts).
  */
 export const EMIT_CARDS_TOOL = {
   name: 'emit_cards',
-  description:
-    "Émet la liste des flashcards générées à partir de l'extrait. Chaque carte a un recto (front) et un verso (back) en Markdown.",
-  input_schema: {
-    type: 'object' as const,
-    additionalProperties: false,
-    properties: {
-      cards: {
-        type: 'array',
-        description: 'Les flashcards générées, atomiques et sans doublon (max 24).',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            front: { type: 'string', description: 'Recto : question précise, Markdown.' },
-            back: { type: 'string', description: 'Verso : réponse concise, Markdown.' },
-          },
-          required: ['front', 'back'],
-        },
-      },
-    },
-    required: ['cards'],
-  },
+  description: EMIT_CARDS_DESCRIPTION,
+  input_schema: EMIT_CARDS_JSON_SCHEMA,
 }

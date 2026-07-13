@@ -137,6 +137,8 @@ export const generationSchema = z.object({
   kind: generationKindSchema,
   status: generationStatusSchema,
   model: z.string(),
+  /** Provider used for this run (nullable: rows created before multi-provider). */
+  provider: z.string().nullable(),
   items: z.array(generationItemSchema),
   promptTokens: z.number().int().nullable(),
   completionTokens: z.number().int().nullable(),
@@ -168,6 +170,125 @@ export type GenerationKind = z.infer<typeof generationKindSchema>
 export type GenerationStatus = z.infer<typeof generationStatusSchema>
 export type Generation = z.infer<typeof generationSchema>
 export type Exam = z.infer<typeof examSchema>
+
+// --- AI providers (multi-provider generation config) ----------------------
+//
+// Single source of truth for the AI settings surface. NO schema here ever
+// carries a secret: keys are write-only end to end (sent, never read back).
+
+export const aiProviderIdSchema = z.enum(['anthropic', 'openrouter', 'ollama', 'openai-compat'])
+
+/**
+ * Non-secret per-provider config (model + optional base URL). `baseUrl` accepts
+ * a valid URL OR the empty string (the "not yet configured" state for
+ * openai-compat), so the default config round-trips through this schema.
+ */
+export const aiProviderConfigSchema = z.object({
+  model: z.string(),
+  baseUrl: z.union([z.string().url(), z.literal('')]).optional(), // ollama / openai-compat
+})
+
+/**
+ * Full config for every provider. An explicit object (not `z.record`): the four
+ * providers are always present, so indexing by a provider id yields a defined
+ * config (no `| undefined`) — and `z.record(enum, …)` would infer a partial.
+ */
+export const aiProvidersSchema = z.object({
+  anthropic: aiProviderConfigSchema,
+  openrouter: aiProviderConfigSchema,
+  ollama: aiProviderConfigSchema,
+  'openai-compat': aiProviderConfigSchema,
+})
+
+export const aiSettingsSchema = z.object({
+  activeProvider: aiProviderIdSchema,
+  providers: aiProvidersSchema,
+})
+
+/** Per-provider status — derived, NEVER contains a secret. */
+export const aiProviderStatusSchema = z.object({
+  provider: aiProviderIdSchema,
+  requiresKey: z.boolean(),
+  hasKey: z.boolean(),
+  keySource: z.enum(['app', 'env']).nullable(),
+  model: z.string().nullable(),
+  baseUrl: z.string().optional(),
+  active: z.boolean(),
+})
+
+export const aiSettingsResponseSchema = z.object({
+  settings: aiSettingsSchema,
+  statuses: z.array(aiProviderStatusSchema),
+})
+
+/**
+ * PATCH body — non-secret config only. Unknown keys (a secret) are stripped.
+ * `providers` is a genuine partial (any subset of providers, each with a
+ * partial config): `z.record(enum, …)` would force every provider key present.
+ */
+const partialProviderConfigSchema = aiProviderConfigSchema.partial()
+export const updateAiSettingsSchema = z.object({
+  activeProvider: aiProviderIdSchema.optional(),
+  providers: z
+    .object({
+      anthropic: partialProviderConfigSchema,
+      openrouter: partialProviderConfigSchema,
+      ollama: partialProviderConfigSchema,
+      'openai-compat': partialProviderConfigSchema,
+    })
+    .partial()
+    .optional(),
+})
+
+/** PUT key body — the only place a key is accepted (write-only). */
+export const setAiKeySchema = z.object({ key: z.string().min(1) })
+
+/** POST test — an optional not-yet-saved candidate (key/baseUrl/model). */
+export const testConnectionRequestSchema = z.object({
+  key: z.string().min(1).optional(),
+  baseUrl: z.string().url().optional(),
+  model: z.string().optional(),
+})
+export const aiModelSchema = z.object({ id: z.string(), label: z.string().optional() })
+
+/**
+ * i18n-neutral outcome code for a connection test. The server NEVER returns a
+ * localized message (no French text hardcoded); the client maps this code to a
+ * `dict.fr`/`dict.en` string. `httpStatus` (when present) is appended by the UI.
+ */
+export const testConnectionDetailCodeSchema = z.enum([
+  'ok',
+  'invalid_key',
+  'forbidden',
+  'unreachable',
+  'incomplete_config',
+  'no_credentials',
+  'http_error',
+])
+export const testConnectionResponseSchema = z.object({
+  ok: z.boolean(),
+  detailCode: testConnectionDetailCodeSchema,
+  httpStatus: z.number().int().optional(),
+  models: z.array(aiModelSchema).optional(),
+})
+export const listModelsResponseSchema = z.object({ models: z.array(aiModelSchema) })
+
+/** `:provider` path param for the `/api/ai/providers/:provider/*` routes. */
+export const providerParamSchema = z.object({ provider: aiProviderIdSchema })
+
+export type AiProviderId = z.infer<typeof aiProviderIdSchema>
+export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
+export type AiSettings = z.infer<typeof aiSettingsSchema>
+export type AiProviderStatus = z.infer<typeof aiProviderStatusSchema>
+export type AiSettingsResponse = z.infer<typeof aiSettingsResponseSchema>
+export type UpdateAiSettings = z.infer<typeof updateAiSettingsSchema>
+export type SetAiKey = z.infer<typeof setAiKeySchema>
+export type TestConnectionRequest = z.infer<typeof testConnectionRequestSchema>
+export type AiModel = z.infer<typeof aiModelSchema>
+export type TestConnectionDetailCode = z.infer<typeof testConnectionDetailCodeSchema>
+export type TestConnectionResponse = z.infer<typeof testConnectionResponseSchema>
+export type ListModelsResponse = z.infer<typeof listModelsResponseSchema>
+export type ProviderParam = z.infer<typeof providerParamSchema>
 
 // --- Payloads (create / update) -------------------------------------------
 

@@ -22,6 +22,7 @@ export const generation = pgTable(
     kind: text('kind').notNull(), // 'cards' | 'quiz'
     status: text('status').notNull().default('pending'), // 'pending' | 'succeeded' | 'failed'
     model: text('model').notNull(), // e.g. 'claude-sonnet-4-6'
+    provider: text('provider'), // nullable: rows created before multi-provider are null
     items: jsonb('items')
       .$type<GenerationItem[]>()
       .notNull()
@@ -37,5 +38,10 @@ export const generation = pgTable(
     index('generation_deck_idx').on(t.deckId),
     check('generation_kind_ck', sql`${t.kind} in ('cards','quiz')`),
     check('generation_status_ck', sql`${t.status} in ('pending','succeeded','failed')`),
+    // Nullable (historical rows are null); otherwise one of the 4 providers.
+    check(
+      'generation_provider_ck',
+      sql`${t.provider} is null or ${t.provider} in ('anthropic','openrouter','ollama','openai-compat')`,
+    ),
   ],
 )

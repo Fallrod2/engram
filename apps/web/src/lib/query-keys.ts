@@ -48,6 +48,12 @@ export const qk = {
     listByNote: (noteId: string) => ['generations', 'list', { noteId }] as const,
     detail: (generationId: string) => ['generations', 'detail', generationId] as const,
   },
+  ai: {
+    // Config + per-provider status (invalidated after every set/delete/update).
+    settings: ['ai', 'settings'] as const,
+    // Selectable models for a provider (ollama /api/tags, openrouter /models).
+    models: (provider: string) => ['ai', 'models', provider] as const,
+  },
   analytics: {
     // Everything under `analytics` — a session's end invalidates this prefix.
     all: ['analytics'] as const,

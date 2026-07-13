@@ -3,7 +3,15 @@ import { note } from '../db/schema'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
 import type { CardGenerator } from '../ai/generator'
+import type { ResolvedProviderConfig } from '../ai/providers/types'
 import { startGeneration } from './generations.service'
+
+/** Resolved provider passed by the router in prod; fixed here for the specs. */
+const testCfg: ResolvedProviderConfig = {
+  providerId: 'anthropic',
+  model: 'claude-sonnet-4-6',
+  keySource: 'env',
+}
 
 /**
  * Covers the Vercel-only wiring in `startGeneration`:
@@ -61,7 +69,7 @@ describe('startGeneration — Vercel waitUntil wiring', () => {
     process.env.VERCEL = '1'
     const noteId = await seedNote('some content')
 
-    const dto = await startGeneration(db, { noteId, kind: 'cards' }, oneCardGen)
+    const dto = await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
 
     expect(dto.status).toBe('pending')
     expect(registered).toHaveLength(1)
@@ -75,7 +83,7 @@ describe('startGeneration — Vercel waitUntil wiring', () => {
     expect(process.env.VERCEL).toBeUndefined()
     const noteId = await seedNote('some content')
 
-    const dto = await startGeneration(db, { noteId, kind: 'cards' }, oneCardGen)
+    const dto = await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
 
     expect(dto.status).toBe('pending')
     expect(registered).toHaveLength(0)
@@ -85,7 +93,7 @@ describe('startGeneration — Vercel waitUntil wiring', () => {
     process.env.VERCEL = 'true'
     const noteId = await seedNote('some content')
 
-    await startGeneration(db, { noteId, kind: 'cards' }, oneCardGen)
+    await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
 
     expect(registered).toHaveLength(0)
   })

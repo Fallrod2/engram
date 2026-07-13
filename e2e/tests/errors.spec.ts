@@ -4,7 +4,7 @@ import { createDeck, createSubject, openSubject } from '../support/selectors'
 
 /** Key error paths (Phase 7 §1.8). */
 
-test('missing Anthropic key → 503 → ApiKeyMissingBanner in the launch panel', async ({ page }) => {
+test('no AI provider configured → 503 → provider banner in the launch panel', async ({ page }) => {
   const uid = Date.now().toString(36)
   const subject = `E2E err ${uid}`
   const deck = `E2E err deck ${uid}`
@@ -42,7 +42,7 @@ test('missing Anthropic key → 503 → ApiKeyMissingBanner in the launch panel'
   await page.getByRole('option', { name: deck }).click()
   await page.getByRole('button', { name: 'Générer' }).click()
 
-  await expect(page.getByText('Clé API Anthropic manquante')).toBeVisible()
+  await expect(page.getByText('Aucun provider IA configuré')).toBeVisible()
 })
 
 test('unsupported upload type → toast', async ({ page }) => {

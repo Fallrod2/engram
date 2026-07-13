@@ -1,6 +1,17 @@
 import { createEmptyCard } from 'ts-fsrs'
 import type { DB } from '../db/client'
-import { card, deck, exam, examSubject, generation, note, reviewLog, subject } from '../db/schema'
+import {
+  aiCredential,
+  appSettings,
+  card,
+  deck,
+  exam,
+  examSubject,
+  generation,
+  note,
+  reviewLog,
+  subject,
+} from '../db/schema'
 import { fsrsCardToColumns } from '../db/mappers'
 import { localMidnight } from '../lib/day'
 
@@ -20,6 +31,10 @@ export async function resetDb(db: DB): Promise<void> {
   await db.delete(note)
   await db.delete(deck)
   await db.delete(subject)
+  // Standalone config tables (no FKs) — reset so AI config never leaks between
+  // specs sharing the preloaded PGlite database.
+  await db.delete(appSettings)
+  await db.delete(aiCredential)
 }
 
 export async function seedSubject(

@@ -6,7 +6,7 @@ import { healthResponseSchema, type HealthResponse, type ApiErrorCode } from '@e
 import { ApiError } from './http/errors'
 import { resolveAuthConfig } from './auth/config'
 import { createAuthMiddleware } from './http/auth'
-import { getCardGenerator, anthropicGenerator } from './ai/generator'
+import { getCardGenerator, configuredGenerator } from './ai/generator'
 import { subjectsRouter } from './routes/subjects'
 import { decksRouter } from './routes/decks'
 import { cardsRouter } from './routes/cards'
@@ -17,6 +17,7 @@ import { examsRouter } from './routes/exams'
 import { studyPlanRouter } from './routes/study-plan'
 import { analyticsRouter } from './routes/analytics'
 import { backupRouter } from './routes/backup'
+import { aiRouter } from './routes/ai'
 
 /**
  * The Hono application, exported without a server binding so it can be
@@ -38,8 +39,9 @@ app.get('/api/health', (c) => {
     timestamp: new Date().toISOString(),
     // Reflects the RUNTIME generator, not just the env flag: if the fake-AI
     // wiring in index.ts ever fails to apply, this stays false and the e2e boot
-    // guard aborts the run before any spec can trigger a real Anthropic call.
-    fakeAi: getCardGenerator() !== anthropicGenerator,
+    // guard aborts the run before any spec can trigger a real API call. Compared
+    // against the new default (`configuredGenerator`), not the legacy Anthropic one.
+    fakeAi: getCardGenerator() !== configuredGenerator,
     // Self-report of the gate. This call is PURE and never throws — the
     // fail-closed `misconfigured` case is judged ONLY by the middleware, so the
     // probe stays readable even on a prod misconfig (reports authEnforced:false).
@@ -59,6 +61,7 @@ app.route('/api/exams', examsRouter) // exam deadlines CRUD
 app.route('/api/study-plan', studyPlanRouter) // projected load + "today" suggestions
 app.route('/api/analytics', analyticsRouter) // heatmap, streaks, study-time, volume, retention, deck-success
 app.route('/api/backup', backupRouter) // full-database JSON export + restore
+app.route('/api/ai', aiRouter) // multi-provider AI config (settings, keys, test, models)
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
 

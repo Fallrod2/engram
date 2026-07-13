@@ -45,7 +45,7 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 interface RequestOptions<T> {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
   /** Schema for the success body. Omit for `204 No Content`. */
   schema?: z.ZodType<T>
@@ -106,6 +106,8 @@ export const api = {
     request<T>(path, { method: 'POST', body, schema }),
   patch: <T>(path: string, body: unknown, schema: z.ZodType<T>) =>
     request<T>(path, { method: 'PATCH', body, schema }),
+  /** Write-only PUT (e.g. an API key): sends `body`, expects `204` (no schema). */
+  put: (path: string, body: unknown) => request<void>(path, { method: 'PUT', body }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
   /** Multipart POST (file upload). `body` is a `FormData`; parsed via `schema`. */
   upload: <T>(path: string, body: FormData, schema: z.ZodType<T>) =>

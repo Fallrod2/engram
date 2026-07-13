@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type Anthropic from '@anthropic-ai/sdk'
-import { parseEmitCards } from './parse'
+import { extractJsonEmit, parseEmitCards, parseEmitCardsInput } from './parse'
 
 /** Build a minimal Anthropic.Message with the given content + stop_reason. */
 function message(
@@ -44,5 +44,46 @@ describe('parseEmitCards', () => {
       'max_tokens',
     )
     expect(() => parseEmitCards(res)).toThrow()
+  })
+})
+
+describe('parseEmitCardsInput (shared Zod funnel)', () => {
+  it('validates a raw emitInput object → cards', () => {
+    expect(parseEmitCardsInput({ cards: [{ front: 'Q', back: 'A' }] })).toEqual([
+      { front: 'Q', back: 'A' },
+    ])
+  })
+
+  it('rejects a non-conforming shape', () => {
+    expect(() => parseEmitCardsInput({ cards: [{ front: '', back: 'A' }] })).toThrow()
+    expect(() => parseEmitCardsInput({ nope: true })).toThrow()
+  })
+})
+
+describe('extractJsonEmit (JSON-mode providers)', () => {
+  it('parses a bare JSON object', () => {
+    expect(extractJsonEmit('{"cards":[{"front":"Q","back":"A"}]}')).toEqual({
+      cards: [{ front: 'Q', back: 'A' }],
+    })
+  })
+
+  it('strips ```json fences', () => {
+    expect(extractJsonEmit('```json\n{"cards":[]}\n```')).toEqual({ cards: [] })
+  })
+
+  it('extracts the first balanced object embedded in prose', () => {
+    const text = 'Voici le résultat : {"cards":[{"front":"Q","back":"A"}]} — voilà.'
+    expect(extractJsonEmit(text)).toEqual({ cards: [{ front: 'Q', back: 'A' }] })
+  })
+
+  it('is string-aware (braces inside JSON strings do not confuse balancing)', () => {
+    expect(extractJsonEmit('{"cards":[{"front":"a { b }","back":"A"}]}')).toEqual({
+      cards: [{ front: 'a { b }', back: 'A' }],
+    })
+  })
+
+  it('throws a clear error when there is no JSON object', () => {
+    expect(() => extractJsonEmit('just prose, no json')).toThrow(/no JSON object|structured/i)
+    expect(() => extractJsonEmit('')).toThrow()
   })
 })

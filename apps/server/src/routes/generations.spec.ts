@@ -10,6 +10,7 @@ import { generation, note } from '../db/schema'
 import { resetDb, seedDeck, seedSubject } from '../test-support/harness'
 import { setCardGenerator, resetCardGenerator, type CardGenerator } from '../ai/generator'
 import { runGenerationJob } from '../services/generations.service'
+import { updateAiSettings } from '../services/ai-config.service'
 
 // One card per call — the fire-and-forget job launched by POST /api/generations
 // uses this via the registry, so the real Anthropic API is NEVER called.
@@ -46,14 +47,25 @@ async function seedNote(content = 'quelques notes de cours'): Promise<string> {
 }
 
 describe('generations routes', () => {
-  it('POST without a key → 503, no row created', async () => {
-    delete process.env.ANTHROPIC_API_KEY
+  it('POST with no provider configured → 503, no row created', async () => {
+    delete process.env.ANTHROPIC_API_KEY // default provider (anthropic) → unusable
     const noteId = await seedNote()
     const res = await postJson('/api/generations', { noteId, kind: 'cards' })
     expect(res.status).toBe(503)
     const body = (await res.json()) as { error: { code: string } }
     expect(body.error.code).toBe('service_unavailable')
     expect(await db.select().from(generation)).toHaveLength(0)
+  })
+
+  it('POST with a keyless provider (ollama) configured → 202, provider stamped', async () => {
+    delete process.env.ANTHROPIC_API_KEY
+    await updateAiSettings(db, { activeProvider: 'ollama' })
+    const noteId = await seedNote()
+    const res = await postJson('/api/generations', { noteId, kind: 'cards' })
+    expect(res.status).toBe(202)
+    const g = generationSchema.parse(await res.json())
+    expect(g.provider).toBe('ollama')
+    expect(g.model).toBe('llama3.1')
   })
 
   it('POST unknown noteId → 404', async () => {
@@ -67,13 +79,15 @@ describe('generations routes', () => {
     expect(res.status).toBe(409)
   })
 
-  it('POST valid → 202, status pending, items []', async () => {
+  it('POST valid → 202, status pending, items [], provider/model stamped', async () => {
     const noteId = await seedNote()
     const res = await postJson('/api/generations', { noteId, kind: 'cards' })
     expect(res.status).toBe(202)
     const g = generationSchema.parse(await res.json())
     expect(g.status).toBe('pending')
     expect(g.items).toEqual([])
+    expect(g.provider).toBe('anthropic')
+    expect(g.model).toBe('claude-sonnet-4-6')
   })
 
   it('GET /:id reflects status after the job runs (succeeded, items)', async () => {
