@@ -11,7 +11,7 @@ import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
 import { ServiceUnavailableError } from '../http/errors'
-import { hasAnthropicKey } from '../ai/client'
+import { resolveActiveProvider } from '../services/ai-config.service'
 import {
   deleteGeneration,
   getGeneration,
@@ -24,11 +24,13 @@ export const generationsRouter = new Hono()
 
 // POST /api/generations — launch a fire-and-forget generation job (202).
 generationsRouter.post('/', zValidator('json', startGenerationSchema), async (c) => {
-  // Guard the key before creating any row; the rest of the app stays usable.
-  if (!hasAnthropicKey()) {
-    throw new ServiceUnavailableError('AI generation unavailable: ANTHROPIC_API_KEY not configured')
+  // Resolve the active provider ONCE (single DB read, no TOCTOU): it is both the
+  // 503 guard and the config stamped on the row + passed to the job.
+  const cfg = await resolveActiveProvider(db)
+  if (!cfg) {
+    throw new ServiceUnavailableError('AI generation unavailable: no provider configured')
   }
-  return ok(c, generationSchema, await startGeneration(db, c.req.valid('json')), 202)
+  return ok(c, generationSchema, await startGeneration(db, c.req.valid('json'), cfg), 202)
 })
 
 // GET /api/generations — list, optional noteId filter.
