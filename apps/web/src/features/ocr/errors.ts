@@ -1,9 +1,13 @@
+import type { TKey } from '@/lib/i18n'
 import { ApiError } from '@/lib/api'
 import { DownscaleError } from './downscale'
 
 /**
  * Error mapping for the photo-OCR flow (OCR spec §3.5). Pure + unit-tested: the
- * preview screen renders the classification, it never re-derives it.
+ * preview screen renders the classification, it never re-derives it. This module
+ * is non-React, so it returns i18n *codes/keys* — the message text lives in the
+ * dictionary and is resolved at the display point (mirrors the AI test-connection
+ * outcome codes).
  */
 export type OcrErrorKind =
   | 'noVisionProvider' // 503 — no provider / no vision capability (config banner)
@@ -33,20 +37,21 @@ export function classifyExtractError(err: unknown): OcrErrorKind {
   return 'generic'
 }
 
-/** A clear, actionable French message for a failed extraction. */
-export function describeExtractError(err: unknown): string {
-  switch (classifyExtractError(err)) {
-    case 'noVisionProvider':
-      return 'Extraction indisponible : aucun modèle de vision configuré. Choisissez un modèle vision (Claude, GPT-4o, llava…) dans les Réglages.'
-    case 'heic':
-      return 'Format HEIC non supporté. Réglez l’appareil photo iPhone sur « Le plus compatible » (JPEG), ou convertissez l’image.'
-    case 'unsupported':
-      return 'Image non supportée (formats acceptés : JPG, PNG, WebP).'
-    case 'tooLarge':
-      return 'Image trop volumineuse, même après réduction.'
-    case 'illegible':
-      return 'Aucun texte n’a pu être extrait de cette image.'
-    case 'generic':
-      return 'L’extraction a échoué.'
-  }
+/** Dict key carrying a clear, actionable message for each failure kind. */
+const MESSAGE_KEY: Record<OcrErrorKind, TKey> = {
+  noVisionProvider: 'ocr.error.noVisionProvider',
+  heic: 'ocr.error.heic',
+  unsupported: 'ocr.error.unsupported',
+  tooLarge: 'ocr.error.tooLarge',
+  illegible: 'ocr.error.illegible',
+  generic: 'ocr.error.generic',
+}
+
+/**
+ * Dict key for a stored error kind. The reducer keeps the raw kind string (an
+ * `OcrErrorKind` widened to `string`); this resolves it to a `TKey` at the
+ * display point, falling back to the generic key for anything unrecognized.
+ */
+export function ocrErrorMessageKey(kind: string | undefined): TKey {
+  return kind && kind in MESSAGE_KEY ? MESSAGE_KEY[kind as OcrErrorKind] : MESSAGE_KEY.generic
 }
