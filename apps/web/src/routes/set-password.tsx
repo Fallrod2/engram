@@ -55,6 +55,11 @@ function SetPasswordPage() {
   const navigate = useNavigate()
   const linkState = useAuthLink()
 
+  // The link flow just ended (password set, or the user is escaping the expired
+  // screen): the store cleared `linkState` and a navigation is already in flight.
+  // Render nothing rather than flashing the raw set-password form for a frame.
+  if (linkState.kind === 'none') return null
+
   if (linkState.kind === 'error') {
     return (
       <Shell>
@@ -66,7 +71,11 @@ function SetPasswordPage() {
         <CardContent className="flex flex-col gap-4">
           <p className="text-sm text-text-muted">{t('auth.link.expiredDesc')}</p>
           <Button asChild variant="outline" className="w-full">
-            <Link to="/login">{t('auth.link.backToLogin')}</Link>
+            {/* Clear the terminal error state before navigating so the root guard
+                does not immediately bounce us back here (dead-end). */}
+            <Link to="/login" onClick={() => authStore.clearLinkState()}>
+              {t('auth.link.backToLogin')}
+            </Link>
           </Button>
         </CardContent>
       </Shell>

@@ -172,6 +172,26 @@ describe('linkRedirect guard', () => {
       }),
     ).toBeUndefined()
   })
+
+  it('error state + /login → no redirect (escape hatch from the expired screen)', async () => {
+    const { linkRedirect } = await import('./auth-store')
+    expect(
+      linkRedirect({
+        pathname: '/login',
+        linkState: {
+          kind: 'error',
+          error: { kind: 'error', error: 'x', code: null, description: null },
+        },
+      }),
+    ).toBeUndefined()
+  })
+
+  it('setup state + /login → still forced to /set-password (mandatory gate stays strict)', async () => {
+    const { linkRedirect } = await import('./auth-store')
+    expect(
+      linkRedirect({ pathname: '/login', linkState: { kind: 'setup', linkType: 'invite' } }),
+    ).toEqual({ to: '/set-password' })
+  })
 })
 
 describe('requireAuth guard', () => {

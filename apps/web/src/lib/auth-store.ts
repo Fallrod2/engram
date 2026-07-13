@@ -49,6 +49,48 @@ const linkListeners = new Set<(state: LinkState) => void>()
 /** Tokens captured from the URL before `init()`, established via `setSession`. */
 let pendingLink: AuthLinkTokens | null = null
 
+/**
+ * localStorage marker for an *in-progress* password setup (spec: invite/recovery).
+ * The invite/recovery session is persisted by supabase-js (`persistSession`) and
+ * survives a page reload, but the in-memory `linkState` does not — and the URL
+ * tokens were already stripped, so `captureAuthLink()` finds nothing on the second
+ * load. Without this marker `init()` would rehydrate the recovery session as a
+ * *normal* login and let the user into the app WITHOUT ever setting a password
+ * (a hard auth bypass). We persist the setup intent here, re-read it in `init()`
+ * when a session is present, and clear it only once the password is actually set
+ * (`clearLinkState`). Distinct from supabase-js's own `engram-auth` storage key.
+ */
+const LINK_SETUP_STORAGE_KEY = 'engram-auth-link'
+
+function persistLinkSetup(linkType: AuthLinkType): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LINK_SETUP_STORAGE_KEY, linkType)
+  } catch {
+    // Storage unavailable (private mode). The in-memory `linkState` still gates
+    // this tab; only cross-reload persistence is lost — acceptable degradation.
+  }
+}
+
+function readPersistedLinkSetup(): AuthLinkType | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const value = window.localStorage.getItem(LINK_SETUP_STORAGE_KEY)
+    return value === 'invite' || value === 'recovery' ? value : null
+  } catch {
+    return null
+  }
+}
+
+function clearPersistedLinkSetup(): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(LINK_SETUP_STORAGE_KEY)
+  } catch {
+    // ignore — nothing to clear if storage is unavailable
+  }
+}
+
 function setLinkState(next: LinkState): void {
   linkState = next
   for (const listener of linkListeners) listener(linkState)
@@ -73,6 +115,7 @@ export function isPasswordSetupPending(): boolean {
 /** Clear the onboarding link state once the password has been set (or dismissed). */
 export function clearLinkState(): void {
   pendingLink = null
+  clearPersistedLinkSetup()
   if (linkState.kind !== 'none') setLinkState({ kind: 'none' })
 }
 
@@ -189,11 +232,25 @@ export function init(): Promise<void> {
             })
             setState({ status: 'unauthenticated', session: null })
           } else {
+            // Persist the setup intent so a reload BEFORE the password is set
+            // re-enters this gate instead of leaking into the app (see marker doc).
+            persistLinkSetup(pendingLink!.type)
             setLinkState({ kind: 'setup', linkType: pendingLink!.type })
             setState({ status: 'authenticated', session: data.session })
           }
         })
     : client.auth.getSession().then(({ data }) => {
+        // No fresh URL link, but a persisted setup marker + a live session means an
+        // invite/recovery reload landed here mid-onboarding: re-enter the setup gate
+        // rather than treating the recovery session as a normal login (auth bypass).
+        const persistedSetup = readPersistedLinkSetup()
+        if (data.session && persistedSetup) {
+          setLinkState({ kind: 'setup', linkType: persistedSetup })
+          setState({ status: 'authenticated', session: data.session })
+          return
+        }
+        // A marker with no session is stale (session expired/cleared) — drop it.
+        if (persistedSetup) clearPersistedLinkSetup()
         setState({
           status: data.session ? 'authenticated' : 'unauthenticated',
           session: data.session,
@@ -276,5 +333,10 @@ export function linkRedirect(opts: {
 }): { to: '/set-password' } | undefined {
   if (opts.linkState.kind === 'none') return undefined
   if (opts.pathname === '/set-password') return undefined
+  // Expired/used-link screen: the flow is already dead (no session to complete),
+  // and it offers an escape to /login. Never bounce that navigation back to the
+  // dead-end set-password screen. The mandatory `setup` gate stays strict — only
+  // the terminal `error` state is allowed to reach /login.
+  if (opts.linkState.kind === 'error' && opts.pathname === '/login') return undefined
   return { to: '/set-password' }
 }
