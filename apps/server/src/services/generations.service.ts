@@ -17,9 +17,9 @@ import { requireNoteRow } from './notes.service'
 import { requireDeckRow } from './decks.service'
 import { requireSubjectRow } from './subjects.service'
 import { insertFreshCardRow } from './cards.service'
-import { GENERATION_MODEL } from '../ai/prompts/cards.v1'
 import { chunkNote } from '../ai/chunk'
 import { getCardGenerator, type CardGenerator } from '../ai/generator'
+import type { ResolvedProviderConfig } from '../ai/providers/types'
 
 /** Global cap on the number of cards a single generation may propose. */
 const MAX_TOTAL_ITEMS = 100
@@ -54,12 +54,16 @@ export async function deleteGeneration(db: DB, id: string): Promise<void> {
 
 /**
  * Create the `pending` row and launch the fire-and-forget job. Returns the
- * pending DTO. `generator` defaults to the active registry entry (real in prod,
+ * pending DTO. The provider `cfg` is resolved ONCE by the router (which already
+ * guarded the 503 with it) and passed in — the row is stamped with the actual
+ * provider/model used, and the same `cfg` flows to the job (no second DB read,
+ * no TOCTOU). `generator` defaults to the active registry entry (real in prod,
  * fake in tests) so the fire-and-forget path never hits the real API in tests.
  */
 export async function startGeneration(
   db: DB,
   input: StartGeneration,
+  cfg: ResolvedProviderConfig,
   generator: CardGenerator = getCardGenerator(),
 ): Promise<Generation> {
   await requireNoteRow(db, input.noteId)
@@ -74,7 +78,8 @@ export async function startGeneration(
     .values({
       noteId: input.noteId,
       kind: input.kind,
-      model: GENERATION_MODEL,
+      model: cfg.model,
+      provider: cfg.providerId,
       status: 'pending',
       ...(input.deckId !== undefined ? { deckId: input.deckId } : {}),
       // items defaults to [] via the schema $defaultFn
@@ -87,7 +92,7 @@ export async function startGeneration(
   // promise with `waitUntil` to keep the invocation alive until the job completes.
   // The env guard means the local/test behaviour is byte-for-byte unchanged:
   // `waitUntil` is only ever invoked inside a real Vercel request context.
-  const job = runGenerationJob(db, row!.id, generator).catch(() => {
+  const job = runGenerationJob(db, row!.id, generator, cfg).catch(() => {
     /* runGenerationJob already captures everything; this is a belt. */
   })
   if (process.env.VERCEL === '1') waitUntil(job)
@@ -103,6 +108,7 @@ export async function runGenerationJob(
   db: DB,
   genId: string,
   generator: CardGenerator = getCardGenerator(),
+  cfg?: ResolvedProviderConfig,
 ): Promise<void> {
   const [gen] = await db.select().from(generation).where(eq(generation.id, genId))
   if (!gen || gen.status !== 'pending') return // idempotence: only ever replays pending
@@ -116,8 +122,13 @@ export async function runGenerationJob(
 
     for (const chunk of chunks) {
       if (items.length >= MAX_TOTAL_ITEMS) break
-      // No signal fabricated here: the generator owns its per-call timeout.
-      const r = await generator.generate({ content: chunk, kind: gen.kind as GenerationKind })
+      // No signal fabricated here: the generator owns its per-call timeout. The
+      // resolved provider is passed through so the model used matches the stamp.
+      const r = await generator.generate({
+        content: chunk,
+        kind: gen.kind as GenerationKind,
+        ...(cfg ? { provider: cfg } : {}),
+      })
       promptTokens += r.promptTokens
       completionTokens += r.completionTokens
       for (const c of r.cards) {

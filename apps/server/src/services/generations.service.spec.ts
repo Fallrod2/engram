@@ -7,12 +7,20 @@ import { card, generation, note } from '../db/schema'
 import { ConflictError, NotFoundError, ValidationError } from '../http/errors'
 import { seedDeck, seedSubject } from '../test-support/harness'
 import type { CardGenerator } from '../ai/generator'
+import type { ResolvedProviderConfig } from '../ai/providers/types'
 import {
   requireGenerationRow,
   resolveGeneration,
   runGenerationJob,
   startGeneration,
 } from './generations.service'
+
+/** Resolved provider passed by the router in prod; fixed here for the specs. */
+const testCfg: ResolvedProviderConfig = {
+  providerId: 'anthropic',
+  model: 'claude-sonnet-4-6',
+  keySource: 'env',
+}
 
 let t: TestDb
 let db: DB
@@ -62,16 +70,17 @@ async function seedGeneration(o: {
 describe('startGeneration', () => {
   it('creates a pending row with items [] and returns the DTO', async () => {
     const noteId = await seedNote('some content')
-    const dto = await startGeneration(db, { noteId, kind: 'cards' }, oneCardGen)
+    const dto = await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
     expect(dto.status).toBe('pending')
     expect(dto.items).toEqual([])
     expect(dto.model).toBe('claude-sonnet-4-6')
+    expect(dto.provider).toBe('anthropic')
     expect(dto.noteId).toBe(noteId)
   })
 
   it('unknown noteId → NotFoundError', async () => {
     await expect(
-      startGeneration(db, { noteId: 'nope', kind: 'cards' }, oneCardGen),
+      startGeneration(db, { noteId: 'nope', kind: 'cards' }, testCfg, oneCardGen),
     ).rejects.toThrow(NotFoundError)
   })
 
@@ -79,7 +88,7 @@ describe('startGeneration', () => {
     const noteId = await seedNote('content')
     const deck = await seedDeck(db, (await seedSubject(db, { archived: true })).id)
     await expect(
-      startGeneration(db, { noteId, kind: 'cards', deckId: deck.id }, oneCardGen),
+      startGeneration(db, { noteId, kind: 'cards', deckId: deck.id }, testCfg, oneCardGen),
     ).rejects.toThrow(ConflictError)
   })
 })

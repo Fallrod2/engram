@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getCardGenerator, anthropicGenerator, resetCardGenerator } from './generator'
+import {
+  getCardGenerator,
+  anthropicGenerator,
+  configuredGenerator,
+  resetCardGenerator,
+} from './generator'
 import { fakeGenerator } from './generator.fake'
 
 /**
@@ -9,9 +14,11 @@ import { fakeGenerator } from './generator.fake'
  * `fakeAi`). Here we assert the default registry and the fake's determinism.
  */
 describe('card generator registry (fake-AI guard)', () => {
-  it('defaults to the real Anthropic generator when nothing wires the fake', () => {
+  it('defaults to the configured multi-provider generator when nothing wires the fake', () => {
     resetCardGenerator()
-    expect(getCardGenerator()).toBe(anthropicGenerator)
+    expect(getCardGenerator()).toBe(configuredGenerator)
+    // The fake stays distinct from both real generators.
+    expect(fakeGenerator).not.toBe(configuredGenerator)
     expect(fakeGenerator).not.toBe(anthropicGenerator)
   })
 })
