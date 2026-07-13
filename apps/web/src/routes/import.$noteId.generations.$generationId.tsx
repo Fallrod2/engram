@@ -113,7 +113,8 @@ function GenerationReviewPage() {
   if (!generation || !note) return null
   const deck = decks.find((d) => d.id === generation.deckId) ?? null
 
-  const kindLabel = generation.kind === 'quiz' ? 'Quiz' : 'Cartes'
+  const kindLabel =
+    generation.kind === 'quiz' ? 'Quiz' : generation.kind === 'mixed' ? 'Mixte' : 'Cartes'
 
   const header = (
     <ReviewHeader

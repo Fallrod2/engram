@@ -401,6 +401,20 @@ export const dictFr = {
     noProviderBody:
       'Configurez un provider (Anthropic, OpenRouter, Ollama…) dans Réglages → Intelligence artificielle.',
     noProviderCta: 'Réglages',
+    // 'Mixte auto' generation mode (cloze feature). New strings only — the rest of
+    // the import/generation flow keeps its inherited hardcoded FR (documented debt).
+    mixedTab: 'Mixte (auto)',
+    mixedDescription:
+      'L’IA choisit le meilleur format (Q/R ou texte à trous) selon la nature du contenu.',
+    badgeQa: 'Q/R',
+    badgeCloze: 'Cloze',
+    contentType: {
+      definition: 'définition',
+      formula: 'formule',
+      list: 'liste',
+      fact: 'fait',
+      concept: 'concept',
+    },
   },
 
   ocr: {

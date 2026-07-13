@@ -1,9 +1,42 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import type { GenerationItemContentType } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT, type TKey } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
 import { Markdown } from '@/components/markdown'
 import type { ReviewItem } from '@/features/generations/review-machine'
+
+/** Type-safe map from a content type to its dictionary key (spec §3.2 badges). */
+const CONTENT_TYPE_KEYS: Record<GenerationItemContentType, TKey> = {
+  definition: 'generation.contentType.definition',
+  formula: 'generation.contentType.formula',
+  list: 'generation.contentType.list',
+  fact: 'generation.contentType.fact',
+  concept: 'generation.contentType.concept',
+}
+
+/**
+ * Format badges for a 'mixed' proposal (spec §3.2): a primary Q/R–Cloze pill plus
+ * a discreet content-type pill. Renders nothing for legacy / cards / quiz items
+ * (no `kind`), so those reviews look exactly as before.
+ */
+function FormatBadges({ item }: { item: ReviewItem }) {
+  const t = useT()
+  if (!item.kind) return null
+  return (
+    <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+      <span className="rounded-xs bg-surface-3 px-1 font-mono text-2xs uppercase tracking-wide text-text-muted">
+        {item.kind === 'cloze' ? t('generation.badgeCloze') : t('generation.badgeQa')}
+      </span>
+      {item.contentType && (
+        <span className="rounded-xs px-1 font-mono text-2xs text-text-faint">
+          {t(CONTENT_TYPE_KEYS[item.contentType])}
+        </span>
+      )}
+    </div>
+  )
+}
 
 /** Status glyph — monochrome + luminance, never a rating hue (spec §5). */
 function StatusGlyph({ status }: { status: ReviewItem['status'] }) {
@@ -85,6 +118,7 @@ export function ProposalCard({
         </span>
 
         <div className="min-w-0 flex-1">
+          <FormatBadges item={item} />
           {editing ? (
             <ProposalEditor item={item} onSave={onEdit} onCancel={onCancelEdit} />
           ) : (

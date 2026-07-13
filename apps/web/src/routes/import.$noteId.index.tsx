@@ -261,7 +261,7 @@ function NotePage() {
                       className={entityRowClass('gap-2')}
                     >
                       <span className="text-sm capitalize text-text">
-                        {g.kind === 'quiz' ? 'Quiz' : 'Cartes'}
+                        {g.kind === 'quiz' ? 'Quiz' : g.kind === 'mixed' ? 'Mixte' : 'Cartes'}
                       </span>
                       <span className="ml-auto">
                         <GenerationStatusBadge generation={g} />

@@ -89,6 +89,48 @@ test('import → generation → keyboard triage → insert → review', async ({
   await reviewAllGood(page, 2)
 })
 
+test('mixed generation → badges → accept all → materialised cloze cards land in the deck', async ({
+  page,
+}) => {
+  const uid = Date.now().toString(36)
+  const { subject, deck } = await setupSubjectDeck(page, uid)
+
+  await uploadInto(page, subject, SAMPLE_MD)
+
+  // Open the note, switch to the "Mixte (auto)" tab, pick the deck, generate.
+  await page.getByRole('link', { name: 'sample' }).click()
+  await expect(page).toHaveURL(/\/import\/[^/]+$/)
+  await page.getByRole('tab', { name: 'Mixte (auto)' }).click()
+  await page.getByRole('combobox', { name: 'Deck cible' }).click()
+  await page.getByRole('option', { name: deck }).click()
+  await page.getByRole('button', { name: 'Générer' }).click()
+  await expect(page).toHaveURL(/\/generations\/[^/]+$/)
+
+  // The fake mixed generator emits 2 Q/R + a 2-mask cloze; the server expands
+  // the cloze into 2 cards → 4 materialised proposals.
+  await expect(page.locator('article')).toHaveCount(4)
+  // Evaluation badges from the mixed mode.
+  await expect(page.getByText('Cloze').first()).toBeVisible()
+  await expect(page.getByText('Q/R').first()).toBeVisible()
+  // A materialised cloze recto shows the blank placeholder ([…]).
+  await expect(page.getByText('[…]').first()).toBeVisible()
+
+  // Accept every proposal (Shift+A), then insert the 4.
+  await page.keyboard.press('Shift+A')
+  await expect(page.getByRole('button', { name: /Insérer 4 cartes/ })).toBeVisible()
+  await page.keyboard.press('ControlOrMeta+Enter')
+  const confirm = page.getByRole('alertdialog')
+  await expect(confirm).toBeVisible()
+  await confirm.getByRole('button', { name: 'Insérer', exact: true }).click()
+
+  await expect(page.getByText(/4 cartes insérées/)).toBeVisible()
+
+  // The freshly inserted cards (including the 2 cloze-derived ones) are reviewable.
+  await page.getByRole('link', { name: 'Réviser maintenant' }).click()
+  await expect(page).toHaveURL(/\/review/)
+  await reviewAllGood(page, 4)
+})
+
 test('empty generation shows the "no cards" state', async ({ page }) => {
   const uid = Date.now().toString(36)
   const { subject, deck } = await setupSubjectDeck(page, uid)
