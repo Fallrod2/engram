@@ -331,6 +331,7 @@ export const dictFr = {
     dataImportConfirmAction: 'Remplacer les données',
     dataImportDone: 'Base restaurée ({subjects} matières, {cards} cartes).',
     dataImportError: 'Échec de l’import.',
+    adminOnly: 'Réservé à l’administrateur.',
     aboutTitle: 'À propos',
     aboutDesc: 'Dashboard de révision self-hosted (FSRS).',
     version: 'Version',

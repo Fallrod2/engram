@@ -327,6 +327,7 @@ export const dictEn: Dict = {
     dataImportConfirmAction: 'Replace data',
     dataImportDone: 'Database restored ({subjects} subjects, {cards} cards).',
     dataImportError: 'Import failed.',
+    adminOnly: 'Administrator only.',
     aboutTitle: 'About',
     aboutDesc: 'Self-hosted review dashboard (FSRS).',
     version: 'Version',
