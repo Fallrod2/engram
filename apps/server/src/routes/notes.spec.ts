@@ -76,6 +76,16 @@ describe('notes upload', () => {
     expect((await upload(png)).status).toBe(400)
   })
 
+  it('POST /upload of a real image → 400 pointing at the photo importer', async () => {
+    const jpeg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])], 'photo.jpg', {
+      type: 'image/jpeg',
+    })
+    const res = await upload(jpeg)
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: { message: string } }
+    expect(body.error.message).toContain('import photo')
+  })
+
   it('POST /upload empty MD → 400 no extractable text', async () => {
     const res = await upload(new File(['   \n  '], 'empty.md', { type: 'text/markdown' }))
     expect(res.status).toBe(400)
@@ -101,6 +111,19 @@ describe('notes CRUD', () => {
     expect(res.status).toBe(201)
     const n = noteSchema.parse(await res.json())
     expect(n.content).toContain('du texte')
+  })
+
+  it('POST /api/notes with sourceType image (OCR result) → 201', async () => {
+    const res = await postJson('/api/notes', {
+      title: 'Cours photographié',
+      sourceType: 'image',
+      originalFilename: 'cours (2 photos)',
+      content: '# Page 1\n\ndu texte\n\n---\n\n# Page 2\n\nla suite',
+    })
+    expect(res.status).toBe(201)
+    const n = noteSchema.parse(await res.json())
+    expect(n.sourceType).toBe('image')
+    expect(n.originalFilename).toBe('cours (2 photos)')
   })
 
   it('POST /api/notes with blank content → 400 note content is empty', async () => {
