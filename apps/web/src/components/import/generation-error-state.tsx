@@ -1,14 +1,18 @@
 import { Link } from '@tanstack/react-router'
 import { TriangleAlert, Unplug } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 
 /**
- * Missing-Anthropic-key banner (spec §1.5.bis-3, §5). The single justified use
- * of a semantic hue (`warning-subtle`) in these screens — a configuration
- * warning, not a card rating, visually isolated from the triage flow. Never
- * offers a naive "Réessayer" (it would fail identically) and never leaks the key.
+ * "No AI provider configured" banner (spec §6.4). Multi-provider: the config
+ * now lives in Settings → Intelligence artificielle (no more `.env` mention).
+ * The single justified use of a semantic hue (`warning-subtle`) in these
+ * screens — a configuration warning, visually isolated from the triage flow.
+ * Never offers a naive "Réessayer" (it would fail identically) and never leaks
+ * a key. Kept named `ApiKeyMissingBanner` (its call sites are unchanged).
  */
 export function ApiKeyMissingBanner() {
+  const t = useT()
   return (
     <div className="rounded-md border border-warning/30 bg-warning-subtle px-4 py-3">
       <div className="flex items-start gap-3">
@@ -18,25 +22,13 @@ export function ApiKeyMissingBanner() {
           aria-hidden
         />
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-text">Clé API Anthropic manquante</p>
+          <p className="text-sm font-medium text-text">{t('generation.noProviderTitle')}</p>
           <p className="text-xs leading-relaxed text-text-muted">
-            Ajoutez{' '}
-            <code className="rounded-xs bg-surface-3 px-1 py-0.5 font-mono text-2xs text-text">
-              ANTHROPIC_API_KEY
-            </code>{' '}
-            dans{' '}
-            <code className="rounded-xs bg-surface-3 px-1 py-0.5 font-mono text-2xs text-text">
-              apps/server/.env
-            </code>{' '}
-            (voir{' '}
-            <code className="rounded-xs bg-surface-3 px-1 py-0.5 font-mono text-2xs text-text">
-              .env.example
-            </code>
-            ) puis relancez le serveur.
+            {t('generation.noProviderBody')}
           </p>
           <div className="mt-1">
             <Button asChild variant="secondary" size="sm">
-              <Link to="/settings">Réglages</Link>
+              <Link to="/settings">{t('generation.noProviderCta')}</Link>
             </Button>
           </div>
         </div>
