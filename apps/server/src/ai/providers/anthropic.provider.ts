@@ -24,12 +24,15 @@ export function createAnthropicAdapter(
 
     async complete(cfg, args) {
       const client = clientFor(cfg)
+      // v1 tool by default (cards/quiz); the orchestrator supplies `emit.tool`
+      // for the mixed kind (v2 qa|cloze schema). Both are named `emit_cards`.
+      const tool = args.emit?.tool ?? EMIT_CARDS_TOOL
       const res = await client.messages.create(
         {
           model: cfg.model,
           max_tokens: MAX_OUTPUT_TOKENS,
           system: args.system,
-          tools: [EMIT_CARDS_TOOL],
+          tools: [tool],
           tool_choice: { type: 'tool', name: 'emit_cards' },
           messages: [{ role: 'user', content: args.userText }],
         },

@@ -55,4 +55,19 @@ describe('fakeGenerator', () => {
     const result = await fakeGenerator.generate({ content: '__E2E_EMPTY__', kind: 'cards' })
     expect(result.cards).toEqual([])
   })
+
+  it("kind 'mixed' → deterministic UN-expanded mix (2 qa + 1 two-mask cloze)", async () => {
+    const result = await fakeGenerator.generate({ content: 'des notes de cours', kind: 'mixed' })
+    expect(result.cards).toHaveLength(3)
+    expect(result.cards.filter((c) => c.kind === 'qa')).toHaveLength(2)
+    const cloze = result.cards.find((c) => c.kind === 'cloze')
+    expect(cloze).toBeDefined()
+    // The cloze stays a template here — the server expands it into 2 cards.
+    expect(cloze && 'clozeText' in cloze ? cloze.clozeText : '').toContain('{{c1::')
+  })
+
+  it("kind 'mixed' still honours the __E2E_EMPTY__ sentinel", async () => {
+    const result = await fakeGenerator.generate({ content: '__E2E_EMPTY__', kind: 'mixed' })
+    expect(result.cards).toEqual([])
+  })
 })

@@ -8,14 +8,31 @@ import {
   CARDS_INSTRUCTIONS,
   QUIZ_INSTRUCTIONS,
 } from './prompts/cards.v1'
-import { parseEmitCards, parseEmitCardsInput } from './parse'
+import {
+  MIXED_INSTRUCTIONS,
+  EMIT_MIXED_CARDS_DESCRIPTION,
+  EMIT_MIXED_CARDS_JSON_SCHEMA,
+  EMIT_MIXED_CARDS_TOOL,
+} from './prompts/cards.v2'
+import { parseEmitCards, parseEmitCardsInput, type GeneratedCardDraft } from './parse'
 import { PROVIDERS } from './providers'
 import { MAX_OUTPUT_TOKENS } from './providers/constants'
-import type { ProviderAdapter, ResolvedProviderConfig } from './providers/types'
+import type { EmitSpec, ProviderAdapter, ResolvedProviderConfig } from './providers/types'
 
-export interface GeneratedCardDraft {
-  front: string
-  back: string
+export type { GeneratedCardDraft }
+
+/** The v2 (qa|cloze) structured-output contract, used ONLY for the mixed kind. */
+const MIXED_EMIT: EmitSpec = {
+  description: EMIT_MIXED_CARDS_DESCRIPTION,
+  schema: EMIT_MIXED_CARDS_JSON_SCHEMA,
+  tool: EMIT_MIXED_CARDS_TOOL,
+}
+
+/** Kind → the instruction block appended to the user message. */
+function instructionsFor(kind: GenerationKind): string {
+  if (kind === 'quiz') return QUIZ_INSTRUCTIONS
+  if (kind === 'mixed') return MIXED_INSTRUCTIONS
+  return CARDS_INSTRUCTIONS
 }
 
 export interface GenerateArgs {
@@ -57,8 +74,11 @@ export async function runProviderGeneration(
   cfg: ResolvedProviderConfig,
   args: { content: string; kind: GenerationKind; signal?: AbortSignal },
 ): Promise<GenerateResult> {
-  const instructions = args.kind === 'quiz' ? QUIZ_INSTRUCTIONS : CARDS_INSTRUCTIONS
+  const instructions = instructionsFor(args.kind)
   const userText = `${instructions}\n\n--- EXTRAIT DE NOTES ---\n${args.content}`
+  // Only the mixed kind switches the wire schema to v2 (qa|cloze); cards/quiz
+  // leave `emit` undefined → the adapters keep their byte-identical v1 wire.
+  const emit = args.kind === 'mixed' ? MIXED_EMIT : undefined
 
   let lastErr: unknown
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -71,6 +91,7 @@ export async function runProviderGeneration(
         userText,
         signal: attemptSignal,
         attempt,
+        ...(emit ? { emit } : {}),
       })
       const cards = parseEmitCardsInput(res.emitInput) // the ONLY Zod validation
       return {
@@ -118,8 +139,10 @@ export const configuredGenerator: CardGenerator = {
 export const anthropicGenerator: CardGenerator = {
   async generate({ content, kind, signal }) {
     const client: Anthropic = createAnthropic()
-    const instructions = kind === 'quiz' ? QUIZ_INSTRUCTIONS : CARDS_INSTRUCTIONS
+    const instructions = instructionsFor(kind)
     const userText = `${instructions}\n\n--- EXTRAIT DE NOTES ---\n${content}`
+    // Mixed forces the v2 tool; cards/quiz keep the v1 tool (unchanged).
+    const tool = kind === 'mixed' ? EMIT_MIXED_CARDS_TOOL : EMIT_CARDS_TOOL
 
     let lastErr: unknown
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -131,7 +154,7 @@ export const anthropicGenerator: CardGenerator = {
             model: GENERATION_MODEL,
             max_tokens: MAX_OUTPUT_TOKENS,
             system: SYSTEM_PROMPT,
-            tools: [EMIT_CARDS_TOOL],
+            tools: [tool],
             tool_choice: { type: 'tool', name: 'emit_cards' },
             messages: [{ role: 'user', content: userText }],
           },

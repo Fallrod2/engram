@@ -15,9 +15,10 @@ function toolUse(name: string, input: unknown) {
 }
 
 describe('parseEmitCards', () => {
-  it('valid response → list of {front, back}', () => {
+  it('valid response → list of drafts (kind defaults to qa)', () => {
     const res = message([toolUse('emit_cards', { cards: [{ front: 'Q1', back: 'A1' }] })])
-    expect(parseEmitCards(res)).toEqual([{ front: 'Q1', back: 'A1' }])
+    // The discriminated union normalises a kind-less v1 card to `qa`.
+    expect(parseEmitCards(res)).toEqual([{ kind: 'qa', front: 'Q1', back: 'A1' }])
   })
 
   it('no tool_use block → throws', () => {
@@ -48,15 +49,57 @@ describe('parseEmitCards', () => {
 })
 
 describe('parseEmitCardsInput (shared Zod funnel)', () => {
-  it('validates a raw emitInput object → cards', () => {
+  it('validates a raw emitInput object → cards (kind defaults to qa)', () => {
     expect(parseEmitCardsInput({ cards: [{ front: 'Q', back: 'A' }] })).toEqual([
-      { front: 'Q', back: 'A' },
+      { kind: 'qa', front: 'Q', back: 'A' },
     ])
   })
 
   it('rejects a non-conforming shape', () => {
     expect(() => parseEmitCardsInput({ cards: [{ front: '', back: 'A' }] })).toThrow()
     expect(() => parseEmitCardsInput({ nope: true })).toThrow()
+  })
+})
+
+describe('parseEmitCardsInput (mixed: qa | cloze discriminated union)', () => {
+  it('keeps an explicit qa draft with its contentType', () => {
+    expect(
+      parseEmitCardsInput({
+        cards: [{ kind: 'qa', contentType: 'concept', front: 'Q', back: 'A' }],
+      }),
+    ).toEqual([{ kind: 'qa', contentType: 'concept', front: 'Q', back: 'A' }])
+  })
+
+  it('accepts a cloze draft carrying at least one {{cN::…}} mask', () => {
+    expect(
+      parseEmitCardsInput({
+        cards: [{ kind: 'cloze', contentType: 'definition', clozeText: 'Un {{c1::monoïde}}.' }],
+      }),
+    ).toEqual([{ kind: 'cloze', contentType: 'definition', clozeText: 'Un {{c1::monoïde}}.' }])
+  })
+
+  it('rejects a cloze draft with no mask (mislabelled)', () => {
+    expect(() =>
+      parseEmitCardsInput({ cards: [{ kind: 'cloze', clozeText: 'pas de trou ici' }] }),
+    ).toThrow()
+  })
+
+  it('rejects an unknown kind', () => {
+    expect(() =>
+      parseEmitCardsInput({ cards: [{ kind: 'bogus', front: 'Q', back: 'A' }] }),
+    ).toThrow()
+  })
+
+  it('accepts a mixed batch (qa + cloze together)', () => {
+    const out = parseEmitCardsInput({
+      cards: [
+        { kind: 'qa', front: 'Q', back: 'A' },
+        { kind: 'cloze', clozeText: 'La valeur {{c1::42}}.' },
+      ],
+    })
+    expect(out).toHaveLength(2)
+    expect(out[0]).toMatchObject({ kind: 'qa' })
+    expect(out[1]).toMatchObject({ kind: 'cloze' })
   })
 })
 

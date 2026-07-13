@@ -39,6 +39,11 @@ export function createOllamaAdapter(fetchFn: FetchFn = defaultFetch): ProviderAd
     async complete(cfg, args) {
       const base = baseUrlOf(cfg)
       const useTools = args.attempt >= 2
+      // v1 schema by default (cards/quiz); the orchestrator supplies `emit` for
+      // the mixed kind (v2 qa|cloze schema). Whatever the model returns is
+      // re-validated leniently by parse.ts.
+      const emitDescription = args.emit?.description ?? EMIT_CARDS_DESCRIPTION
+      const emitSchema = args.emit?.schema ?? EMIT_CARDS_JSON_SCHEMA
       const body = {
         model: cfg.model,
         stream: false,
@@ -54,13 +59,13 @@ export function createOllamaAdapter(fetchFn: FetchFn = defaultFetch): ProviderAd
                   type: 'function',
                   function: {
                     name: 'emit_cards',
-                    description: EMIT_CARDS_DESCRIPTION,
-                    parameters: EMIT_CARDS_JSON_SCHEMA,
+                    description: emitDescription,
+                    parameters: emitSchema,
                   },
                 },
               ],
             }
-          : { format: EMIT_CARDS_JSON_SCHEMA }),
+          : { format: emitSchema }),
       }
 
       const res = await fetchFn(`${base}/api/chat`, {

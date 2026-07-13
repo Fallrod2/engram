@@ -16,6 +16,26 @@ export interface ResolvedProviderConfig {
   keySource: 'app' | 'env' | null
 }
 
+/**
+ * The structured-output contract for ONE generation kind, wrapped differently by
+ * each provider (Anthropic tool, OpenAI function / json_schema, Ollama format).
+ * Optional on `ProviderCompleteArgs` so the wire stays byte-identical for the v1
+ * kinds (cards/quiz): the orchestrator only sets it for `mixed` (→ v2 schema).
+ * Adapters fall back to their statically-imported v1 constants when it's absent.
+ */
+export interface EmitSpec {
+  /** Tool / function description string. */
+  description: string
+  /** Naked JSON Schema of the emit payload (`{ cards: [...] }`). */
+  schema: Record<string, unknown>
+  /** Anthropic tool definition (`{ name, description, input_schema }`). */
+  tool: {
+    name: string
+    description: string
+    input_schema: { type: 'object'; [k: string]: unknown }
+  }
+}
+
 export interface ProviderCompleteArgs {
   /** SYSTEM_PROMPT (shared, provider-agnostic). */
   system: string
@@ -25,6 +45,12 @@ export interface ProviderCompleteArgs {
   signal: AbortSignal
   /** 1..MAX_ATTEMPTS — lets an adapter switch strategy on the 2nd attempt. */
   attempt: number
+  /**
+   * Per-kind structured-output contract. Absent → the adapter uses its v1
+   * constants (cards/quiz, byte-identical wire). Set by the orchestrator for the
+   * `mixed` kind so the wire carries the v2 (qa|cloze) schema.
+   */
+  emit?: EmitSpec
 }
 
 export interface ProviderCompleteResult {
