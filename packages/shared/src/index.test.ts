@@ -9,6 +9,7 @@ describe('healthResponseSchema', () => {
       timestamp: new Date().toISOString(),
       fakeAi: false,
       authEnforced: false,
+      demoEnabled: false,
     })
     expect(result.success).toBe(true)
   })

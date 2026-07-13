@@ -26,6 +26,12 @@ export const healthResponseSchema = z.object({
    * aborts the run if it is not `false`, so the suite never runs with auth ON.
    */
   authEnforced: z.boolean(),
+  /**
+   * True iff a demo account is configured (`ENGRAM_DEMO_USER_ID` set). Absent in
+   * the current prod (no demo) → `false`. The wave-2 landing reads this to decide
+   * whether to show a "Try the demo" CTA. Never exposes the demo user id.
+   */
+  demoEnabled: z.boolean(),
 })
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>
