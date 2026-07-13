@@ -1,5 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { createRootRouteWithContext, redirect, Outlet } from '@tanstack/react-router'
+import {
+  createRootRouteWithContext,
+  redirect,
+  Outlet,
+  useRouterState,
+} from '@tanstack/react-router'
 import { AppShell } from '@/components/shell/app-shell'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth, useAuthLink } from '@/lib/auth'
@@ -50,10 +55,16 @@ function AuthSplash() {
 function RootLayout() {
   const { status } = useAuth()
   const linkState = useAuthLink()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
   if (status === 'loading') return <AuthSplash />
   // During an invite/recovery flow the set-password screen renders bare (outside
   // the shell) even though the recovery session makes `status` authenticated.
   if (linkState.kind !== 'none') return <Outlet />
-  if (status === 'unauthenticated') return <Outlet /> // /login renders bare
+  // `/welcome` always renders the landing bare (no shell), even in dev/e2e where
+  // auth is forced `authenticated` — it's the route to develop/verify the public
+  // landing locally (landing spec §1). Placed AFTER the link branch to preserve
+  // the invite/recovery flow.
+  if (pathname === '/welcome') return <Outlet />
+  if (status === 'unauthenticated') return <Outlet /> // /login and `/` landing render bare
   return <AppShell /> // AppShell already contains its own <Outlet/>
 }

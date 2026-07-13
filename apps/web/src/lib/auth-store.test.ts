@@ -223,6 +223,16 @@ describe('requireAuth guard', () => {
     ).toBeUndefined()
   })
 
+  it('/ is exempt when unauthenticated → public landing, no redirect (landing §1)', async () => {
+    const { requireAuth } = await import('./auth-store')
+    expect(requireAuth({ auth: anon, pathname: '/', href: '/' })).toBeUndefined()
+  })
+
+  it('/welcome is exempt when unauthenticated → public landing, no redirect (landing §1)', async () => {
+    const { requireAuth } = await import('./auth-store')
+    expect(requireAuth({ auth: anon, pathname: '/welcome', href: '/welcome' })).toBeUndefined()
+  })
+
   it('hard-refresh authenticated after ready → no redirect (audit §3)', async () => {
     const { requireAuth } = await import('./auth-store')
     expect(requireAuth({ auth: authed, pathname: '/', href: '/' })).toBeUndefined()

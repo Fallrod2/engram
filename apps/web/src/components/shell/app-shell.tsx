@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
 import { Sidebar } from './sidebar'
@@ -16,6 +16,13 @@ function ShellInner() {
   const reduceMotion = useReducedMotion()
   const t = useT()
   const [scrolled, setScrolled] = useState(false)
+
+  // The static index.html carries the marketing <title> for the public landing
+  // (landing spec §4); reset it to the app name once the authenticated shell
+  // mounts so the browser tab reads 'engram', not the marketing headline.
+  useEffect(() => {
+    document.title = 'engram'
+  }, [])
 
   return (
     <div id="app-shell" className="flex h-dvh w-full overflow-hidden bg-bg text-text">

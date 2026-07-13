@@ -4,7 +4,42 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
-    <title>engram</title>
+
+    <!--
+      Marketing title + social meta for the public landing (landing spec §4).
+      One static index.html serves every route, so this title also shows on
+      /login (harmless); the authenticated app resets document.title to 'engram'
+      at mount, and the landing sets its own localized title. og:image is a
+      root-relative path — fine until a public origin exists (documented debt).
+    -->
+    <title>engram — révision par répétition espacée, cartes générées par IA</title>
+    <meta
+      name="description"
+      content="engram programme tes révisions par répétition espacée (FSRS) et génère des cartes depuis tes notes et tes photos de cours. Self-hosted, open source, gratuit."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="engram" />
+    <meta
+      property="og:title"
+      content="engram — révision par répétition espacée, cartes générées par IA"
+    />
+    <meta
+      property="og:description"
+      content="Révise ce qui est dû, pile quand c'est dû. Génère des cartes depuis tes notes et photos de cours. Self-hosted, open source."
+    />
+    <meta property="og:image" content="/landing/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="engram — révision par répétition espacée, cartes générées par IA"
+    />
+    <meta
+      name="twitter:description"
+      content="Révise ce qui est dû, pile quand c'est dû. Cartes générées par IA depuis tes notes. Self-hosted, open source."
+    />
+    <meta name="twitter:image" content="/landing/og.png" />
     <!-- Anti-FOUC : applique le thème stocké avant le premier paint. -->
     <script>
       ;(function () {
