@@ -1,8 +1,19 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { useLang, useT, type Lang } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { SetPasswordForm } from '@/features/auth/set-password-form'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -110,10 +121,11 @@ function SettingsPage() {
   )
 }
 
-/** Session + sign-out (spec §3.5). Rendered only when web auth is enabled. */
+/** Session, change-password + sign-out (spec §3.5). Only when web auth is enabled. */
 function AccountCard() {
   const t = useT()
   const { email, signOut } = useAuth()
+  const [changeOpen, setChangeOpen] = useState(false)
   return (
     <Card>
       <CardHeader>
@@ -122,9 +134,29 @@ function AccountCard() {
       </CardHeader>
       <CardContent className="flex items-center justify-between gap-4">
         <span className="truncate font-mono text-xs text-text-muted">{email}</span>
-        <Button variant="outline" onClick={() => void signOut()}>
-          {t('settings.signOut')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Dialog open={changeOpen} onOpenChange={setChangeOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">{t('settings.changePassword')}</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>{t('settings.changePassword')}</DialogTitle>
+                <DialogDescription>{t('auth.setPassword.subtitle')}</DialogDescription>
+              </DialogHeader>
+              <SetPasswordForm
+                submitLabel={t('settings.changePassword')}
+                onSuccess={() => {
+                  setChangeOpen(false)
+                  toast.success(t('settings.changePasswordDone'))
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" onClick={() => void signOut()}>
+            {t('settings.signOut')}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
