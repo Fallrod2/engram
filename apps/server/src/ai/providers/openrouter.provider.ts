@@ -3,9 +3,17 @@ import {
   defaultFetch,
   MAX_OUTPUT_TOKENS,
   OPENROUTER_DEFAULT_BASE_URL,
+  toBase64,
   unstructuredOutputError,
 } from './constants'
-import { emitFromMessage, tokensOf, type OpenAiChatResponse } from './openai-http'
+import {
+  emitFromMessage,
+  textFromChat,
+  tokensOf,
+  visionMessages,
+  type OpenAiChatResponse,
+} from './openai-http'
+import { openAiCompatSupportsVision } from './vision-support'
 import type { FetchFn, ProviderAdapter, ProviderModel, ResolvedProviderConfig } from './types'
 
 /** Attribution headers recommended by OpenRouter (ranking only, no secret). */
@@ -110,6 +118,37 @@ export function createOpenRouterAdapter(fetchFn: FetchFn = defaultFetch): Provid
         ...(m.name ? { label: m.name } : {}),
       }))
       return models
+    },
+
+    supportsVision() {
+      return openAiCompatSupportsVision()
+    },
+
+    async completeVision(cfg, args) {
+      const base = baseUrlOf(cfg)
+      const body = {
+        model: cfg.model,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        messages: visionMessages({
+          system: args.system,
+          instruction: args.instruction,
+          base64: toBase64(args.image),
+          mediaType: args.mediaType,
+        }),
+      }
+      const res = await fetchFn(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cfg.secret ?? ''}`,
+          'Content-Type': 'application/json',
+          ...ATTRIBUTION,
+        },
+        body: JSON.stringify(body),
+        signal: args.signal,
+      })
+      if (!res.ok) throw openRouterHttpError(res.status)
+      const json = (await res.json()) as OpenAiChatResponse
+      return { markdown: textFromChat(json), ...tokensOf(json) }
     },
   }
 }

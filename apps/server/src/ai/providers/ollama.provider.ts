@@ -4,8 +4,10 @@ import {
   defaultFetch,
   MAX_OUTPUT_TOKENS,
   OLLAMA_DEFAULT_BASE_URL,
+  toBase64,
   unstructuredOutputError,
 } from './constants'
+import { ollamaSupportsVision } from './vision-support'
 import type { FetchFn, ProviderAdapter, ProviderModel, ResolvedProviderConfig } from './types'
 
 /** Native Ollama `/api/chat` message shape (structured output + tool calls). */
@@ -92,6 +94,36 @@ export function createOllamaAdapter(fetchFn: FetchFn = defaultFetch): ProviderAd
         return { ok: true, detailCode: 'ok', models }
       } catch {
         return { ok: false, detailCode: 'unreachable' }
+      }
+    },
+
+    supportsVision(cfg) {
+      return ollamaSupportsVision(cfg.model)
+    },
+
+    async completeVision(cfg, args) {
+      const base = baseUrlOf(cfg)
+      const body = {
+        model: cfg.model,
+        stream: false,
+        options: { num_predict: MAX_OUTPUT_TOKENS },
+        messages: [
+          { role: 'system', content: args.system },
+          { role: 'user', content: args.instruction, images: [toBase64(args.image)] },
+        ],
+      }
+      const res = await fetchFn(`${base}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: args.signal,
+      })
+      if (!res.ok) throw new Error(`Requête Ollama échouée (HTTP ${res.status}).`)
+      const json = (await res.json()) as OllamaChatResponse
+      return {
+        markdown: json.message?.content ?? '',
+        promptTokens: json.prompt_eval_count ?? 0,
+        completionTokens: json.eval_count ?? 0,
       }
     },
 

@@ -1,6 +1,13 @@
 import { EMIT_CARDS_JSON_SCHEMA } from '../prompts/cards.v1'
-import { defaultFetch, MAX_OUTPUT_TOKENS, unstructuredOutputError } from './constants'
-import { emitFromMessage, tokensOf, type OpenAiChatResponse } from './openai-http'
+import { defaultFetch, MAX_OUTPUT_TOKENS, toBase64, unstructuredOutputError } from './constants'
+import {
+  emitFromMessage,
+  textFromChat,
+  tokensOf,
+  visionMessages,
+  type OpenAiChatResponse,
+} from './openai-http'
+import { openAiCompatSupportsVision } from './vision-support'
 import type { FetchFn, ProviderAdapter, ProviderModel, ResolvedProviderConfig } from './types'
 
 function baseUrlOf(cfg: ResolvedProviderConfig): string {
@@ -75,6 +82,34 @@ export function createOpenAiCompatAdapter(fetchFn: FetchFn = defaultFetch): Prov
       const json = (await res.json()) as { data?: { id: string }[] }
       const models: ProviderModel[] = (json.data ?? []).map((m) => ({ id: m.id }))
       return models
+    },
+
+    supportsVision() {
+      return openAiCompatSupportsVision()
+    },
+
+    async completeVision(cfg, args) {
+      const base = baseUrlOf(cfg)
+      if (base.length === 0) throw new Error('openai-compat: base URL manquante')
+      const body = {
+        model: cfg.model,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        messages: visionMessages({
+          system: args.system,
+          instruction: args.instruction,
+          base64: toBase64(args.image),
+          mediaType: args.mediaType,
+        }),
+      }
+      const res = await fetchFn(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(cfg) },
+        body: JSON.stringify(body),
+        signal: args.signal,
+      })
+      if (!res.ok) throw new Error(`Requête serveur échouée (HTTP ${res.status}).`)
+      const json = (await res.json()) as OpenAiChatResponse
+      return { markdown: textFromChat(json), ...tokensOf(json) }
     },
   }
 }
