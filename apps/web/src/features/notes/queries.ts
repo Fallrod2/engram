@@ -1,6 +1,12 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { listNotesResponseSchema, noteSchema, type Note, type UpdateNote } from '@engram/shared'
+import {
+  listNotesResponseSchema,
+  noteSchema,
+  type CreateNote,
+  type Note,
+  type UpdateNote,
+} from '@engram/shared'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
 import { mergeDefined } from '@/lib/utils'
@@ -52,6 +58,22 @@ export function useUploadNote() {
   return useMutation({
     mutationFn: ({ file, subjectId }: { file: File; subjectId?: string }) =>
       api.upload('/notes/upload', buildUploadForm(file, subjectId), noteSchema),
+    onSuccess: (created) => {
+      qc.setQueryData<Note[]>(LIST_KEY, (old) => [created, ...(old ?? [])])
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: qk.notes.all }),
+  })
+}
+
+/**
+ * Create a note from JSON (OCR spec §3.4 — the corrected photo transcription,
+ * `sourceType: 'image'`). Aligned on `useUploadNote`: prepend into the list
+ * cache on success, invalidate on settle. The pasted-text importer can reuse it.
+ */
+export function useCreateNote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateNote) => api.post('/notes', input, noteSchema),
     onSuccess: (created) => {
       qc.setQueryData<Note[]>(LIST_KEY, (old) => [created, ...(old ?? [])])
     },
