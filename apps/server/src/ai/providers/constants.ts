@@ -13,6 +13,11 @@ export const defaultFetch: FetchFn = ((
 /** Max output tokens per call — mapped to each provider's own param. */
 export const MAX_OUTPUT_TOKENS = 8192
 
+/** Base64-encode raw bytes (image payload for the vision APIs). */
+export function toBase64(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('base64')
+}
+
 /** Default base URLs (used when the stored config leaves them empty). */
 export const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 export const OLLAMA_DEFAULT_BASE_URL = 'http://localhost:11434'

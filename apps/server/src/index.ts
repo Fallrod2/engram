@@ -11,6 +11,9 @@ if (process.env.ENGRAM_FAKE_AI === '1') {
   const { setCardGenerator } = await import('./ai/generator')
   const { fakeGenerator } = await import('./ai/generator.fake')
   setCardGenerator(fakeGenerator)
+  const { setVisionExtractor } = await import('./ai/vision')
+  const { fakeVisionExtractor } = await import('./ai/vision.fake')
+  setVisionExtractor(fakeVisionExtractor)
   console.warn('[engram] ENGRAM_FAKE_AI actif — générateur factice (NE JAMAIS activer en prod)')
 }
 

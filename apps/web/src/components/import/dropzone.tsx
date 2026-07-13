@@ -1,17 +1,38 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { Upload } from 'lucide-react'
+import { Camera, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Kbd } from '@/components/ui/kbd'
 
-/** Accepted upload extensions (mirrors the server's `detectSourceType`). */
-export const ACCEPT_EXTENSIONS = ['.md', '.markdown', '.txt', '.pdf'] as const
-/** Client-side size cap, aligned with the server's 10 MiB limit. */
+/** Photo extensions (OCR spec §3.1). Downscaled + OCR'd, not uploaded as docs. */
+export const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const
+/** iPhone default photo formats — rejected with an actionable message (§1.1). */
+export const HEIC_EXTENSIONS = ['.heic', '.heif'] as const
+/** Accepted upload extensions (docs mirror `detectSourceType` + photos). */
+export const ACCEPT_EXTENSIONS = ['.md', '.markdown', '.txt', '.pdf', ...IMAGE_EXTENSIONS] as const
+/** Client-side size cap, aligned with the server's 10 MiB limit (docs). */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 /** True iff the filename ends with an accepted extension. */
 export function hasAcceptedExtension(name: string): boolean {
   const lower = name.toLowerCase()
   return ACCEPT_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/** True iff the filename is a photo routed through the OCR preview flow. */
+export function isImageFile(name: string): boolean {
+  const lower = name.toLowerCase()
+  return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/**
+ * True iff the filename is a HEIC/HEIF photo (iPhone default). Recognized so the
+ * caller can surface the actionable HEIC message (§1.1) instead of the generic
+ * "unsupported type" toast — the vision APIs and the canvas downscale can't
+ * decode it, so it's rejected before any upload.
+ */
+export function isHeicFile(name: string): boolean {
+  const lower = name.toLowerCase()
+  return HEIC_EXTENSIONS.some((ext) => lower.endsWith(ext))
 }
 
 /**
@@ -32,10 +53,15 @@ export function Dropzone({
   children?: ReactNode
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
 
   function pick() {
     if (!disabled) inputRef.current?.click()
+  }
+
+  function openCamera() {
+    if (!disabled) cameraRef.current?.click()
   }
 
   function emit(fileList: FileList | null) {
@@ -86,14 +112,32 @@ export function Dropzone({
       >
         <Upload className="size-6 text-text-faint" strokeWidth={1.75} aria-hidden />
         <p className="text-sm text-text">
-          Déposez un fichier <span className="font-mono text-xs text-text-muted">.md</span> ou{' '}
-          <span className="font-mono text-xs text-text-muted">.pdf</span>, ou cliquez pour choisir
+          Déposez un fichier <span className="font-mono text-xs text-text-muted">.md</span>,{' '}
+          <span className="font-mono text-xs text-text-muted">.pdf</span> ou une{' '}
+          <span className="text-text">photo</span> de cours, ou cliquez pour choisir
         </p>
         <p className="flex items-center justify-center gap-1.5 text-2xs text-text-faint">
           <Kbd>↵</Kbd> pour parcourir
           <span className="text-border-strong">·</span>
-          max 10 Mo
+          docs max 10 Mo · photos réduites automatiquement
         </p>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={(e) => {
+            // Own the click so the surrounding dropzone doesn't also open the picker.
+            e.stopPropagation()
+            openCamera()
+          }}
+          className={cn(
+            'mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-1 px-2.5 py-1 text-xs text-text-muted',
+            'transition-colors hover:border-border-strong hover:text-text',
+            disabled && 'cursor-not-allowed opacity-60',
+          )}
+        >
+          <Camera className="size-3.5" aria-hidden />
+          Prendre une photo
+        </button>
         <input
           ref={inputRef}
           type="file"
@@ -103,6 +147,20 @@ export function Dropzone({
           onChange={(e) => {
             emit(e.target.files)
             // Reset so re-selecting the same file fires `change` again.
+            e.target.value = ''
+          }}
+        />
+        {/* Distinct capture input: opens the rear camera on mobile; on desktop
+            `capture` is ignored and it falls back to the file picker. */}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            emit(e.target.files)
             e.target.value = ''
           }}
         />

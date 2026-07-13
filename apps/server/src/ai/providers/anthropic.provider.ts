@@ -1,7 +1,8 @@
 import { createAnthropic, type CreateAnthropic } from '../client'
 import { extractAnthropicToolInput } from '../parse'
 import { EMIT_CARDS_TOOL } from '../prompts/cards.v1'
-import { MAX_OUTPUT_TOKENS } from './constants'
+import { MAX_OUTPUT_TOKENS, toBase64 } from './constants'
+import { anthropicSupportsVision } from './vision-support'
 import type { TestConnectionDetailCode } from '@engram/shared'
 import type { ProviderAdapter, ResolvedProviderConfig, ProviderModel } from './types'
 
@@ -53,6 +54,47 @@ export function createAnthropicAdapter(
         return { ok: true, detailCode: 'ok', models }
       } catch (e) {
         return { ok: false, ...classifyAnthropicError(e) }
+      }
+    },
+
+    supportsVision(cfg) {
+      return anthropicSupportsVision(cfg.model)
+    },
+
+    async completeVision(cfg, args) {
+      const client = clientFor(cfg)
+      const res = await client.messages.create(
+        {
+          model: cfg.model,
+          max_tokens: MAX_OUTPUT_TOKENS,
+          system: args.system,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: args.mediaType,
+                    data: toBase64(args.image),
+                  },
+                },
+                { type: 'text', text: args.instruction },
+              ],
+            },
+          ],
+        },
+        { signal: args.signal },
+      )
+      const markdown = res.content
+        .filter((b): b is Extract<typeof b, { type: 'text' }> => b.type === 'text')
+        .map((b) => b.text)
+        .join('')
+      return {
+        markdown,
+        promptTokens: res.usage.input_tokens,
+        completionTokens: res.usage.output_tokens,
       }
     },
   }

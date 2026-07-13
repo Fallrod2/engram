@@ -17,7 +17,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Dropzone, hasAcceptedExtension, MAX_UPLOAD_BYTES } from '@/components/import/dropzone'
+import {
+  Dropzone,
+  hasAcceptedExtension,
+  isHeicFile,
+  isImageFile,
+  MAX_UPLOAD_BYTES,
+} from '@/components/import/dropzone'
+import { setPendingPhotos } from '@/features/ocr/pending'
+import { DownscaleError } from '@/features/ocr/downscale'
+import { describeExtractError } from '@/features/ocr/errors'
 import { NoteRow } from '@/components/import/note-row'
 import { ImportingRow } from '@/components/import/importing-row'
 import { useHotkeys } from '@/lib/use-hotkeys'
@@ -34,6 +43,8 @@ import { NoteEditDialog } from '@/features/notes/note-edit-dialog'
 import { describeUploadError } from '@/features/generations/errors'
 
 const NO_SUBJECT = '__none__'
+/** Client-side cap on photos per batch (OCR spec §1.2, cost guard §0.2.1). */
+const MAX_PHOTOS = 10
 
 export const Route = createFileRoute('/import/')({
   loader: ({ context }) =>
@@ -134,9 +145,27 @@ function ImportPage() {
 
   function onFiles(files: File[]) {
     const subjectId = fileInSubject === NO_SUBJECT ? undefined : fileInSubject
+    const images: File[] = []
     for (const file of files) {
+      // HEIC/HEIF (iPhone default) is rejected with an actionable message BEFORE
+      // the generic check — neither the vision APIs nor the canvas downscale can
+      // decode it (§1.1). Reuse the shared client-side classification/message.
+      if (isHeicFile(file.name)) {
+        toast.error(describeExtractError(new DownscaleError('heic')), {
+          description: file.name,
+        })
+        continue
+      }
       if (!hasAcceptedExtension(file.name)) {
-        toast.error('Type de fichier non supporté', { description: `${file.name} — .md ou .pdf` })
+        toast.error('Type de fichier non supporté', {
+          description: `${file.name} — .md, .pdf ou photo`,
+        })
+        continue
+      }
+      // Photos take the OCR preview flow; their size is validated AFTER the
+      // client downscale (§3.2), never rejected raw here.
+      if (isImageFile(file.name)) {
+        images.push(file)
         continue
       }
       if (file.size > MAX_UPLOAD_BYTES) {
@@ -144,6 +173,14 @@ function ImportPage() {
         continue
       }
       startUpload(file, subjectId)
+    }
+    if (images.length > 0) {
+      const capped = images.slice(0, MAX_PHOTOS)
+      if (images.length > MAX_PHOTOS) {
+        toast.error('Trop de photos', { description: `max ${MAX_PHOTOS} pages par lot` })
+      }
+      setPendingPhotos({ files: capped, ...(subjectId ? { subjectId } : {}) })
+      void navigate({ to: '/import/photo' })
     }
   }
 

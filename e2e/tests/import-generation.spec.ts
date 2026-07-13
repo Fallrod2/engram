@@ -34,7 +34,8 @@ async function uploadInto(
   await page.goto('/import')
   await page.getByRole('combobox', { name: 'Ranger les imports dans une matière' }).click()
   await page.getByRole('option', { name: subject }).click()
-  await page.locator('input[type="file"]').setInputFiles(file)
+  // The doc picker (the camera-capture input also matches `input[type=file]`).
+  await page.locator('input[type="file"]:not([capture])').setInputFiles(file)
 }
 
 /** Open a note by title and launch a generation into `deck`. */

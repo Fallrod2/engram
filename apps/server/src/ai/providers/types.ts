@@ -1,4 +1,4 @@
-import type { AiProviderId, TestConnectionDetailCode } from '@engram/shared'
+import type { AiProviderId, TestConnectionDetailCode, VisionMediaType } from '@engram/shared'
 
 export type ProviderId = AiProviderId
 
@@ -39,6 +39,27 @@ export interface ProviderModel {
   label?: string
 }
 
+/** One vision (image → Markdown) call, spec §2.2. */
+export interface ProviderVisionArgs {
+  /** OCR system prompt (faithful transcription rules). */
+  system: string
+  /** User instruction accompanying the image. */
+  instruction: string
+  /** Raw (already client-downscaled) image bytes. */
+  image: Uint8Array
+  /** Concrete media type, from magic-byte detection. */
+  mediaType: VisionMediaType
+  /** Per-call timeout signal, provided by the vision orchestrator. */
+  signal: AbortSignal
+}
+
+export interface ProviderVisionResult {
+  /** Transcribed Markdown (free text — no structured tool). */
+  markdown: string
+  promptTokens: number
+  completionTokens: number
+}
+
 export interface TestConnectionResult {
   ok: boolean
   /**
@@ -61,6 +82,21 @@ export interface ProviderAdapter {
   testConnection(cfg: ResolvedProviderConfig): Promise<TestConnectionResult>
   /** Selectable models (ollama /api/tags, openrouter /models). */
   listModels?(cfg: ResolvedProviderConfig): Promise<ProviderModel[]>
+  /**
+   * Whether THIS provider + the configured model can accept an image (spec
+   * §2.2). Best-effort, model-name driven; absent = no vision transport at all.
+   * Consulted as a guard BEFORE any call (→ 503 for a text-only provider).
+   */
+  supportsVision?(cfg: ResolvedProviderConfig): boolean
+  /**
+   * One vision completion (image → Markdown transcription). Present iff the
+   * provider has a vision transport; the OCR service guards with
+   * `supportsVision` first. Throws on network/HTTP/format failure (bubbles up).
+   */
+  completeVision?(
+    cfg: ResolvedProviderConfig,
+    args: ProviderVisionArgs,
+  ): Promise<ProviderVisionResult>
 }
 
 /** Injected fetch (default `globalThis.fetch`) so tests never touch the network. */
