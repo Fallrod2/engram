@@ -123,7 +123,7 @@ Classé par taille, puis par valeur décroissante à l'intérieur. « ROI » = j
 | **Import ICS agenda EPITA → exams auto**                          | Abonnement/upload `.ics` → heuristique événement→`exam`, alimente le boost FSRS déjà codé (`ceil(n/7)`). Supprime la saisie manuelle des échéances. ⚠️ Validation « accepter/ignorer » (un TD n'est pas un exam), pas d'auto-création aveugle.                                                                                                   | Token (3a) ; qualité de l'ICS EPITA           |
 | **Quick-capture / Inbox + Share Target mobile**                   | Carte « brute » créable en un geste (deck _Inbox_), triée plus tard ; sur mobile, Web Share Target. Complète Obsidian pour ce qui n'y est pas. ⚠️ L'inbox devient un cimetière si le triage n'est pas rendu agréable (mini-session).                                                                                                             | PWA (share target), token                     |
 | **Multi-provider IA cloud (Anthropic + OpenRouter), abstraction** | La **partie abstraction** est peu coûteuse (générateur injectable). Le multi-provider **cloud-only** est faisable partout et prépare le routage cheap/premium. Le volet **Ollama gratuit reste bloqué** par l'archi (cf. chantier 3c / arbitrage a). CLAUDE.md fige `claude-sonnet-4-6` → à débattre avec Alex avant.                            | Décision provider ; chemin réseau pour Ollama |
-| **Auth Supabase (enabler, pas une feature)**                      | Valeur directe faible pour Alex seul (Vercel Auth protège déjà). Prérequis du partage v2 et du multi-user. Entraîne la **dette schéma `user_id` + RLS** sur 8 tables. **Ne coder que si le multi-user est engagé** (arbitrage b) — sinon rester Vercel Auth + partage v1.                                                                        | — (mais dette schéma lourde)                  |
+| **Auth Supabase (enabler, pas une feature)**                      | ✅ **FAIT le 13/07/2026** (JWT vérifié localement, login + set-password, invitations). Écrit avant que le multi-user soit engagé — il l'est désormais (cf. §2bis) : la **dette schéma `user_id` + RLS** sur 8 tables reste à payer et devient la première étape du multi-user.                                                                   | — (dette schéma à payer en §2bis)             |
 
 ### Taille L (gros paris, à besoin confirmé)
 
@@ -133,6 +133,31 @@ Classé par taille, puis par valeur décroissante à l'intérieur. « ROI » = j
 | **Mode « examen blanc » chronométré, exam-aware**       | Échantillon pondéré par matière d'un exam, **sans feedback carte par carte**, chronométré, bilan par matière, ratés re-planifiés. Testing sous conditions proches du réel. Se déclenche depuis le compte à rebours d'exam existant. ⚠️ Taguer ces reviews dans `review_log` (source) pour ne pas polluer les analytics de rétention « spontanée ».                                      | Session + `exam`/`study-plan`                                |
 | **Révision offline (file de reviews rejouée)**          | Le seul « multi-device » qui reste à gagner (le sync cloud est déjà fait). `review_log` append-only → conflits quasi nuls ; le piège est le **rejeu séquentiel ordonné** côté serveur (FSRS est stateful) + **review-id générés client** pour l'idempotence. **À ne lancer qu'APRÈS la PWA validée en usage réel** — sinon on optimise un écran que personne n'ouvre encore sur mobile. | PWA ; `POST /review` idempotent + endpoint de replay ordonné |
 | **Partage de decks — v2 registre public**               | Lien public en lecture seule / registre de decks de promo. Attend une **preuve d'usage de la v1 fichier** avant d'investir.                                                                                                                                                                                                                                                             | Auth (multi-user)                                            |
+
+---
+
+## 2bis. Orientation produit décidée par Alex (13/07/2026) : multi-utilisateurs freemium — **pour plus tard, explicitement PAS maintenant**
+
+Alex a tranché la direction (sans engager de date) : engram deviendra un site multi-utilisateurs avec un modèle freemium autour de l'IA.
+
+### Le modèle
+
+- **Abonnés payants** : utilisent la **clé IA fournie par la plateforme** (configurée par Alex ; les coûts API sont couverts par l'abonnement).
+- **Utilisateurs gratuits** : apportent **leur propre clé API** (BYOK — l'infra write-only `ai_credential` existe déjà) ou **leur propre abonnement** à un fournisseur IA (à investiguer : OAuth des abonnements Claude/ChatGPT/Codex quand les fournisseurs l'exposent).
+- **Inscriptions ouvertes** (aujourd'hui : signups fermés, invitation uniquement).
+- **Paiement + tarifs** : abonnement récurrent (Stripe est le défaut évident), grille tarifaire à définir.
+
+### Ce que ça implique (dette à payer le moment venu — ne rien coder « au cas où »)
+
+1. **Schéma multi-tenant** : `user_id` sur les 8+ tables + **RLS Supabase** (la dette identifiée dans le backlog M « Auth Supabase » — l'auth est faite depuis le 13/07, la dette schéma reste).
+2. **Config IA par utilisateur** : `app_settings`/`ai_credential` deviennent par-user ; s'y ajoute un **slot plateforme** (la clé d'Alex) réservé au plan payant, avec **metering** (tokens/coût par user — le garde-fou coûts du backlog S devient un prérequis, pas un gadget).
+3. **Plans & billing** : table `subscription` (plan, statut, période), webhooks Stripe, gating des features par plan (provider plateforme = payant ; BYOK = gratuit).
+4. **Quotas anti-abus** : rate limits par user sur génération/OCR, plafond mensuel plateforme.
+5. **Légal** : CGU/CGV, RGPD (export/suppression de compte — l'export JSON existe, il faudra le scoper par user).
+
+### Séquencement honnête quand ce sera engagé
+
+`user_id`+RLS → inscriptions ouvertes → config IA par user (BYOK gratuit) → metering → Stripe + plan payant avec clé plateforme. Chaque étape est shippable seule ; ne pas commencer par le paiement.
 
 ---
 
