@@ -11,6 +11,7 @@ import {
 import type { DB } from '../db/client'
 import { appSettings, aiCredential } from '../db/schema'
 import { ValidationError } from '../http/errors'
+import { hasAnthropicKey } from '../ai/client'
 import type { ResolvedProviderConfig } from '../ai/providers/types'
 
 /** The single key under which the AI config blob lives in `app_settings`. */
@@ -112,8 +113,15 @@ function resolveSecret(
   appSecret: string | undefined,
 ): { secret: string | undefined; keySource: 'app' | 'env' | null } {
   if (appSecret) return { secret: appSecret, keySource: 'app' }
+  if (provider === 'anthropic') {
+    // The SDK reads ANTHROPIC_API_KEY (and machine profiles) itself, so we only
+    // detect presence here via the shared `hasAnthropicKey()` fallback helper.
+    return hasAnthropicKey()
+      ? { secret: undefined, keySource: 'env' }
+      : { secret: undefined, keySource: null }
+  }
   const env = envKey(provider)
-  if (env) return { secret: provider === 'anthropic' ? undefined : env, keySource: 'env' }
+  if (env) return { secret: env, keySource: 'env' }
   return { secret: undefined, keySource: null }
 }
 
