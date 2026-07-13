@@ -115,6 +115,19 @@ export interface AuthLike {
 }
 
 /**
+ * Clamp an attacker-controllable `redirect` value to a safe same-origin relative
+ * path (CWE-601 open-redirect defense). Anything that is not a path starting with
+ * a single `/` (so not `//host`, not `https://…`, not `\\`) falls back to `/`.
+ * Applied at every site that turns `redirect` into a real navigation.
+ */
+export function sanitizeRedirect(value: string | undefined | null): string {
+  if (value && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\')) {
+    return value
+  }
+  return '/'
+}
+
+/**
  * Router guard (spec §3.4), extracted for a unit test (audit §3/§8). Assumes the
  * caller has already `await`ed `auth.ready`, so the store is never `loading`.
  * `/login` is exempt (anti-loop).
@@ -126,7 +139,8 @@ export function requireAuth(opts: {
 }): { to: '/login'; search: { redirect: string } } | undefined {
   if (opts.pathname === '/login') return undefined // anti-loop (audit §8)
   if (opts.auth.getState().status !== 'authenticated') {
-    return { to: '/login', search: { redirect: opts.href } }
+    // Defense in depth: only ever stash a same-origin relative return path.
+    return { to: '/login', search: { redirect: sanitizeRedirect(opts.href) } }
   }
   return undefined
 }

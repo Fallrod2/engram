@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useT } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
+import { sanitizeRedirect } from '@/lib/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -48,7 +49,9 @@ export function LoginForm() {
       setError(t('auth.error.invalid'))
       return
     }
-    void navigate({ href: search.redirect ?? '/' })
+    // Sanitize the attacker-controllable search param to a same-origin relative
+    // path before navigating post-login (CWE-601 open-redirect defense).
+    void navigate({ href: sanitizeRedirect(search.redirect) })
   })
 
   return (

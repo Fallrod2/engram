@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { useT } from '@/lib/i18n'
+import { sanitizeRedirect } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { LoginForm } from '@/features/auth/login-form'
 
@@ -14,7 +15,9 @@ export const Route = createFileRoute('/login')({
   beforeLoad: async ({ context, search }) => {
     await context.auth.ready
     if (context.auth.getState().status === 'authenticated') {
-      throw redirect({ href: search.redirect ?? '/' })
+      // Sanitize first: `href` is clamped to a same-origin relative path, so this
+      // can never navigate to an attacker-supplied cross-origin URL (CWE-601).
+      throw redirect({ href: sanitizeRedirect(search.redirect) })
     }
   },
   component: LoginPage,

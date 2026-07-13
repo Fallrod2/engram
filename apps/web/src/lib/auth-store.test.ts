@@ -93,4 +93,32 @@ describe('requireAuth guard', () => {
     const { requireAuth } = await import('./auth-store')
     expect(requireAuth({ auth: authed, pathname: '/', href: '/' })).toBeUndefined()
   })
+
+  it('open-redirect: an absolute return path is clamped to / (CWE-601)', async () => {
+    const { requireAuth } = await import('./auth-store')
+    expect(requireAuth({ auth: anon, pathname: '/x', href: 'https://evil.example/phish' })).toEqual(
+      { to: '/login', search: { redirect: '/' } },
+    )
+  })
+})
+
+describe('sanitizeRedirect (CWE-601 open-redirect defense)', () => {
+  it('keeps a same-origin relative path (with query/hash)', async () => {
+    const { sanitizeRedirect } = await import('./auth-store')
+    expect(sanitizeRedirect('/subjects')).toBe('/subjects')
+    expect(sanitizeRedirect('/review?deck=1#top')).toBe('/review?deck=1#top')
+  })
+
+  it('rejects anything that could navigate cross-origin → /', async () => {
+    const { sanitizeRedirect } = await import('./auth-store')
+    expect(sanitizeRedirect('https://example.com/evil-phish')).toBe('/')
+    expect(sanitizeRedirect('//example.com')).toBe('/') // protocol-relative
+    expect(sanitizeRedirect('/\\example.com')).toBe('/') // backslash trick
+    expect(sanitizeRedirect('http://x')).toBe('/')
+    expect(sanitizeRedirect('javascript:alert(1)')).toBe('/')
+    expect(sanitizeRedirect('subjects')).toBe('/') // no leading slash
+    expect(sanitizeRedirect(undefined)).toBe('/')
+    expect(sanitizeRedirect(null)).toBe('/')
+    expect(sanitizeRedirect('')).toBe('/')
+  })
 })
