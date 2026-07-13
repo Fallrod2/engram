@@ -11,6 +11,15 @@ export const id = () =>
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID())
 
+/**
+ * Owner of the row (multi-tenant). Holds the `sub` claim of the Supabase JWT
+ * (a uuid in prod, a plain string in dev/test). Deliberately NOT a physical FK
+ * to `auth.users`: the PGlite database used in tests has no Supabase `auth`
+ * schema. Isolation is enforced in the application layer (every query is scoped)
+ * with RLS as documented defence-in-depth (see migration 0004).
+ */
+export const userId = () => text('user_id').notNull()
+
 /** `created_at` timestamptz, set on insert. Drizzle type stays `Date`. */
 export const createdAt = () =>
   timestamp('created_at', { withTimezone: true, mode: 'date' })

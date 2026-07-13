@@ -1,5 +1,5 @@
 import { pgTable, text, timestamp, index, primaryKey } from 'drizzle-orm/pg-core'
-import { id, createdAt, updatedAt } from './columns'
+import { id, userId, createdAt, updatedAt } from './columns'
 import { subject } from './subject'
 
 /**
@@ -11,13 +11,17 @@ export const exam = pgTable(
   'exam',
   {
     id: id(),
+    // Own user_id (spec §1.1): exam is a root with no subject FK, so it must
+    // carry its own owner. exam_subject (junction) has none — its ownership is
+    // guaranteed by the application check that both exam AND subject belong here.
+    userId: userId(),
     title: text('title').notNull(),
     date: timestamp('date', { withTimezone: true, mode: 'date' }).notNull(),
     notes: text('notes'), // nullable
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index('exam_date_idx').on(t.date)],
+  (t) => [index('exam_date_idx').on(t.date), index('exam_user_date_idx').on(t.userId, t.date)],
 )
 
 /** M2M junction between `exam` and `subject` (append-only). */

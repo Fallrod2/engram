@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { pgTable, text, integer, jsonb, index, check } from 'drizzle-orm/pg-core'
 import type { GenerationItem } from '@engram/shared'
-import { id, createdAt, updatedAt } from './columns'
+import { id, userId, createdAt, updatedAt } from './columns'
 import { note } from './note'
 import { deck } from './deck'
 
@@ -15,6 +15,7 @@ export const generation = pgTable(
   'generation',
   {
     id: id(),
+    userId: userId(),
     noteId: text('note_id')
       .notNull()
       .references(() => note.id, { onDelete: 'cascade' }),
@@ -36,6 +37,7 @@ export const generation = pgTable(
   (t) => [
     index('generation_note_idx').on(t.noteId),
     index('generation_deck_idx').on(t.deckId),
+    index('generation_user_idx').on(t.userId),
     check('generation_kind_ck', sql`${t.kind} in ('cards','quiz')`),
     check('generation_status_ck', sql`${t.status} in ('pending','succeeded','failed')`),
     // Nullable (historical rows are null); otherwise one of the 5 providers.

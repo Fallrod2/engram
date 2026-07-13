@@ -8,7 +8,7 @@ import {
   index,
   check,
 } from 'drizzle-orm/pg-core'
-import { id, createdAt, updatedAt } from './columns'
+import { id, userId, createdAt, updatedAt } from './columns'
 import { deck } from './deck'
 
 /**
@@ -21,6 +21,7 @@ export const card = pgTable(
   'card',
   {
     id: id(),
+    userId: userId(),
     deckId: text('deck_id')
       .notNull()
       .references(() => deck.id, { onDelete: 'cascade' }),
@@ -44,7 +45,9 @@ export const card = pgTable(
   },
   (t) => [
     index('card_deck_idx').on(t.deckId),
-    index('card_due_idx').on(t.due),
+    // The due-queue scan is now scoped by user first, so the lead column is user_id
+    // (replaces the old card_due_idx on due alone).
+    index('card_user_due_idx').on(t.userId, t.due),
     index('card_deck_due_idx').on(t.deckId, t.due),
     index('card_state_idx').on(t.state),
     check('card_state_ck', sql`${t.state} in (0,1,2,3)`),
