@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { pgTable, text, index, check } from 'drizzle-orm/pg-core'
-import { id, createdAt, updatedAt } from './columns'
+import { id, userId, createdAt, updatedAt } from './columns'
 import { subject } from './subject'
 
 /**
@@ -12,6 +12,9 @@ export const note = pgTable(
   'note',
   {
     id: id(),
+    // Own user_id (spec §1.1): subject_id is nullable/set-null, so a note must
+    // carry its own owner to survive its subject being removed.
+    userId: userId(),
     subjectId: text('subject_id').references(() => subject.id, {
       onDelete: 'set null',
     }), // nullable
@@ -24,6 +27,7 @@ export const note = pgTable(
   },
   (t) => [
     index('note_subject_idx').on(t.subjectId),
+    index('note_user_idx').on(t.userId),
     check('note_source_type_ck', sql`${t.sourceType} in ('md','pdf','image')`),
   ],
 )

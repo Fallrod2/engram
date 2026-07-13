@@ -8,6 +8,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
+import { requireUserId } from '../http/identity'
 import { studyPlan, studyToday } from '../services/study-plan.service'
 
 export const studyPlanRouter = new Hono()
@@ -18,7 +19,7 @@ studyPlanRouter.get('/', zValidator('query', studyPlanQuerySchema), async (c) =>
   return ok(
     c,
     studyPlanResponseSchema,
-    await studyPlan(db, {
+    await studyPlan(db, requireUserId(c), {
       from: q.from,
       to: q.to,
       now,
@@ -30,5 +31,5 @@ studyPlanRouter.get('/', zValidator('query', studyPlanQuerySchema), async (c) =>
 studyPlanRouter.get('/today', zValidator('query', studyTodayQuerySchema), async (c) => {
   const q = c.req.valid('query')
   const now = q.now ? new Date(q.now) : new Date()
-  return ok(c, studyTodayResponseSchema, await studyToday(db, now))
+  return ok(c, studyTodayResponseSchema, await studyToday(db, requireUserId(c), now))
 })

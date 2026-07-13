@@ -14,6 +14,16 @@ import {
 } from '../db/schema'
 import { fsrsCardToColumns } from '../db/mappers'
 import { localMidnight } from '../lib/day'
+import { DEFAULT_DEV_USER_ID } from '../auth/config'
+
+/**
+ * Default owner for seeded rows. MUST match the identity the auth middleware
+ * poses when the gate is not enforced (bun:test runs with no auth env), so that
+ * `app.request(...)` route specs — scoped to that same id — see the seeded data
+ * (critique amendment 2). Isolation specs override `userId` per seed to create
+ * distinct tenants.
+ */
+export { DEFAULT_DEV_USER_ID }
 
 /**
  * Shared async seeding/reset helpers for the integration specs. All functions
@@ -39,11 +49,19 @@ export async function resetDb(db: DB): Promise<void> {
 
 export async function seedSubject(
   db: DB,
-  o: { name?: string; color?: string; icon?: string; archived?: boolean; position?: number } = {},
+  o: {
+    name?: string
+    color?: string
+    icon?: string
+    archived?: boolean
+    position?: number
+    userId?: string
+  } = {},
 ) {
   const [row] = await db
     .insert(subject)
     .values({
+      userId: o.userId ?? DEFAULT_DEV_USER_ID,
       name: o.name ?? 'Subject',
       color: o.color ?? '#3b82f6',
       icon: o.icon ?? 'book',
@@ -57,11 +75,12 @@ export async function seedSubject(
 export async function seedDeck(
   db: DB,
   subjectId: string,
-  o: { name?: string; description?: string; position?: number } = {},
+  o: { name?: string; description?: string; position?: number; userId?: string } = {},
 ) {
   const [row] = await db
     .insert(deck)
     .values({
+      userId: o.userId ?? DEFAULT_DEV_USER_ID,
       subjectId,
       name: o.name ?? 'Deck',
       ...(o.description !== undefined ? { description: o.description } : {}),
@@ -74,12 +93,13 @@ export async function seedDeck(
 export async function seedCard(
   db: DB,
   deckId: string,
-  o: { front?: string; back?: string; due?: Date } = {},
+  o: { front?: string; back?: string; due?: Date; userId?: string } = {},
 ) {
   const cols = fsrsCardToColumns(createEmptyCard(new Date()))
   const [row] = await db
     .insert(card)
     .values({
+      userId: o.userId ?? DEFAULT_DEV_USER_ID,
       deckId,
       front: o.front ?? '# Q',
       back: o.back ?? '# A',
@@ -99,12 +119,19 @@ export async function seedCard(
 export async function seedReviewLog(
   db: DB,
   cardId: string,
-  o: { rating?: number; state?: number; review?: Date; durationMs?: number | null } = {},
+  o: {
+    rating?: number
+    state?: number
+    review?: Date
+    durationMs?: number | null
+    userId?: string
+  } = {},
 ) {
   const when = o.review ?? new Date()
   const [row] = await db
     .insert(reviewLog)
     .values({
+      userId: o.userId ?? DEFAULT_DEV_USER_ID,
       cardId,
       rating: o.rating ?? 3,
       state: o.state ?? 2, // Review by default
@@ -125,12 +152,13 @@ export async function seedReviewLog(
 export async function seedExam(
   db: DB,
   subjectIds: string[],
-  o: { title?: string; date?: Date; notes?: string } = {},
+  o: { title?: string; date?: Date; notes?: string; userId?: string } = {},
 ) {
   const now = new Date()
   const [row] = await db
     .insert(exam)
     .values({
+      userId: o.userId ?? DEFAULT_DEV_USER_ID,
       title: o.title ?? 'Exam',
       date: o.date ?? localMidnight(now.getFullYear(), now.getMonth(), now.getDate()),
       ...(o.notes !== undefined ? { notes: o.notes } : {}),

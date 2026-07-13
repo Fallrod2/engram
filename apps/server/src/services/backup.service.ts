@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { eq, inArray } from 'drizzle-orm'
 import { backupSchema, BACKUP_VERSION, type Backup, type BackupImportResult } from '@engram/shared'
 import type { DB } from '../db/client'
 import { card, deck, exam, examSubject, generation, note, reviewLog, subject } from '../db/schema'
@@ -42,17 +43,22 @@ function appVersion(): string {
  * serialized with ISO timestamps; `generation.items` (jsonb) passes through
  * verbatim. The caller validates the result against `backupSchema`.
  */
-export async function exportBackup(db: DB): Promise<Backup> {
+export async function exportBackup(db: DB, userId: string): Promise<Backup> {
   const [subjects, decks, cards, reviewLogs, notes, generations, exams, examSubjects] =
     await Promise.all([
-      db.select().from(subject),
-      db.select().from(deck),
-      db.select().from(card),
-      db.select().from(reviewLog),
-      db.select().from(note),
-      db.select().from(generation),
-      db.select().from(exam),
-      db.select().from(examSubject),
+      db.select().from(subject).where(eq(subject.userId, userId)),
+      db.select().from(deck).where(eq(deck.userId, userId)),
+      db.select().from(card).where(eq(card.userId, userId)),
+      db.select().from(reviewLog).where(eq(reviewLog.userId, userId)),
+      db.select().from(note).where(eq(note.userId, userId)),
+      db.select().from(generation).where(eq(generation.userId, userId)),
+      db.select().from(exam).where(eq(exam.userId, userId)),
+      // exam_subject has no user_id — scope it via a join on the owning exam.
+      db
+        .select({ examId: examSubject.examId, subjectId: examSubject.subjectId })
+        .from(examSubject)
+        .innerJoin(exam, eq(exam.id, examSubject.examId))
+        .where(eq(exam.userId, userId)),
     ])
 
   return {
@@ -155,12 +161,53 @@ export async function exportBackup(db: DB): Promise<Backup> {
 }
 
 /**
- * Restore a full dump, replacing ALL current data. Steps run in one
- * transaction: validate → guard version/schema → wipe (child→parent) →
- * reinsert (parent→child) with original ids and timestamps. Any failure rolls
- * back, so a bad backup never leaves the database half-restored.
+ * Assert every FK inside the file resolves to another row IN THE SAME FILE
+ * (spec §3 / critique amendment 7). Without this, a forged backup could attach
+ * one user's row to another user's parent: the physical DB FK would still pass
+ * (the parent row exists), silently corrupting the tenant boundary and letting a
+ * later cascade delete destroy the other user's data. We reject such a file with
+ * a 400 BEFORE wiping anything.
  */
-export async function importBackup(db: DB, raw: unknown): Promise<BackupImportResult> {
+function assertForeignKeyClosure(t: Backup['tables']): void {
+  const subjectIds = new Set(t.subject.map((r) => r.id))
+  const deckIds = new Set(t.deck.map((r) => r.id))
+  const cardIds = new Set(t.card.map((r) => r.id))
+  const noteIds = new Set(t.note.map((r) => r.id))
+  const examIds = new Set(t.exam.map((r) => r.id))
+  const bad = (msg: string): never => {
+    throw new ValidationError(`backup import failed: ${msg}`)
+  }
+  for (const r of t.deck)
+    if (!subjectIds.has(r.subjectId)) bad('deck references an unknown subject')
+  for (const r of t.card) if (!deckIds.has(r.deckId)) bad('card references an unknown deck')
+  for (const r of t.reviewLog)
+    if (!cardIds.has(r.cardId)) bad('review_log references an unknown card')
+  for (const r of t.note)
+    if (r.subjectId !== null && !subjectIds.has(r.subjectId))
+      bad('note references an unknown subject')
+  for (const r of t.generation) {
+    if (!noteIds.has(r.noteId)) bad('generation references an unknown note')
+    if (r.deckId !== null && !deckIds.has(r.deckId)) bad('generation references an unknown deck')
+  }
+  for (const r of t.examSubject) {
+    if (!examIds.has(r.examId)) bad('exam_subject references an unknown exam')
+    if (!subjectIds.has(r.subjectId)) bad('exam_subject references an unknown subject')
+  }
+}
+
+/**
+ * Restore a full dump for `userId`, replacing that user's data ONLY. Steps run
+ * in one transaction: validate → guard version/schema → verify FK closure →
+ * wipe (child→parent, scoped) → reinsert (parent→child) with original ids and
+ * timestamps but the `userId` FORCED server-side (never read from the file — the
+ * backup schemas carry no user_id). Any failure rolls back, so a bad backup
+ * never leaves the database half-restored.
+ */
+export async function importBackup(
+  db: DB,
+  userId: string,
+  raw: unknown,
+): Promise<BackupImportResult> {
   const parsed = backupSchema.safeParse(raw)
   if (!parsed.success) {
     throw new ValidationError('invalid backup file', parsed.error.flatten())
@@ -175,23 +222,28 @@ export async function importBackup(db: DB, raw: unknown): Promise<BackupImportRe
   }
 
   const t = dump.tables
+  assertForeignKeyClosure(t)
+  // Subquery of THIS user's exam ids — used to scope the junction wipe (it has
+  // no user_id of its own).
+  const myExamIds = db.select({ id: exam.id }).from(exam).where(eq(exam.userId, userId))
   try {
     return await db.transaction(async (tx) => {
-      // Wipe child → parent (foreign keys are enforced).
-      await tx.delete(examSubject)
-      await tx.delete(exam)
-      await tx.delete(reviewLog)
-      await tx.delete(card)
-      await tx.delete(generation)
-      await tx.delete(note)
-      await tx.delete(deck)
-      await tx.delete(subject)
+      // Wipe child → parent, SCOPED to this user (foreign keys are enforced).
+      await tx.delete(examSubject).where(inArray(examSubject.examId, myExamIds))
+      await tx.delete(exam).where(eq(exam.userId, userId))
+      await tx.delete(reviewLog).where(eq(reviewLog.userId, userId))
+      await tx.delete(card).where(eq(card.userId, userId))
+      await tx.delete(generation).where(eq(generation.userId, userId))
+      await tx.delete(note).where(eq(note.userId, userId))
+      await tx.delete(deck).where(eq(deck.userId, userId))
+      await tx.delete(subject).where(eq(subject.userId, userId))
 
       // Reinsert parent → child, preserving ids and timestamps verbatim.
       if (t.subject.length) {
         await tx.insert(subject).values(
           t.subject.map((r) => ({
             id: r.id,
+            userId,
             name: r.name,
             color: r.color,
             icon: r.icon,
@@ -206,6 +258,7 @@ export async function importBackup(db: DB, raw: unknown): Promise<BackupImportRe
         await tx.insert(deck).values(
           t.deck.map((r) => ({
             id: r.id,
+            userId,
             subjectId: r.subjectId,
             name: r.name,
             description: r.description,
@@ -219,6 +272,7 @@ export async function importBackup(db: DB, raw: unknown): Promise<BackupImportRe
         await tx.insert(card).values(
           t.card.map((r) => ({
             id: r.id,
+            userId,
             deckId: r.deckId,
             front: r.front,
             back: r.back,
@@ -241,6 +295,7 @@ export async function importBackup(db: DB, raw: unknown): Promise<BackupImportRe
         await tx.insert(reviewLog).values(
           t.reviewLog.map((r) => ({
             id: r.id,
+            userId,
             cardId: r.cardId,
             rating: r.rating,
             state: r.state,
@@ -261,6 +316,7 @@ export async function importBackup(db: DB, raw: unknown): Promise<BackupImportRe
         await tx.insert(note).values(
           t.note.map((r) => ({
             id: r.id,
+            userId,
             subjectId: r.subjectId,
             title: r.title,
             sourceType: r.sourceType,
@@ -275,6 +331,7 @@ export async function importBackup(db: DB, raw: unknown): Promise<BackupImportRe
         await tx.insert(generation).values(
           t.generation.map((r) => ({
             id: r.id,
+            userId,
             noteId: r.noteId,
             deckId: r.deckId,
             kind: r.kind,
@@ -293,6 +350,7 @@ export async function importBackup(db: DB, raw: unknown): Promise<BackupImportRe
         await tx.insert(exam).values(
           t.exam.map((r) => ({
             id: r.id,
+            userId,
             title: r.title,
             date: new Date(r.date),
             notes: r.notes,

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import type { GenerationItem } from '@engram/shared'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import { card, generation, note } from '../db/schema'
 import { ConflictError, NotFoundError, ValidationError } from '../http/errors'
 import { seedDeck, seedSubject } from '../test-support/harness'
@@ -42,7 +43,7 @@ const oneCardGen: CardGenerator = {
 async function seedNote(content: string): Promise<string> {
   const [row] = await db
     .insert(note)
-    .values({ title: 'Note', sourceType: 'md', content })
+    .values({ userId: U, title: 'Note', sourceType: 'md', content })
     .returning()
   return row!.id
 }
@@ -56,6 +57,7 @@ async function seedGeneration(o: {
   const [row] = await db
     .insert(generation)
     .values({
+      userId: U,
       noteId: o.noteId,
       kind: 'cards',
       model: 'claude-sonnet-4-6',
@@ -70,7 +72,7 @@ async function seedGeneration(o: {
 describe('startGeneration', () => {
   it('creates a pending row with items [] and returns the DTO', async () => {
     const noteId = await seedNote('some content')
-    const dto = await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
+    const dto = await startGeneration(db, U, { noteId, kind: 'cards' }, testCfg, oneCardGen)
     expect(dto.status).toBe('pending')
     expect(dto.items).toEqual([])
     expect(dto.model).toBe('claude-sonnet-4-6')
@@ -80,7 +82,7 @@ describe('startGeneration', () => {
 
   it('unknown noteId → NotFoundError', async () => {
     await expect(
-      startGeneration(db, { noteId: 'nope', kind: 'cards' }, testCfg, oneCardGen),
+      startGeneration(db, U, { noteId: 'nope', kind: 'cards' }, testCfg, oneCardGen),
     ).rejects.toThrow(NotFoundError)
   })
 
@@ -88,7 +90,7 @@ describe('startGeneration', () => {
     const noteId = await seedNote('content')
     const deck = await seedDeck(db, (await seedSubject(db, { archived: true })).id)
     await expect(
-      startGeneration(db, { noteId, kind: 'cards', deckId: deck.id }, testCfg, oneCardGen),
+      startGeneration(db, U, { noteId, kind: 'cards', deckId: deck.id }, testCfg, oneCardGen),
     ).rejects.toThrow(ConflictError)
   })
 })
@@ -97,8 +99,8 @@ describe('runGenerationJob', () => {
   it('multi-chunk note → aggregated items, summed tokens, status succeeded', async () => {
     const noteId = await seedNote(`${'A'.repeat(8000)}\n\n${'B'.repeat(8000)}`)
     const genId = await seedGeneration({ noteId })
-    await runGenerationJob(db, genId, oneCardGen)
-    const row = await requireGenerationRow(db, genId)
+    await runGenerationJob(db, U, genId, oneCardGen)
+    const row = await requireGenerationRow(db, U, genId)
     expect(row.status).toBe('succeeded')
     expect(row.items).toHaveLength(2) // one card per chunk, two chunks
     expect(row.promptTokens).toBe(20)
@@ -114,8 +116,8 @@ describe('runGenerationJob', () => {
         throw new Error('boom')
       },
     }
-    await runGenerationJob(db, genId, boomGen)
-    const row = await requireGenerationRow(db, genId)
+    await runGenerationJob(db, U, genId, boomGen)
+    const row = await requireGenerationRow(db, U, genId)
     expect(row.status).toBe('failed')
     expect(row.error).toContain('boom')
   })
@@ -128,15 +130,15 @@ describe('runGenerationJob', () => {
         return Promise.reject(new Error('The operation was aborted due to timeout'))
       },
     }
-    await runGenerationJob(db, genId, timeoutGen)
-    expect((await requireGenerationRow(db, genId)).status).toBe('failed')
+    await runGenerationJob(db, U, genId, timeoutGen)
+    expect((await requireGenerationRow(db, U, genId)).status).toBe('failed')
   })
 
   it('idempotent — a second run on a succeeded generation is a no-op', async () => {
     const noteId = await seedNote('content')
     const genId = await seedGeneration({ noteId })
-    await runGenerationJob(db, genId, oneCardGen)
-    const first = (await requireGenerationRow(db, genId)).items
+    await runGenerationJob(db, U, genId, oneCardGen)
+    const first = (await requireGenerationRow(db, U, genId)).items
     // A generator that would add many cards — must not run.
     const manyGen: CardGenerator = {
       async generate() {
@@ -147,8 +149,8 @@ describe('runGenerationJob', () => {
         }
       },
     }
-    await runGenerationJob(db, genId, manyGen)
-    expect((await requireGenerationRow(db, genId)).items).toEqual(first)
+    await runGenerationJob(db, U, genId, manyGen)
+    expect((await requireGenerationRow(db, U, genId)).items).toEqual(first)
   })
 
   it('respects MAX_TOTAL_ITEMS (global cap)', async () => {
@@ -163,9 +165,9 @@ describe('runGenerationJob', () => {
         }
       },
     }
-    await runGenerationJob(db, genId, bulkGen)
+    await runGenerationJob(db, U, genId, bulkGen)
     // Two chunks × 60 = 120 proposed, capped at 100.
-    expect((await requireGenerationRow(db, genId)).items).toHaveLength(100)
+    expect((await requireGenerationRow(db, U, genId)).items).toHaveLength(100)
   })
 })
 
@@ -185,7 +187,7 @@ describe('resolveGeneration', () => {
 
   it('accepted/edited insert fresh cards; rejected/pending insert nothing', async () => {
     const { genId, deckId } = await seedSucceeded()
-    const dto = await resolveGeneration(db, genId, {
+    const dto = await resolveGeneration(db, U, genId, {
       items: [
         { id: 'i0', front: 'Q0', back: 'A0', status: 'accepted' },
         { id: 'i1', front: 'edited front', back: 'edited back', status: 'edited' },
@@ -208,7 +210,7 @@ describe('resolveGeneration', () => {
 
   it('edited uses the client-modified front/back', async () => {
     const { genId, deckId } = await seedSucceeded()
-    await resolveGeneration(db, genId, {
+    await resolveGeneration(db, U, genId, {
       items: [{ id: 'i1', front: 'NEW FRONT', back: 'NEW BACK', status: 'edited' }],
     })
     const cards = await db
@@ -223,8 +225,8 @@ describe('resolveGeneration', () => {
   it('idempotent — replaying does not recreate cards', async () => {
     const { genId, deckId } = await seedSucceeded()
     const decision = { items: [{ id: 'i0', front: 'Q0', back: 'A0', status: 'accepted' as const }] }
-    await resolveGeneration(db, genId, decision)
-    await resolveGeneration(db, genId, decision)
+    await resolveGeneration(db, U, genId, decision)
+    await resolveGeneration(db, U, genId, decision)
     const cards = await db
       .select()
       .from(card)
@@ -234,10 +236,10 @@ describe('resolveGeneration', () => {
 
   it('an already-inserted item (cardId) stays frozen even if re-sent as rejected', async () => {
     const { genId, deckId } = await seedSucceeded()
-    await resolveGeneration(db, genId, {
+    await resolveGeneration(db, U, genId, {
       items: [{ id: 'i0', front: 'Q0', back: 'A0', status: 'accepted' }],
     })
-    const dto = await resolveGeneration(db, genId, {
+    const dto = await resolveGeneration(db, U, genId, {
       items: [{ id: 'i0', front: 'Q0', back: 'A0', status: 'rejected' }],
     })
     const item = dto.items.find((i) => i.id === 'i0')
@@ -255,13 +257,13 @@ describe('resolveGeneration', () => {
   it('status !== succeeded → ConflictError (409)', async () => {
     const noteId = await seedNote('content')
     const genId = await seedGeneration({ noteId, status: 'pending' })
-    await expect(resolveGeneration(db, genId, { items: [] })).rejects.toThrow(ConflictError)
+    await expect(resolveGeneration(db, U, genId, { items: [] })).rejects.toThrow(ConflictError)
   })
 
   it('unknown item id → ValidationError (400)', async () => {
     const { genId } = await seedSucceeded()
     await expect(
-      resolveGeneration(db, genId, {
+      resolveGeneration(db, U, genId, {
         items: [{ id: 'nope', front: 'x', back: 'y', status: 'accepted' }],
       }),
     ).rejects.toThrow(ValidationError)
@@ -270,7 +272,7 @@ describe('resolveGeneration', () => {
   it('accepting with no target deck (deckId null) → ConflictError (409)', async () => {
     const { genId } = await seedSucceeded(false)
     await expect(
-      resolveGeneration(db, genId, {
+      resolveGeneration(db, U, genId, {
         items: [{ id: 'i0', front: 'Q0', back: 'A0', status: 'accepted' }],
       }),
     ).rejects.toThrow(ConflictError)
@@ -278,7 +280,7 @@ describe('resolveGeneration', () => {
 
   it('inserted cards carry a fresh FSRS state (state 0, reps 0)', async () => {
     const { genId, deckId } = await seedSucceeded()
-    await resolveGeneration(db, genId, {
+    await resolveGeneration(db, U, genId, {
       items: [{ id: 'i0', front: 'Q0', back: 'A0', status: 'accepted' }],
     })
     const [row] = await db

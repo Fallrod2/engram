@@ -22,6 +22,7 @@ import {
   examToDto,
 } from './dto'
 import { fsrsCardToColumns, fsrsLogToRow, toFsrsCard } from './mappers'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
 let t: TestDb
 
@@ -36,19 +37,20 @@ describe('row → DTO conforms to shared Zod schemas (anti-drift)', () => {
   it('parses a full graph of DTOs', async () => {
     const [s] = await t.db
       .insert(subject)
-      .values({ name: 'Théorie des langages', color: '#3B82F6', icon: 'book-open' })
+      .values({ userId: U, name: 'Théorie des langages', color: '#3B82F6', icon: 'book-open' })
       .returning()
     expect(subjectSchema.parse(subjectToDto(s!))).toBeTruthy()
 
     const [d] = await t.db
       .insert(deck)
-      .values({ subjectId: s!.id, name: 'Automates', description: null })
+      .values({ userId: U, subjectId: s!.id, name: 'Automates', description: null })
       .returning()
     expect(deckSchema.parse(deckToDto(d!))).toBeTruthy()
 
     const [c] = await t.db
       .insert(card)
       .values({
+        userId: U,
         deckId: d!.id,
         front: '# Q',
         back: '# A',
@@ -60,13 +62,14 @@ describe('row → DTO conforms to shared Zod schemas (anti-drift)', () => {
     const rec = fsrs().next(toFsrsCard(c!), new Date(), Rating.Good)
     const [l] = await t.db
       .insert(reviewLog)
-      .values(fsrsLogToRow(c!.id, rec.log, 1500))
+      .values({ ...fsrsLogToRow(c!.id, rec.log, 1500), userId: U })
       .returning()
     expect(reviewLogSchema.parse(reviewLogToDto(l!))).toBeTruthy()
 
     const [n] = await t.db
       .insert(note)
       .values({
+        userId: U,
         subjectId: s!.id,
         title: 'Chapitre 1',
         sourceType: 'pdf',
@@ -83,6 +86,7 @@ describe('row → DTO conforms to shared Zod schemas (anti-drift)', () => {
     const [g] = await t.db
       .insert(generation)
       .values({
+        userId: U,
         noteId: n!.id,
         deckId: d!.id,
         kind: 'cards',
@@ -100,7 +104,7 @@ describe('row → DTO conforms to shared Zod schemas (anti-drift)', () => {
 
     const [e] = await t.db
       .insert(exam)
-      .values({ title: 'Partiel', date: new Date(2026, 6, 20), notes: null })
+      .values({ userId: U, title: 'Partiel', date: new Date(2026, 6, 20), notes: null })
       .returning()
     await t.db.insert(examSubject).values({ examId: e!.id, subjectId: s!.id })
     expect(examSchema.parse(examToDto(e!, [s!.id]))).toBeTruthy()
@@ -109,7 +113,7 @@ describe('row → DTO conforms to shared Zod schemas (anti-drift)', () => {
   it('nullable subject on note DTO parses', async () => {
     const [n] = await t.db
       .insert(note)
-      .values({ title: 'Orpheline', sourceType: 'md', content: 'x' })
+      .values({ userId: U, title: 'Orpheline', sourceType: 'md', content: 'x' })
       .returning()
     const dto = noteToDto(n!)
     expect(dto.subjectId).toBeNull()
@@ -122,7 +126,7 @@ describe('migration produces the expected schema on a fresh DB', () => {
     // Valid value passes.
     const [row] = await t.db
       .insert(subject)
-      .values({ name: 'S', color: '#000000', icon: 'x' })
+      .values({ userId: U, name: 'S', color: '#000000', icon: 'x' })
       .returning()
     expect(row).toBeDefined()
 
@@ -130,7 +134,7 @@ describe('migration produces the expected schema on a fresh DB', () => {
     // so the guard is the runtime constraint, not the type system).
     let threw = false
     try {
-      await t.db.insert(note).values({ title: 'bad', sourceType: 'docx', content: 'x' })
+      await t.db.insert(note).values({ userId: U, title: 'bad', sourceType: 'docx', content: 'x' })
     } catch {
       threw = true
     }

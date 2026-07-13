@@ -10,6 +10,7 @@ import type {
   TestConnectionResponse,
   UpdateAiSettings,
 } from '@engram/shared'
+import { ApiError } from '@/lib/api'
 import { useT, type TFunction } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -184,7 +185,12 @@ function AiSettingsBody({
       { providers },
       {
         onSuccess: () => toast.success(t('settings.ai.saved')),
-        onError: () => toast.error(t('settings.ai.saveError')),
+        onError: (err) =>
+          toast.error(
+            err instanceof ApiError && err.code === 'forbidden'
+              ? t('settings.adminOnly')
+              : t('settings.ai.saveError'),
+          ),
       },
     )
   }
@@ -198,7 +204,12 @@ function AiSettingsBody({
           setKeyInput('')
           toast.success(t('settings.ai.keySaved'))
         },
-        onError: () => toast.error(t('settings.ai.saveError')),
+        onError: (err) =>
+          toast.error(
+            err instanceof ApiError && err.code === 'forbidden'
+              ? t('settings.adminOnly')
+              : t('settings.ai.saveError'),
+          ),
       },
     )
   }
@@ -446,7 +457,12 @@ export function OcrSettingsSection({
       { ocr: { model } },
       {
         onSuccess: () => toast.success(t('settings.ai.saved')),
-        onError: () => toast.error(t('settings.ai.saveError')),
+        onError: (err) =>
+          toast.error(
+            err instanceof ApiError && err.code === 'forbidden'
+              ? t('settings.adminOnly')
+              : t('settings.ai.saveError'),
+          ),
       },
     )
   }
@@ -460,7 +476,12 @@ export function OcrSettingsSection({
           setKeyInput('')
           toast.success(t('settings.ai.keySaved'))
         },
-        onError: () => toast.error(t('settings.ai.saveError')),
+        onError: (err) =>
+          toast.error(
+            err instanceof ApiError && err.code === 'forbidden'
+              ? t('settings.adminOnly')
+              : t('settings.ai.saveError'),
+          ),
       },
     )
   }

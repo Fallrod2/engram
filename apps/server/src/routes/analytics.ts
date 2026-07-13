@@ -16,6 +16,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
+import { requireUserId } from '../http/identity'
 import {
   deckSuccess,
   heatmap,
@@ -33,7 +34,7 @@ analyticsRouter.get('/heatmap', zValidator('query', heatmapQuerySchema), async (
   return ok(
     c,
     heatmapResponseSchema,
-    await heatmap(db, {
+    await heatmap(db, requireUserId(c), {
       now,
       ...(q.from !== undefined ? { from: q.from } : {}),
       ...(q.to !== undefined ? { to: q.to } : {}),
@@ -44,7 +45,7 @@ analyticsRouter.get('/heatmap', zValidator('query', heatmapQuerySchema), async (
 analyticsRouter.get('/streaks', zValidator('query', streaksQuerySchema), async (c) => {
   const q = c.req.valid('query')
   const now = q.now ? new Date(q.now) : new Date()
-  return ok(c, streaksResponseSchema, await streaks(db, now))
+  return ok(c, streaksResponseSchema, await streaks(db, requireUserId(c), now))
 })
 
 analyticsRouter.get('/study-time', zValidator('query', studyTimeQuerySchema), async (c) => {
@@ -53,7 +54,7 @@ analyticsRouter.get('/study-time', zValidator('query', studyTimeQuerySchema), as
   return ok(
     c,
     studyTimeResponseSchema,
-    await studyTime(db, {
+    await studyTime(db, requireUserId(c), {
       now,
       granularity: q.granularity,
       ...(q.from !== undefined ? { from: q.from } : {}),
@@ -68,7 +69,7 @@ analyticsRouter.get('/review-volume', zValidator('query', reviewVolumeQuerySchem
   return ok(
     c,
     reviewVolumeResponseSchema,
-    await reviewVolume(db, {
+    await reviewVolume(db, requireUserId(c), {
       now,
       granularity: q.granularity,
       ...(q.from !== undefined ? { from: q.from } : {}),
@@ -82,7 +83,7 @@ analyticsRouter.get('/retention', zValidator('query', retentionQuerySchema), asy
   return ok(
     c,
     retentionResponseSchema,
-    await retention(db, {
+    await retention(db, requireUserId(c), {
       ...(q.from !== undefined ? { from: q.from } : {}),
       ...(q.to !== undefined ? { to: q.to } : {}),
     }),
@@ -94,7 +95,7 @@ analyticsRouter.get('/deck-success', zValidator('query', deckSuccessQuerySchema)
   return ok(
     c,
     deckSuccessResponseSchema,
-    await deckSuccess(db, {
+    await deckSuccess(db, requireUserId(c), {
       ...(q.from !== undefined ? { from: q.from } : {}),
       ...(q.to !== undefined ? { to: q.to } : {}),
     }),

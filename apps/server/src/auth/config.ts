@@ -13,6 +13,17 @@
  *   silently disable the gate.
  */
 
+/**
+ * Default owner id used for the dev/e2e/test identity when the gate is NOT
+ * enforced (bypass or unconfigured). Exported as the SINGLE source of truth so
+ * the auth middleware (its default `sub`) and the test harness seeds agree —
+ * otherwise seeds and scoped queries would use different ids and every list
+ * would come back empty (spec §2 / §6.1). Alex overrides it locally with
+ * `ENGRAM_DEV_USER_ID=<his Supabase uid>` so his live dashboard shows his data
+ * after the 0004 backfill.
+ */
+export const DEFAULT_DEV_USER_ID = 'dev-user'
+
 export interface AuthConfig {
   /** Reflected by `/api/health.authEnforced`; true iff the gate verifies JWTs. */
   enforced: boolean
@@ -24,6 +35,12 @@ export interface AuthConfig {
   supabaseUrl: string | undefined
   /** Shared secret — HS256 fallback for a future local login (not shipped). */
   jwtSecret: string | undefined
+  /** `sub` of the default identity posed when the gate is not enforced (§2). */
+  devUserId: string
+  /** `ENGRAM_ADMIN_USER_ID` — the only user allowed on admin routes (§3). */
+  adminUserId: string | undefined
+  /** `ENGRAM_DEMO_USER_ID` — the demo account, reset on each new login (§4). */
+  demoUserId: string | undefined
 }
 
 /** Pure: reads an env object, no network, no logging, never throws. */
@@ -40,5 +57,19 @@ export function resolveAuthConfig(env: Record<string, string | undefined>): Auth
     bypassActive,
     supabaseUrl,
     jwtSecret,
+    devUserId: env.ENGRAM_DEV_USER_ID || DEFAULT_DEV_USER_ID,
+    adminUserId: env.ENGRAM_ADMIN_USER_ID || undefined,
+    demoUserId: env.ENGRAM_DEMO_USER_ID || undefined,
   }
+}
+
+/**
+ * The user id that is allowed on admin-only routes (spec §3), or `undefined`
+ * when nobody is (→ fail-closed 403). Under bypass/dev the default identity is
+ * the admin, so everything works locally without extra env; in enforced prod it
+ * is strictly `ENGRAM_ADMIN_USER_ID` (absent → all admin routes 403).
+ */
+export function resolveAdminUserId(cfg: AuthConfig): string | undefined {
+  if (!cfg.enforced) return cfg.adminUserId ?? cfg.devUserId
+  return cfg.adminUserId
 }

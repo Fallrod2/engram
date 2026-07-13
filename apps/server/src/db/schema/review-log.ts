@@ -8,7 +8,7 @@ import {
   index,
   check,
 } from 'drizzle-orm/pg-core'
-import { id, createdAt } from './columns'
+import { id, userId, createdAt } from './columns'
 import { card } from './card'
 
 /**
@@ -25,6 +25,10 @@ export const reviewLog = pgTable(
   'review_log',
   {
     id: id(),
+    // Denormalized owner (spec §1.1): the four analytics scans (heatmap, streaks,
+    // studyTime, reviewVolume) read review_log WITHOUT joining card/deck/subject,
+    // so the row carries its own user_id to stay scopable with a single index.
+    userId: userId(),
     cardId: text('card_id')
       .notNull()
       .references(() => card.id, { onDelete: 'cascade' }),
@@ -49,6 +53,7 @@ export const reviewLog = pgTable(
     index('review_log_card_idx').on(t.cardId),
     index('review_log_review_idx').on(t.review),
     index('review_log_card_review_idx').on(t.cardId, t.review),
+    index('review_log_user_review_idx').on(t.userId, t.review),
     check('review_log_rating_ck', sql`${t.rating} between 0 and 4`),
     check('review_log_state_ck', sql`${t.state} in (0,1,2,3)`),
   ],

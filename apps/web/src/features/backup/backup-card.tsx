@@ -35,7 +35,12 @@ export function BackupCard() {
   const exportMutation = useMutation({
     mutationFn: downloadBackup,
     onSuccess: () => toast.success(t('settings.dataExportDone')),
-    onError: () => toast.error(t('settings.dataExportError')),
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError && err.code === 'forbidden'
+          ? t('settings.adminOnly')
+          : t('settings.dataExportError'),
+      ),
   })
 
   const importMutation = useMutation({
@@ -51,7 +56,13 @@ export function BackupCard() {
       )
     },
     onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : t('settings.dataImportError')),
+      toast.error(
+        err instanceof ApiError && err.code === 'forbidden'
+          ? t('settings.adminOnly')
+          : err instanceof ApiError
+            ? err.message
+            : t('settings.dataImportError'),
+      ),
     onSettled: () => setPendingFile(null),
   })
 

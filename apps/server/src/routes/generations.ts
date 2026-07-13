@@ -10,6 +10,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
+import { requireUserId } from '../http/identity'
 import { ServiceUnavailableError } from '../http/errors'
 import { resolveActiveProvider } from '../services/ai-config.service'
 import {
@@ -30,18 +31,23 @@ generationsRouter.post('/', zValidator('json', startGenerationSchema), async (c)
   if (!cfg) {
     throw new ServiceUnavailableError('AI generation unavailable: no provider configured')
   }
-  return ok(c, generationSchema, await startGeneration(db, c.req.valid('json'), cfg), 202)
+  return ok(
+    c,
+    generationSchema,
+    await startGeneration(db, requireUserId(c), c.req.valid('json'), cfg),
+    202,
+  )
 })
 
 // GET /api/generations — list, optional noteId filter.
 generationsRouter.get('/', zValidator('query', listGenerationsQuerySchema), async (c) => {
   const q = c.req.valid('query')
-  return ok(c, listGenerationsResponseSchema, await listGenerations(db, q.noteId))
+  return ok(c, listGenerationsResponseSchema, await listGenerations(db, requireUserId(c), q.noteId))
 })
 
 // GET /api/generations/:id — poll endpoint.
 generationsRouter.get('/:id', zValidator('param', idParamSchema), async (c) => {
-  return ok(c, generationSchema, await getGeneration(db, c.req.valid('param').id))
+  return ok(c, generationSchema, await getGeneration(db, requireUserId(c), c.req.valid('param').id))
 })
 
 // POST /api/generations/:id/resolve — per-card decisions + card insertion.
@@ -53,12 +59,12 @@ generationsRouter.post(
     return ok(
       c,
       generationSchema,
-      await resolveGeneration(db, c.req.valid('param').id, c.req.valid('json')),
+      await resolveGeneration(db, requireUserId(c), c.req.valid('param').id, c.req.valid('json')),
     )
   },
 )
 
 generationsRouter.delete('/:id', zValidator('param', idParamSchema), async (c) => {
-  await deleteGeneration(db, c.req.valid('param').id)
+  await deleteGeneration(db, requireUserId(c), c.req.valid('param').id)
   return c.body(null, 204)
 })

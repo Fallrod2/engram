@@ -1,0 +1,48 @@
+import type { MiddlewareHandler } from 'hono'
+import { sql } from 'drizzle-orm'
+import { db } from '../db/client'
+import { resolveAuthConfig } from '../auth/config'
+import { readDemoMarker, seedDemo, DEMO_NO_SESSION } from '../services/demo.service'
+
+/**
+ * Demo-account reset middleware (spec §4). Mounted after the auth gate and before
+ * the routers. When the authenticated user is the configured demo account and the
+ * token's `session_id` differs from the last one we seeded, it wipes the demo
+ * data and reseeds a fresh dataset — so each new demo login starts clean, but a
+ * long session never re-wipes on every request.
+ *
+ * - Demo disabled (`ENGRAM_DEMO_USER_ID` unset) → pure no-op, no DB hit.
+ * - No claims (e.g. `/api/health`, which returns before claims are set) → no-op.
+ * - Token without a `session_id` (HS256 test tokens) → treated as marker
+ *   `'no-session'`: seeded ONCE on the first pass, never re-wiped afterwards.
+ * - Concurrency: the reset runs inside a transaction holding a constant advisory
+ *   lock, and re-reads the marker under the lock, so two first-hits of the same
+ *   new session can never double-seed.
+ */
+
+/** Constant key for `pg_advisory_xact_lock` guarding the demo reset. */
+const DEMO_LOCK_KEY = 918273
+
+export function createDemoMiddleware(): MiddlewareHandler {
+  return async (c, next) => {
+    const demoUserId = resolveAuthConfig(process.env).demoUserId
+    if (!demoUserId) return next() // demo disabled → no-op (no DB round-trip)
+
+    const claims = c.get('authClaims')
+    if (!claims || claims.sub !== demoUserId) return next()
+
+    const sessionId = typeof claims.session_id === 'string' ? claims.session_id : null
+    const marker = sessionId ?? DEMO_NO_SESSION
+
+    // Fast path: already seeded for this session (one cheap read, no lock).
+    if ((await readDemoMarker(db)) === marker) return next()
+
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${DEMO_LOCK_KEY})`)
+      // Re-check under the lock: a racing request may have just seeded.
+      if ((await readDemoMarker(tx)) === marker) return
+      await seedDemo(tx, demoUserId, marker)
+    })
+    return next()
+  }
+}

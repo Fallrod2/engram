@@ -12,8 +12,13 @@ export interface QueueFilter {
 }
 
 /** Cards due at `now` (subject not archived), optionally filtered, plus the unpaged total. */
-export async function dueQueue(db: DB, f: QueueFilter): Promise<{ total: number; cards: Card[] }> {
+export async function dueQueue(
+  db: DB,
+  userId: string,
+  f: QueueFilter,
+): Promise<{ total: number; cards: Card[] }> {
   const where = and(
+    eq(card.userId, userId),
     lte(card.due, f.now),
     eq(subject.archived, false),
     f.deckId ? eq(card.deckId, f.deckId) : undefined,
@@ -40,15 +45,20 @@ export async function dueQueue(db: DB, f: QueueFilter): Promise<{ total: number;
 }
 
 /** Due counts per subject and per deck (archived subjects excluded, zeros kept). */
-export async function dueCounts(db: DB, now: Date): Promise<Omit<DueCounts, 'now'>> {
+export async function dueCounts(
+  db: DB,
+  userId: string,
+  now: Date,
+): Promise<Omit<DueCounts, 'now'>> {
   // `card` sits in the ON clause (with `card.due <= now`) so subjects/decks with
-  // no due card survive the left join with a null card.
+  // no due card survive the left join with a null card. Scope by `subject.user_id`
+  // (the enumeration root); deck/card are reached only through the owned subject.
   const rows = await db
     .select({ subjectId: subject.id, deckId: deck.id, cardId: card.id })
     .from(subject)
     .leftJoin(deck, eq(deck.subjectId, subject.id))
     .leftJoin(card, and(eq(card.deckId, deck.id), lte(card.due, now)))
-    .where(eq(subject.archived, false))
+    .where(and(eq(subject.userId, userId), eq(subject.archived, false)))
 
   const bySubjectMap = new Map<string, number>()
   const byDeckMap = new Map<string, { deckId: string; subjectId: string; dueCount: number }>()

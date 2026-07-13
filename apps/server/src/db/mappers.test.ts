@@ -12,6 +12,7 @@ import {
 } from '@engram/shared'
 import type { card, subject, deck, note, generation, exam } from './schema'
 import { toFsrsCard, fsrsCardToColumns, fsrsLogToRow } from './mappers'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import {
   cardToDto,
   reviewLogToDto,
@@ -33,6 +34,7 @@ const now = new Date('2026-07-12T10:00:00.000Z')
 function makeCardRow(overrides: Partial<InferSelectModel<typeof card>> = {}) {
   const base: InferSelectModel<typeof card> = {
     id: 'card-1',
+    userId: U,
     deckId: 'deck-1',
     front: '# Q',
     back: '# A',
@@ -86,6 +88,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
   it('subject / deck / card / note DTOs parse', () => {
     const s: InferSelectModel<typeof subject> = {
       id: 's1',
+      userId: U,
       name: 'TL',
       color: '#3B82F6',
       icon: 'book-open',
@@ -98,6 +101,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
 
     const d: InferSelectModel<typeof deck> = {
       id: 'd1',
+      userId: U,
       subjectId: 's1',
       name: 'Automata',
       description: null,
@@ -111,6 +115,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
 
     const n: InferSelectModel<typeof note> = {
       id: 'n1',
+      userId: U,
       subjectId: null,
       title: 'Ch1',
       sourceType: 'md',
@@ -129,6 +134,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
       reviewLogSchema.parse(
         reviewLogToDto({
           id: 'l1',
+          userId: U,
           cardId: 'card-1',
           rating: rec.log.rating,
           state: rec.log.state,
@@ -148,6 +154,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
 
     const g: InferSelectModel<typeof generation> = {
       id: 'g1',
+      userId: U,
       noteId: 'n1',
       deckId: null,
       kind: 'cards',
@@ -165,6 +172,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
 
     const e: InferSelectModel<typeof exam> = {
       id: 'e1',
+      userId: U,
       title: 'Partiel',
       date: now,
       notes: null,

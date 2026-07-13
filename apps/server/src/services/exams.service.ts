@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import type { CreateExam, Exam, UpdateExam } from '@engram/shared'
 import type { DB } from '../db/client'
 import { exam, examSubject, subject } from '../db/schema'
@@ -12,17 +12,31 @@ function normalizeExamDate(iso: string): Date {
   return localMidnight(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
-/** Dedupe + assert every subject id exists (404 otherwise). Returns the deduped ids. */
-async function assertSubjectsExist(db: DB, subjectIds: string[]): Promise<string[]> {
+/**
+ * Dedupe + assert every subject id exists AND belongs to `userId` (404
+ * otherwise — never a 403). Returns the deduped ids. Scoping here is what stops
+ * a forged request from linking an exam to another user's subject.
+ */
+async function assertSubjectsExist(
+  db: DB,
+  userId: string,
+  subjectIds: string[],
+): Promise<string[]> {
   const ids = [...new Set(subjectIds)]
-  const found = await db.select({ id: subject.id }).from(subject).where(inArray(subject.id, ids))
+  const found = await db
+    .select({ id: subject.id })
+    .from(subject)
+    .where(and(inArray(subject.id, ids), eq(subject.userId, userId)))
   if (found.length !== ids.length) throw new NotFoundError('one or more subjects not found')
   return ids
 }
 
-/** Fetch a raw exam row or throw 404. Exported for cross-service guards. */
-export async function requireExamRow(db: DB, id: string) {
-  const [row] = await db.select().from(exam).where(eq(exam.id, id))
+/** Fetch a raw exam row (scoped to `userId`) or throw 404. Exported for guards. */
+export async function requireExamRow(db: DB, userId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(exam)
+    .where(and(eq(exam.id, id), eq(exam.userId, userId)))
   if (!row) throw new NotFoundError(`exam ${id} not found`)
   return row
 }
@@ -36,20 +50,27 @@ async function getSubjectIds(db: DB, examId: string): Promise<string[]> {
   return rows.map((r) => r.subjectId)
 }
 
-export async function listExams(db: DB, f: { subjectId?: string }): Promise<Exam[]> {
+export async function listExams(
+  db: DB,
+  userId: string,
+  f: { subjectId?: string },
+): Promise<Exam[]> {
   const rows = await db
     .select()
     .from(exam)
     .where(
       f.subjectId
-        ? inArray(
-            exam.id,
-            db
-              .select({ id: examSubject.examId })
-              .from(examSubject)
-              .where(eq(examSubject.subjectId, f.subjectId)),
+        ? and(
+            eq(exam.userId, userId),
+            inArray(
+              exam.id,
+              db
+                .select({ id: examSubject.examId })
+                .from(examSubject)
+                .where(eq(examSubject.subjectId, f.subjectId)),
+            ),
           )
-        : undefined,
+        : eq(exam.userId, userId),
     )
     .orderBy(asc(exam.date), asc(exam.createdAt))
 
@@ -74,17 +95,18 @@ export async function listExams(db: DB, f: { subjectId?: string }): Promise<Exam
   return rows.map((r) => examToDto(r, byExam.get(r.id) ?? []))
 }
 
-export async function getExam(db: DB, id: string): Promise<Exam> {
-  const row = await requireExamRow(db, id)
+export async function getExam(db: DB, userId: string, id: string): Promise<Exam> {
+  const row = await requireExamRow(db, userId, id)
   return examToDto(row, await getSubjectIds(db, id))
 }
 
-export async function createExam(db: DB, input: CreateExam): Promise<Exam> {
-  const ids = await assertSubjectsExist(db, input.subjectIds)
+export async function createExam(db: DB, userId: string, input: CreateExam): Promise<Exam> {
+  const ids = await assertSubjectsExist(db, userId, input.subjectIds)
   return db.transaction(async (tx) => {
     const [row] = await tx
       .insert(exam)
       .values({
+        userId,
         title: input.title,
         date: normalizeExamDate(input.date),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
@@ -97,19 +119,27 @@ export async function createExam(db: DB, input: CreateExam): Promise<Exam> {
   })
 }
 
-export async function updateExam(db: DB, id: string, patch: UpdateExam): Promise<Exam> {
-  await requireExamRow(db, id)
+export async function updateExam(
+  db: DB,
+  userId: string,
+  id: string,
+  patch: UpdateExam,
+): Promise<Exam> {
+  await requireExamRow(db, userId, id)
   const set = {
     ...(patch.title !== undefined ? { title: patch.title } : {}),
     ...(patch.date !== undefined ? { date: normalizeExamDate(patch.date) } : {}),
     ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
   }
   // Empty patch (both columns and subjectIds untouched): no-op, never `set({})`.
-  if (Object.keys(set).length === 0 && patch.subjectIds === undefined) return getExam(db, id)
+  if (Object.keys(set).length === 0 && patch.subjectIds === undefined)
+    return getExam(db, userId, id)
 
-  // Validate subject existence BEFORE mutating (404 rolls nothing back).
+  // Validate subject existence + ownership BEFORE mutating (404 rolls nothing back).
   const ids =
-    patch.subjectIds !== undefined ? await assertSubjectsExist(db, patch.subjectIds) : undefined
+    patch.subjectIds !== undefined
+      ? await assertSubjectsExist(db, userId, patch.subjectIds)
+      : undefined
 
   return db.transaction(async (tx) => {
     if (Object.keys(set).length > 0) {
@@ -140,7 +170,10 @@ export async function updateExam(db: DB, id: string, patch: UpdateExam): Promise
   })
 }
 
-export async function deleteExam(db: DB, id: string): Promise<void> {
-  const res = await db.delete(exam).where(eq(exam.id, id)).returning({ id: exam.id })
+export async function deleteExam(db: DB, userId: string, id: string): Promise<void> {
+  const res = await db
+    .delete(exam)
+    .where(and(eq(exam.id, id), eq(exam.userId, userId)))
+    .returning({ id: exam.id })
   if (res.length === 0) throw new NotFoundError(`exam ${id} not found`)
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { waitUntil } from '@vercel/functions'
 import type {
   Generation,
@@ -24,30 +24,41 @@ import type { ResolvedProviderConfig } from '../ai/providers/types'
 /** Global cap on the number of cards a single generation may propose. */
 const MAX_TOTAL_ITEMS = 100
 
-/** Fetch a raw generation row or throw 404. */
-export async function requireGenerationRow(db: DB, id: string) {
-  const [row] = await db.select().from(generation).where(eq(generation.id, id))
+/** Fetch a raw generation row (scoped to `userId`) or throw 404. */
+export async function requireGenerationRow(db: DB, userId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(generation)
+    .where(and(eq(generation.id, id), eq(generation.userId, userId)))
   if (!row) throw new NotFoundError(`generation ${id} not found`)
   return row
 }
 
-export async function listGenerations(db: DB, noteId?: string): Promise<ListGenerationsResponse> {
+export async function listGenerations(
+  db: DB,
+  userId: string,
+  noteId?: string,
+): Promise<ListGenerationsResponse> {
   const rows = await db
     .select()
     .from(generation)
-    .where(noteId ? eq(generation.noteId, noteId) : undefined)
+    .where(
+      noteId
+        ? and(eq(generation.userId, userId), eq(generation.noteId, noteId))
+        : eq(generation.userId, userId),
+    )
     .orderBy(desc(generation.createdAt))
   return { generations: rows.map(generationToDto) }
 }
 
-export async function getGeneration(db: DB, id: string): Promise<Generation> {
-  return generationToDto(await requireGenerationRow(db, id))
+export async function getGeneration(db: DB, userId: string, id: string): Promise<Generation> {
+  return generationToDto(await requireGenerationRow(db, userId, id))
 }
 
-export async function deleteGeneration(db: DB, id: string): Promise<void> {
+export async function deleteGeneration(db: DB, userId: string, id: string): Promise<void> {
   const res = await db
     .delete(generation)
-    .where(eq(generation.id, id))
+    .where(and(eq(generation.id, id), eq(generation.userId, userId)))
     .returning({ id: generation.id })
   if (res.length === 0) throw new NotFoundError(`generation ${id} not found`)
 }
@@ -62,20 +73,22 @@ export async function deleteGeneration(db: DB, id: string): Promise<void> {
  */
 export async function startGeneration(
   db: DB,
+  userId: string,
   input: StartGeneration,
   cfg: ResolvedProviderConfig,
   generator: CardGenerator = getCardGenerator(),
 ): Promise<Generation> {
-  await requireNoteRow(db, input.noteId)
+  await requireNoteRow(db, userId, input.noteId)
   if (input.deckId !== undefined) {
-    const deckRow = await requireDeckRow(db, input.deckId)
-    if ((await requireSubjectRow(db, deckRow.subjectId)).archived) {
+    const deckRow = await requireDeckRow(db, userId, input.deckId)
+    if ((await requireSubjectRow(db, userId, deckRow.subjectId)).archived) {
       throw new ConflictError('cannot generate into a deck under an archived subject')
     }
   }
   const [row] = await db
     .insert(generation)
     .values({
+      userId,
       noteId: input.noteId,
       kind: input.kind,
       model: cfg.model,
@@ -91,8 +104,9 @@ export async function startGeneration(
   // response is returned, so any work started after that never runs — register the
   // promise with `waitUntil` to keep the invocation alive until the job completes.
   // The env guard means the local/test behaviour is byte-for-byte unchanged:
-  // `waitUntil` is only ever invoked inside a real Vercel request context.
-  const job = runGenerationJob(db, row!.id, generator, cfg).catch(() => {
+  // `waitUntil` is only ever invoked inside a real Vercel request context. The
+  // captured `userId` flows to the job (no Hono context inside the job — spec §2).
+  const job = runGenerationJob(db, userId, row!.id, generator, cfg).catch(() => {
     /* runGenerationJob already captures everything; this is a belt. */
   })
   if (process.env.VERCEL === '1') waitUntil(job)
@@ -106,15 +120,19 @@ export async function startGeneration(
  */
 export async function runGenerationJob(
   db: DB,
+  userId: string,
   genId: string,
   generator: CardGenerator = getCardGenerator(),
   cfg?: ResolvedProviderConfig,
 ): Promise<void> {
-  const [gen] = await db.select().from(generation).where(eq(generation.id, genId))
+  const [gen] = await db
+    .select()
+    .from(generation)
+    .where(and(eq(generation.id, genId), eq(generation.userId, userId)))
   if (!gen || gen.status !== 'pending') return // idempotence: only ever replays pending
 
   try {
-    const note = await requireNoteRow(db, gen.noteId)
+    const note = await requireNoteRow(db, userId, gen.noteId)
     const chunks = chunkNote(note.content)
     const items: GenerationItem[] = []
     let promptTokens = 0
@@ -158,10 +176,11 @@ export async function runGenerationJob(
  */
 export async function resolveGeneration(
   db: DB,
+  userId: string,
   id: string,
   input: ResolveGeneration,
 ): Promise<Generation> {
-  const row = await requireGenerationRow(db, id)
+  const row = await requireGenerationRow(db, userId, id)
   if (row.status !== 'succeeded') {
     throw new ConflictError('generation not ready to resolve')
   }
@@ -190,8 +209,8 @@ export async function resolveGeneration(
   const deckId = row.deckId
   if (needsDeck) {
     if (deckId === null) throw new ConflictError('generation has no target deck')
-    const deckRow = await requireDeckRow(db, deckId)
-    if ((await requireSubjectRow(db, deckRow.subjectId)).archived) {
+    const deckRow = await requireDeckRow(db, userId, deckId)
+    if ((await requireSubjectRow(db, userId, deckRow.subjectId)).archived) {
       throw new ConflictError('cannot insert cards into a deck under an archived subject')
     }
   }
@@ -211,7 +230,7 @@ export async function resolveGeneration(
       }
       if (item.status === 'accepted' || item.status === 'edited') {
         // deckId is guaranteed non-null here (needsDeck validated above).
-        const cardId = await insertFreshCardRow(tx, {
+        const cardId = await insertFreshCardRow(tx, userId, {
           deckId: deckId as string,
           front: item.front,
           back: item.back,

@@ -26,6 +26,7 @@ import { card, reviewLog } from './schema'
 import { resetDb, seedCard, seedDeck, seedReviewLog, seedSubject } from '../test-support/harness'
 import { reviewCard } from '../services/review.service'
 import { retention, deckSuccess } from '../services/analytics.service'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
 // Never run destructive DDL against anything but the local Supabase database.
 const { hostname, port } = new URL(resolveDatabaseUrl())
@@ -58,7 +59,7 @@ describe('postgres-js: transaction rollback-on-throw', () => {
     const c = await seedCard(db, d.id)
     // reviewedAt far in the future → the guard throws inside the transaction.
     const future = new Date(Date.now() + 10 * 60_000)
-    await expect(reviewCard(db, c.id, { grade: 3, reviewedAt: future })).rejects.toThrow()
+    await expect(reviewCard(db, U, c.id, { grade: 3, reviewedAt: future })).rejects.toThrow()
     // The write inside the tx must have rolled back.
     expect(await db.select().from(reviewLog)).toHaveLength(0)
     // And the card itself is untouched (reps still 0).
@@ -74,6 +75,7 @@ describe('postgres-js: transaction rollback-on-throw', () => {
     await expect(
       db.transaction(async (tx) => {
         await tx.insert(reviewLog).values({
+          userId: U,
           cardId: c.id,
           rating: 3,
           state: 2,
@@ -100,7 +102,7 @@ describe('postgres-js: SUM(bigint) returns number (contract-safe)', () => {
     const c = await seedCard(db, d.id)
     for (let i = 0; i < 12; i++) await seedReviewLog(db, c.id, { state: 2, rating: 3 })
 
-    const res = await retention(db, {})
+    const res = await retention(db, U, {})
     const found = res.subjects.find((x) => x.subjectId === s.id)
     expect(found).toBeDefined()
     expect(typeof found!.recalled).toBe('number')
@@ -116,7 +118,7 @@ describe('postgres-js: SUM(bigint) returns number (contract-safe)', () => {
     const c = await seedCard(db, d.id)
     for (let i = 0; i < 12; i++) await seedReviewLog(db, c.id, { state: 2, rating: 3 })
 
-    const res = await deckSuccess(db, {})
+    const res = await deckSuccess(db, U, {})
     const found = res.decks.find((x) => x.deckId === d.id)
     expect(found).toBeDefined()
     expect(typeof found!.passed).toBe('number')

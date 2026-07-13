@@ -13,6 +13,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
+import { requireUserId } from '../http/identity'
 import { PayloadTooLargeError, ServiceUnavailableError, ValidationError } from '../http/errors'
 import { detectImageMedia, detectSourceType, extractText } from '../services/extract'
 import { createNote, deleteNote, getNote, listNotes, updateNote } from '../services/notes.service'
@@ -86,7 +87,7 @@ notesRouter.post('/upload', async (c) => {
     content: extracted,
     ...(meta.data.subjectId !== undefined ? { subjectId: meta.data.subjectId } : {}),
   }
-  return ok(c, noteSchema, await createNote(db, input), 201)
+  return ok(c, noteSchema, await createNote(db, requireUserId(c), input), 201)
 })
 
 // POST /api/notes/extract-image — photo OCR (OCR spec §2.4). One DOWNSCALED
@@ -149,17 +150,17 @@ notesRouter.post('/extract-image', async (c) => {
 
 // POST /api/notes — JSON (pasted text).
 notesRouter.post('/', zValidator('json', createNoteSchema), async (c) => {
-  return ok(c, noteSchema, await createNote(db, c.req.valid('json')), 201)
+  return ok(c, noteSchema, await createNote(db, requireUserId(c), c.req.valid('json')), 201)
 })
 
 // GET /api/notes — list, optional subjectId filter.
 notesRouter.get('/', zValidator('query', listNotesQuerySchema), async (c) => {
   const q = c.req.valid('query')
-  return ok(c, listNotesResponseSchema, await listNotes(db, q.subjectId))
+  return ok(c, listNotesResponseSchema, await listNotes(db, requireUserId(c), q.subjectId))
 })
 
 notesRouter.get('/:id', zValidator('param', idParamSchema), async (c) => {
-  return ok(c, noteSchema, await getNote(db, c.req.valid('param').id))
+  return ok(c, noteSchema, await getNote(db, requireUserId(c), c.req.valid('param').id))
 })
 
 notesRouter.patch(
@@ -167,11 +168,15 @@ notesRouter.patch(
   zValidator('param', idParamSchema),
   zValidator('json', updateNoteSchema),
   async (c) => {
-    return ok(c, noteSchema, await updateNote(db, c.req.valid('param').id, c.req.valid('json')))
+    return ok(
+      c,
+      noteSchema,
+      await updateNote(db, requireUserId(c), c.req.valid('param').id, c.req.valid('json')),
+    )
   },
 )
 
 notesRouter.delete('/:id', zValidator('param', idParamSchema), async (c) => {
-  await deleteNote(db, c.req.valid('param').id)
+  await deleteNote(db, requireUserId(c), c.req.valid('param').id)
   return c.body(null, 204)
 })

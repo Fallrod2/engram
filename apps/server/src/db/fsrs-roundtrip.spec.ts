@@ -6,6 +6,7 @@ import { createTestDb, type TestDb } from './test-db'
 import { subject, deck, card, reviewLog } from './schema'
 import { toFsrsCard, fsrsCardToColumns, fsrsLogToRow } from './mappers'
 import { reviewLogToDto } from './dto'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
 let t: TestDb
 
@@ -19,13 +20,17 @@ afterEach(async () => {
 async function seedCard(): Promise<string> {
   const [s] = await t.db
     .insert(subject)
-    .values({ name: 'TL', color: '#a1b2c3', icon: 'book-open' })
+    .values({ userId: U, name: 'TL', color: '#a1b2c3', icon: 'book-open' })
     .returning()
-  const [d] = await t.db.insert(deck).values({ subjectId: s!.id, name: 'Automata' }).returning()
+  const [d] = await t.db
+    .insert(deck)
+    .values({ userId: U, subjectId: s!.id, name: 'Automata' })
+    .returning()
   const empty = createEmptyCard(new Date())
   const [c] = await t.db
     .insert(card)
     .values({
+      userId: U,
       deckId: d!.id,
       front: 'front',
       back: 'back',
@@ -57,7 +62,7 @@ describe('FSRS round-trip DB ⇄ ts-fsrs', () => {
     const rec = fsrs().next(before, reviewedAt, Rating.Good)
 
     await t.db.update(card).set(fsrsCardToColumns(rec.card)).where(eq(card.id, id))
-    await t.db.insert(reviewLog).values(fsrsLogToRow(id, rec.log, 4200))
+    await t.db.insert(reviewLog).values({ ...fsrsLogToRow(id, rec.log, 4200), userId: U })
 
     const [updated] = await t.db.select().from(card).where(eq(card.id, id))
     expect(updated!.reps).toBe(1)
@@ -79,7 +84,7 @@ describe('FSRS round-trip DB ⇄ ts-fsrs', () => {
     const id = await seedCard()
     const [row] = await t.db.select().from(card).where(eq(card.id, id))
     const rec = fsrs().next(toFsrsCard(row!), new Date(), Rating.Again)
-    await t.db.insert(reviewLog).values(fsrsLogToRow(id, rec.log))
+    await t.db.insert(reviewLog).values({ ...fsrsLogToRow(id, rec.log), userId: U })
     const [logRow] = await t.db.select().from(reviewLog).where(eq(reviewLog.cardId, id))
     expect(logRow!.durationMs).toBeNull()
   })

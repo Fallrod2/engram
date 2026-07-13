@@ -63,7 +63,19 @@ export function createAuthMiddleware(): MiddlewareHandler {
       console.warn('[engram] ENGRAM_AUTH_DISABLED ignoré (prod) — auth maintenue')
     }
 
-    if (!cfg.enforced) return next()
+    // Gate not enforced (dev/e2e bypass OR unconfigured local): pose a DEFAULT
+    // identity so downstream `requireUserId` resolves and every scoped query has
+    // an owner (spec §2, critique amendment 1). Set on ALL non-enforced exits,
+    // not only when bypass is active — the route/isolation specs run with no auth
+    // env at all (enforced=false, bypassActive=false) and would otherwise 401.
+    if (!cfg.enforced) {
+      c.set('authClaims', {
+        sub: cfg.devUserId,
+        email: 'dev@local',
+        role: 'authenticated',
+      })
+      return next()
+    }
     if (c.req.method === 'OPTIONS') return next() // CORS preflight (redundant, audit §17)
 
     if (!memo || memo.key !== configKey(cfg)) {
