@@ -7,6 +7,7 @@ import {
   getAiSettings,
   isAiConfigured,
   resolveActiveProvider,
+  resolveOcrProvider,
   setAiKey,
   updateAiSettings,
 } from './ai-config.service'
@@ -14,7 +15,12 @@ import {
 let t: TestDb
 let db: DB
 
-const ENV_VARS = ['ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY'] as const
+const ENV_VARS = [
+  'ANTHROPIC_API_KEY',
+  'OPENROUTER_API_KEY',
+  'OPENAI_API_KEY',
+  'MISTRAL_API_KEY',
+] as const
 const ORIGINAL = Object.fromEntries(ENV_VARS.map((k) => [k, process.env[k]]))
 
 beforeEach(async () => {
@@ -123,6 +129,104 @@ describe('write-only guarantee', () => {
 
   it('setAiKey rejects ollama (no key)', async () => {
     await expect(setAiKey(db, 'ollama', 'x')).rejects.toThrow(ValidationError)
+  })
+})
+
+describe('resolveOcrProvider — mode same (default)', () => {
+  it('follows the active generation provider when mode is "same"', async () => {
+    process.env.ANTHROPIC_API_KEY = 'env-key'
+    // Default ocr mode is 'same' → OCR resolves exactly like generation.
+    const gen = await resolveActiveProvider(db)
+    const ocr = await resolveOcrProvider(db)
+    expect(ocr).not.toBeNull()
+    expect(ocr!.providerId).toBe('anthropic')
+    expect(ocr!.model).toBe(gen!.model)
+  })
+
+  it('is null when the active provider is unusable (same as generation)', async () => {
+    // No key anywhere → anthropic unusable → OCR unusable too.
+    expect(await resolveOcrProvider(db)).toBeNull()
+  })
+})
+
+describe('resolveOcrProvider — mode custom (the OCR/generation split)', () => {
+  it('resolves a DISTINCT provider + model with its own key, independent of generation', async () => {
+    // Generation = ollama (usable, key-less); OCR = mistral custom with its key.
+    await updateAiSettings(db, { activeProvider: 'ollama' })
+    await setAiKey(db, 'mistral', 'mistral-app-key')
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+
+    const gen = await resolveActiveProvider(db)
+    const ocr = await resolveOcrProvider(db)
+    expect(gen!.providerId).toBe('ollama')
+    expect(ocr).not.toBeNull()
+    expect(ocr!.providerId).toBe('mistral')
+    expect(ocr!.model).toBe('mistral-ocr-latest')
+    expect(ocr!.secret).toBe('mistral-app-key')
+    expect(ocr!.keySource).toBe('app')
+  })
+
+  it('is null when the custom OCR provider has no key, EVEN IF generation is usable', async () => {
+    // Generation stays usable (ollama), but the OCR slot points at an unkeyed
+    // mistral → the split is proven: OCR fails independently.
+    await updateAiSettings(db, { activeProvider: 'ollama' })
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    expect(await resolveActiveProvider(db)).not.toBeNull()
+    expect(await resolveOcrProvider(db)).toBeNull()
+  })
+
+  it('falls back to MISTRAL_API_KEY from the env for the OCR slot', async () => {
+    process.env.MISTRAL_API_KEY = 'mistral-env-key'
+    await updateAiSettings(db, { activeProvider: 'ollama' })
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    const ocr = await resolveOcrProvider(db)
+    expect(ocr).not.toBeNull()
+    expect(ocr!.keySource).toBe('env')
+    expect(ocr!.secret).toBe('mistral-env-key')
+  })
+
+  it('marks ocrActive on the effective OCR provider in the status surface', async () => {
+    await updateAiSettings(db, { activeProvider: 'ollama' })
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    const { statuses } = await getAiSettings(db)
+    const mistral = statuses.find((s) => s.provider === 'mistral')!
+    const ollama = statuses.find((s) => s.provider === 'ollama')!
+    expect(mistral.ocrActive).toBe(true)
+    expect(mistral.active).toBe(false) // generation is ollama
+    expect(ollama.active).toBe(true)
+    expect(ollama.ocrActive).toBe(false)
+  })
+})
+
+describe('updateAiSettings — OCR slot merge', () => {
+  it('a PATCH touching a single OCR field leaves the others intact', async () => {
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    // Only change the model — provider + mode must survive.
+    await updateAiSettings(db, { ocr: { model: 'mistral-ocr-2505' } })
+    const { settings } = await getAiSettings(db)
+    expect(settings.ocr.mode).toBe('custom')
+    expect(settings.ocr.provider).toBe('mistral')
+    expect(settings.ocr.model).toBe('mistral-ocr-2505')
+  })
+
+  it('a PATCH with no ocr key leaves the OCR slot untouched (no 400)', async () => {
+    await updateAiSettings(db, {
+      ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
+    })
+    await updateAiSettings(db, { activeProvider: 'openrouter' })
+    const { settings } = await getAiSettings(db)
+    expect(settings.ocr.mode).toBe('custom')
+    expect(settings.ocr.provider).toBe('mistral')
   })
 })
 
