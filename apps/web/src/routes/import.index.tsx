@@ -25,8 +25,6 @@ import {
   MAX_UPLOAD_BYTES,
 } from '@/components/import/dropzone'
 import { setPendingPhotos } from '@/features/ocr/pending'
-import { DownscaleError } from '@/features/ocr/downscale'
-import { describeExtractError } from '@/features/ocr/errors'
 import { NoteRow } from '@/components/import/note-row'
 import { ImportingRow } from '@/components/import/importing-row'
 import { useHotkeys } from '@/lib/use-hotkeys'
@@ -151,14 +149,12 @@ function ImportPage() {
       // the generic check — neither the vision APIs nor the canvas downscale can
       // decode it (§1.1). Reuse the shared client-side classification/message.
       if (isHeicFile(file.name)) {
-        toast.error(describeExtractError(new DownscaleError('heic')), {
-          description: file.name,
-        })
+        toast.error(t('ocr.error.heic'), { description: file.name })
         continue
       }
       if (!hasAcceptedExtension(file.name)) {
-        toast.error('Type de fichier non supporté', {
-          description: `${file.name} — .md, .pdf ou photo`,
+        toast.error(t('ocr.rejectUnsupported'), {
+          description: t('ocr.rejectUnsupportedDetail', { name: file.name }),
         })
         continue
       }
@@ -177,7 +173,9 @@ function ImportPage() {
     if (images.length > 0) {
       const capped = images.slice(0, MAX_PHOTOS)
       if (images.length > MAX_PHOTOS) {
-        toast.error('Trop de photos', { description: `max ${MAX_PHOTOS} pages par lot` })
+        toast.error(t('ocr.tooManyPhotos'), {
+          description: t('ocr.tooManyPhotosDetail', { max: MAX_PHOTOS }),
+        })
       }
       setPendingPhotos({ files: capped, ...(subjectId ? { subjectId } : {}) })
       void navigate({ to: '/import/photo' })

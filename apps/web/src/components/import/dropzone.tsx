@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Camera, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
 
 /** Photo extensions (OCR spec §3.1). Downscaled + OCR'd, not uploaded as docs. */
@@ -52,6 +53,7 @@ export function Dropzone({
   /** Optional controls rendered under the hint (e.g. "Ranger dans…" select). */
   children?: ReactNode
 }) {
+  const t = useT()
   const inputRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -75,7 +77,7 @@ export function Dropzone({
         role="button"
         tabIndex={disabled ? -1 : 0}
         aria-disabled={disabled || undefined}
-        aria-label="Déposer ou choisir un fichier à importer"
+        aria-label={t('ocr.dropzone.aria')}
         onClick={pick}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -112,14 +114,15 @@ export function Dropzone({
       >
         <Upload className="size-6 text-text-faint" strokeWidth={1.75} aria-hidden />
         <p className="text-sm text-text">
-          Déposez un fichier <span className="font-mono text-xs text-text-muted">.md</span>,{' '}
-          <span className="font-mono text-xs text-text-muted">.pdf</span> ou une{' '}
-          <span className="text-text">photo</span> de cours, ou cliquez pour choisir
+          {t('ocr.dropzone.hintLead')}{' '}
+          <span className="font-mono text-xs text-text-muted">.md</span>,{' '}
+          <span className="font-mono text-xs text-text-muted">.pdf</span> {t('ocr.dropzone.hintOr')}{' '}
+          <span className="text-text">{t('ocr.dropzone.photo')}</span> {t('ocr.dropzone.hintTail')}
         </p>
         <p className="flex items-center justify-center gap-1.5 text-2xs text-text-faint">
-          <Kbd>↵</Kbd> pour parcourir
+          <Kbd>↵</Kbd> {t('ocr.dropzone.browse')}
           <span className="text-border-strong">·</span>
-          docs max 10 Mo · photos réduites automatiquement
+          {t('ocr.dropzone.limits')}
         </p>
         <button
           type="button"
@@ -136,7 +139,7 @@ export function Dropzone({
           )}
         >
           <Camera className="size-3.5" aria-hidden />
-          Prendre une photo
+          {t('ocr.dropzone.takePhoto')}
         </button>
         <input
           ref={inputRef}

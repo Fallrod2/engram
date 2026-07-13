@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import { PhotoImport } from '@/features/ocr/photo-import'
 import { takePendingPhotos, type PendingPhotos } from '@/features/ocr/pending'
@@ -12,6 +13,7 @@ export const Route = createFileRoute('/import/photo')({
 })
 
 function ImportPhotoPage() {
+  const t = useT()
   const subjects = useQuery(subjectsListOptions()).data ?? []
   // Read-and-clear the hand-off exactly once (Files can't ride in search params).
   // NO auto-redirect effect on empty: a stray re-mount during the create-note
@@ -22,9 +24,9 @@ function ImportPhotoPage() {
   if (!pending || pending.files.length === 0) {
     return (
       <EmptyState
-        title="Aucune photo à importer"
-        meta="Retournez à l’import pour choisir des photos de cours."
-        action={<Link to="/import">Retour à l’import</Link>}
+        title={t('ocr.route.emptyTitle')}
+        meta={t('ocr.route.emptyMeta')}
+        action={<Link to="/import">{t('ocr.route.backLink')}</Link>}
       />
     )
   }

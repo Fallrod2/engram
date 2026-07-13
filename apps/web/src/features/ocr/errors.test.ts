@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { classifyExtractError, describeExtractError } from './errors'
+import { classifyExtractError, ocrErrorMessageKey } from './errors'
 import { DownscaleError } from './downscale'
 
 describe('classifyExtractError', () => {
@@ -44,7 +44,6 @@ describe('classifyExtractError', () => {
 
   it('client DownscaleError(heic) → heic (no round-trip)', () => {
     expect(classifyExtractError(new DownscaleError('heic'))).toBe('heic')
-    expect(describeExtractError(new DownscaleError('heic'))).toMatch(/HEIC/)
   })
 
   it('unknown error → generic', () => {
@@ -52,10 +51,18 @@ describe('classifyExtractError', () => {
   })
 })
 
-describe('describeExtractError', () => {
-  it('produces a non-empty actionable message per kind', () => {
-    expect(describeExtractError(new ApiError(503, 'x', 'service_unavailable'))).toMatch(/vision/i)
-    expect(describeExtractError(new DownscaleError('tooLarge'))).toMatch(/volumineuse/i)
-    expect(describeExtractError(new Error('boom'))).toMatch(/échoué/i)
+describe('ocrErrorMessageKey', () => {
+  it('maps each error kind to its dict key', () => {
+    expect(ocrErrorMessageKey('noVisionProvider')).toBe('ocr.error.noVisionProvider')
+    expect(ocrErrorMessageKey('heic')).toBe('ocr.error.heic')
+    expect(ocrErrorMessageKey('unsupported')).toBe('ocr.error.unsupported')
+    expect(ocrErrorMessageKey('tooLarge')).toBe('ocr.error.tooLarge')
+    expect(ocrErrorMessageKey('illegible')).toBe('ocr.error.illegible')
+    expect(ocrErrorMessageKey('generic')).toBe('ocr.error.generic')
+  })
+
+  it('falls back to the generic key for an unknown or undefined kind', () => {
+    expect(ocrErrorMessageKey(undefined)).toBe('ocr.error.generic')
+    expect(ocrErrorMessageKey('boom')).toBe('ocr.error.generic')
   })
 })
