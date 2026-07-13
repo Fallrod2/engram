@@ -95,10 +95,17 @@ test('mixed generation → badges → accept all → materialised cloze cards la
   const uid = Date.now().toString(36)
   const { subject, deck } = await setupSubjectDeck(page, uid)
 
-  await uploadInto(page, subject, SAMPLE_MD)
+  // Unique note name: the suite shares one DB, so 'sample' would collide with the
+  // first test's upload. The fake mixed generator ignores the content.
+  const noteName = `mixed-${uid}`
+  await uploadInto(page, subject, {
+    name: `${noteName}.md`,
+    mimeType: 'text/markdown',
+    buffer: Buffer.from('# Mixte\n\nContenu de cours pour le mode mixte.\n'),
+  })
 
   // Open the note, switch to the "Mixte (auto)" tab, pick the deck, generate.
-  await page.getByRole('link', { name: 'sample' }).click()
+  await page.getByRole('link', { name: noteName }).click()
   await expect(page).toHaveURL(/\/import\/[^/]+$/)
   await page.getByRole('tab', { name: 'Mixte (auto)' }).click()
   await page.getByRole('combobox', { name: 'Deck cible' }).click()
