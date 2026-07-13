@@ -104,7 +104,26 @@ export const reviewLogSchema = z.object({
   createdAt: iso,
 })
 
-export const sourceTypeSchema = z.enum(['md', 'pdf'])
+export const sourceTypeSchema = z.enum(['md', 'pdf', 'image'])
+
+/**
+ * Media types accepted by the photo-OCR vision path (`POST /api/notes/extract-image`).
+ * The shared denominator of the vision APIs (Anthropic / OpenAI-compatible /
+ * Ollama). GIF and HEIC are excluded (OCR spec §1.1).
+ */
+export const visionMediaTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp'])
+
+/**
+ * Response of `POST /api/notes/extract-image` (OCR spec §2.4). The endpoint
+ * NEVER writes a note — the transcription is previewed/corrected client-side
+ * before `POST /api/notes` creates the note (`sourceType: 'image'`). `warnings`
+ * are deterministic markers derived from the Markdown (`[?]` / `[illisible]`).
+ */
+export const extractImageResponseSchema = z.object({
+  markdown: z.string(),
+  mediaType: visionMediaTypeSchema,
+  warnings: z.array(z.string()),
+})
 
 export const noteSchema = z.object({
   id: z.string(),
@@ -163,6 +182,8 @@ export type FsrsCardState = z.infer<typeof fsrsCardStateSchema>
 export type Card = z.infer<typeof cardSchema>
 export type ReviewLog = z.infer<typeof reviewLogSchema>
 export type SourceType = z.infer<typeof sourceTypeSchema>
+export type VisionMediaType = z.infer<typeof visionMediaTypeSchema>
+export type ExtractImageResponse = z.infer<typeof extractImageResponseSchema>
 export type Note = z.infer<typeof noteSchema>
 export type GenerationItem = z.infer<typeof generationItemSchema>
 export type GenerationItemStatus = z.infer<typeof generationItemStatusSchema>
