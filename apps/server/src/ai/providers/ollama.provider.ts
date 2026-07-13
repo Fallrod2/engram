@@ -89,9 +89,9 @@ export function createOllamaAdapter(fetchFn: FetchFn = defaultFetch): ProviderAd
     async testConnection(cfg) {
       try {
         const models = await this.listModels!(cfg)
-        return { ok: true, detail: `Ollama joignable (${models.length} modèle(s))`, models }
+        return { ok: true, detailCode: 'ok', models }
       } catch {
-        return { ok: false, detail: 'Ollama injoignable — vérifie que le serveur tourne.' }
+        return { ok: false, detailCode: 'unreachable' }
       }
     },
 

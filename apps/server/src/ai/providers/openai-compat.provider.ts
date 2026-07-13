@@ -57,12 +57,14 @@ export function createOpenAiCompatAdapter(fetchFn: FetchFn = defaultFetch): Prov
 
     async testConnection(cfg) {
       const base = baseUrlOf(cfg)
-      if (base.length === 0) return { ok: false, detail: 'Base URL manquante' }
+      if (base.length === 0) return { ok: false, detailCode: 'incomplete_config' }
       try {
         const models = await this.listModels!(cfg)
-        return { ok: true, detail: `Serveur joignable (${models.length} modèle(s))`, models }
-      } catch (e) {
-        return { ok: false, detail: e instanceof Error ? e.message : 'Serveur injoignable' }
+        return { ok: true, detailCode: 'ok', models }
+      } catch {
+        // Constructed outcome (like the other adapters) — never surface the raw
+        // runtime/HTTP error message, which is not i18n-neutral or controlled.
+        return { ok: false, detailCode: 'unreachable' }
       }
     },
 

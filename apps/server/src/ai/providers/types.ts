@@ -1,4 +1,4 @@
-import type { AiProviderId } from '@engram/shared'
+import type { AiProviderId, TestConnectionDetailCode } from '@engram/shared'
 
 export type ProviderId = AiProviderId
 
@@ -41,8 +41,13 @@ export interface ProviderModel {
 
 export interface TestConnectionResult {
   ok: boolean
-  /** Short message, WITHOUT any secret; i18n-neutral server-side. */
-  detail: string
+  /**
+   * i18n-neutral outcome code (NO hardcoded server-side text). The client maps
+   * it to a localized string. Guaranteed to never carry a secret by design.
+   */
+  detailCode: TestConnectionDetailCode
+  /** Upstream HTTP status, when known — the UI appends it to the message. */
+  httpStatus?: number
   /** Returned when the test endpoint exposes them (ollama, openrouter). */
   models?: ProviderModel[]
 }

@@ -47,6 +47,12 @@ const MODEL_PRESETS: Record<AiProviderId, string[]> = {
   'openai-compat': [],
 }
 
+/** Map the server's i18n-neutral test outcome code to a localized message. */
+function testDetailMessage(t: TFunction, res: TestConnectionResponse): string {
+  const base = t(`settings.ai.testDetail.${res.detailCode}`)
+  return res.httpStatus ? `${base} (HTTP ${res.httpStatus})` : base
+}
+
 function providerLabel(t: TFunction, p: AiProviderId): string {
   switch (p) {
     case 'anthropic':
@@ -122,14 +128,14 @@ function AiSettingsBody({
   }, [active, providerConfig.model, providerConfig.baseUrl])
 
   const modelsQ = useProviderModels(active, isOllama)
-  const ollamaModelIds = useMemo(
-    () => (modelsQ.data?.models ?? []).map((m) => m.id),
-    [modelsQ.data],
-  )
-  const modelOptions = useMemo(
-    () => [...new Set([...(model ? [model] : []), ...ollamaModelIds])],
-    [model, ollamaModelIds],
-  )
+  // Keep the server-provided label (e.g. 'gemma3:12b · 12.2B') alongside the id;
+  // the current model is always kept as an option even if not in the fetched list.
+  const modelOptions = useMemo(() => {
+    const list = modelsQ.data?.models ?? []
+    const ids = [...new Set([...(model ? [model] : []), ...list.map((m) => m.id)])]
+    const labelById = new Map(list.map((m) => [m.id, m.label]))
+    return ids.map((id) => ({ id, label: labelById.get(id) ?? id }))
+  }, [model, modelsQ.data])
 
   function changeProvider(next: AiProviderId) {
     updateSettings.mutate({ activeProvider: next })
@@ -183,7 +189,7 @@ function AiSettingsBody({
           setTestResult(res)
           if (isOllama) void modelsQ.refetch()
         },
-        onError: () => setTestResult({ ok: false, detail: t('settings.ai.testing') }),
+        onError: () => setTestResult({ ok: false, detailCode: 'unreachable' }),
       },
     )
   }
@@ -247,9 +253,9 @@ function AiSettingsBody({
               <SelectValue placeholder={t('settings.ai.modelPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
-              {modelOptions.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
+              {modelOptions.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {o.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -324,7 +330,7 @@ function AiSettingsBody({
             ) : (
               <X className="size-3.5" aria-hidden />
             )}
-            {testResult.detail}
+            {testDetailMessage(t, testResult)}
           </span>
         )}
       </div>

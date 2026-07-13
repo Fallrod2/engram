@@ -66,7 +66,7 @@ aiRouter.post(
     if (!cfg) {
       return ok(c, testConnectionResponseSchema, {
         ok: false,
-        detail: 'Configuration incomplète (modèle manquant).',
+        detailCode: 'incomplete_config',
       })
     }
     const result = await PROVIDERS[provider].testConnection(cfg)

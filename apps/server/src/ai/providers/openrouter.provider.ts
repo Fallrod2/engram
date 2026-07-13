@@ -89,12 +89,12 @@ export function createOpenRouterAdapter(fetchFn: FetchFn = defaultFetch): Provid
         const res = await fetchFn(`${base}/key`, {
           headers: { Authorization: `Bearer ${cfg.secret ?? ''}`, ...ATTRIBUTION },
         })
-        if (!res.ok) return { ok: false, detail: `Clé refusée (HTTP ${res.status})` }
+        if (!res.ok) return { ok: false, detailCode: 'invalid_key', httpStatus: res.status }
         // Best-effort model list to populate the dropdown (never fatal).
         const models = await this.listModels?.(cfg).catch(() => undefined)
-        return { ok: true, detail: 'Clé OpenRouter valide', ...(models ? { models } : {}) }
+        return { ok: true, detailCode: 'ok', ...(models ? { models } : {}) }
       } catch {
-        return { ok: false, detail: 'OpenRouter injoignable' }
+        return { ok: false, detailCode: 'unreachable' }
       }
     },
 

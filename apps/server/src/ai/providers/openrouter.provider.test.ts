@@ -129,6 +129,9 @@ describe('openRouterAdapter.testConnection + listModels', () => {
     const adapter = createOpenRouterAdapter(fetchFn)
     const res = await adapter.testConnection(cfg)
     expect(res.ok).toBe(false)
-    expect(res.detail).not.toContain('or-secret-123')
+    expect(res.detailCode).toBe('invalid_key')
+    expect(res.httpStatus).toBe(401)
+    // The outcome is a fixed enum code, never a message carrying the key.
+    expect(JSON.stringify(res)).not.toContain('or-secret-123')
   })
 })

@@ -250,9 +250,25 @@ export const testConnectionRequestSchema = z.object({
   model: z.string().optional(),
 })
 export const aiModelSchema = z.object({ id: z.string(), label: z.string().optional() })
+
+/**
+ * i18n-neutral outcome code for a connection test. The server NEVER returns a
+ * localized message (no French text hardcoded); the client maps this code to a
+ * `dict.fr`/`dict.en` string. `httpStatus` (when present) is appended by the UI.
+ */
+export const testConnectionDetailCodeSchema = z.enum([
+  'ok',
+  'invalid_key',
+  'forbidden',
+  'unreachable',
+  'incomplete_config',
+  'no_credentials',
+  'http_error',
+])
 export const testConnectionResponseSchema = z.object({
   ok: z.boolean(),
-  detail: z.string(),
+  detailCode: testConnectionDetailCodeSchema,
+  httpStatus: z.number().int().optional(),
   models: z.array(aiModelSchema).optional(),
 })
 export const listModelsResponseSchema = z.object({ models: z.array(aiModelSchema) })
@@ -269,6 +285,7 @@ export type UpdateAiSettings = z.infer<typeof updateAiSettingsSchema>
 export type SetAiKey = z.infer<typeof setAiKeySchema>
 export type TestConnectionRequest = z.infer<typeof testConnectionRequestSchema>
 export type AiModel = z.infer<typeof aiModelSchema>
+export type TestConnectionDetailCode = z.infer<typeof testConnectionDetailCodeSchema>
 export type TestConnectionResponse = z.infer<typeof testConnectionResponseSchema>
 export type ListModelsResponse = z.infer<typeof listModelsResponseSchema>
 export type ProviderParam = z.infer<typeof providerParamSchema>

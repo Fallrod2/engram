@@ -2,6 +2,7 @@ import { createAnthropic, type CreateAnthropic } from '../client'
 import { extractAnthropicToolInput } from '../parse'
 import { EMIT_CARDS_TOOL } from '../prompts/cards.v1'
 import { MAX_OUTPUT_TOKENS } from './constants'
+import type { TestConnectionDetailCode } from '@engram/shared'
 import type { ProviderAdapter, ResolvedProviderConfig, ProviderModel } from './types'
 
 /**
@@ -49,21 +50,24 @@ export function createAnthropicAdapter(
           id: m.id,
           ...(m.display_name ? { label: m.display_name } : {}),
         }))
-        return { ok: true, detail: 'Connexion établie', models }
+        return { ok: true, detailCode: 'ok', models }
       } catch (e) {
-        return { ok: false, detail: redactAnthropicError(e) }
+        return { ok: false, ...classifyAnthropicError(e) }
       }
     },
   }
 }
 
-/** Map an SDK error to a short message that NEVER contains the key or headers. */
-function redactAnthropicError(e: unknown): string {
+/** Map an SDK error to an i18n-neutral code that NEVER carries the key/headers. */
+function classifyAnthropicError(e: unknown): {
+  detailCode: TestConnectionDetailCode
+  httpStatus?: number
+} {
   const status = (e as { status?: number } | null)?.status
-  if (status === 401) return 'Clé invalide (401)'
-  if (status === 403) return 'Accès refusé (403)'
-  if (typeof status === 'number') return `Échec de la connexion (HTTP ${status})`
-  return 'Connexion impossible (aucune credential Anthropic valide)'
+  if (status === 401) return { detailCode: 'invalid_key', httpStatus: 401 }
+  if (status === 403) return { detailCode: 'forbidden', httpStatus: 403 }
+  if (typeof status === 'number') return { detailCode: 'http_error', httpStatus: status }
+  return { detailCode: 'no_credentials' }
 }
 
 /** Default instance (real credential chain). Tests build their own with a fake. */
