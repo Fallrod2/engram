@@ -18,6 +18,7 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsIndexRouteImport } from './routes/subjects.index'
 import { Route as ImportIndexRouteImport } from './routes/import.index'
+import { Route as ImportPhotoRouteImport } from './routes/import.photo'
 import { Route as SubjectsSubjectIdIndexRouteImport } from './routes/subjects.$subjectId.index'
 import { Route as ImportNoteIdIndexRouteImport } from './routes/import.$noteId.index'
 import { Route as SubjectsSubjectIdDecksDeckIdRouteImport } from './routes/subjects.$subjectId.decks.$deckId'
@@ -68,6 +69,11 @@ const ImportIndexRoute = ImportIndexRouteImport.update({
   path: '/import/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ImportPhotoRoute = ImportPhotoRouteImport.update({
+  id: '/import/photo',
+  path: '/import/photo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubjectsSubjectIdIndexRoute = SubjectsSubjectIdIndexRouteImport.update({
   id: '/subjects/$subjectId/',
   path: '/subjects/$subjectId/',
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
   '/import/$noteId/': typeof ImportNoteIdIndexRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByTo {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/import/photo': typeof ImportPhotoRoute
   '/import': typeof ImportIndexRoute
   '/subjects': typeof SubjectsIndexRoute
   '/import/$noteId': typeof ImportNoteIdIndexRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
   '/subjects/': typeof SubjectsIndexRoute
   '/import/$noteId/': typeof ImportNoteIdIndexRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/import/photo'
     | '/import/'
     | '/subjects/'
     | '/import/$noteId/'
@@ -162,6 +172,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/import/photo'
     | '/import'
     | '/subjects'
     | '/import/$noteId'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/import/photo'
     | '/import/'
     | '/subjects/'
     | '/import/$noteId/'
@@ -193,6 +205,7 @@ export interface RootRouteChildren {
   ReviewRoute: typeof ReviewRoute
   SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
+  ImportPhotoRoute: typeof ImportPhotoRoute
   ImportIndexRoute: typeof ImportIndexRoute
   SubjectsIndexRoute: typeof SubjectsIndexRoute
   ImportNoteIdIndexRoute: typeof ImportNoteIdIndexRoute
@@ -266,6 +279,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImportIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/import/photo': {
+      id: '/import/photo'
+      path: '/import/photo'
+      fullPath: '/import/photo'
+      preLoaderRoute: typeof ImportPhotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/subjects/$subjectId/': {
       id: '/subjects/$subjectId/'
       path: '/subjects/$subjectId'
@@ -305,6 +325,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewRoute: ReviewRoute,
   SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
+  ImportPhotoRoute: ImportPhotoRoute,
   ImportIndexRoute: ImportIndexRoute,
   SubjectsIndexRoute: SubjectsIndexRoute,
   ImportNoteIdIndexRoute: ImportNoteIdIndexRoute,
