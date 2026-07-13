@@ -337,8 +337,10 @@ export const dictFr = {
     mode: 'Mode',
     modeValue: 'Localhost · mono-utilisateur',
     accountTitle: 'Compte',
-    accountDesc: 'Session et déconnexion.',
+    accountDesc: 'Session, mot de passe et déconnexion.',
     signOut: 'Se déconnecter',
+    changePassword: 'Changer le mot de passe',
+    changePasswordDone: 'Mot de passe mis à jour.',
   },
 
   auth: {
@@ -351,6 +353,25 @@ export const dictFr = {
     error: {
       invalid: 'E-mail ou mot de passe incorrect.',
       generic: 'Connexion impossible. Réessaie.',
+    },
+    setPassword: {
+      title: 'Définir un mot de passe',
+      titleRecovery: 'Réinitialiser le mot de passe',
+      subtitle: 'Choisis un mot de passe pour ton compte.',
+      subtitleRecovery: 'Choisis un nouveau mot de passe pour ton compte.',
+      newPassword: 'Nouveau mot de passe',
+      confirm: 'Confirmer le mot de passe',
+      submit: 'Enregistrer',
+      submitting: 'Enregistrement…',
+      tooShort: 'Au moins 8 caractères.',
+      mismatch: 'Les mots de passe ne correspondent pas.',
+      error: 'Impossible de définir le mot de passe. Réessaie.',
+    },
+    link: {
+      expiredTitle: 'Lien expiré',
+      expiredDesc:
+        'Ce lien est invalide ou a déjà été utilisé. Demande un nouveau lien d’invitation ou de réinitialisation.',
+      backToLogin: 'Retour à la connexion',
     },
   },
 }

@@ -50,7 +50,10 @@ configureAuth({
   onUnauthorized: () => authStore.forceSignOut(),
 })
 
-// Start session hydration BEFORE the router runs its guard (which awaits `ready`).
+// Capture any invite/recovery email link from the URL BEFORE hydration (so the
+// token is stripped from the URL immediately and `init()` establishes that
+// session), then start session hydration before the router runs its guard.
+authStore.captureAuthLink()
 void authStore.init()
 
 const rootElement = document.getElementById('root')

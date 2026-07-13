@@ -17,6 +17,13 @@ export const AUTH_TEST_SECRET = 'engram-e2e-auth-secret-at-least-32-bytes-long!!
 /** The storageKey configured in apps/web/src/lib/supabase.ts. */
 export const AUTH_STORAGE_KEY = 'engram-auth'
 
+/**
+ * Marker key for an in-progress invite/recovery password setup (see
+ * `LINK_SETUP_STORAGE_KEY` in apps/web/src/lib/auth-store.ts). Its presence
+ * alongside a live session means a reload landed mid-onboarding.
+ */
+export const AUTH_LINK_STORAGE_KEY = 'engram-auth-link'
+
 function base64url(input: string): string {
   return Buffer.from(input).toString('base64url')
 }

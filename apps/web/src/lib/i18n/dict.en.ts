@@ -333,8 +333,10 @@ export const dictEn: Dict = {
     mode: 'Mode',
     modeValue: 'Localhost · single-user',
     accountTitle: 'Account',
-    accountDesc: 'Session and sign-out.',
+    accountDesc: 'Session, password and sign-out.',
     signOut: 'Sign out',
+    changePassword: 'Change password',
+    changePasswordDone: 'Password updated.',
   },
 
   auth: {
@@ -347,6 +349,25 @@ export const dictEn: Dict = {
     error: {
       invalid: 'Invalid email or password.',
       generic: 'Sign-in failed. Try again.',
+    },
+    setPassword: {
+      title: 'Set a password',
+      titleRecovery: 'Reset your password',
+      subtitle: 'Choose a password for your account.',
+      subtitleRecovery: 'Choose a new password for your account.',
+      newPassword: 'New password',
+      confirm: 'Confirm password',
+      submit: 'Save',
+      submitting: 'Saving…',
+      tooShort: 'At least 8 characters.',
+      mismatch: 'Passwords do not match.',
+      error: 'Could not set the password. Try again.',
+    },
+    link: {
+      expiredTitle: 'Link expired',
+      expiredDesc:
+        'This link is invalid or has already been used. Ask for a new invitation or reset link.',
+      backToLogin: 'Back to sign in',
     },
   },
 }
