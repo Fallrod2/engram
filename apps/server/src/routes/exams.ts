@@ -10,6 +10,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
+import { requireUserId } from '../http/identity'
 import { createExam, deleteExam, getExam, listExams, updateExam } from '../services/exams.service'
 
 export const examsRouter = new Hono()
@@ -19,16 +20,16 @@ examsRouter.get('/', zValidator('query', listExamsQuerySchema), async (c) => {
   return ok(
     c,
     z.array(examSchema),
-    await listExams(db, subjectId !== undefined ? { subjectId } : {}),
+    await listExams(db, requireUserId(c), subjectId !== undefined ? { subjectId } : {}),
   )
 })
 
 examsRouter.post('/', zValidator('json', createExamSchema), async (c) =>
-  ok(c, examSchema, await createExam(db, c.req.valid('json')), 201),
+  ok(c, examSchema, await createExam(db, requireUserId(c), c.req.valid('json')), 201),
 )
 
 examsRouter.get('/:id', zValidator('param', idParamSchema), async (c) =>
-  ok(c, examSchema, await getExam(db, c.req.valid('param').id)),
+  ok(c, examSchema, await getExam(db, requireUserId(c), c.req.valid('param').id)),
 )
 
 examsRouter.patch(
@@ -36,10 +37,14 @@ examsRouter.patch(
   zValidator('param', idParamSchema),
   zValidator('json', updateExamSchema),
   async (c) =>
-    ok(c, examSchema, await updateExam(db, c.req.valid('param').id, c.req.valid('json'))),
+    ok(
+      c,
+      examSchema,
+      await updateExam(db, requireUserId(c), c.req.valid('param').id, c.req.valid('json')),
+    ),
 )
 
 examsRouter.delete('/:id', zValidator('param', idParamSchema), async (c) => {
-  await deleteExam(db, c.req.valid('param').id)
+  await deleteExam(db, requireUserId(c), c.req.valid('param').id)
   return c.body(null, 204)
 })

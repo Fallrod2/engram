@@ -181,13 +181,18 @@ export interface RateParams {
  * feed. One indexed range scan on `review`, no join (retrospective: the past is
  * immutable, archived state is not applied). Manual(0) excluded.
  */
-export async function heatmap(db: DB, params: SeriesParams): Promise<HeatmapResponse> {
+export async function heatmap(
+  db: DB,
+  userId: string,
+  params: SeriesParams,
+): Promise<HeatmapResponse> {
   const w = resolveSeriesWindow(params.now, params.from, params.to)
   const rows = await db
     .select({ review: reviewLog.review })
     .from(reviewLog)
     .where(
       and(
+        eq(reviewLog.userId, userId),
         gte(reviewLog.review, w.fromMidnight),
         lt(reviewLog.review, w.endExclusive),
         gte(reviewLog.rating, RATING_MIN_COUNTED),
@@ -222,11 +227,11 @@ export async function heatmap(db: DB, params: SeriesParams): Promise<HeatmapResp
  * excluded). One indexed scan, no join (retrospective; archiving never rewrites
  * an earned streak).
  */
-export async function streaks(db: DB, now: Date): Promise<StreaksResponse> {
+export async function streaks(db: DB, userId: string, now: Date): Promise<StreaksResponse> {
   const rows = await db
     .select({ review: reviewLog.review })
     .from(reviewLog)
-    .where(gte(reviewLog.rating, RATING_MIN_COUNTED))
+    .where(and(eq(reviewLog.userId, userId), gte(reviewLog.rating, RATING_MIN_COUNTED)))
     .orderBy(desc(reviewLog.review))
 
   const daySet = new Set<string>()
@@ -279,13 +284,18 @@ export async function streaks(db: DB, now: Date): Promise<StreaksResponse> {
  * Time spent per day/week — sum of non-null `durationMs` (NULL = not measured,
  * never counted as 0). One indexed range scan, no join. Manual(0) excluded.
  */
-export async function studyTime(db: DB, params: GranularSeriesParams): Promise<StudyTimeResponse> {
+export async function studyTime(
+  db: DB,
+  userId: string,
+  params: GranularSeriesParams,
+): Promise<StudyTimeResponse> {
   const w = resolveSeriesWindow(params.now, params.from, params.to)
   const rows = await db
     .select({ review: reviewLog.review, durationMs: reviewLog.durationMs })
     .from(reviewLog)
     .where(
       and(
+        eq(reviewLog.userId, userId),
         gte(reviewLog.review, w.fromMidnight),
         lt(reviewLog.review, w.endExclusive),
         gte(reviewLog.rating, RATING_MIN_COUNTED),
@@ -342,6 +352,7 @@ export async function studyTime(db: DB, params: GranularSeriesParams): Promise<S
  */
 export async function reviewVolume(
   db: DB,
+  userId: string,
   params: GranularSeriesParams,
 ): Promise<ReviewVolumeResponse> {
   const w = resolveSeriesWindow(params.now, params.from, params.to)
@@ -350,6 +361,7 @@ export async function reviewVolume(
     .from(reviewLog)
     .where(
       and(
+        eq(reviewLog.userId, userId),
         gte(reviewLog.review, w.fromMidnight),
         lt(reviewLog.review, w.endExclusive),
         gte(reviewLog.rating, RATING_MIN_COUNTED),
@@ -397,7 +409,11 @@ export async function reviewVolume(
  * Review before the review). `retention = null` below `MIN_RATE_SAMPLE`.
  * Archived subjects excluded (present-tense view). Single aggregation query.
  */
-export async function retention(db: DB, params: RateParams): Promise<RetentionResponse> {
+export async function retention(
+  db: DB,
+  userId: string,
+  params: RateParams,
+): Promise<RetentionResponse> {
   const win = resolveRateWindow(params.from, params.to)
   const rows = await db
     .select({
@@ -423,7 +439,7 @@ export async function retention(db: DB, params: RateParams): Promise<RetentionRe
         win.clause,
       ),
     )
-    .where(eq(subject.archived, false))
+    .where(and(eq(subject.userId, userId), eq(subject.archived, false)))
     .groupBy(subject.id)
 
   const subjects = rows.map((r) => ({
@@ -441,7 +457,11 @@ export async function retention(db: DB, params: RateParams): Promise<RetentionRe
  * learning reps included). `successRate = null` below `MIN_RATE_SAMPLE`.
  * Decks of archived subjects excluded. Single aggregation query.
  */
-export async function deckSuccess(db: DB, params: RateParams): Promise<DeckSuccessResponse> {
+export async function deckSuccess(
+  db: DB,
+  userId: string,
+  params: RateParams,
+): Promise<DeckSuccessResponse> {
   const win = resolveRateWindow(params.from, params.to)
   const rows = await db
     .select({
@@ -461,7 +481,7 @@ export async function deckSuccess(db: DB, params: RateParams): Promise<DeckSucce
       reviewLog,
       and(eq(reviewLog.cardId, card.id), gte(reviewLog.rating, RATING_MIN_COUNTED), win.clause),
     )
-    .where(eq(subject.archived, false))
+    .where(and(eq(subject.userId, userId), eq(subject.archived, false)))
     // Postgres (unlike SQLite) requires every non-aggregated selected column in
     // GROUP BY. `subject.id` is functionally determined by `deck.id` (one subject
     // per deck) but pg cannot infer that across the join, so group by both.

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { FSRS } from 'ts-fsrs'
 import type { ReviewResult } from '@engram/shared'
 import type { DB } from '../db/client'
@@ -24,6 +24,7 @@ export interface ReviewInput {
  */
 export async function reviewCard(
   db: DB,
+  userId: string,
   cardId: string,
   input: ReviewInput,
   sched: FSRS = scheduler,
@@ -32,7 +33,11 @@ export async function reviewCard(
   const reviewedAt = input.reviewedAt ?? now
 
   return db.transaction(async (tx) => {
-    const [row] = await tx.select().from(card).where(eq(card.id, cardId))
+    // Scoped SELECT: a card owned by another user reads as 404 (never a 403).
+    const [row] = await tx
+      .select()
+      .from(card)
+      .where(and(eq(card.id, cardId), eq(card.userId, userId)))
     if (!row) throw new NotFoundError(`card ${cardId} not found`)
 
     // Guards depend on row.lastReview, so they sit after the select but before
@@ -49,7 +54,11 @@ export async function reviewCard(
     await tx.update(card).set(fsrsCardToColumns(rec.card)).where(eq(card.id, cardId))
 
     const logRow = fsrsLogToRow(cardId, rec.log, input.durationMs)
-    const [insertedLog] = await tx.insert(reviewLog).values(logRow).returning()
+    // Denormalized owner on the append-only log (spec §1.1).
+    const [insertedLog] = await tx
+      .insert(reviewLog)
+      .values({ ...logRow, userId })
+      .returning()
 
     const [updatedCard] = await tx.select().from(card).where(eq(card.id, cardId))
     if (!updatedCard) throw new NotFoundError(`card ${cardId} not found`)

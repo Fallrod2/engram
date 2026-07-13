@@ -40,7 +40,11 @@ function ensureLoad(acc: DayAcc, subjectId: string): SubjectLoad {
 }
 
 /** Projected review load per local calendar day over `[from, to]` (inclusive). */
-export async function studyPlan(db: DB, params: StudyPlanParams): Promise<StudyPlanResponse> {
+export async function studyPlan(
+  db: DB,
+  userId: string,
+  params: StudyPlanParams,
+): Promise<StudyPlanResponse> {
   const { from, to, now } = params
   // `from`/`to` are already zero-padded, so string comparison is chronological.
   if (from > to) throw new ValidationError('from must be <= to')
@@ -73,6 +77,7 @@ export async function studyPlan(db: DB, params: StudyPlanParams): Promise<StudyP
     .innerJoin(subject, eq(subject.id, deck.subjectId))
     .where(
       and(
+        eq(card.userId, userId),
         eq(subject.archived, false),
         lt(card.due, endExclusive),
         params.subjectId ? eq(deck.subjectId, params.subjectId) : undefined,
@@ -95,7 +100,13 @@ export async function studyPlan(db: DB, params: StudyPlanParams): Promise<StudyP
   const examRows = await db
     .select()
     .from(exam)
-    .where(and(gte(exam.date, fromMidnight), lt(exam.date, endExclusivePlusRamp)))
+    .where(
+      and(
+        eq(exam.userId, userId),
+        gte(exam.date, fromMidnight),
+        lt(exam.date, endExclusivePlusRamp),
+      ),
+    )
     .orderBy(asc(exam.date))
 
   if (examRows.length > 0) {
@@ -120,7 +131,13 @@ export async function studyPlan(db: DB, params: StudyPlanParams): Promise<StudyP
         .from(card)
         .innerJoin(deck, eq(deck.id, card.deckId))
         .innerJoin(subject, eq(subject.id, deck.subjectId))
-        .where(and(eq(subject.archived, false), inArray(deck.subjectId, allSubjectIds)))
+        .where(
+          and(
+            eq(subject.userId, userId),
+            eq(subject.archived, false),
+            inArray(deck.subjectId, allSubjectIds),
+          ),
+        )
         .groupBy(deck.subjectId)
       for (const r of scopeRows) scope.set(r.subjectId, r.n)
     }
@@ -188,11 +205,11 @@ export async function studyPlan(db: DB, params: StudyPlanParams): Promise<StudyP
 }
 
 /** Prioritized "what to review today", crossing dues with exam proximity. */
-export async function studyToday(db: DB, now: Date): Promise<StudyTodayResponse> {
-  const counts = await dueCounts(db, now)
+export async function studyToday(db: DB, userId: string, now: Date): Promise<StudyTodayResponse> {
+  const counts = await dueCounts(db, userId, now)
   const todayMidnight = localMidnight(now.getFullYear(), now.getMonth(), now.getDate())
   // Cards due strictly before local midnight today = the overdue backlog.
-  const overdueCount = (await dueCounts(db, new Date(todayMidnight.getTime() - 1))).total
+  const overdueCount = (await dueCounts(db, userId, new Date(todayMidnight.getTime() - 1))).total
 
   // Next upcoming exam per subject, batched into ONE query (no N+1).
   const subjectIds = counts.bySubject.map((b) => b.subjectId)
@@ -207,7 +224,13 @@ export async function studyToday(db: DB, now: Date): Promise<StudyTodayResponse>
       })
       .from(exam)
       .innerJoin(examSubject, eq(examSubject.examId, exam.id))
-      .where(and(inArray(examSubject.subjectId, subjectIds), gte(exam.date, todayMidnight)))
+      .where(
+        and(
+          eq(exam.userId, userId),
+          inArray(examSubject.subjectId, subjectIds),
+          gte(exam.date, todayMidnight),
+        ),
+      )
       .orderBy(asc(exam.date))
     for (const r of rows) {
       if (!nextExamBySubject.has(r.subjectId)) {
