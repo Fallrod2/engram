@@ -416,6 +416,8 @@ export const dictFr = {
     previewEmpty: 'Rien à prévisualiser pour l’instant.',
     tooManyPhotos: 'Trop de photos',
     tooManyPhotosDetail: 'max {max} pages par lot',
+    rejectUnsupported: 'Type de fichier non supporté',
+    rejectUnsupportedDetail: '{name} — .md, .pdf ou photo',
     provider: {
       title: 'Aucun modèle de vision configuré',
       body: 'L’extraction photo a besoin d’un fournisseur IA compatible vision (Claude, GPT-4o, llava…).',

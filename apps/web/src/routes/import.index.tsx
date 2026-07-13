@@ -153,8 +153,8 @@ function ImportPage() {
         continue
       }
       if (!hasAcceptedExtension(file.name)) {
-        toast.error('Type de fichier non supporté', {
-          description: `${file.name} — .md, .pdf ou photo`,
+        toast.error(t('ocr.rejectUnsupported'), {
+          description: t('ocr.rejectUnsupportedDetail', { name: file.name }),
         })
         continue
       }

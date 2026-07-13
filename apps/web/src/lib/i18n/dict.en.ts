@@ -412,6 +412,8 @@ export const dictEn: Dict = {
     previewEmpty: 'Nothing to preview yet.',
     tooManyPhotos: 'Too many photos',
     tooManyPhotosDetail: 'max {max} pages per batch',
+    rejectUnsupported: 'Unsupported file type',
+    rejectUnsupportedDetail: '{name} — .md, .pdf, or a photo',
     provider: {
       title: 'No vision model configured',
       body: 'Photo extraction needs a vision-capable AI provider (Claude, GPT-4o, llava…).',
