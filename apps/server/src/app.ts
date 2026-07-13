@@ -6,6 +6,7 @@ import { healthResponseSchema, type HealthResponse, type ApiErrorCode } from '@e
 import { ApiError } from './http/errors'
 import { resolveAuthConfig } from './auth/config'
 import { createAuthMiddleware } from './http/auth'
+import { createDemoMiddleware } from './http/demo'
 import { getCardGenerator, configuredGenerator } from './ai/generator'
 import { subjectsRouter } from './routes/subjects'
 import { decksRouter } from './routes/decks'
@@ -31,6 +32,10 @@ app.use('/api/*', cors({ origin: 'http://localhost:5173' }))
 // the routers. It resolves its config PER REQUEST from `process.env` — nothing is
 // read at this module's top level, so importing `app.ts` never throws (audit §6).
 app.use('/api/*', createAuthMiddleware())
+// Demo-account reset (spec §4). AFTER auth (needs the resolved identity) and
+// BEFORE the routers. No-op unless `ENGRAM_DEMO_USER_ID` is set AND the caller is
+// that demo user — so prod/dev/e2e without a demo account pay nothing.
+app.use('/api/*', createDemoMiddleware())
 
 app.get('/api/health', (c) => {
   const body: HealthResponse = {
@@ -46,6 +51,9 @@ app.get('/api/health', (c) => {
     // fail-closed `misconfigured` case is judged ONLY by the middleware, so the
     // probe stays readable even on a prod misconfig (reports authEnforced:false).
     authEnforced: resolveAuthConfig(process.env).enforced,
+    // Whether a demo account is wired (ENGRAM_DEMO_USER_ID). Read for the wave-2
+    // landing CTA; never leaks the demo id itself. `false` in the current prod.
+    demoEnabled: Boolean(process.env.ENGRAM_DEMO_USER_ID),
   }
   // Validate against the shared contract before it leaves the server.
   return c.json(healthResponseSchema.parse(body))
@@ -67,7 +75,7 @@ app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not fou
 
 app.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json(err.toResponse(), err.status as 400 | 401 | 404 | 409 | 413 | 503)
+    return c.json(err.toResponse(), err.status as 400 | 401 | 403 | 404 | 409 | 413 | 503)
   }
   // Hono-level failures (e.g. malformed JSON body → HTTPException 400) mapped
   // to the single error envelope so they never surface as an opaque 500.

@@ -40,6 +40,13 @@ export class UnauthorizedError extends ApiError {
   }
 }
 
+/** 403 — authenticated but not permitted (admin-only route, spec §3). */
+export class ForbiddenError extends ApiError {
+  constructor(message: string) {
+    super(403, 'forbidden', message)
+  }
+}
+
 /** 404 — the path resource, or a foreign id referenced in the body, does not exist. */
 export class NotFoundError extends ApiError {
   constructor(message: string) {
