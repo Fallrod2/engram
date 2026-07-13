@@ -1,5 +1,5 @@
 import { extractText as unpdfExtractText } from 'unpdf'
-import type { SourceType } from '@engram/shared'
+import type { SourceType, VisionMediaType } from '@engram/shared'
 import { ValidationError } from '../http/errors'
 
 /** The metadata of an uploaded file needed to derive its source type. */
@@ -31,6 +31,52 @@ export function detectSourceType(meta: UploadFileMeta, bytes: Uint8Array): Sourc
   const mdType = meta.type === 'text/markdown' || meta.type === 'text/plain' || meta.type === ''
   if (mdName || mdType) return 'md'
 
+  return null
+}
+
+// --- Image detection (photo-OCR path, spec §2.1) ---------------------------
+
+/** `%PDF` etc. — a byte prefix check anchored at offset 0. */
+function startsWith(bytes: Uint8Array, sig: number[], offset = 0): boolean {
+  if (bytes.length < offset + sig.length) return false
+  return sig.every((b, i) => bytes[offset + i] === b)
+}
+
+/** `ftyp` box brands that mark a HEIC/HEIF container (rejected, spec §1.1). */
+const HEIF_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1', 'heif'])
+
+/**
+ * Detect a supported image from its MAGIC BYTES (authoritative over the
+ * extension/MIME, exactly like PDF), returning the concrete media type needed
+ * for the vision call. HEIC/HEIF is detected on purpose so the route can reject
+ * it with an actionable message (spec §1.1); anything else is `null`.
+ *
+ * The `meta` param mirrors `detectSourceType`'s signature for call-site
+ * symmetry, but the decision is byte-driven — a photo downscaled client-side is
+ * re-encoded to JPEG, so the MIME cannot be trusted.
+ */
+export function detectImageMedia(
+  _meta: UploadFileMeta,
+  bytes: Uint8Array,
+): { mediaType: VisionMediaType } | { heic: true } | null {
+  // JPEG: FF D8 FF
+  if (startsWith(bytes, [0xff, 0xd8, 0xff])) return { mediaType: 'image/jpeg' }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+    return { mediaType: 'image/png' }
+  }
+  // WebP: "RIFF" @ 0 and "WEBP" @ 8
+  if (
+    startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) &&
+    startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8)
+  ) {
+    return { mediaType: 'image/webp' }
+  }
+  // HEIC/HEIF: "ftyp" @ 4, brand @ 8 (targeted rejection). Brand is ASCII.
+  if (startsWith(bytes, [0x66, 0x74, 0x79, 0x70], 4) && bytes.length >= 12) {
+    const brand = String.fromCharCode(...bytes.subarray(8, 12)).toLowerCase()
+    if (HEIF_BRANDS.has(brand)) return { heic: true }
+  }
   return null
 }
 
