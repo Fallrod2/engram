@@ -153,6 +153,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
       kind: 'cards',
       status: 'pending',
       model: 'claude-sonnet-4-6',
+      provider: 'anthropic',
       items: [{ id: 'i1', front: 'q', back: 'a', status: 'pending' }],
       promptTokens: null,
       completionTokens: null,

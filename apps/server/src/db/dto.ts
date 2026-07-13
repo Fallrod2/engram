@@ -99,6 +99,7 @@ export function generationToDto(row: InferSelectModel<typeof generation>): Gener
     kind: row.kind as Generation['kind'],
     status: row.status as Generation['status'],
     model: row.model,
+    provider: row.provider,
     items: row.items,
     promptTokens: row.promptTokens,
     completionTokens: row.completionTokens,
