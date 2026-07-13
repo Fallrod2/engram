@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { createTestDb, type TestDb } from './test-db'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import { note } from './schema'
 
 let t: TestDb
@@ -15,21 +16,21 @@ describe('note_source_type_ck (additive migration 0002)', () => {
   it("accepts sourceType 'image'", async () => {
     const [row] = await t.db
       .insert(note)
-      .values({ title: 'Photo', sourceType: 'image', content: 'transcription' })
+      .values({ userId: U, title: 'Photo', sourceType: 'image', content: 'transcription' })
       .returning()
     expect(row?.sourceType).toBe('image')
   })
 
   it("still accepts the legacy 'md' / 'pdf' values", async () => {
-    await t.db.insert(note).values({ title: 'a', sourceType: 'md', content: 'x' })
-    await t.db.insert(note).values({ title: 'b', sourceType: 'pdf', content: 'y' })
+    await t.db.insert(note).values({ userId: U, title: 'a', sourceType: 'md', content: 'x' })
+    await t.db.insert(note).values({ userId: U, title: 'b', sourceType: 'pdf', content: 'y' })
     expect(await t.db.select().from(note)).toHaveLength(2)
   })
 
   it('rejects an unknown sourceType (CHECK violation)', async () => {
     let threw = false
     try {
-      await t.db.insert(note).values({ title: 'bad', sourceType: 'bogus', content: 'z' })
+      await t.db.insert(note).values({ userId: U, title: 'bad', sourceType: 'bogus', content: 'z' })
     } catch {
       threw = true
     }

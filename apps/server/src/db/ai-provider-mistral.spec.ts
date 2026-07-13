@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { createTestDb, type TestDb } from './test-db'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import { aiCredential, generation, note } from './schema'
 
 /**
@@ -57,11 +58,17 @@ describe('generation_provider_ck (migration 0003)', () => {
   it("stamps a generation with provider 'mistral'", async () => {
     const [n] = await t.db
       .insert(note)
-      .values({ title: 'N', sourceType: 'image', content: 'x' })
+      .values({ userId: U, title: 'N', sourceType: 'image', content: 'x' })
       .returning()
     const [g] = await t.db
       .insert(generation)
-      .values({ noteId: n!.id, kind: 'cards', model: 'mistral-small-latest', provider: 'mistral' })
+      .values({
+        userId: U,
+        noteId: n!.id,
+        kind: 'cards',
+        model: 'mistral-small-latest',
+        provider: 'mistral',
+      })
       .returning()
     expect(g?.provider).toBe('mistral')
   })
@@ -69,11 +76,11 @@ describe('generation_provider_ck (migration 0003)', () => {
   it('still allows a NULL provider (historical rows) and rejects an unknown one', async () => {
     const [n] = await t.db
       .insert(note)
-      .values({ title: 'N', sourceType: 'md', content: 'x' })
+      .values({ userId: U, title: 'N', sourceType: 'md', content: 'x' })
       .returning()
     const [g] = await t.db
       .insert(generation)
-      .values({ noteId: n!.id, kind: 'cards', model: 'm' })
+      .values({ userId: U, noteId: n!.id, kind: 'cards', model: 'm' })
       .returning()
     expect(g?.provider).toBeNull()
 
@@ -81,7 +88,7 @@ describe('generation_provider_ck (migration 0003)', () => {
     try {
       await t.db
         .insert(generation)
-        .values({ noteId: n!.id, kind: 'cards', model: 'm', provider: 'bogus' })
+        .values({ userId: U, noteId: n!.id, kind: 'cards', model: 'm', provider: 'bogus' })
     } catch {
       threw = true
     }

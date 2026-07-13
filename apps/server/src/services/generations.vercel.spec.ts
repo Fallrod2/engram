@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { note } from '../db/schema'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import type { CardGenerator } from '../ai/generator'
 import type { ResolvedProviderConfig } from '../ai/providers/types'
 import { startGeneration } from './generations.service'
@@ -59,7 +60,7 @@ afterEach(async () => {
 async function seedNote(content: string): Promise<string> {
   const [row] = await db
     .insert(note)
-    .values({ title: 'Note', sourceType: 'md', content })
+    .values({ userId: U, title: 'Note', sourceType: 'md', content })
     .returning()
   return row!.id
 }
@@ -69,7 +70,7 @@ describe('startGeneration — Vercel waitUntil wiring', () => {
     process.env.VERCEL = '1'
     const noteId = await seedNote('some content')
 
-    const dto = await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
+    const dto = await startGeneration(db, U, { noteId, kind: 'cards' }, testCfg, oneCardGen)
 
     expect(dto.status).toBe('pending')
     expect(registered).toHaveLength(1)
@@ -83,7 +84,7 @@ describe('startGeneration — Vercel waitUntil wiring', () => {
     expect(process.env.VERCEL).toBeUndefined()
     const noteId = await seedNote('some content')
 
-    const dto = await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
+    const dto = await startGeneration(db, U, { noteId, kind: 'cards' }, testCfg, oneCardGen)
 
     expect(dto.status).toBe('pending')
     expect(registered).toHaveLength(0)
@@ -93,7 +94,7 @@ describe('startGeneration — Vercel waitUntil wiring', () => {
     process.env.VERCEL = 'true'
     const noteId = await seedNote('some content')
 
-    await startGeneration(db, { noteId, kind: 'cards' }, testCfg, oneCardGen)
+    await startGeneration(db, U, { noteId, kind: 'cards' }, testCfg, oneCardGen)
 
     expect(registered).toHaveLength(0)
   })

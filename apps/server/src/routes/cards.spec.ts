@@ -6,6 +6,7 @@ import { db } from '../db/client'
 import { card, reviewLog } from '../db/schema'
 import { resetDb, seedCard, seedDeck, seedSubject } from '../test-support/harness'
 import { reviewCard } from '../services/review.service'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
 beforeEach(() => resetDb(db))
 
@@ -77,7 +78,7 @@ describe('cards routes', () => {
 
   it('DELETE /api/cards/:id cascades review_log', async () => {
     const c = await seedCard(db, await newDeck())
-    await reviewCard(db, c.id, { grade: 3 })
+    await reviewCard(db, U, c.id, { grade: 3 })
     expect(await db.select().from(reviewLog)).toHaveLength(1)
     expect((await app.request(`/api/cards/${c.id}`, { method: 'DELETE' })).status).toBe(204)
     expect(await db.select().from(card)).toHaveLength(0)

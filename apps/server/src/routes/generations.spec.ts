@@ -11,6 +11,7 @@ import { resetDb, seedDeck, seedSubject } from '../test-support/harness'
 import { setCardGenerator, resetCardGenerator, type CardGenerator } from '../ai/generator'
 import { runGenerationJob } from '../services/generations.service'
 import { updateAiSettings } from '../services/ai-config.service'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
 // One card per call — the fire-and-forget job launched by POST /api/generations
 // uses this via the registry, so the real Anthropic API is NEVER called.
@@ -42,7 +43,10 @@ const postJson = (path: string, body: unknown) =>
   })
 
 async function seedNote(content = 'quelques notes de cours'): Promise<string> {
-  const [row] = await db.insert(note).values({ title: 'N', sourceType: 'md', content }).returning()
+  const [row] = await db
+    .insert(note)
+    .values({ userId: U, title: 'N', sourceType: 'md', content })
+    .returning()
   return row!.id
 }
 
@@ -95,7 +99,7 @@ describe('generations routes', () => {
     const g = generationSchema.parse(
       await (await postJson('/api/generations', { noteId, kind: 'cards' })).json(),
     )
-    await runGenerationJob(db, g.id, fakeGen) // idempotent — settles to succeeded
+    await runGenerationJob(db, U, g.id, fakeGen) // idempotent — settles to succeeded
     const polled = generationSchema.parse(
       await (await app.request(`/api/generations/${g.id}`)).json(),
     )
@@ -119,7 +123,7 @@ describe('generations routes', () => {
     const g = generationSchema.parse(
       await (await postJson('/api/generations', { noteId, kind: 'cards', deckId: deck.id })).json(),
     )
-    await runGenerationJob(db, g.id, fakeGen)
+    await runGenerationJob(db, U, g.id, fakeGen)
     const ready = generationSchema.parse(
       await (await app.request(`/api/generations/${g.id}`)).json(),
     )
@@ -142,7 +146,7 @@ describe('generations routes', () => {
     const g = generationSchema.parse(
       await (await postJson('/api/generations', { noteId, kind: 'cards', deckId: deck.id })).json(),
     )
-    await runGenerationJob(db, g.id, fakeGen)
+    await runGenerationJob(db, U, g.id, fakeGen)
     const ready = generationSchema.parse(
       await (await app.request(`/api/generations/${g.id}`)).json(),
     )

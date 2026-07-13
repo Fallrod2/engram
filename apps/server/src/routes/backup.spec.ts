@@ -12,6 +12,7 @@ import {
   seedSubject,
 } from '../test-support/harness'
 import { currentSchemaTag, exportBackup } from '../services/backup.service'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
 beforeEach(() => resetDb(db))
 
@@ -33,6 +34,7 @@ async function seedEverything() {
   const [n] = await db
     .insert(note)
     .values({
+      userId: U,
       subjectId: s.id,
       title: 'Cours automates',
       sourceType: 'md',
@@ -41,6 +43,7 @@ async function seedEverything() {
     })
     .returning()
   await db.insert(generation).values({
+    userId: U,
     noteId: n!.id,
     deckId: d.id,
     kind: 'cards',
@@ -73,7 +76,7 @@ describe('backup export', () => {
 describe('backup import — round trip', () => {
   it('export → wipe → import → export is lossless (row for row)', async () => {
     await seedEverything()
-    const first = backupSchema.parse(await exportBackup(db))
+    const first = backupSchema.parse(await exportBackup(db, U))
 
     await resetDb(db)
     const res = await postJson('/api/backup/import', first)
@@ -90,7 +93,7 @@ describe('backup import — round trip', () => {
       examSubject: 1,
     })
 
-    const second = backupSchema.parse(await exportBackup(db))
+    const second = backupSchema.parse(await exportBackup(db, U))
     // exportedAt differs; the tables + schema must be identical.
     expect(second.schema).toBe(first.schema)
     expect(sorted(second.tables)).toEqual(sorted(first.tables))
@@ -103,7 +106,7 @@ describe('backup import — round trip', () => {
     // Dump B.
     await resetDb(db)
     await seedEverything()
-    const dumpB = backupSchema.parse(await exportBackup(db))
+    const dumpB = backupSchema.parse(await exportBackup(db, U))
 
     // Restore A, then import B → only B remains.
     await resetDb(db)
@@ -111,7 +114,7 @@ describe('backup import — round trip', () => {
     const res = await postJson('/api/backup/import', dumpB)
     expect(res.status).toBe(200)
 
-    const after = backupSchema.parse(await exportBackup(db))
+    const after = backupSchema.parse(await exportBackup(db, U))
     expect(after.tables.subject).toHaveLength(1)
     expect(after.tables.subject[0]!.name).toBe('Théorie des langages')
   })
@@ -120,23 +123,23 @@ describe('backup import — round trip', () => {
 describe('backup import — guards & atomicity', () => {
   it('rejects a wrong format version with 400 and leaves the DB unchanged', async () => {
     await seedEverything()
-    const before = await exportBackup(db)
+    const before = await exportBackup(db, U)
     const bad = { ...before, engramBackup: 2 }
     const res = await postJson('/api/backup/import', bad)
     expect(res.status).toBe(400)
-    const after = await exportBackup(db)
+    const after = await exportBackup(db, U)
     expect(after.tables.subject).toHaveLength(before.tables.subject.length)
   })
 
   it('rejects a divergent schema tag with 409', async () => {
-    const dump = backupSchema.parse(await exportBackup(db))
+    const dump = backupSchema.parse(await exportBackup(db, U))
     const res = await postJson('/api/backup/import', { ...dump, schema: 'not_the_current_tag' })
     expect(res.status).toBe(409)
   })
 
   it('rolls back on a forged FK violation (400) — DB unchanged', async () => {
     await seedEverything()
-    const before = backupSchema.parse(await exportBackup(db))
+    const before = backupSchema.parse(await exportBackup(db, U))
     // Forge a card pointing at a non-existent deck: valid shape, bad FK.
     const forged: Backup = {
       ...before,
@@ -148,7 +151,7 @@ describe('backup import — guards & atomicity', () => {
     const res = await postJson('/api/backup/import', forged)
     expect(res.status).toBe(400)
     // The wipe+insert transaction rolled back: the original data is intact.
-    const after = backupSchema.parse(await exportBackup(db))
+    const after = backupSchema.parse(await exportBackup(db, U))
     expect(sorted(after.tables)).toEqual(sorted(before.tables))
   })
 

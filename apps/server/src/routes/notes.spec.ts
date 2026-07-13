@@ -6,6 +6,7 @@ import { app } from '../app'
 import { db } from '../db/client'
 import { generation, note } from '../db/schema'
 import { resetDb, seedSubject } from '../test-support/harness'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
 beforeEach(() => resetDb(db))
 
@@ -164,9 +165,13 @@ describe('notes CRUD', () => {
     const created = noteSchema.parse(
       await (await postJson('/api/notes', { title: 'n', sourceType: 'md', content: 'ddd' })).json(),
     )
-    await db
-      .insert(generation)
-      .values({ noteId: created.id, kind: 'cards', model: 'claude-sonnet-4-6', status: 'pending' })
+    await db.insert(generation).values({
+      userId: U,
+      noteId: created.id,
+      kind: 'cards',
+      model: 'claude-sonnet-4-6',
+      status: 'pending',
+    })
     expect(await db.select().from(generation)).toHaveLength(1)
     expect((await app.request(`/api/notes/${created.id}`, { method: 'DELETE' })).status).toBe(204)
     expect(await db.select().from(note)).toHaveLength(0)
