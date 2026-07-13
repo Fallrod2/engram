@@ -195,7 +195,15 @@ function RhythmStrip() {
     <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <div className="rounded-lg border border-border bg-surface-1 p-6 sm:p-8">
         <SectionLabel>{t('landing.rhythm.label')}</SectionLabel>
-        <div className="mt-6 overflow-x-auto pb-1">
+        {/* Focusable + named: the strip scrolls horizontally below ~520px, so it
+            must be reachable by keyboard (axe scrollable-region-focusable) — the
+            page is mobile-first and claims 100% keyboard operability. */}
+        <div
+          className="mt-6 overflow-x-auto pb-1"
+          role="group"
+          tabIndex={0}
+          aria-label={t('landing.rhythm.label')}
+        >
           <div className="flex min-w-[520px] items-center gap-2">
             <RhythmPill accent>{t('landing.rhythm.today')}</RhythmPill>
             {INTERVALS.map((n) => (
@@ -450,16 +458,22 @@ function LandingFooter() {
 
 /* ------------------------------------------------------------- primitives -- */
 
+/**
+ * Section eyebrow. Rendered as an <h2> (not a styled <p>) so the document keeps a
+ * gapless heading order — h1 (hero) → h2 (section) → h3 (cards). Skipping to h3
+ * trips axe `heading-order`, one of the four rules the project a11y suite gates
+ * (e2e/tests/a11y.spec.ts). Visual weight is unchanged; only the tag differs.
+ */
 function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <p
+    <h2
       className={cn(
         'font-mono text-2xs font-semibold uppercase tracking-[0.12em] text-text-faint',
         className,
       )}
     >
       {children}
-    </p>
+    </h2>
   )
 }
 
@@ -483,6 +497,17 @@ function BrowserFrame({ children }: { children: ReactNode }) {
 type ShotBase = 'dashboard' | 'review' | 'analytics'
 
 /**
+ * Intrinsic pixel size of each capture (they are cropped to different aspect
+ * ratios). Passing the true width/height keeps the reserved box ratio equal to
+ * the loaded image's, so there is no layout shift as each shot decodes.
+ */
+const SHOT_SIZE: Record<ShotBase, { width: number; height: number }> = {
+  dashboard: { width: 1920, height: 780 },
+  review: { width: 980, height: 838 },
+  analytics: { width: 1920, height: 1200 },
+}
+
+/**
  * Theme-aware product screenshot. Picks the dark/light WebP from the resolved
  * theme (synchronous from the theme context — no flash, no extra loading state).
  * Served from `public/landing/`, so it never touches the JS bundle (§5.4).
@@ -490,12 +515,13 @@ type ShotBase = 'dashboard' | 'review' | 'analytics'
 function ThemedShot({ base, alt, priority }: { base: ShotBase; alt: string; priority?: boolean }) {
   const { resolved } = useTheme()
   const src = `/landing/${base}-${resolved}.webp`
+  const { width, height } = SHOT_SIZE[base]
   return (
     <img
       src={src}
       alt={alt}
-      width={1440}
-      height={900}
+      width={width}
+      height={height}
       loading={priority ? 'eager' : 'lazy'}
       decoding="async"
       className="block h-auto w-full bg-bg"
