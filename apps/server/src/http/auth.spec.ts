@@ -140,6 +140,14 @@ describe('createAuthMiddleware', () => {
     expect(res.status).toBe(500)
   })
 
+  it('/api/health stays readable during a prod misconfig (spec §2.6)', async () => {
+    // Same env as the fail-closed case above (misconfigured=true), but the probe
+    // must NOT 500 — it is the public path ops curl to diagnose the outage.
+    process.env.VERCEL = '1'
+    const res = await makeApp().request('/api/health')
+    expect(res.status).toBe(200)
+  })
+
   it('bypass is logged loudly (audit §7)', async () => {
     process.env.ENGRAM_AUTH_DISABLED = '1'
     const warn = spyOn(console, 'warn').mockImplementation(() => {})

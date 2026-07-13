@@ -37,6 +37,12 @@ export function createAuthMiddleware(): MiddlewareHandler {
   return async (c, next) => {
     const cfg = resolveAuthConfig(process.env)
 
+    // `/api/health` stays readable even during a prod misconfiguration (spec §2.6):
+    // it self-reports `authEnforced:false`, which is the ops runbook for diagnosing
+    // *why* a bad deploy is 500ing. So the public-path exemption is checked BEFORE
+    // the fail-closed throw below (the probe never carries an Authorization header).
+    if (PUBLIC_PATHS.has(c.req.path)) return next() // /api/health is public
+
     // Fail-closed (audit §6/§13): EVALUATED HERE, per request — never at import.
     // On Vercel the bundle is lazy-imported, so this 500s at the first cold-start
     // request, not at build time (the deploy "succeeds", then every request 500s
@@ -59,7 +65,6 @@ export function createAuthMiddleware(): MiddlewareHandler {
 
     if (!cfg.enforced) return next()
     if (c.req.method === 'OPTIONS') return next() // CORS preflight (redundant, audit §17)
-    if (PUBLIC_PATHS.has(c.req.path)) return next() // /api/health is public
 
     if (!memo || memo.key !== configKey(cfg)) {
       memo = { key: configKey(cfg), verify: makeVerifier(cfg) }

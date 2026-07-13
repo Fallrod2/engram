@@ -18,6 +18,14 @@ describe('app module import', () => {
     try {
       const mod = await import('./app')
       expect(typeof mod.app.fetch).toBe('function')
+
+      // Even prod-misconfigured, /api/health stays readable and self-reports
+      // authEnforced:false (spec §2.6) — that is the ops runbook for diagnosing
+      // *why* every other route is 500ing after a bad deploy.
+      const res = await mod.app.fetch(new Request('http://localhost/api/health'))
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { authEnforced: boolean }
+      expect(body.authEnforced).toBe(false)
     } finally {
       if (prevVercel === undefined) delete process.env.VERCEL
       else process.env.VERCEL = prevVercel
