@@ -75,14 +75,21 @@ aiRouter.post(
   zValidator('json', testConnectionRequestSchema),
   async (c) => {
     const { provider } = c.req.valid('param')
+    const adapter = PROVIDERS[provider]
     const cfg = await resolveProviderForTest(db, requireUserId(c), provider, c.req.valid('json'))
-    if (!cfg) {
+    // The env fallback is admin-only (spec BYOK §1.2): a key-requiring provider
+    // with NO resolved key (`keySource === null`) must never reach the adapter.
+    // For anthropic, `clientFor` would otherwise pass `undefined` and the SDK's
+    // `new Anthropic()` would read the admin's `ANTHROPIC_API_KEY` from
+    // process.env — leaking a validity oracle + the admin account's model list
+    // to a public (BYOK) caller. Short-circuit to `incomplete_config` first.
+    if (!cfg || (adapter.requiresKey && cfg.keySource === null)) {
       return ok(c, testConnectionResponseSchema, {
         ok: false,
         detailCode: 'incomplete_config',
       })
     }
-    const result = await PROVIDERS[provider].testConnection(cfg)
+    const result = await adapter.testConnection(cfg)
     return ok(c, testConnectionResponseSchema, result)
   },
 )

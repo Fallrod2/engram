@@ -241,4 +241,27 @@ describe('per-user config isolation over the API (spec BYOK §1.3)', () => {
       delete process.env.SUPABASE_JWT_SECRET
     }
   })
+
+  it('a non-admin anthropic test never consumes the admin env key (BYOK §1.2)', async () => {
+    process.env.SUPABASE_JWT_SECRET = SECRET
+    // A fake admin env key: with NO ENGRAM_ADMIN_USER_ID, Bob is a plain public
+    // user, so the env fallback is off for him → `keySource` resolves to null.
+    // The route must short-circuit to `incomplete_config` BEFORE the adapter —
+    // otherwise `new Anthropic()` would read this key and leak a validity oracle
+    // + the admin account's model list to a public caller.
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-fake-admin-env-key'
+    try {
+      const bob = await bearer('bob-uuid')
+      const r = await jsonAs(bob, '/api/ai/providers/anthropic/test', 'POST', {})
+      expect(r.status).toBe(200)
+      const parsed = testConnectionResponseSchema.parse(await r.json())
+      expect(parsed.ok).toBe(false)
+      expect(parsed.detailCode).toBe('incomplete_config')
+      // No adapter call happened → no models oracle leaked.
+      expect(parsed.models).toBeUndefined()
+    } finally {
+      delete process.env.SUPABASE_JWT_SECRET
+      delete process.env.ANTHROPIC_API_KEY
+    }
+  })
 })
