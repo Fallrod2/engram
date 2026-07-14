@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { useT } from '@/lib/i18n'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { sanitizeRedirect } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { AuthBrand } from '@/features/auth/auth-brand'
@@ -27,6 +28,7 @@ export const Route = createFileRoute('/signup')({
 
 function SignupPage() {
   const t = useT()
+  useDocumentTitle(t('auth.meta.signup'))
   const [sent, setSent] = useState(false)
 
   return (

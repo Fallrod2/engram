@@ -56,9 +56,21 @@ function installMockStorage() {
   Object.defineProperty(globalThis, 'localStorage', { value: mock, configurable: true })
 }
 
+/**
+ * Pin the browser language so the "FR by default" assertions are deterministic:
+ * with no stored `engram-lang`, `LangProvider` now falls back to
+ * `navigator.language` (so an anglophone visitor gets EN), and jsdom's default is
+ * `en-US`. Force `fr-FR` here to exercise the French default path.
+ */
+function installNavigatorLanguage(lang: string) {
+  Object.defineProperty(window.navigator, 'language', { value: lang, configurable: true })
+  Object.defineProperty(window.navigator, 'languages', { value: [lang], configurable: true })
+}
+
 beforeEach(() => {
   installMatchMedia()
   installMockStorage()
+  installNavigatorLanguage('fr-FR')
 })
 afterEach(cleanup)
 
@@ -90,10 +102,13 @@ describe('<LandingPage>', () => {
     for (const cta of signIn) expect(cta.getAttribute('href')).toBe('/login')
   })
 
-  it('the hero CTA "Créer un compte" points at /signup', () => {
+  it('every "Créer un compte" CTA points at /signup (header, hero, final section)', () => {
     renderLanding()
-    const cta = screen.getByRole('link', { name: /Créer un compte/ })
-    expect(cta.getAttribute('href')).toBe('/signup')
+    const ctas = screen.getAllByRole('link', { name: /Créer un compte/ })
+    // Repeated so a convinced reader at the foot of the page can sign up without
+    // scrolling back up (landing spec — final CTA + header CTA).
+    expect(ctas.length).toBeGreaterThanOrEqual(2)
+    for (const cta of ctas) expect(cta.getAttribute('href')).toBe('/signup')
   })
 
   it('the product screenshots carry alt text (a11y)', () => {
@@ -103,7 +118,18 @@ describe('<LandingPage>', () => {
     expect(shot.getAttribute('src')).toBe('/landing/dashboard-dark.webp')
   })
 
-  it('the footer FR/EN toggle switches every string', () => {
+  it('defaults to English when the browser language is English and nothing is stored', () => {
+    // Regression guard for the navigator.language seed (finding: an anglophone
+    // visitor never discovered the EN copy). No stored engram-lang + en browser
+    // → the hero renders in English on first paint.
+    installNavigatorLanguage('en-GB')
+    renderLanding()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
+      'Remember more, review less.',
+    )
+  })
+
+  it('the header FR/EN toggle switches every string', () => {
     renderLanding()
     fireEvent.click(screen.getByRole('button', { name: 'en' }))
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
@@ -113,7 +139,8 @@ describe('<LandingPage>', () => {
     const signIn = screen.getAllByRole('link', { name: 'Sign in' })
     expect(signIn.length).toBeGreaterThanOrEqual(1)
     for (const cta of signIn) expect(cta.getAttribute('href')).toBe('/login')
-    const create = screen.getByRole('link', { name: /Create an account/ })
-    expect(create.getAttribute('href')).toBe('/signup')
+    const create = screen.getAllByRole('link', { name: /Create an account/ })
+    expect(create.length).toBeGreaterThanOrEqual(2)
+    for (const cta of create) expect(cta.getAttribute('href')).toBe('/signup')
   })
 })

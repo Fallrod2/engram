@@ -62,10 +62,28 @@ const DEFAULT_VALUE: LangContextValue = {
 
 const LangContext = createContext<LangContextValue>(DEFAULT_VALUE)
 
+/**
+ * Initial language: an explicit stored choice wins; otherwise we fall back to the
+ * browser's preferred language so an English-speaking visitor (e.g. arriving from
+ * GitHub) lands on the EN copy without hunting for a toggle. Default `fr`
+ * otherwise (the project's primary EPITA audience). Only the first, un-persisted
+ * paint consults the navigator — once the user picks a language it is stored and
+ * takes precedence forever.
+ */
 function readStoredLang(): Lang {
-  if (typeof localStorage === 'undefined') return 'fr'
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return raw === 'en' ? 'en' : 'fr'
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw === 'en' || raw === 'fr') return raw
+  }
+  if (typeof navigator !== 'undefined') {
+    const langs = navigator.languages?.length ? navigator.languages : [navigator.language]
+    for (const l of langs) {
+      const primary = l?.toLowerCase().split('-')[0]
+      if (primary === 'fr') return 'fr'
+      if (primary === 'en') return 'en'
+    }
+  }
+  return 'fr'
 }
 
 export function LangProvider({ children }: { children: React.ReactNode }) {

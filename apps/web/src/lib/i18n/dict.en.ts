@@ -211,6 +211,7 @@ export const dictEn: Dict = {
     },
     activity: {
       label: 'Recent activity',
+      help: 'Each block is one of the last 14 days; the more it is tinted, the more cards you reviewed that day.',
       viewAnalytics: 'View analytics',
       tooltip_one: '{date} · {count} review',
       tooltip_other: '{date} · {count} reviews',
@@ -313,6 +314,12 @@ export const dictEn: Dict = {
     nextWeek: 'Next week',
     examsError: 'Could not load exams.',
     planError: 'Could not load the forecast.',
+    legend: {
+      load: 'Review load',
+      loadHint:
+        'The bar shows how many reviews are scheduled that day, relative to the busiest day in view.',
+      exam: 'Exam',
+    },
   },
 
   settings: {
@@ -533,6 +540,12 @@ export const dictEn: Dict = {
 
   auth: {
     title: 'engram',
+    meta: {
+      login: 'Sign in — engram',
+      signup: 'Sign up — engram',
+      forgot: 'Forgot password — engram',
+      setPassword: 'Password — engram',
+    },
     subtitle: 'Sign in',
     email: 'Email',
     password: 'Password',
@@ -610,7 +623,13 @@ export const dictEn: Dict = {
     },
     nav: {
       signIn: 'Sign in',
+      createAccount: 'Create an account',
       githubAria: 'Source code on GitHub',
+      language: 'Language',
+    },
+    finalCta: {
+      title: 'Start remembering today.',
+      body: 'Create your account, import a lecture and launch your first session in under two minutes. Free, self-hosted, open source.',
     },
     hero: {
       eyebrow: 'Spaced repetition · FSRS v5',

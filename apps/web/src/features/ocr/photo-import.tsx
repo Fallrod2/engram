@@ -365,7 +365,12 @@ export function PhotoImport({
             </Tabs>
           )}
 
-          <div className="flex items-center justify-end gap-2">
+          {/* Below md the "Créer la note" action would otherwise fall under the
+              fold (finding: CTA at y≈823 for a 740px viewport). Make the bar
+              sticky just above the mobile tab bar (h-14) — the same pattern the
+              review session uses for its rating bar. Reverts to an inline
+              right-aligned row from md up. */}
+          <div className="sticky bottom-14 z-10 -mx-4 flex items-center justify-end gap-2 border-t border-border bg-surface-1/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
             <Button asChild variant="ghost">
               <Link to="/import">{t('common.cancel')}</Link>
             </Button>

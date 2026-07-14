@@ -91,7 +91,12 @@ export function StudyTimeChart({
           <AreaChart
             accessibilityLayer
             data={buckets}
-            margin={{ top: 8, right: 12, bottom: 0, left: -4 }}
+            // Extra right margin so the end-anchored value label on the LAST point
+            // is not clipped by the plot edge (finding: label truncated on the
+            // right). The last data point sits at `plotWidth`, and the label is
+            // textAnchor="end", i.e. it extends leftward from that x — the margin
+            // gives the last glyph room to breathe.
+            margin={{ top: 8, right: 40, bottom: 0, left: -4 }}
           >
             <CartesianGrid stroke={chartInk.grid} vertical={false} />
             <XAxis

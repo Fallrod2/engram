@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
+import { Info } from 'lucide-react'
 import type { HeatmapResponse } from '@engram/shared'
 import { addDays, localDayKey } from '@/lib/calendar'
 import { useT, usePlural } from '@/lib/i18n'
@@ -33,8 +34,24 @@ export function RecentActivity({ heatmap, now }: { heatmap: HeatmapResponse; now
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface-1 p-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
+        <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
           {t('dashboard.activity.label')}
+          {/* Explains what the 14-block band is, so it no longer reads as a
+              skeleton next to the finished cards (finding). */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="flex size-4 items-center justify-center rounded-full text-text-faint transition-colors hover:text-text-muted"
+                aria-label={t('dashboard.activity.help')}
+              >
+                <Info className="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-56 normal-case">
+              {t('dashboard.activity.help')}
+            </TooltipContent>
+          </Tooltip>
         </p>
         <Link
           to="/analytics"

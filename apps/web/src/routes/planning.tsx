@@ -18,6 +18,8 @@ import { useHotkeys } from '@/lib/use-hotkeys'
 import { useMediaQuery, useCoarsePointer } from '@/lib/use-media-query'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { LoadMeter } from '@/components/load-meter'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -290,6 +292,7 @@ function PlanningPage() {
                 }
               />
             )}
+            {!planQuery.isError && <PlanningLegend />}
           </div>
 
           {/* Right rail — hidden < md, where the bottom Sheet takes over (§8.3). */}
@@ -494,6 +497,32 @@ function PlanningRail({
         )}
       </div>
     </>
+  )
+}
+
+/**
+ * Mini legend decoding the otherwise cryptic "N —" day-load indicator (finding):
+ * the number is the reviews scheduled that day, the bar its magnitude relative to
+ * the busiest day in view. The per-cell tooltip already spells it out; this makes
+ * it legible without hovering.
+ */
+function PlanningLegend() {
+  const t = useT()
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-2xs text-text-faint">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="flex cursor-help items-center gap-1.5">
+            <span className="font-mono tabular-nums text-text-muted">12</span>
+            <LoadMeter value={3} max={4} className="w-8" />
+            <span>{t('planning.legend.load')}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-56">
+          {t('planning.legend.loadHint')}
+        </TooltipContent>
+      </Tooltip>
+    </div>
   )
 }
 

@@ -1,5 +1,6 @@
 import { createFileRoute, redirect, useNavigate, Link } from '@tanstack/react-router'
 import { useT } from '@/lib/i18n'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { useAuthLink } from '@/lib/auth'
 import { authStore } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -50,6 +51,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function SetPasswordPage() {
   const t = useT()
+  useDocumentTitle(t('auth.meta.setPassword'))
   const navigate = useNavigate()
   const linkState = useAuthLink()
   const { noToken } = Route.useRouteContext()

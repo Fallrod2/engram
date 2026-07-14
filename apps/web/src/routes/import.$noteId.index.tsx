@@ -3,8 +3,9 @@ import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-r
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { FileWarning, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
-import type { Deck, GenerationKind, Subject } from '@engram/shared'
+import type { Deck, Generation, GenerationKind, Subject } from '@engram/shared'
 import { ApiError } from '@/lib/api'
+import { formatRelativeTime } from '@/lib/format'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { NoteSkeleton } from '@/components/skeletons'
@@ -73,6 +74,27 @@ function buildDeckGroups(subjects: Subject[], decks: Deck[]): DeckGroup[] {
         (a, b) => a.position - b.position || a.name.localeCompare(b.name),
       ),
     }))
+}
+
+/**
+ * Accepted/rejected recap appended to a history row's meta line — only once a
+ * generation has been triaged (its items carry a card id). Keeps the run
+ * distinguishable at a glance (finding: rows were indistinguishable "Cartes ✓").
+ */
+function GenerationOutcome({ generation }: { generation: Generation }) {
+  if (generation.status !== 'succeeded') return null
+  const resolved = generation.items.some((it) => it.cardId !== undefined)
+  if (!resolved) return null
+  const accepted = generation.items.filter((it) => it.cardId !== undefined).length
+  const rejected = generation.items.filter((it) => it.status === 'rejected').length
+  return (
+    <>
+      <span className="px-1 text-border-strong">·</span>
+      <span className="tabular-nums">
+        {accepted} acceptée{accepted > 1 ? 's' : ''} / {rejected} rejetée{rejected > 1 ? 's' : ''}
+      </span>
+    </>
+  )
 }
 
 function NotePage() {
@@ -252,23 +274,39 @@ function NotePage() {
               </p>
             ) : (
               <ul className="flex flex-col" onKeyDown={roving.onKeyDown}>
-                {generations.map((g, i) => (
-                  <EntityRow key={g.id}>
-                    <Link
-                      {...roving.getItemProps(i)}
-                      to="/import/$noteId/generations/$generationId"
-                      params={{ noteId, generationId: g.id }}
-                      className={entityRowClass('gap-2')}
-                    >
-                      <span className="text-sm capitalize text-text">
-                        {g.kind === 'quiz' ? 'Quiz' : g.kind === 'mixed' ? 'Mixte' : 'Cartes'}
-                      </span>
-                      <span className="ml-auto">
-                        <GenerationStatusBadge generation={g} />
-                      </span>
-                    </Link>
-                  </EntityRow>
-                ))}
+                {generations.map((g, i) => {
+                  const gDeck = decks.find((d) => d.id === g.deckId) ?? null
+                  return (
+                    <EntityRow key={g.id}>
+                      <Link
+                        {...roving.getItemProps(i)}
+                        to="/import/$noteId/generations/$generationId"
+                        params={{ noteId, generationId: g.id }}
+                        className={entityRowClass('items-start gap-2 py-2')}
+                      >
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="flex min-w-0 items-baseline gap-1.5">
+                            <span className="text-sm text-text">
+                              {g.kind === 'quiz' ? 'Quiz' : g.kind === 'mixed' ? 'Mixte' : 'Cartes'}
+                            </span>
+                            {gDeck && (
+                              <span className="truncate text-xs text-text-muted">
+                                → {gDeck.name}
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-2xs text-text-faint">
+                            {formatRelativeTime(g.createdAt)}
+                            <GenerationOutcome generation={g} />
+                          </span>
+                        </span>
+                        <span className="ml-auto shrink-0 pt-0.5">
+                          <GenerationStatusBadge generation={g} />
+                        </span>
+                      </Link>
+                    </EntityRow>
+                  )
+                })}
               </ul>
             )}
           </div>
