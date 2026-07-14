@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as SuspendedRouteImport } from './routes/suspended'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetPasswordRouteImport } from './routes/set-password'
@@ -18,6 +19,7 @@ import { Route as PlanningRouteImport } from './routes/planning'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubjectsIndexRouteImport } from './routes/subjects.index'
 import { Route as ImportIndexRouteImport } from './routes/import.index'
@@ -30,6 +32,11 @@ import { Route as ImportNoteIdGenerationsGenerationIdRouteImport } from './route
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuspendedRoute = SuspendedRouteImport.update({
+  id: '/suspended',
+  path: '/suspended',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -70,6 +77,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
 const AnalyticsRoute = AnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -117,6 +129,7 @@ const ImportNoteIdGenerationsGenerationIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -125,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/suspended': typeof SuspendedRoute
   '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
@@ -136,6 +150,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -144,6 +159,7 @@ export interface FileRoutesByTo {
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/suspended': typeof SuspendedRoute
   '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import': typeof ImportIndexRoute
@@ -156,6 +172,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -164,6 +181,7 @@ export interface FileRoutesById {
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/suspended': typeof SuspendedRoute
   '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
@@ -177,6 +195,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/analytics'
     | '/forgot-password'
     | '/login'
@@ -185,6 +204,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/settings'
     | '/signup'
+    | '/suspended'
     | '/welcome'
     | '/import/photo'
     | '/import/'
@@ -196,6 +216,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/analytics'
     | '/forgot-password'
     | '/login'
@@ -204,6 +225,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/settings'
     | '/signup'
+    | '/suspended'
     | '/welcome'
     | '/import/photo'
     | '/import'
@@ -215,6 +237,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/analytics'
     | '/forgot-password'
     | '/login'
@@ -223,6 +246,7 @@ export interface FileRouteTypes {
     | '/set-password'
     | '/settings'
     | '/signup'
+    | '/suspended'
     | '/welcome'
     | '/import/photo'
     | '/import/'
@@ -235,6 +259,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AnalyticsRoute: typeof AnalyticsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
@@ -243,6 +268,7 @@ export interface RootRouteChildren {
   SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
+  SuspendedRoute: typeof SuspendedRoute
   WelcomeRoute: typeof WelcomeRoute
   ImportPhotoRoute: typeof ImportPhotoRoute
   ImportIndexRoute: typeof ImportIndexRoute
@@ -260,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/welcome'
       fullPath: '/welcome'
       preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suspended': {
+      id: '/suspended'
+      path: '/suspended'
+      fullPath: '/suspended'
+      preLoaderRoute: typeof SuspendedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -316,6 +349,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/analytics'
       preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -379,6 +419,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AnalyticsRoute: AnalyticsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
@@ -387,6 +428,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
+  SuspendedRoute: SuspendedRoute,
   WelcomeRoute: WelcomeRoute,
   ImportPhotoRoute: ImportPhotoRoute,
   ImportIndexRoute: ImportIndexRoute,
