@@ -17,15 +17,46 @@ function sleep(ms: number): Promise<void> {
 }
 
 export const fakeGenerator: CardGenerator = {
-  async generate({ content }: GenerateArgs): Promise<GenerateResult> {
+  async generate({ content, kind }: GenerateArgs): Promise<GenerateResult> {
     await sleep(40)
 
-    // Sentinels drive the error/empty paths without any API dependency.
+    // Sentinels drive the error/empty paths without any API dependency. They
+    // stay BEFORE the kind branch so every mode can exercise them.
     if (content.includes('__E2E_FAIL__')) {
       throw new Error('fake generation failure (__E2E_FAIL__)')
     }
     if (content.includes('__E2E_EMPTY__')) {
       return { cards: [], promptTokens: 1, completionTokens: 1 }
+    }
+
+    // Mixed mode: emit a deterministic, UN-expanded mix (2 qa + 1 cloze with two
+    // masks). The server's real expansion path (ai/cloze.ts) then materialises
+    // the cloze into 2 cards → 4 items total, so the e2e exercises expansion for
+    // real rather than a pre-baked result.
+    if (kind === 'mixed') {
+      return {
+        cards: [
+          {
+            kind: 'qa',
+            contentType: 'concept',
+            front: 'Pourquoi réviser ?',
+            back: 'Pour retenir.',
+          },
+          {
+            kind: 'qa',
+            contentType: 'concept',
+            front: 'Comment fonctionne la répétition espacée ?',
+            back: 'En espaçant les révisions.',
+          },
+          {
+            kind: 'cloze',
+            contentType: 'definition',
+            clozeText: 'Un {{c1::monoïde}} possède un élément {{c2::neutre}}.',
+          },
+        ],
+        promptTokens: 10,
+        completionTokens: 5,
+      }
     }
 
     // Deterministic parse: every `question :: answer` line becomes one card.

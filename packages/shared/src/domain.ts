@@ -138,15 +138,41 @@ export const noteSchema = z.object({
 
 export const generationItemStatusSchema = z.enum(['pending', 'accepted', 'edited', 'rejected'])
 
+/**
+ * Per-item output format decided by the 'mixed' evaluator (spec §2). `qa` =
+ * classic front/back; `cloze` = a materialised fill-in-the-blank card. Absent on
+ * legacy items and on `cards`/`quiz` items → the review UI shows no format badge.
+ */
+export const generationItemKindSchema = z.enum(['qa', 'cloze'])
+
+/**
+ * The pedagogical classification the 'mixed' evaluator assigns to a knowledge
+ * unit before choosing its format (spec §2.2). Drives the discreet second badge.
+ */
+export const generationItemContentTypeSchema = z.enum([
+  'definition',
+  'formula',
+  'list',
+  'fact',
+  'concept',
+])
+
 export const generationItemSchema = z.object({
   id: z.string(),
   front: z.string(),
   back: z.string(),
   status: generationItemStatusSchema,
   cardId: z.string().optional(),
+  // --- 'mixed' generation metadata (spec §2.3). Additive & optional: legacy
+  // items and cards/quiz items omit them entirely, so existing jsonb rows stay
+  // valid with no data migration, and only mixed items carry review badges. ---
+  kind: generationItemKindSchema.optional(),
+  contentType: generationItemContentTypeSchema.optional(),
+  /** The original cloze template (`{{cN::…}}`) a materialised cloze expanded from. */
+  clozeText: z.string().optional(),
 })
 
-export const generationKindSchema = z.enum(['cards', 'quiz'])
+export const generationKindSchema = z.enum(['cards', 'quiz', 'mixed'])
 export const generationStatusSchema = z.enum(['pending', 'succeeded', 'failed'])
 
 export const generationSchema = z.object({
@@ -187,6 +213,8 @@ export type ExtractImageResponse = z.infer<typeof extractImageResponseSchema>
 export type Note = z.infer<typeof noteSchema>
 export type GenerationItem = z.infer<typeof generationItemSchema>
 export type GenerationItemStatus = z.infer<typeof generationItemStatusSchema>
+export type GenerationItemKind = z.infer<typeof generationItemKindSchema>
+export type GenerationItemContentType = z.infer<typeof generationItemContentTypeSchema>
 export type GenerationKind = z.infer<typeof generationKindSchema>
 export type GenerationStatus = z.infer<typeof generationStatusSchema>
 export type Generation = z.infer<typeof generationSchema>

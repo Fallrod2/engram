@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { Plus, Sparkles } from 'lucide-react'
 import type { Deck, GenerationKind, Subject } from '@engram/shared'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -51,6 +52,7 @@ export function GenerationLaunchPanel({
   /** e.g. `<ApiKeyMissingBanner />` when the key is missing. */
   banner?: ReactNode
 }) {
+  const t = useT()
   const noDecks = deckGroups.every((g) => g.decks.length === 0)
   const canLaunch = !!deckId && !contentEmpty && !pending
   const hint = contentEmpty
@@ -79,8 +81,15 @@ export function GenerationLaunchPanel({
           <TabsTrigger value="quiz" className="flex-1">
             Quiz
           </TabsTrigger>
+          <TabsTrigger value="mixed" className="flex-1">
+            {t('generation.mixedTab')}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {kind === 'mixed' && (
+        <p className="-mt-1 text-2xs text-text-faint">{t('generation.mixedDescription')}</p>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <label className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">

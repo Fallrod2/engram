@@ -33,6 +33,8 @@ export function createOpenAiCompatAdapter(fetchFn: FetchFn = defaultFetch): Prov
       const base = baseUrlOf(cfg)
       if (base.length === 0) throw new Error('openai-compat: base URL manquante')
       const useJsonObject = args.attempt >= 2
+      // v1 schema by default (cards/quiz); mixed supplies the v2 schema via `emit`.
+      const emitSchema = args.emit?.schema ?? EMIT_CARDS_JSON_SCHEMA
       const body = {
         model: cfg.model,
         max_tokens: MAX_OUTPUT_TOKENS,
@@ -44,7 +46,7 @@ export function createOpenAiCompatAdapter(fetchFn: FetchFn = defaultFetch): Prov
           ? { type: 'json_object' }
           : {
               type: 'json_schema',
-              json_schema: { name: 'emit_cards', schema: EMIT_CARDS_JSON_SCHEMA, strict: true },
+              json_schema: { name: 'emit_cards', schema: emitSchema, strict: true },
             },
       }
 

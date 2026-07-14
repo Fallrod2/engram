@@ -53,13 +53,14 @@ async function seedGeneration(o: {
   deckId?: string | null
   status?: 'pending' | 'succeeded' | 'failed'
   items?: GenerationItem[]
+  kind?: 'cards' | 'quiz' | 'mixed'
 }): Promise<string> {
   const [row] = await db
     .insert(generation)
     .values({
       userId: U,
       noteId: o.noteId,
-      kind: 'cards',
+      kind: o.kind ?? 'cards',
       model: 'claude-sonnet-4-6',
       status: o.status ?? 'pending',
       items: o.items ?? [],
@@ -151,6 +152,70 @@ describe('runGenerationJob', () => {
     }
     await runGenerationJob(db, U, genId, manyGen)
     expect((await requireGenerationRow(db, U, genId)).items).toEqual(first)
+  })
+
+  it("kind 'mixed' → cloze drafts expand to N materialised cards, round-trips through jsonb", async () => {
+    const noteId = await seedNote('petite note de cours')
+    const genId = await seedGeneration({ noteId, kind: 'mixed' })
+    const mixedGen: CardGenerator = {
+      async generate() {
+        return {
+          cards: [
+            { kind: 'qa', contentType: 'concept', front: 'Q1', back: 'A1' },
+            { kind: 'qa', contentType: 'concept', front: 'Q2', back: 'A2' },
+            {
+              kind: 'cloze',
+              contentType: 'definition',
+              clozeText: 'Un {{c1::monoïde}} a un élément {{c2::neutre}}.',
+            },
+          ],
+          promptTokens: 3,
+          completionTokens: 2,
+        }
+      },
+    }
+    await runGenerationJob(db, U, genId, mixedGen)
+    const row = await requireGenerationRow(db, U, genId)
+    expect(row.status).toBe('succeeded')
+    // 2 qa + a 2-mask cloze materialised into 2 cards = 4 items.
+    expect(row.items).toHaveLength(4)
+
+    const qa = row.items.filter((i) => i.kind === 'qa')
+    const cloze = row.items.filter((i) => i.kind === 'cloze')
+    expect(qa).toHaveLength(2)
+    expect(cloze).toHaveLength(2)
+
+    // The evaluation metadata survived the DB jsonb round-trip.
+    expect(qa[0]?.contentType).toBe('concept')
+    expect(cloze[0]?.contentType).toBe('definition')
+    expect(cloze[0]?.clozeText).toBe('Un {{c1::monoïde}} a un élément {{c2::neutre}}.')
+    // The materialised faces: recto blanked, verso bold answer, other mask kept.
+    expect(cloze[0]?.front).toBe('Un **[…]** a un élément neutre.')
+    expect(cloze[0]?.back).toBe('Un **monoïde** a un élément neutre.')
+    expect(cloze[1]?.front).toBe('Un monoïde a un élément **[…]**.')
+    expect(cloze[1]?.back).toBe('Un monoïde a un élément **neutre**.')
+  })
+
+  it("kind 'mixed' → a malformed cloze draft is dropped, valid items kept", async () => {
+    const noteId = await seedNote('petite note')
+    const genId = await seedGeneration({ noteId, kind: 'mixed' })
+    const badGen: CardGenerator = {
+      async generate() {
+        return {
+          cards: [
+            { kind: 'qa', front: 'Q', back: 'A' },
+            { kind: 'cloze', clozeText: 'aucun trou ici' },
+          ],
+          promptTokens: 1,
+          completionTokens: 1,
+        }
+      },
+    }
+    await runGenerationJob(db, U, genId, badGen)
+    const row = await requireGenerationRow(db, U, genId)
+    expect(row.status).toBe('succeeded')
+    expect(row.items).toHaveLength(1) // only the qa item survives
+    expect(row.items[0]?.kind).toBe('qa')
   })
 
   it('respects MAX_TOTAL_ITEMS (global cap)', async () => {

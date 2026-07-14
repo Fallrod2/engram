@@ -1,4 +1,9 @@
-import type { GenerationItem, GenerationItemStatus } from '@engram/shared'
+import type {
+  GenerationItem,
+  GenerationItemContentType,
+  GenerationItemKind,
+  GenerationItemStatus,
+} from '@engram/shared'
 
 /**
  * Local review state (spec §4.4) — the accept/edit/reject/undo decisions live
@@ -24,6 +29,13 @@ export interface ReviewItem {
   status: GenerationItemStatus
   frozen: boolean
   cardId: string | undefined
+  /**
+   * Evaluation metadata from the 'mixed' generator (spec §3.2). READ-ONLY: never
+   * mutated, never snapshotted (they can't change during review), so undo and
+   * `toResolvePayload` ignore them. Absent on legacy / cards / quiz items → no badge.
+   */
+  kind?: GenerationItemKind
+  contentType?: GenerationItemContentType
   /** Per-item undo stack (most recent last). */
   history: Snapshot[]
 }
@@ -53,6 +65,9 @@ export function initReviewItems(items: GenerationItem[]): ReviewItem[] {
     status: it.status,
     frozen: it.cardId !== undefined,
     cardId: it.cardId,
+    // exactOptionalPropertyTypes: only set the key when the server sent a value.
+    ...(it.kind !== undefined ? { kind: it.kind } : {}),
+    ...(it.contentType !== undefined ? { contentType: it.contentType } : {}),
     history: [],
   }))
 }

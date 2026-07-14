@@ -1,26 +1,65 @@
 import { z } from 'zod'
 import type Anthropic from '@anthropic-ai/sdk'
+import { generationItemContentTypeSchema, type GenerationItemContentType } from '@engram/shared'
+import { looksLikeCloze } from './cloze'
+
+/**
+ * A single generated draft, BEFORE cloze expansion. A `qa` draft is a classic
+ * front/back card; a `cloze` draft is a template the job expands into N cards.
+ * `cards`/`quiz` (v1) outputs and any output missing `kind` normalise to `qa`
+ * (see the schema below) — the public type keeps `kind` optional on the qa arm
+ * so test generators returning bare `{ front, back }` still type-check.
+ */
+export type GeneratedCardDraft =
+  | {
+      kind?: 'qa' | undefined
+      contentType?: GenerationItemContentType | undefined
+      front: string
+      back: string
+    }
+  | { kind: 'cloze'; contentType?: GenerationItemContentType | undefined; clozeText: string }
+
+const qaDraftSchema = z.object({
+  // `kind` absent (v1 / older providers) normalises to 'qa'. The
+  // `.optional().default('qa')` chain is REQUIRED for discriminatedUnion to also
+  // match an ABSENT discriminator (ZodOptional adds `undefined` to the values);
+  // a bare `.default('qa')` would NOT match a missing `kind`.
+  kind: z.literal('qa').optional().default('qa'),
+  contentType: generationItemContentTypeSchema.optional(),
+  front: z.string().trim().min(1),
+  back: z.string().trim().min(1),
+})
+
+const clozeDraftSchema = z.object({
+  kind: z.literal('cloze'),
+  contentType: generationItemContentTypeSchema.optional(),
+  // Lenient gate: it must at least LOOK like a cloze (carry a `{{cN::` opener).
+  // Full structural validation + graceful per-item rejection happen later, in
+  // the expansion step (ai/cloze.ts) — a slightly malformed mask must not nuke
+  // the whole chunk's parse.
+  clozeText: z.string().trim().min(1).refine(looksLikeCloze, {
+    message: 'clozeText doit contenir au moins un masque {{cN::…}}',
+  }),
+})
+
+const emitCardDraftSchema = z.discriminatedUnion('kind', [qaDraftSchema, clozeDraftSchema])
 
 export const emitCardsInputSchema = z.object({
-  cards: z
-    .array(
-      z.object({
-        front: z.string().trim().min(1),
-        back: z.string().trim().min(1),
-      }),
-    )
-    // Bound aligned with MAX_TOKENS=8192: ~24 front/back Markdown cards fit well
-    // under 8k output tokens. The prompt (rule 8) already caps at 24 — this is
-    // the realistic per-call ceiling, not a distant safety valve.
-    .max(24),
+  // Bound aligned with MAX_TOKENS=8192: ~24 Markdown cards fit well under 8k
+  // output tokens. The prompts already cap at 24 — this is the realistic
+  // per-call ceiling, not a distant safety valve. (Cloze drafts still expand to
+  // several cards each afterwards; the global cap is enforced post-expansion.)
+  cards: z.array(emitCardDraftSchema).max(24),
 })
 
 /**
  * THE single Zod validation point, shared by every provider: takes a raw
  * `emitInput` object (a tool-call input, or a JSON-mode object) and returns the
- * validated cards. Throws (ZodError) on any non-conforming shape.
+ * validated drafts (qa and/or cloze). Throws (ZodError) on any non-conforming
+ * shape. `cards`/`quiz` callers only ever see `qa` drafts (their prompts never
+ * ask for cloze); `mixed` callers may see both.
  */
-export function parseEmitCardsInput(input: unknown): { front: string; back: string }[] {
+export function parseEmitCardsInput(input: unknown): GeneratedCardDraft[] {
   return emitCardsInputSchema.parse(input).cards
 }
 
@@ -50,7 +89,7 @@ export function extractAnthropicToolInput(res: Anthropic.Message): unknown {
  * block is present, the tool name is wrong, or the input is non-conforming.
  * Kept as the Anthropic-specific convenience used by the legacy generator.
  */
-export function parseEmitCards(res: Anthropic.Message): { front: string; back: string }[] {
+export function parseEmitCards(res: Anthropic.Message): GeneratedCardDraft[] {
   return parseEmitCardsInput(extractAnthropicToolInput(res))
 }
 

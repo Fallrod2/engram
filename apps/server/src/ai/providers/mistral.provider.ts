@@ -122,6 +122,9 @@ export function createMistralAdapter(fetchFn: FetchFn = defaultFetch): ProviderA
     async complete(cfg, args) {
       const base = baseUrlOf(cfg)
       const useTools = args.attempt < 2
+      // v1 schema by default (cards/quiz); mixed supplies the v2 schema via `emit`.
+      const emitDescription = args.emit?.description ?? EMIT_CARDS_DESCRIPTION
+      const emitSchema = args.emit?.schema ?? EMIT_CARDS_JSON_SCHEMA
       const body = useTools
         ? {
             model: cfg.model,
@@ -135,8 +138,8 @@ export function createMistralAdapter(fetchFn: FetchFn = defaultFetch): ProviderA
                 type: 'function',
                 function: {
                   name: 'emit_cards',
-                  description: EMIT_CARDS_DESCRIPTION,
-                  parameters: EMIT_CARDS_JSON_SCHEMA,
+                  description: emitDescription,
+                  parameters: emitSchema,
                 },
               },
             ],
@@ -151,7 +154,7 @@ export function createMistralAdapter(fetchFn: FetchFn = defaultFetch): ProviderA
             ],
             response_format: {
               type: 'json_schema',
-              json_schema: { name: 'emit_cards', schema: EMIT_CARDS_JSON_SCHEMA, strict: true },
+              json_schema: { name: 'emit_cards', schema: emitSchema, strict: true },
             },
           }
 

@@ -19,6 +19,7 @@ import { requireSubjectRow } from './subjects.service'
 import { insertFreshCardRow } from './cards.service'
 import { chunkNote } from '../ai/chunk'
 import { getCardGenerator, type CardGenerator } from '../ai/generator'
+import { expandCloze } from '../ai/cloze'
 import type { ResolvedProviderConfig } from '../ai/providers/types'
 
 /** Global cap on the number of cards a single generation may propose. */
@@ -149,9 +150,45 @@ export async function runGenerationJob(
       })
       promptTokens += r.promptTokens
       completionTokens += r.completionTokens
+      const isMixed = gen.kind === 'mixed'
       for (const c of r.cards) {
         if (items.length >= MAX_TOTAL_ITEMS) break
-        items.push({ id: randomUUID(), front: c.front, back: c.back, status: 'pending' })
+        if (c.kind === 'cloze') {
+          // Materialise the cloze template into one front/back card per distinct
+          // mask (the "façon quiz" light path — nothing downstream learns cloze
+          // exists). Malformed templates degrade gracefully: log + drop the item.
+          const expansion = expandCloze(c.clozeText)
+          if (!expansion.ok) {
+            console.warn(`[engram] generation ${genId}: cloze rejeté — ${expansion.reason}`)
+            continue
+          }
+          // A single group may be truncated mid-way by MAX_TOTAL_ITEMS; the
+          // resulting cards are independent, so a partial group is acceptable.
+          for (const card of expansion.cards) {
+            if (items.length >= MAX_TOTAL_ITEMS) break
+            items.push({
+              id: randomUUID(),
+              front: card.front,
+              back: card.back,
+              status: 'pending',
+              kind: 'cloze',
+              ...(c.contentType ? { contentType: c.contentType } : {}),
+              clozeText: c.clozeText,
+            })
+          }
+          continue
+        }
+        // qa draft. Only `mixed` stamps the evaluation metadata (kind/contentType)
+        // so the review UI can badge it; cards/quiz stay byte-identical (no meta).
+        items.push({
+          id: randomUUID(),
+          front: c.front,
+          back: c.back,
+          status: 'pending',
+          ...(isMixed
+            ? { kind: 'qa' as const, ...(c.contentType ? { contentType: c.contentType } : {}) }
+            : {}),
+        })
       }
     }
 

@@ -397,6 +397,20 @@ export const dictEn: Dict = {
     noProviderBody:
       'Configure a provider (Anthropic, OpenRouter, Ollama…) in Settings → Artificial intelligence.',
     noProviderCta: 'Settings',
+    // 'Mixed auto' generation mode (cloze feature). New strings only — the rest of
+    // the import/generation flow keeps its inherited hardcoded FR (documented debt).
+    mixedTab: 'Mixed (auto)',
+    mixedDescription:
+      'The AI picks the best format (Q/A or fill-in-the-blank) based on the nature of the content.',
+    badgeQa: 'Q/A',
+    badgeCloze: 'Cloze',
+    contentType: {
+      definition: 'definition',
+      formula: 'formula',
+      list: 'list',
+      fact: 'fact',
+      concept: 'concept',
+    },
   },
 
   ocr: {
