@@ -40,7 +40,14 @@ function ShellInner() {
   }, [])
 
   return (
-    <div id="app-shell" className="flex h-dvh w-full overflow-hidden bg-bg text-text">
+    // `relative` makes the shell (which is `overflow-hidden` + `h-dvh`) the
+    // containing block for any absolutely-positioned descendant — notably the
+    // sr-only file input in the backup card, whose static position on a long
+    // /settings page otherwise resolved against the viewport and stretched the
+    // document past the fold, defeating the scroll lock (fix-mobile-shell
+    // §settings-scroll). The `html { overflow: clip }` lock below stays as a
+    // belt-and-suspenders guard.
+    <div id="app-shell" className="relative flex h-dvh w-full overflow-hidden bg-bg text-text">
       {/* Skip link (a11y) — first in tab order. */}
       <a
         href="#main-content"
