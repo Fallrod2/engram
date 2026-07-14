@@ -380,6 +380,8 @@ export const dictFr = {
     colSubject: 'Matière',
     colMatureReviews: 'Reviews mûres',
     colRetention: 'Rétention',
+    matureReviews_one: '{count} review mûre',
+    matureReviews_other: '{count} reviews mûres',
     studyTime: "Temps d'étude",
     reviews: 'Reviews',
     success: 'Réussite',

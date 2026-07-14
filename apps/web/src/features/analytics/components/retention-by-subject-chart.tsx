@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import type { RetentionResponse, Subject } from '@engram/shared'
 import { SubjectDot } from '@/components/subject-dot'
+import { useT, usePlural, type PluralCategory, type TFunction } from '@/lib/i18n'
 import { chartInk, subjectColorValue } from '../chart-theme'
 import { formatPercent } from '../metrics'
 import { ChartCard } from './chart-card'
@@ -30,17 +31,25 @@ interface Row {
   reviews: number
 }
 
-const tableColumns: ChartColumn<Row>[] = [
-  { key: 'name', header: 'Matière', render: (r) => r.name },
-  { key: 'reviews', header: 'Reviews mûres', align: 'right', mono: true, render: (r) => r.reviews },
-  {
-    key: 'retention',
-    header: 'Rétention',
-    align: 'right',
-    mono: true,
-    render: (r) => (r.retention === null ? '—' : formatPercent(r.retention)),
-  },
-]
+function buildTableColumns(t: TFunction): ChartColumn<Row>[] {
+  return [
+    { key: 'name', header: t('analytics.colSubject'), render: (r) => r.name },
+    {
+      key: 'reviews',
+      header: t('analytics.colMatureReviews'),
+      align: 'right',
+      mono: true,
+      render: (r) => r.reviews,
+    },
+    {
+      key: 'retention',
+      header: t('analytics.colRetention'),
+      align: 'right',
+      mono: true,
+      render: (r) => (r.retention === null ? '—' : formatPercent(r.retention)),
+    },
+  ]
+}
 
 export function RetentionBySubjectChart({
   data,
@@ -57,6 +66,9 @@ export function RetentionBySubjectChart({
   error: boolean
   onRetry: () => void
 }) {
+  const t = useT()
+  const plural = usePlural()
+  const tableColumns = buildTableColumns(t)
   const byId = new Map(subjects.map((s) => [s.id, s]))
   const rows: Row[] = (data?.subjects ?? []).flatMap((r) => {
     const s = byId.get(r.subjectId)
@@ -85,7 +97,7 @@ export function RetentionBySubjectChart({
     body = (
       <ChartEmpty
         variant="error"
-        title="Impossible de charger la rétention."
+        title={t('analytics.retentionError')}
         onRetry={onRetry}
         height={180}
       />
@@ -93,8 +105,8 @@ export function RetentionBySubjectChart({
   } else if (allEmpty) {
     body = (
       <ChartEmpty
-        title="Révise encore un peu pour voir ta rétention par matière."
-        hint="La rétention se calcule sur les cartes mûres (≥ 10 reviews)."
+        title={t('analytics.retentionEmpty')}
+        hint={t('analytics.retentionHint')}
         height={180}
       />
     )
@@ -130,7 +142,7 @@ export function RetentionBySubjectChart({
             />
             <Tooltip
               cursor={{ fill: chartInk.surface, opacity: 0.4 }}
-              content={renderTooltip}
+              content={(props: TooltipProps<number, string>) => renderTooltip(props, t, plural)}
               isAnimationActive={false}
             />
             <Bar
@@ -164,7 +176,7 @@ export function RetentionBySubjectChart({
                 <SubjectDot color={r.color} />
                 <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{r.name}</span>
                 <span className="font-mono text-xs text-text-faint">—</span>
-                <span className="text-xs text-text-faint">pas encore assez de données</span>
+                <span className="text-xs text-text-faint">{t('analytics.notEnoughData')}</span>
               </li>
             ))}
           </ul>
@@ -176,14 +188,14 @@ export function RetentionBySubjectChart({
         columns={tableColumns}
         rows={[...rated, ...unrated]}
         rowKey={(r) => r.subjectId}
-        caption="Rétention par matière"
+        caption={t('analytics.retentionCaption')}
       />
     )
   }
 
   return (
     <ChartCard
-      title="Rétention par matière"
+      title={t('analytics.retentionTitle')}
       subtitle={windowLabel}
       isFetching={isFetching}
       showToggle={!allEmpty && !(error && !data)}
@@ -223,13 +235,17 @@ function SubjectTick(props: {
   )
 }
 
-function renderTooltip({ active, payload }: TooltipProps<number, string>) {
+function renderTooltip(
+  { active, payload }: TooltipProps<number, string>,
+  t: TFunction,
+  plural: (n: number) => PluralCategory,
+) {
   if (!active || !payload || payload.length === 0) return null
   const row = payload[0]?.payload as Row | undefined
   if (!row || row.retention === null) return null
   return (
     <TooltipShell
-      date={`${row.reviews} review${row.reviews > 1 ? 's' : ''} mûre${row.reviews > 1 ? 's' : ''}`}
+      date={t(`analytics.matureReviews_${plural(row.reviews)}`, { count: row.reviews })}
     >
       <TooltipRow
         colorVar={subjectColorValue(row.color)}

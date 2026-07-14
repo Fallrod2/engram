@@ -374,6 +374,8 @@ export const dictEn: Dict = {
     colSubject: 'Subject',
     colMatureReviews: 'Mature reviews',
     colRetention: 'Retention',
+    matureReviews_one: '{count} mature review',
+    matureReviews_other: '{count} mature reviews',
     studyTime: 'Study time',
     reviews: 'Reviews',
     success: 'Success',
