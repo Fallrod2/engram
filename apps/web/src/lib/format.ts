@@ -121,6 +121,24 @@ export function weekdayAbbrevs(): string[] {
   )
 }
 
+/** Short month name for a date in the active locale, e.g. `juil.` / `Jul`. */
+export function monthShort(date: Date): string {
+  return date.toLocaleDateString(currentLocale, { month: 'short' })
+}
+
+/**
+ * Heatmap weekday gutter labels (Mon/Wed/Fri only, others blank) in the active
+ * locale, capitalized — FR `Lun/Mer/Ven`, EN `Mon/Wed/Fri`. Derived from `Intl`
+ * so the grid follows the language instead of hard-coding FR.
+ */
+export function heatmapWeekdayLabels(): string[] {
+  const monday = new Date(2023, 0, 2) // a Monday
+  const short = (i: number) =>
+    addDays(monday, i).toLocaleDateString(currentLocale, { weekday: 'short' }).replace(/\.$/, '')
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+  return [cap(short(0)), '', cap(short(2)), '', cap(short(4)), '', '']
+}
+
 /** Month + year label for the month toolbar, e.g. `juillet 2026`. */
 export function formatMonthLabel(anchor: Date): string {
   return anchor.toLocaleDateString(currentLocale, { month: 'long', year: 'numeric' })

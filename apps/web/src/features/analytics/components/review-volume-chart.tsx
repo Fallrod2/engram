@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import type { ReviewVolumeBucket, ReviewVolumeResponse } from '@engram/shared'
 import { RATINGS } from '@/features/review/labels'
-import { useT } from '@/lib/i18n'
+import { useT, type TFunction } from '@/lib/i18n'
 import { formatLongDay } from '@/lib/format'
 import { chartInk, ratingColor } from '../chart-theme'
 import { formatAxisDay } from '../metrics'
@@ -31,14 +31,46 @@ const SERIES = [
   { key: 'easy', token: 'info' },
 ] as const
 
-const tableColumns: ChartColumn<ReviewVolumeBucket>[] = [
-  { key: 'date', header: 'Jour', render: (b) => b.date, mono: true },
-  { key: 'again', header: 'Encore', align: 'right', mono: true, render: (b) => b.again },
-  { key: 'hard', header: 'Difficile', align: 'right', mono: true, render: (b) => b.hard },
-  { key: 'good', header: 'Bien', align: 'right', mono: true, render: (b) => b.good },
-  { key: 'easy', header: 'Facile', align: 'right', mono: true, render: (b) => b.easy },
-  { key: 'total', header: 'Total', align: 'right', mono: true, render: (b) => b.total },
-]
+function buildTableColumns(t: TFunction): ChartColumn<ReviewVolumeBucket>[] {
+  return [
+    { key: 'date', header: t('analytics.colDay'), render: (b) => b.date, mono: true },
+    {
+      key: 'again',
+      header: t('session.ratings.again'),
+      align: 'right',
+      mono: true,
+      render: (b) => b.again,
+    },
+    {
+      key: 'hard',
+      header: t('session.ratings.hard'),
+      align: 'right',
+      mono: true,
+      render: (b) => b.hard,
+    },
+    {
+      key: 'good',
+      header: t('session.ratings.good'),
+      align: 'right',
+      mono: true,
+      render: (b) => b.good,
+    },
+    {
+      key: 'easy',
+      header: t('session.ratings.easy'),
+      align: 'right',
+      mono: true,
+      render: (b) => b.easy,
+    },
+    {
+      key: 'total',
+      header: t('analytics.colTotal'),
+      align: 'right',
+      mono: true,
+      render: (b) => b.total,
+    },
+  ]
+}
 
 export function ReviewVolumeChart({
   data,
@@ -56,6 +88,7 @@ export function ReviewVolumeChart({
   reduce: boolean
 }) {
   const t = useT()
+  const tableColumns = buildTableColumns(t)
   // Legend labels reuse the shared rating i18n keys so they stay in sync with
   // the session (RATINGS[].label is an i18n key, resolved here).
   const legendItems: LegendItem[] = RATINGS.map((r) => ({
@@ -77,7 +110,7 @@ export function ReviewVolumeChart({
     body = (
       <ChartEmpty
         variant="error"
-        title="Impossible de charger le volume de reviews."
+        title={t('analytics.volumeError')}
         onRetry={onRetry}
         height={HEIGHT}
       />
@@ -85,8 +118,8 @@ export function ReviewVolumeChart({
   } else if (empty) {
     body = (
       <ChartEmpty
-        title="Aucune review sur cette période."
-        hint="Élargis la fenêtre pour voir plus."
+        title={t('analytics.volumeEmpty')}
+        hint={t('analytics.volumeHint')}
         height={HEIGHT}
       />
     )
@@ -119,7 +152,7 @@ export function ReviewVolumeChart({
             />
             <Tooltip
               cursor={{ fill: chartInk.surface, opacity: 0.4 }}
-              content={renderTooltip}
+              content={(props: TooltipProps<number, string>) => renderTooltip(props, t)}
               isAnimationActive={false}
             />
             {SERIES.map((s, i) => (
@@ -153,14 +186,14 @@ export function ReviewVolumeChart({
         columns={tableColumns}
         rows={buckets}
         rowKey={(b) => b.date}
-        caption="Reviews par jour et par note"
+        caption={t('analytics.volumeCaption')}
       />
     )
   }
 
   return (
     <ChartCard
-      title="Volume par jour"
+      title={t('analytics.volumeTitle')}
       subtitle={windowLabel}
       isFetching={isFetching}
       showToggle={!empty && !(error && !data)}
@@ -201,17 +234,38 @@ function MaxTotalLabel(props: {
   )
 }
 
-function renderTooltip({ active, payload }: TooltipProps<number, string>) {
+function renderTooltip({ active, payload }: TooltipProps<number, string>, t: TFunction) {
   if (!active || !payload || payload.length === 0) return null
   const bucket = payload[0]?.payload as ReviewVolumeBucket | undefined
   if (!bucket) return null
   return (
     <TooltipShell date={formatLongDay(bucket.date)}>
-      <TooltipRow colorVar={ratingColor.danger} label="Encore" value={String(bucket.again)} />
-      <TooltipRow colorVar={ratingColor.warning} label="Difficile" value={String(bucket.hard)} />
-      <TooltipRow colorVar={ratingColor.success} label="Bien" value={String(bucket.good)} />
-      <TooltipRow colorVar={ratingColor.info} label="Facile" value={String(bucket.easy)} />
-      <TooltipRow colorVar={chartInk.axis} label="Total" value={String(bucket.total)} strong />
+      <TooltipRow
+        colorVar={ratingColor.danger}
+        label={t('session.ratings.again')}
+        value={String(bucket.again)}
+      />
+      <TooltipRow
+        colorVar={ratingColor.warning}
+        label={t('session.ratings.hard')}
+        value={String(bucket.hard)}
+      />
+      <TooltipRow
+        colorVar={ratingColor.success}
+        label={t('session.ratings.good')}
+        value={String(bucket.good)}
+      />
+      <TooltipRow
+        colorVar={ratingColor.info}
+        label={t('session.ratings.easy')}
+        value={String(bucket.easy)}
+      />
+      <TooltipRow
+        colorVar={chartInk.axis}
+        label={t('analytics.colTotal')}
+        value={String(bucket.total)}
+        strong
+      />
     </TooltipShell>
   )
 }

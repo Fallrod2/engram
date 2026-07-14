@@ -1,6 +1,7 @@
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { isEditableTarget } from '@/lib/use-hotkeys'
 import { Kbd } from '@/components/ui/kbd'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 /**
@@ -30,6 +31,7 @@ export function ChartCard({
   showToggle?: boolean
   className?: string
 }) {
+  const t = useT()
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const labelId = useId()
   const canToggle = showToggle && table !== undefined
@@ -58,7 +60,7 @@ export function ChartCard({
           </h2>
           {subtitle && (
             <p className="font-mono text-2xs uppercase tracking-[0.08em] text-text-faint">
-              sur {subtitle}
+              {t('analytics.period', { label: subtitle })}
             </p>
           )}
         </div>
@@ -67,14 +69,14 @@ export function ChartCard({
           {canToggle && (
             <div
               role="tablist"
-              aria-label="Affichage"
+              aria-label={t('analytics.viewAria')}
               className="flex items-center gap-0.5 rounded-md bg-surface-3 p-0.5"
             >
               <ToggleButton active={view === 'chart'} onClick={() => setView('chart')}>
-                Graphe
+                {t('analytics.viewChart')}
               </ToggleButton>
               <ToggleButton active={view === 'table'} onClick={() => setView('table')}>
-                Tableau
+                {t('analytics.viewTable')}
               </ToggleButton>
               <Kbd className="ml-1 mr-0.5 border-transparent bg-transparent">t</Kbd>
             </div>

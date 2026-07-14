@@ -167,7 +167,7 @@ function AnalyticsPage() {
         {/* Activity heatmap — its own year stepper, NOT window-scoped */}
         {heatmapQuery.data ? (
           <ChartCard
-            title="Activité"
+            title={t('analytics.activity')}
             isFetching={heatmapQuery.isFetching}
             toolbar={
               <div className="flex items-center gap-4">
@@ -242,16 +242,23 @@ function AnalyticsPage() {
 }
 
 function HeatmapTable({ data }: { data: HeatmapResponse }) {
+  const t = useT()
   const rows = data.days.filter((d) => d.count > 0).sort((a, b) => b.date.localeCompare(a.date))
   return (
     <ChartTableView
       columns={[
-        { key: 'date', header: 'Jour', render: (d) => d.date, mono: true },
-        { key: 'count', header: 'Reviews', align: 'right', mono: true, render: (d) => d.count },
+        { key: 'date', header: t('analytics.colDay'), render: (d) => d.date, mono: true },
+        {
+          key: 'count',
+          header: t('analytics.colReviews'),
+          align: 'right',
+          mono: true,
+          render: (d) => d.count,
+        },
       ]}
       rows={rows}
       rowKey={(d) => d.date}
-      caption="Activité par jour"
+      caption={t('analytics.activityByDay')}
     />
   )
 }

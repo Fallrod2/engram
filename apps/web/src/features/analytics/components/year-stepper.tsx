@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useT } from '@/lib/i18n'
 
 /**
  * Calendar navigation for the heatmap (spec §1.5) — NOT a data filter. `next`
@@ -16,13 +17,14 @@ export function YearStepper({
   maxYear: number
   onChange: (year: number) => void
 }) {
+  const t = useT()
   return (
     <div className="flex items-center gap-0.5">
       <Button
         variant="ghost"
         size="icon"
         className="size-7 text-text-muted"
-        aria-label="Année précédente"
+        aria-label={t('analytics.yearPrev')}
         disabled={year <= minYear}
         onClick={() => onChange(year - 1)}
       >
@@ -33,7 +35,7 @@ export function YearStepper({
         variant="ghost"
         size="icon"
         className="size-7 text-text-muted"
-        aria-label="Année suivante"
+        aria-label={t('analytics.yearNext')}
         disabled={year >= maxYear}
         onClick={() => onChange(year + 1)}
       >

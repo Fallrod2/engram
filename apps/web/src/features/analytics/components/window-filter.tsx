@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react'
 import { ANALYTICS_WINDOWS, windowTabLabel, type AnalyticsWindow } from '../window'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 /**
@@ -15,6 +16,7 @@ export function WindowFilter({
   value: AnalyticsWindow
   onChange: (w: AnalyticsWindow) => void
 }) {
+  const t = useT()
   const refs = useRef<(HTMLButtonElement | null)[]>([])
 
   function onKeyDown(e: KeyboardEvent, index: number) {
@@ -35,7 +37,7 @@ export function WindowFilter({
   return (
     <div
       role="radiogroup"
-      aria-label="Fenêtre temporelle"
+      aria-label={t('analytics.windowAria')}
       className="inline-flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5"
     >
       {ANALYTICS_WINDOWS.map((w, i) => {
