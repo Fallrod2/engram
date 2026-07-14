@@ -1,8 +1,29 @@
-import { memo } from 'react'
+import { lazy, memo, Suspense } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize from 'rehype-sanitize'
 import { cn } from '@/lib/utils'
+
+/**
+ * KaTeX is ~300 kB + fonts, so it never touches the base pipeline. It lives in a
+ * separate module loaded lazily and ONLY when a card actually contains math
+ * (spec §1). Math-free content keeps the exact previous pipeline at zero cost.
+ */
+const MarkdownMath = lazy(() => import('./markdown-math'))
+
+/**
+ * Cheap pre-parse heuristic to decide whether to pull the KaTeX chunk: a pair of
+ * unescaped `$` delimiters (covers both `$…$` inline and `$$…$$` block, whose
+ * adjacent opening `$$` already matches). Prose with a single `$` (a price)
+ * never triggers a load; a rare false positive like "$5 to $10" only costs the
+ * chunk, never correctness. Kept as a `test()` (no allocation) on every render.
+ */
+const MATH_HINT = /\$[^$]*\$/
+
+// Spacing + horizontal scroll for display math so a wide matrix never blows out
+// the card width. KaTeX inherits `currentColor`, so no theme rule is needed.
+const KATEX_PROSE =
+  '[&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-0.5'
 
 /**
  * Reusable, XSS-safe Markdown renderer (spec §5). Rendered by `react-markdown`
@@ -55,12 +76,27 @@ function MarkdownImpl({
   centered?: boolean
   className?: string
 }) {
+  const hasMath = MATH_HINT.test(source)
   return (
-    <div className={cn('text-text', PROSE, centered && 'text-center', className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-        {source}
-      </ReactMarkdown>
+    <div className={cn('text-text', PROSE, KATEX_PROSE, centered && 'text-center', className)}>
+      {hasMath ? (
+        // Fallback = the plain pipeline so the card text is visible instantly and
+        // upgrades to rendered math once the (local, fast) chunk resolves.
+        <Suspense fallback={<BaseMarkdown source={source} />}>
+          <MarkdownMath source={source} />
+        </Suspense>
+      ) : (
+        <BaseMarkdown source={source} />
+      )}
     </div>
+  )
+}
+
+function BaseMarkdown({ source }: { source: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+      {source}
+    </ReactMarkdown>
   )
 }
 
