@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { useCoarsePointer } from '@/lib/use-media-query'
+import { useT, usePlural } from '@/lib/i18n'
 import { MarkdownPreview } from '@/lib/markdown-preview'
 
 export interface CardComposerHandle {
@@ -40,6 +41,8 @@ export function CardComposer({
   const [added, setAdded] = useState(0)
   const [preview, setPreview] = useState(false)
   const coarse = useCoarsePointer()
+  const t = useT()
+  const plural = usePlural()
 
   const frontRef = useRef<HTMLTextAreaElement>(null)
   const backRef = useRef<HTMLTextAreaElement>(null)
@@ -88,7 +91,7 @@ export function CardComposer({
   return (
     <div className="rounded-md border border-border bg-surface-2 p-3" onKeyDown={onKeyDown}>
       <Field
-        label="Recto"
+        label={t('composer.front')}
         error={errors.front}
         textareaRef={frontRef}
         value={front}
@@ -97,13 +100,13 @@ export function CardComposer({
           if (errors.front) setErrors((e) => ({ ...e, front: false }))
           autoGrow(frontRef.current)
         }}
-        placeholder="Question, terme, invite…"
+        placeholder={t('composer.frontPlaceholder')}
         autoFocus
       />
 
       <div className="mt-3">
         <Field
-          label="Verso"
+          label={t('composer.back')}
           error={errors.back}
           textareaRef={backRef}
           value={back}
@@ -112,7 +115,7 @@ export function CardComposer({
             if (errors.back) setErrors((e) => ({ ...e, back: false }))
             autoGrow(backRef.current)
           }}
-          placeholder="Réponse, définition…"
+          placeholder={t('composer.backPlaceholder')}
         />
         {preview && back.trim().length > 0 && (
           <div className="mt-2 rounded-sm border border-border bg-bg px-3 py-2 text-sm text-text">
@@ -131,14 +134,14 @@ export function CardComposer({
           onClick={() => setPreview((p) => !p)}
         >
           {preview ? <EyeOff /> : <Eye />}
-          Markdown
+          {t('composer.markdown')}
         </Button>
 
         {/* Keyboard cheat-sheet — hidden on touch, where it is inoperative
             noise (fix-session §3). */}
         {!coarse && (
           <span className="flex items-center gap-1.5 text-2xs text-text-faint">
-            <Kbd>⌘↵</Kbd> Ajouter et continuer
+            <Kbd>⌘↵</Kbd> {t('composer.addContinue')}
             <span className="text-border-strong">·</span>
             <Kbd>esc</Kbd>
           </span>
@@ -147,11 +150,11 @@ export function CardComposer({
         <div className="ml-auto flex items-center gap-3">
           {added > 0 && (
             <span className="font-mono text-xs tabular-nums text-text-faint" aria-live="polite">
-              +{added} ajoutée{added > 1 ? 's' : ''}
+              {t(`composer.added_${plural(added)}`, { count: added })}
             </span>
           )}
           <Button type="button" onClick={submit}>
-            Ajouter
+            {t('composer.add')}
           </Button>
         </div>
       </div>
@@ -176,6 +179,7 @@ function Field({
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   autoFocus?: boolean
 }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-1">
       <label className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
@@ -195,7 +199,7 @@ function Field({
           error ? 'border-danger' : 'border-border hover:border-border-strong',
         )}
       />
-      {error && <p className="text-2xs text-danger">Ce champ est requis.</p>}
+      {error && <p className="text-2xs text-danger">{t('composer.required')}</p>}
     </div>
   )
 }

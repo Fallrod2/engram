@@ -11,6 +11,7 @@ import {
 } from 'react-hook-form'
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
+import { useT, type TKey } from '@/lib/i18n'
 
 /**
  * React Hook Form primitives (shadcn `form`, spec §1.8/§1.10). `Form` is the
@@ -110,7 +111,12 @@ function FormMessage({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(error.message ?? '') : children
+  const t = useT()
+  // Validation messages are stored as dict keys (e.g. 'forms.nameRequired'); t()
+  // returns the path unchanged for anything that isn't a key, so plain-string
+  // messages from the shared schemas still render verbatim.
+  const raw = error ? String(error.message ?? '') : children
+  const body = typeof raw === 'string' && raw ? t(raw as TKey) : raw
   if (!body) return null
   return (
     <p id={formMessageId} className={cn('text-2xs text-danger', className)} {...props}>

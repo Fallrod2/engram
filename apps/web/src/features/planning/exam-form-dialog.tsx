@@ -6,6 +6,7 @@ import { Check, ChevronsUpDown } from 'lucide-react'
 import { z } from 'zod'
 import type { CreateExam, Exam, UpdateExam } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { parseDayKey } from '@/lib/calendar'
 import { EntityFormDialog } from '@/components/entity-form-dialog'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -26,9 +27,9 @@ import { subjectsListOptions } from '@/features/subjects/queries'
 import { DatePicker } from './date-picker'
 
 const examFormSchema = z.object({
-  title: z.string().trim().min(1, 'Le titre est requis.'),
+  title: z.string().trim().min(1, 'forms.titleRequired'),
   date: z.date(),
-  subjectIds: z.array(z.string()).min(1, 'Au moins une matière.'),
+  subjectIds: z.array(z.string()).min(1, 'forms.atLeastOneSubject'),
   notes: z.string(),
 })
 
@@ -63,6 +64,7 @@ export function ExamFormDialog({
   onCreate: (input: CreateExam) => void
   onUpdate: (id: string, patch: UpdateExam) => void
 }) {
+  const t = useT()
   const subjects = (useQuery(subjectsListOptions()).data ?? []).filter((s) => !s.archived)
   const form = useForm<ExamFormValues>({
     resolver: zodResolver(examFormSchema),
@@ -77,7 +79,7 @@ export function ExamFormDialog({
     <EntityFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={exam ? "Modifier l'examen" : 'Nouvel examen'}
+      title={exam ? t('dialogs.examEdit') : t('dialogs.examNew')}
       form={form}
       onSubmit={(values) => {
         const isoDate = values.date.toISOString()
@@ -105,11 +107,11 @@ export function ExamFormDialog({
         name="title"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Titre</FormLabel>
+            <FormLabel>{t('forms.title')}</FormLabel>
             <FormControl>
               <Input
                 autoFocus
-                placeholder="ex. Partiel de Théorie des langages"
+                placeholder={t('forms.examTitlePlaceholder')}
                 className={cn(fieldState.error && 'border-danger')}
                 {...field}
               />
@@ -124,7 +126,7 @@ export function ExamFormDialog({
         name="date"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Date</FormLabel>
+            <FormLabel>{t('forms.date')}</FormLabel>
             <FormControl>
               <DatePicker
                 value={field.value}
@@ -149,7 +151,7 @@ export function ExamFormDialog({
           }
           return (
             <FormItem>
-              <FormLabel>Matières</FormLabel>
+              <FormLabel>{t('forms.subjects')}</FormLabel>
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
@@ -160,7 +162,7 @@ export function ExamFormDialog({
                     >
                       <span className="flex flex-wrap items-center gap-1.5">
                         {selected.length === 0 ? (
-                          <span className="text-text-faint">Sélectionner…</span>
+                          <span className="text-text-faint">{t('forms.selectSubjects')}</span>
                         ) : (
                           selected.map((s) => (
                             <span key={s.id} className="flex items-center gap-1 text-xs">
@@ -176,9 +178,9 @@ export function ExamFormDialog({
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Rechercher une matière…" />
+                    <CommandInput placeholder={t('forms.searchSubject')} />
                     <CommandList>
-                      <CommandEmpty>Aucune matière.</CommandEmpty>
+                      <CommandEmpty>{t('forms.noSubjectResults')}</CommandEmpty>
                       <CommandGroup>
                         {subjects.map((s) => {
                           const isSel = field.value.includes(s.id)
@@ -206,9 +208,9 @@ export function ExamFormDialog({
         name="notes"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Notes</FormLabel>
+            <FormLabel>{t('forms.notes')}</FormLabel>
             <FormControl>
-              <Textarea placeholder="Optionnel" className="min-h-16" {...field} />
+              <Textarea placeholder={t('forms.optional')} className="min-h-16" {...field} />
             </FormControl>
           </FormItem>
         )}

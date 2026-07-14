@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { fetchHealth } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 /**
@@ -8,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
  * TanStack Query and validates against the shared Zod schema (see lib/api).
  */
 export function ApiStatus({ collapsed = false }: { collapsed?: boolean }) {
+  const t = useT()
   const { data, isPending, isError } = useQuery({
     queryKey: ['health'],
     queryFn: ({ signal }) => fetchHealth(signal),
@@ -22,10 +24,10 @@ export function ApiStatus({ collapsed = false }: { collapsed?: boolean }) {
 
   const label =
     state === 'ok'
-      ? `API en ligne · ${data?.service ?? 'engram-server'}`
+      ? t('apiStatus.online', { service: data?.service ?? 'engram-server' })
       : state === 'down'
-        ? 'API injoignable'
-        : 'Vérification…'
+        ? t('apiStatus.offline')
+        : t('apiStatus.checking')
 
   const dot = <span className={cn('size-1.5 shrink-0 rounded-full', dotTone)} aria-hidden />
 

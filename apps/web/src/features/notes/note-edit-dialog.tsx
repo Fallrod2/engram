@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import type { Note, Subject, UpdateNote } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { EntityFormDialog } from '@/components/entity-form-dialog'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -20,7 +21,7 @@ import { SubjectDot } from '@/components/subject-dot'
 const NO_SUBJECT = '__none__'
 
 const noteFormSchema = z.object({
-  title: z.string().trim().min(1, 'Le titre est requis.'),
+  title: z.string().trim().min(1, 'forms.titleRequired'),
   subjectId: z.string(),
 })
 
@@ -40,6 +41,7 @@ export function NoteEditDialog({
   subjects: Subject[]
   onSubmit: (patch: UpdateNote) => void
 }) {
+  const t = useT()
   const form = useForm<NoteFormValues>({
     resolver: zodResolver(noteFormSchema),
     defaultValues: initial(note),
@@ -53,7 +55,7 @@ export function NoteEditDialog({
     <EntityFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Modifier la note"
+      title={t('dialogs.noteEdit')}
       form={form}
       onSubmit={(values) =>
         onSubmit({
@@ -68,7 +70,7 @@ export function NoteEditDialog({
         name="title"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Titre</FormLabel>
+            <FormLabel>{t('forms.title')}</FormLabel>
             <FormControl>
               <Input autoFocus className={cn(fieldState.error && 'border-danger')} {...field} />
             </FormControl>
@@ -82,13 +84,13 @@ export function NoteEditDialog({
         name="subjectId"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Matière</FormLabel>
+            <FormLabel>{t('forms.subject')}</FormLabel>
             <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger aria-label="Matière">
+              <SelectTrigger aria-label={t('forms.subject')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NO_SUBJECT}>Sans matière</SelectItem>
+                <SelectItem value={NO_SUBJECT}>{t('forms.noSubjectOption')}</SelectItem>
                 {subjects
                   .filter((s) => !s.archived)
                   .map((s) => (

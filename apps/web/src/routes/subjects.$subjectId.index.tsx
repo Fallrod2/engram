@@ -58,12 +58,13 @@ export const Route = createFileRoute('/subjects/$subjectId/')({
 
 function DecksError({ error }: { error: Error }) {
   const router = useRouter()
+  const t = useT()
   const notFound = error instanceof ApiError && error.status === 404
   return (
     <ErrorState
       kind={notFound ? 'subject' : 'decks'}
       {...(notFound
-        ? { back: <Link to="/subjects">Retour aux matières</Link> }
+        ? { back: <Link to="/subjects">{t('subjects.backToSubjects')}</Link> }
         : { onRetry: () => void router.invalidate() })}
     />
   )
@@ -157,7 +158,7 @@ function DecksPage() {
         breadcrumb={
           <>
             <Link to="/subjects" className="text-text-muted transition-colors hover:text-text">
-              Matières
+              {t('pageTitle.subjects')}
             </Link>
             <span className="text-text-faint">/</span>
           </>
@@ -176,7 +177,7 @@ function DecksPage() {
                 onClick={() => void navigate({ to: '/review', search: { subjectId } })}
               >
                 <GraduationCap />
-                Réviser
+                {t('subjects.review')}
                 <span className="ml-1 font-mono text-xs tabular-nums text-text-muted">
                   {subjectDue}
                 </span>
@@ -184,7 +185,7 @@ function DecksPage() {
             )}
             <Button onClick={() => setCreateOpen(true)}>
               <Plus />
-              Nouveau deck
+              {t('decks.new')}
               {!coarse && (
                 <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
               )}
@@ -195,7 +196,7 @@ function DecksPage() {
                   variant="ghost"
                   size="icon"
                   className="text-text-muted"
-                  aria-label="Actions de la matière"
+                  aria-label={t('subjects.menuActions')}
                 >
                   <MoreHorizontal />
                 </Button>
@@ -203,14 +204,14 @@ function DecksPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setEditSubjectOpen(true)}>
                   <Pencil />
-                  Éditer la matière
+                  {t('subjects.editSubject')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() =>
                     archiveSubject.mutate({ id: subject.id, archived: !subject.archived })
                   }
                 >
-                  {subject.archived ? 'Désarchiver' : 'Archiver'}
+                  {subject.archived ? t('subjects.unarchive') : t('common.archive')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -218,7 +219,7 @@ function DecksPage() {
                   onSelect={() => setDeleteSubjectOpen(true)}
                 >
                   <Trash2 />
-                  Supprimer
+                  {t('common.delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -228,8 +229,9 @@ function DecksPage() {
 
       {/* Recap banner */}
       <p className="mb-4 font-mono text-xs tabular-nums text-text-muted">
-        {totalCards} cartes<span className="mx-1.5 text-border-strong">·</span>
-        {subjectDue} à réviser
+        {t(`listMeta.cards_${plural(totalCards)}`, { count: totalCards })}
+        <span className="mx-1.5 text-border-strong">·</span>
+        {t(`listMeta.due_${plural(subjectDue)}`, { count: subjectDue })}
       </p>
 
       {sorted.length === 0 ? (
@@ -240,7 +242,7 @@ function DecksPage() {
           action={
             <Button onClick={() => setCreateOpen(true)}>
               <Plus />
-              {t('shortcuts.keys.newDeck')}
+              {t('decks.new')}
               {!coarse && (
                 <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
               )}
@@ -250,9 +252,9 @@ function DecksPage() {
       ) : (
         <div>
           <div className="hidden grid-cols-[1fr_72px_96px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint sm:grid">
-            <span>Deck</span>
-            <span className="text-right">Cartes</span>
-            <span className="text-right">Dues</span>
+            <span>{t('decks.colDeck')}</span>
+            <span className="text-right">{t('subjects.colCards')}</span>
+            <span className="text-right">{t('subjects.colDue')}</span>
             <span />
           </div>
           <ul className="flex flex-col" onKeyDown={roving.onKeyDown}>
@@ -303,7 +305,7 @@ function DecksPage() {
                           variant="ghost"
                           size="icon"
                           className="size-7 pointer-coarse:size-11 text-text-muted"
-                          aria-label={`Actions pour ${d.name}`}
+                          aria-label={t('subjects.rowActions', { name: d.name })}
                         >
                           <MoreHorizontal />
                         </Button>
@@ -311,7 +313,7 @@ function DecksPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onSelect={() => setEditDeck(d)}>
                           <Pencil />
-                          Éditer
+                          {t('common.edit')}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -319,7 +321,7 @@ function DecksPage() {
                           onSelect={() => setDeleteDeck(d)}
                         >
                           <Trash2 />
-                          Supprimer
+                          {t('common.delete')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -353,14 +355,16 @@ function DecksPage() {
       <ConfirmDelete
         open={deleteDeck !== null}
         onOpenChange={(o) => !o && setDeleteDeck(null)}
-        title={`Supprimer « ${deleteDeck?.name} » ?`}
+        title={t('subjects.deleteTitle', { name: deleteDeck?.name ?? '' })}
         description={
           <>
-            Supprime définitivement ce deck, ses{' '}
+            {t('decks.deleteLead')}{' '}
             <strong className="text-text">
-              {cardCountByDeck.get(deleteDeck?.id ?? '') ?? 0} cartes
-            </strong>{' '}
-            et leur historique. Irréversible.
+              {t(`listMeta.cards_${plural(cardCountByDeck.get(deleteDeck?.id ?? '') ?? 0)}`, {
+                count: cardCountByDeck.get(deleteDeck?.id ?? '') ?? 0,
+              })}
+            </strong>
+            {t('decks.deleteTail')}
           </>
         }
         onConfirm={() => deleteDeck && deleteDeckMut.mutate({ id: deleteDeck.id })}
@@ -375,17 +379,19 @@ function DecksPage() {
       <ConfirmDelete
         open={deleteSubjectOpen}
         onOpenChange={setDeleteSubjectOpen}
-        title={`Supprimer « ${subject.name} » ?`}
+        title={t('subjects.deleteTitle', { name: subject.name })}
         description={
           <>
-            Cela supprimera définitivement cette matière, ses{' '}
-            <strong className="text-text">{decks.length} decks</strong>, leurs cartes et tout
-            l'historique. Action irréversible.
+            {t('subjects.deleteLead')}{' '}
+            <strong className="text-text">
+              {t(`listMeta.decks_${plural(decks.length)}`, { count: decks.length })}
+            </strong>
+            {t('subjects.deleteTail')}
           </>
         }
         onConfirm={() => {
           deleteSubjectMut.mutate({ id: subject.id })
-          toast('Matière supprimée')
+          toast(t('subjects.deletedToast'))
           void navigate({ to: '/subjects' })
         }}
       />

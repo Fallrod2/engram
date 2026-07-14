@@ -11,6 +11,7 @@ import { Form } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { useCoarsePointer } from '@/lib/use-media-query'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 /**
@@ -25,7 +26,7 @@ export function EntityFormDialog<TFieldValues extends FieldValues>({
   title,
   form,
   onSubmit,
-  submitLabel = 'Enregistrer',
+  submitLabel,
   contentClassName,
   children,
   footerExtra,
@@ -42,6 +43,7 @@ export function EntityFormDialog<TFieldValues extends FieldValues>({
   footerExtra?: ReactNode
 }) {
   const coarse = useCoarsePointer()
+  const t = useT()
   const submit = form.handleSubmit((values) => {
     onSubmit(values)
     onOpenChange(false)
@@ -69,10 +71,10 @@ export function EntityFormDialog<TFieldValues extends FieldValues>({
               {footerExtra}
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                  Annuler
+                  {t('common.cancel')}
                 </Button>
                 <Button type="submit">
-                  {submitLabel}
+                  {submitLabel ?? t('common.save')}
                   {!coarse && (
                     <Kbd className="ml-1.5 border-accent-fg/30 bg-transparent text-accent-fg">
                       ⌘↵

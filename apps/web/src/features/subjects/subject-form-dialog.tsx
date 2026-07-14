@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createSubjectSchema, type CreateSubject, type Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { EntityFormDialog } from '@/components/entity-form-dialog'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -18,7 +19,7 @@ import { SUBJECT_PIGMENTS, DEFAULT_PIGMENT } from '@/lib/pigments'
  */
 const subjectFormSchema = createSubjectSchema
   .pick({ name: true, color: true, icon: true })
-  .extend({ name: z.string().trim().min(1, 'Le nom est requis.') })
+  .extend({ name: z.string().trim().min(1, 'forms.nameRequired') })
 
 type SubjectFormValues = z.infer<typeof subjectFormSchema>
 
@@ -35,6 +36,7 @@ export function SubjectFormDialog({
   subject?: Subject
   onSubmit: (values: CreateSubject) => void
 }) {
+  const t = useT()
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectFormSchema),
     defaultValues: initial(subject),
@@ -49,7 +51,7 @@ export function SubjectFormDialog({
     <EntityFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={subject ? 'Modifier la matière' : 'Nouvelle matière'}
+      title={subject ? t('dialogs.subjectEdit') : t('dialogs.subjectNew')}
       form={form}
       onSubmit={onSubmit}
       contentClassName="max-w-md"
@@ -59,7 +61,7 @@ export function SubjectFormDialog({
         name="name"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Nom</FormLabel>
+            <FormLabel>{t('forms.name')}</FormLabel>
             <div className="flex items-center gap-2">
               <FormField
                 control={form.control}
@@ -71,7 +73,7 @@ export function SubjectFormDialog({
               <FormControl>
                 <Input
                   autoFocus
-                  placeholder="ex. Théorie des langages"
+                  placeholder={t('forms.subjectPlaceholder')}
                   className={cn(fieldState.error && 'border-danger')}
                   {...field}
                 />
@@ -87,10 +89,10 @@ export function SubjectFormDialog({
         name="color"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Couleur</FormLabel>
+            <FormLabel>{t('forms.color')}</FormLabel>
             <div
               role="radiogroup"
-              aria-label="Couleur de la matière"
+              aria-label={t('forms.colorAria')}
               className="flex items-center gap-1.5"
               onKeyDown={(e) => {
                 if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
