@@ -32,6 +32,12 @@ export interface VisionExtractArgs {
    * extractor re-resolves it.
    */
   provider?: ResolvedProviderConfig
+  /**
+   * Owner id for the rare direct-call re-resolve path (spec BYOK §1.3): the OCR
+   * config is per-user, so resolution WITHOUT an explicit identity is refused.
+   * Ignored when `provider` is already supplied (the nominal route path).
+   */
+  userId?: string
 }
 
 export interface VisionExtractResult {
@@ -66,9 +72,15 @@ export const configuredVisionExtractor: VisionExtractor = {
   async extract(args) {
     let cfg = args.provider
     if (!cfg) {
+      // Per-user OCR config REQUIRES an explicit identity — no resolution without one.
+      if (!args.userId) {
+        throw new Error(
+          'vision extraction: a userId is required to resolve the OCR provider config',
+        )
+      }
       const { db } = await import('../db/client')
       const { resolveOcrProvider } = await import('../services/ai-config.service')
-      cfg = (await resolveOcrProvider(db)) ?? undefined
+      cfg = (await resolveOcrProvider(db, args.userId)) ?? undefined
     }
     if (!cfg) throw new Error('vision extraction unavailable: no provider configured')
     const adapter = PROVIDERS[cfg.providerId]

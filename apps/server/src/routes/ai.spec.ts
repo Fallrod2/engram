@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { SignJWT } from 'jose'
 import {
   aiSettingsResponseSchema,
   listModelsResponseSchema,
@@ -184,5 +185,60 @@ describe('GET /api/ai/providers/:provider/models', () => {
     const r = await app.request('/api/ai/providers/anthropic/models')
     const parsed = listModelsResponseSchema.parse(await r.json())
     expect(parsed.models).toEqual([])
+  })
+})
+
+describe('per-user config isolation over the API (spec BYOK §1.3)', () => {
+  const SECRET = 'a-shared-secret-at-least-32-bytes-long!!'
+
+  async function bearer(sub: string): Promise<Record<string, string>> {
+    const token = await new SignJWT({ role: 'authenticated' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(sub)
+      .setAudience('authenticated')
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(new TextEncoder().encode(SECRET))
+    return { Authorization: `Bearer ${token}` }
+  }
+
+  const jsonAs = (h: Record<string, string>, path: string, method: string, body?: unknown) =>
+    app.request(path, {
+      method,
+      headers: { 'content-type': 'application/json', ...h },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    })
+
+  it('two users have strictly separate config + keys', async () => {
+    process.env.SUPABASE_JWT_SECRET = SECRET
+    try {
+      const alice = await bearer('alice-uuid')
+      const bob = await bearer('bob-uuid')
+
+      // Alice sets openrouter + a key; Bob sets mistral.
+      await jsonAs(alice, '/api/ai/settings', 'PATCH', { activeProvider: 'openrouter' })
+      const put = await jsonAs(alice, '/api/ai/providers/openrouter/key', 'PUT', {
+        key: 'alice-or-secret',
+      })
+      expect(put.status).toBe(204)
+      await jsonAs(bob, '/api/ai/settings', 'PATCH', { activeProvider: 'mistral' })
+
+      // Each sees only their own active provider…
+      const aSettings = aiSettingsResponseSchema.parse(
+        await (await jsonAs(alice, '/api/ai/settings', 'GET')).json(),
+      )
+      const bSettings = aiSettingsResponseSchema.parse(
+        await (await jsonAs(bob, '/api/ai/settings', 'GET')).json(),
+      )
+      expect(aSettings.settings.activeProvider).toBe('openrouter')
+      expect(bSettings.settings.activeProvider).toBe('mistral')
+
+      // …and Bob never sees Alice's key as configured (nor the secret anywhere).
+      expect(aSettings.statuses.find((s) => s.provider === 'openrouter')!.hasKey).toBe(true)
+      expect(bSettings.statuses.find((s) => s.provider === 'openrouter')!.hasKey).toBe(false)
+      expect(JSON.stringify(bSettings)).not.toContain('alice-or-secret')
+    } finally {
+      delete process.env.SUPABASE_JWT_SECRET
+    }
   })
 })

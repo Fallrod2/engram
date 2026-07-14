@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import {
   createEmptyCard,
   fsrs,
@@ -38,23 +38,27 @@ const DAY_MS = 86_400_000
 /** Deterministic scheduler (fuzz off) so the seeded FSRS states are reproducible. */
 const sched = fsrs(generatorParameters({ enable_fuzz: false }))
 
-/** Read the stored demo session marker (or null if never seeded). */
-export async function readDemoMarker(db: DB | Tx): Promise<string | null> {
+/**
+ * Read the stored demo session marker (or null if never seeded). Scoped to the
+ * demo user's row `(demoUserId, 'demo')` now that `app_settings` is per-user
+ * (spec BYOK §1.4 / amendment §3).
+ */
+export async function readDemoMarker(db: DB | Tx, userId: string): Promise<string | null> {
   const [row] = await db
     .select({ value: appSettings.value })
     .from(appSettings)
-    .where(eq(appSettings.key, DEMO_KEY))
+    .where(and(eq(appSettings.userId, userId), eq(appSettings.key, DEMO_KEY)))
   const v = row?.value as { sessionId?: unknown } | undefined
   return typeof v?.sessionId === 'string' ? v.sessionId : null
 }
 
-/** Persist the demo session marker (upsert). */
-async function writeDemoMarker(tx: Tx, marker: string): Promise<void> {
+/** Persist the demo session marker (upsert) under `(userId, 'demo')`. */
+async function writeDemoMarker(tx: Tx, userId: string, marker: string): Promise<void> {
   await tx
     .insert(appSettings)
-    .values({ key: DEMO_KEY, value: { sessionId: marker } })
+    .values({ userId, key: DEMO_KEY, value: { sessionId: marker } })
     .onConflictDoUpdate({
-      target: appSettings.key,
+      target: [appSettings.userId, appSettings.key],
       set: { value: { sessionId: marker }, updatedAt: new Date() },
     })
 }
@@ -235,5 +239,5 @@ export async function seedDemo(tx: Tx, userId: string, marker: string): Promise<
     .returning()
   await tx.insert(examSubject).values({ examId: examRow!.id, subjectId: subjTL!.id })
 
-  await writeDemoMarker(tx, marker)
+  await writeDemoMarker(tx, userId, marker)
 }

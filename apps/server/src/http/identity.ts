@@ -32,3 +32,19 @@ export function requireAdmin(c: Context): string {
   }
   return userId
 }
+
+/**
+ * Require the caller NOT to be the demo account (spec BYOK §1.2 / amendment §5):
+ * returns the user id or throws 403 `forbidden`. The demo READS the admin AI
+ * config (so generation/OCR work in the showcase), but it must never WRITE config
+ * — its data is wiped on every new login anyway. Applied to PATCH /settings and
+ * PUT/DELETE key; POST test stays permitted (it resolves via the admin alias).
+ */
+export function requireNotDemo(c: Context): string {
+  const userId = requireUserId(c)
+  const demoUserId = resolveAuthConfig(process.env).demoUserId
+  if (demoUserId && userId === demoUserId) {
+    throw new ForbiddenError('demo account is read-only for AI config')
+  }
+  return userId
+}

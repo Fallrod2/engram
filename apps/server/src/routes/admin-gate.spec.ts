@@ -1,35 +1,48 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { SignJWT } from 'jose'
 import { app } from '../app'
 import { db } from '../db/client'
 import { resetDb } from '../test-support/harness'
 
 /**
- * Admin-gate (spec §3). The AI write/test routes and every backup route are
- * admin-only. Under the dev bypass (bun:test has no auth env) the default
- * identity IS the admin, so the routes work — UNLESS `ENGRAM_ADMIN_USER_ID` names
- * a DIFFERENT user, which is how we simulate a non-admin caller here. Read routes
- * (GET settings/models) stay open to everyone.
+ * Route-level authorization after the BYOK per-user switch (spec BYOK §1.3,
+ * amendments §5/§6):
+ *
+ * - The AI config WRITE routes are NO LONGER admin-only — any authenticated user
+ *   configures THEIR OWN provider. The only exclusion is the demo account, which
+ *   reads the admin config but must not write it (`requireNotDemo` → 403). POST
+ *   test stays permitted for the demo (it resolves via the admin alias).
+ * - The BACKUP routes stay admin-only in v1 (export of ALL data): a non-admin
+ *   caller → 403.
+ *
+ * Under the bun:test bypass (no auth env) the default identity is the admin, so
+ * the happy paths work; we simulate other callers by mutating the auth env.
  */
 
-const PREV = process.env.ENGRAM_ADMIN_USER_ID
+const SECRET = 'a-shared-secret-at-least-32-bytes-long!!'
+const ENV_KEYS = [
+  'ENGRAM_ADMIN_USER_ID',
+  'ENGRAM_DEMO_USER_ID',
+  'ENGRAM_DEV_USER_ID',
+  'SUPABASE_JWT_SECRET',
+] as const
+const PREV = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]))
 
 beforeEach(async () => {
   await resetDb(db)
 })
 afterEach(() => {
-  if (PREV === undefined) delete process.env.ENGRAM_ADMIN_USER_ID
-  else process.env.ENGRAM_ADMIN_USER_ID = PREV
+  for (const k of ENV_KEYS) {
+    const v = PREV[k]
+    if (v === undefined) delete process.env[k]
+    else process.env[k] = v
+  }
 })
 
-/** Point the admin at someone OTHER than the dev identity → the caller is non-admin. */
-function asNonAdmin() {
-  process.env.ENGRAM_ADMIN_USER_ID = 'someone-else-entirely'
-}
-
-const json = (path: string, method: string, body?: unknown) =>
+const json = (path: string, method: string, body?: unknown, headers: Record<string, string> = {}) =>
   app.request(path, {
     method,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
 
@@ -39,33 +52,68 @@ async function expectForbidden(res: Response) {
   expect(body.error.code).toBe('forbidden')
 }
 
-describe('AI config routes — admin only for writes', () => {
-  it('non-admin → 403 on PATCH /settings, PUT/DELETE key, POST test', async () => {
-    asNonAdmin()
-    await expectForbidden(await json('/api/ai/settings', 'PATCH', { activeProvider: 'ollama' }))
-    await expectForbidden(await json('/api/ai/providers/openrouter/key', 'PUT', { key: 'x' }))
-    await expectForbidden(
-      await app.request('/api/ai/providers/openrouter/key', { method: 'DELETE' }),
-    )
-    await expectForbidden(await json('/api/ai/providers/ollama/test', 'POST', {}))
-  })
+/** Point the admin at someone OTHER than the dev identity → the caller is non-admin. */
+function asNonAdmin() {
+  process.env.ENGRAM_ADMIN_USER_ID = 'someone-else-entirely'
+}
 
-  it('admin (dev identity) → writes succeed', async () => {
-    // No ENGRAM_ADMIN_USER_ID → the dev identity is the admin.
+/** Sign an HS256 token for a given sub (enables enforced auth for that request). */
+async function bearer(sub: string): Promise<Record<string, string>> {
+  const token = await new SignJWT({ role: 'authenticated' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(sub)
+    .setAudience('authenticated')
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(new TextEncoder().encode(SECRET))
+  return { Authorization: `Bearer ${token}` }
+}
+
+describe('AI config writes — any authenticated user (admin gate removed)', () => {
+  it('the dev identity (admin) can write', async () => {
     const r = await json('/api/ai/settings', 'PATCH', { activeProvider: 'ollama' })
     expect(r.status).toBe(200)
     const put = await json('/api/ai/providers/openrouter/key', 'PUT', { key: 'k' })
     expect(put.status).toBe(204)
   })
 
-  it('GET /settings and /models stay readable for a non-admin', async () => {
-    asNonAdmin()
-    expect((await app.request('/api/ai/settings')).status).toBe(200)
-    expect((await app.request('/api/ai/providers/anthropic/models')).status).toBe(200)
+  it('a NON-admin authenticated user can also write their own config', async () => {
+    // Enforced auth (HS256), no ENGRAM_ADMIN_USER_ID → this user is NOT the admin,
+    // yet the write must succeed: config is per-user now.
+    process.env.SUPABASE_JWT_SECRET = SECRET
+    const h = await bearer('some-public-signup-uuid')
+    const r = await json('/api/ai/settings', 'PATCH', { activeProvider: 'mistral' }, h)
+    expect(r.status).toBe(200)
+    const put = await json('/api/ai/providers/mistral/key', 'PUT', { key: 'my-own-key' }, h)
+    expect(put.status).toBe(204)
   })
 })
 
-describe('backup routes — admin only', () => {
+describe('AI config writes — blocked for the demo account (read-only)', () => {
+  function asDemo() {
+    process.env.ENGRAM_DEMO_USER_ID = 'demo-user'
+    process.env.ENGRAM_DEV_USER_ID = 'demo-user' // default bypass identity = demo
+  }
+
+  it('demo → 403 on PATCH /settings and PUT/DELETE key', async () => {
+    asDemo()
+    await expectForbidden(await json('/api/ai/settings', 'PATCH', { activeProvider: 'ollama' }))
+    await expectForbidden(await json('/api/ai/providers/openrouter/key', 'PUT', { key: 'x' }))
+    await expectForbidden(
+      await app.request('/api/ai/providers/openrouter/key', { method: 'DELETE' }),
+    )
+  })
+
+  it('demo → GET /settings and POST test stay allowed', async () => {
+    asDemo()
+    expect((await app.request('/api/ai/settings')).status).toBe(200)
+    // ollama test needs no key/network guard to reach the handler (returns ok/false).
+    const test = await json('/api/ai/providers/ollama/test', 'POST', {})
+    expect(test.status).toBe(200)
+  })
+})
+
+describe('backup routes — admin only (v1)', () => {
   it('non-admin → 403 on export and import', async () => {
     asNonAdmin()
     await expectForbidden(await app.request('/api/backup/export'))

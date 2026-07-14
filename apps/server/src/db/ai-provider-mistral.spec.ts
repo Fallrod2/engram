@@ -23,22 +23,22 @@ describe('ai_credential_provider_ck (migration 0003)', () => {
   it("accepts a 'mistral' credential row", async () => {
     const [row] = await t.db
       .insert(aiCredential)
-      .values({ provider: 'mistral', secret: 'mist-secret' })
+      .values({ userId: U, provider: 'mistral', secret: 'mist-secret' })
       .returning()
     expect(row?.provider).toBe('mistral')
   })
 
   it('still accepts the legacy key-bearing providers', async () => {
-    await t.db.insert(aiCredential).values({ provider: 'anthropic', secret: 'a' })
-    await t.db.insert(aiCredential).values({ provider: 'openrouter', secret: 'b' })
-    await t.db.insert(aiCredential).values({ provider: 'openai-compat', secret: 'c' })
+    await t.db.insert(aiCredential).values({ userId: U, provider: 'anthropic', secret: 'a' })
+    await t.db.insert(aiCredential).values({ userId: U, provider: 'openrouter', secret: 'b' })
+    await t.db.insert(aiCredential).values({ userId: U, provider: 'openai-compat', secret: 'c' })
     expect(await t.db.select().from(aiCredential)).toHaveLength(3)
   })
 
   it("rejects an unknown provider AND 'ollama' (no key stored)", async () => {
     let threwBogus = false
     try {
-      await t.db.insert(aiCredential).values({ provider: 'bogus', secret: 'x' })
+      await t.db.insert(aiCredential).values({ userId: U, provider: 'bogus', secret: 'x' })
     } catch {
       threwBogus = true
     }
@@ -46,7 +46,7 @@ describe('ai_credential_provider_ck (migration 0003)', () => {
 
     let threwOllama = false
     try {
-      await t.db.insert(aiCredential).values({ provider: 'ollama', secret: 'x' })
+      await t.db.insert(aiCredential).values({ userId: U, provider: 'ollama', secret: 'x' })
     } catch {
       threwOllama = true
     }

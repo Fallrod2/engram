@@ -4,6 +4,7 @@ import { app } from '../app'
 import { db } from '../db/client'
 import { resetDb } from '../test-support/harness'
 import { setAiKey, updateAiSettings } from '../services/ai-config.service'
+import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import { resetVisionExtractor, setVisionExtractor, type VisionExtractor } from '../ai/vision'
 
 // Magic-byte prefixes for the multipart bodies.
@@ -28,7 +29,7 @@ async function errorOf(res: Response): Promise<{ code: string; message: string }
 
 /** Make the active provider resolvable (ollama needs only a base URL + model). */
 async function configureOllama() {
-  await updateAiSettings(db, { activeProvider: 'ollama' })
+  await updateAiSettings(db, U, { activeProvider: 'ollama' })
 }
 
 let calls: number
@@ -107,7 +108,7 @@ describe('POST /api/notes/extract-image', () => {
 
   it('no provider configured → 503', async () => {
     // openai-compat with empty model/baseUrl is NOT usable → resolver returns null.
-    await updateAiSettings(db, { activeProvider: 'openai-compat' })
+    await updateAiSettings(db, U, { activeProvider: 'openai-compat' })
     const res = await extract(imageFile(JPEG))
     expect(res.status).toBe(503)
     const err = await errorOf(res)
@@ -143,9 +144,9 @@ describe('POST /api/notes/extract-image', () => {
 describe('POST /api/notes/extract-image — OCR provider split (custom mode)', () => {
   it('uses the DEDICATED OCR provider/model, not the generation provider', async () => {
     // Generation = ollama; OCR slot = a distinct mistral OCR model with its key.
-    await updateAiSettings(db, { activeProvider: 'ollama' })
-    await setAiKey(db, 'mistral', 'mistral-app-key')
-    await updateAiSettings(db, {
+    await updateAiSettings(db, U, { activeProvider: 'ollama' })
+    await setAiKey(db, U, 'mistral', 'mistral-app-key')
+    await updateAiSettings(db, U, {
       ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
     })
     const res = await extract(imageFile(JPEG))
@@ -160,8 +161,8 @@ describe('POST /api/notes/extract-image — OCR provider split (custom mode)', (
 
   it('503 when the custom OCR provider is unusable EVEN IF generation is usable', async () => {
     // Generation (ollama) stays usable, but the OCR mistral has no key → 503.
-    await updateAiSettings(db, { activeProvider: 'ollama' })
-    await updateAiSettings(db, {
+    await updateAiSettings(db, U, { activeProvider: 'ollama' })
+    await updateAiSettings(db, U, {
       ocr: { mode: 'custom', provider: 'mistral', model: 'mistral-ocr-latest' },
     })
     const res = await extract(imageFile(JPEG))
