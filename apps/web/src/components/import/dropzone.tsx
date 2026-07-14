@@ -3,6 +3,7 @@ import { Camera, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
+import { useCoarsePointer } from '@/lib/use-media-query'
 
 /** Photo extensions (OCR spec §3.1). Downscaled + OCR'd, not uploaded as docs. */
 export const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const
@@ -54,6 +55,7 @@ export function Dropzone({
   children?: ReactNode
 }) {
   const t = useT()
+  const coarse = useCoarsePointer()
   const inputRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -119,11 +121,19 @@ export function Dropzone({
           <span className="font-mono text-xs text-text-muted">.pdf</span> {t('ocr.dropzone.hintOr')}{' '}
           <span className="text-text">{t('ocr.dropzone.photo')}</span> {t('ocr.dropzone.hintTail')}
         </p>
-        <p className="flex items-center justify-center gap-1.5 text-2xs text-text-faint">
-          <Kbd>↵</Kbd> {t('ocr.dropzone.browse')}
-          <span className="text-border-strong">·</span>
-          {t('ocr.dropzone.limits')}
-        </p>
+        {coarse ? (
+          // Touch: `↵ pour parcourir` is inoperative and wraps awkwardly at
+          // 360px — swap it for a tap-friendly instruction (fix-session §3).
+          <p className="text-2xs text-text-faint">
+            {t('ocr.dropzone.browseMobile')} · {t('ocr.dropzone.limits')}
+          </p>
+        ) : (
+          <p className="flex items-center justify-center gap-1.5 text-2xs text-text-faint">
+            <Kbd>↵</Kbd> {t('ocr.dropzone.browse')}
+            <span className="text-border-strong">·</span>
+            {t('ocr.dropzone.limits')}
+          </p>
+        )}
         <button
           type="button"
           disabled={disabled}

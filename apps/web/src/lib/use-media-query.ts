@@ -17,3 +17,13 @@ export function useMediaQuery(query: string): boolean {
 
   return matches
 }
+
+/**
+ * True on touch-first devices (phones, tablets) where the primary pointer is
+ * imprecise. Used to swap keyboard-only affordances (`<Kbd>` hints, "Space to
+ * reveal") for tap-friendly controls, and to hide keyboard shortcut hints that
+ * are meaningless without a keyboard (fix-session findings §1 & §3).
+ */
+export function useCoarsePointer(): boolean {
+  return useMediaQuery('(pointer: coarse)')
+}

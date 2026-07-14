@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state'
 import { RewardIllustration } from '@/components/illustrations'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useT, type TFunction } from '@/lib/i18n'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import { useShell } from '@/components/shell/shell-context'
 import type { ReviewScope } from '@/lib/api'
 import { useReviewSession } from './use-review-session'
@@ -127,6 +128,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
 function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
   const t = useT()
+  const coarse = useCoarsePointer()
   const current = api.current
   return (
     <>
@@ -155,6 +157,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
                   back={current.back}
                   revealed={api.revealed}
                   reduce={api.reduce}
+                  onReveal={api.reveal}
                 />
               </motion.div>
             </AnimatePresence>
@@ -175,15 +178,20 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
             disabled={api.submitting}
             flashGrade={api.flashGrade}
             reduce={api.reduce}
+            onReveal={api.reveal}
             onRate={api.rate}
           />
           {api.submitError && (
             <p className="mt-2 text-center text-xs text-danger">{t('session.saveError')}</p>
           )}
         </div>
-        <p className="text-2xs uppercase tracking-[0.08em] text-text-faint">
-          {t('session.footerHint')}
-        </p>
+        {/* Keyboard cheat-sheet — pointless (and a false promise) without a
+            keyboard, so it is hidden on touch devices (fix-session §3). */}
+        {!coarse && (
+          <p className="text-2xs uppercase tracking-[0.08em] text-text-faint">
+            {t('session.footerHint')}
+          </p>
+        )}
       </div>
     </>
   )
