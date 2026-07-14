@@ -555,7 +555,6 @@ export const dictEn: Dict = {
       submit: 'Create my account',
       submitting: 'Creating…',
       confirm: 'Confirm password',
-      invalidEmail: 'Invalid email address.',
       tooShort: 'At least 8 characters.',
       mismatch: 'Passwords do not match.',
       haveAccount: 'Already have an account?',

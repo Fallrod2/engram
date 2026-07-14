@@ -561,7 +561,6 @@ export const dictFr = {
       submit: 'Créer mon compte',
       submitting: 'Création…',
       confirm: 'Confirmer le mot de passe',
-      invalidEmail: 'Adresse e-mail invalide.',
       tooShort: 'Au moins 8 caractères.',
       mismatch: 'Les mots de passe ne correspondent pas.',
       haveAccount: 'Déjà un compte ?',

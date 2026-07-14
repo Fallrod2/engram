@@ -25,7 +25,7 @@ export const SIGNUP_PASSWORD_MIN_LENGTH = 8
 function makeSchema(t: TFunction) {
   return z
     .object({
-      email: z.string().email(t('auth.signup.invalidEmail')),
+      email: z.string().email(t('auth.invalidEmail')),
       password: z.string().min(SIGNUP_PASSWORD_MIN_LENGTH, t('auth.signup.tooShort')),
       confirm: z.string(),
     })
