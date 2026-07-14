@@ -99,7 +99,7 @@ export function DatePicker({
                 className={cn(
                   'flex size-8 items-center justify-center rounded-sm font-mono text-xs tabular-nums transition-colors duration-fast',
                   selected
-                    ? 'bg-accent text-accent-fg'
+                    ? 'bg-accent-fill text-accent-fg'
                     : cell.inMonth
                       ? 'text-text hover:bg-surface-3'
                       : 'text-text-faint hover:bg-surface-3',

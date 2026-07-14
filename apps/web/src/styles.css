@@ -33,6 +33,15 @@
   --color-accent-fg: var(--accent-fg);
   --color-accent-subtle: var(--accent-subtle);
 
+  /* AA variant B — solid BUTTON fills split from `--accent`/`--danger` (which
+     keep serving text, focus ring, progress, switch). Deeper (indigo-700-like)
+     so base ≥ 4.5:1 AND the lighter dark-mode hover stays ≥ 4.5:1. */
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-fill-hover: var(--accent-fill-hover);
+  --color-accent-fill-active: var(--accent-fill-active);
+  --color-danger-fill: var(--danger-fill);
+  --color-danger-fill-hover: var(--danger-fill-hover);
+
   /* Sémantiques en triplet : base / -fg (texte sur fill) / -subtle (fond teinté) */
   --color-success: var(--success);
   --color-success-fg: var(--success-fg);
@@ -121,14 +130,24 @@
   --text-faint: oklch(0.62 0.012 263);
 
   --accent: oklch(0.62 0.17 268);
-  --accent-hover: oklch(0.67 0.175 268);
+  /* C 0.175→0.173: was out of sRGB gamut (browser remapped it) — hygiene fix,
+     visually identical, written value = displayed value. */
+  --accent-hover: oklch(0.67 0.173 268);
   --accent-active: oklch(0.575 0.165 268);
   --accent-fg: oklch(0.985 0.005 265);
   --accent-subtle: oklch(0.3 0.055 268);
+  /* B: richer, deeper button fills — hover still LIGHTENS (keeps the current
+     dark-mode feel) and still clears AA. */
+  --accent-fill: oklch(0.51 0.19 268); /* 5.76:1 vs accent-fg */
+  --accent-fill-hover: oklch(0.55 0.19 268); /* 4.87:1 */
+  --accent-fill-active: oklch(0.475 0.185 268); /* 6.70:1 */
 
   --danger: oklch(0.635 0.17 25);
-  --danger-fg: oklch(0.985 0.01 25);
+  /* C 0.01→0.006: in-gamut hygiene fix (see accent-hover above). */
+  --danger-fg: oklch(0.985 0.006 25);
   --danger-subtle: oklch(0.3 0.055 25);
+  --danger-fill: oklch(0.525 0.16 25); /* 5.62:1 vs danger-fg */
+  --danger-fill-hover: oklch(0.56 0.155 25); /* 4.82:1 */
   --warning: oklch(0.77 0.12 85);
   --warning-fg: oklch(0.18 0.03 85);
   --warning-subtle: oklch(0.32 0.045 85);
@@ -180,10 +199,16 @@
   --accent-active: oklch(0.47 0.18 268);
   --accent-fg: oklch(0.99 0.004 265);
   --accent-subtle: oklch(0.93 0.045 268);
+  --accent-fill: oklch(0.48 0.19 268); /* 6.71:1 vs accent-fg */
+  --accent-fill-hover: oklch(0.44 0.19 268); /* 8.02:1 */
+  --accent-fill-active: oklch(0.415 0.185 268); /* 8.93:1 */
 
   --danger: oklch(0.545 0.19 25);
-  --danger-fg: oklch(0.99 0.01 25);
+  /* C 0.01→0.004: in-gamut hygiene fix (dark block has the rationale). */
+  --danger-fg: oklch(0.99 0.004 25);
   --danger-subtle: oklch(0.95 0.035 25);
+  --danger-fill: oklch(0.505 0.175 25); /* 6.26:1 vs danger-fg */
+  --danger-fill-hover: oklch(0.465 0.165 25); /* 7.36:1 */
   --warning: oklch(0.64 0.13 75);
   --warning-fg: oklch(0.99 0.01 75);
   --warning-subtle: oklch(0.955 0.045 80);
@@ -236,10 +261,15 @@
     --accent-active: oklch(0.47 0.18 268);
     --accent-fg: oklch(0.99 0.004 265);
     --accent-subtle: oklch(0.93 0.045 268);
+    --accent-fill: oklch(0.48 0.19 268);
+    --accent-fill-hover: oklch(0.44 0.19 268);
+    --accent-fill-active: oklch(0.415 0.185 268);
 
     --danger: oklch(0.545 0.19 25);
-    --danger-fg: oklch(0.99 0.01 25);
+    --danger-fg: oklch(0.99 0.004 25);
     --danger-subtle: oklch(0.95 0.035 25);
+    --danger-fill: oklch(0.505 0.175 25);
+    --danger-fill-hover: oklch(0.465 0.165 25);
     --warning: oklch(0.64 0.13 75);
     --warning-fg: oklch(0.99 0.01 75);
     --warning-subtle: oklch(0.955 0.045 80);

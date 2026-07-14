@@ -29,7 +29,7 @@ function ShellInner() {
       {/* Skip link (a11y) — first in tab order. */}
       <a
         href="#main-content"
-        className="sr-only left-3 top-3 z-50 rounded-sm bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg focus:not-sr-only focus:absolute"
+        className="sr-only left-3 top-3 z-50 rounded-sm bg-accent-fill px-3 py-1.5 text-sm font-medium text-accent-fg focus:not-sr-only focus:absolute"
       >
         {t('common.skipToContent')}
       </a>
