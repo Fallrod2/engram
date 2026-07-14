@@ -8,7 +8,7 @@
     "start": "bun src/index.ts",
     "typecheck": "tsc --noEmit",
     "test:db": "bun test --preload ./src/test-support/db-preload.ts ./src/db/*.spec.ts ./src/services/*.spec.ts ./src/routes/*.spec.ts ./src/auth/*.spec.ts ./src/http/*.spec.ts ./src/*.spec.ts",
-    "test:db:pg": "bun test ./src/db/postgres-driver.pgtest.ts",
+    "test:db:pg": "bun test ./src/db/*.pgtest.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:reset": "bun run src/db/reset.ts && bun run db:migrate",
