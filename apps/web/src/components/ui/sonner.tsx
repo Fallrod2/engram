@@ -20,7 +20,7 @@ function Toaster(props: ToasterProps) {
         classNames: {
           toast: 'group toast font-sans border border-border bg-surface-3 text-text shadow-md',
           description: 'text-text-muted',
-          actionButton: 'bg-accent text-accent-fg',
+          actionButton: 'bg-accent-fill text-accent-fg hover:bg-accent-fill-hover',
           cancelButton: 'bg-surface-2 text-text-muted',
         },
       }}

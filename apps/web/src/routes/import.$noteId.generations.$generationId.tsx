@@ -578,7 +578,7 @@ function InsertConfirmDialog({
           {/* Constructive action → accent variant + initial focus (safe here). */}
           <AlertDialogAction
             autoFocus
-            className="bg-accent text-accent-fg hover:bg-accent-hover"
+            className="bg-accent-fill text-accent-fg hover:bg-accent-fill-hover active:bg-accent-fill-active"
             onClick={onConfirm}
           >
             Insérer

@@ -65,7 +65,7 @@ export function DueBadge({ value, className }: { value: number; className?: stri
   return (
     <span
       className={cn(
-        'flex min-w-3.5 items-center justify-center rounded-full bg-accent px-1',
+        'flex min-w-3.5 items-center justify-center rounded-full bg-accent-fill px-1',
         'font-mono text-[9px] leading-none text-accent-fg tabular-nums',
         className,
       )}
