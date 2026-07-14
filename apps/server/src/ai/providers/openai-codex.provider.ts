@@ -34,14 +34,34 @@ function codexHeaders(cfg: ResolvedProviderConfig): Record<string, string> {
   return headers
 }
 
-/** HTTP status → adapter error (never carries the token). */
-function codexHttpError(status: number): Error {
-  if (status === 401) return new Error('Requête Codex refusée (401) — relie ton compte ChatGPT.')
+/**
+ * HTTP status → adapter error (never carries the token). The backend answers
+ * errors with an explicit JSON `{"detail":"…"}` body (e.g. "Unsupported
+ * parameter: max_output_tokens") — surface it so the next contract mismatch
+ * names itself instead of hiding behind a bare status code.
+ */
+function codexHttpError(status: number, detail?: string): Error {
+  const suffix = detail ? ` — ${detail}` : ''
+  if (status === 401)
+    return new Error(`Requête Codex refusée (401) — relie ton compte ChatGPT.${suffix}`)
   if (status === 403)
-    return new Error('Accès Codex refusé (403) — abonnement ou permissions insuffisants.')
+    return new Error(`Accès Codex refusé (403) — abonnement ou permissions insuffisants.${suffix}`)
   if (status === 429)
-    return new Error('Limite d’abonnement ChatGPT atteinte (429) — réessaie plus tard.')
-  return new Error(`Requête Codex échouée (HTTP ${status}).`)
+    return new Error(`Limite d’abonnement ChatGPT atteinte (429) — réessaie plus tard.${suffix}`)
+  return new Error(`Requête Codex échouée (HTTP ${status})${suffix ? suffix : '.'}`)
+}
+
+/** Read the backend's `{"detail":"…"}` error body, best effort, token-safe. */
+async function codexErrorDetail(res: Response): Promise<string | undefined> {
+  try {
+    const parsed = JSON.parse(await res.text()) as { detail?: unknown }
+    if (typeof parsed.detail === 'string' && parsed.detail.length > 0) {
+      return parsed.detail.slice(0, 200)
+    }
+  } catch {
+    /* non-JSON error body — keep the bare status */
+  }
+  return undefined
 }
 
 export function createOpenAiCodexAdapter(fetchFn: FetchFn = defaultFetch): ProviderAdapter {
@@ -74,7 +94,7 @@ export function createOpenAiCodexAdapter(fetchFn: FetchFn = defaultFetch): Provi
         reinforceJson: args.attempt >= 2,
         signal: args.signal,
       })
-      if (!res.ok) throw codexHttpError(res.status)
+      if (!res.ok) throw codexHttpError(res.status, await codexErrorDetail(res))
       const parsed = parseResponsesSse(await res.text())
       const emitInput = emitFromResponses(parsed)
       if (emitInput === null) throw unstructuredOutputError(cfg.model)

@@ -60,6 +60,22 @@ describe('openAiCodexAdapter.complete', () => {
     expect(body.stream).toBe(true)
     expect(typeof body.instructions).toBe('string')
     expect(body.input[0].content[0].type).toBe('input_text')
+    // Regression (Alex's real 400): the subscription backend rejects any
+    // parameter outside its allowlist — max_output_tokens must NEVER be sent.
+    expect(body).not.toHaveProperty('max_output_tokens')
+  })
+
+  it('surfaces the backend {"detail"} body in non-ok errors (names the bad parameter)', async () => {
+    const { fetchFn } = stubFetch(
+      () =>
+        new Response(JSON.stringify({ detail: 'Unsupported parameter: max_output_tokens' }), {
+          status: 400,
+        }),
+    )
+    const adapter = createOpenAiCodexAdapter(fetchFn)
+    await expect(adapter.complete(cfg, args)).rejects.toThrow(
+      /HTTP 400.*Unsupported parameter: max_output_tokens/,
+    )
   })
 
   it('prefers the completed event full text over streamed deltas (no double count)', async () => {

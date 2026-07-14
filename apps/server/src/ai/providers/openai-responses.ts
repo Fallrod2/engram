@@ -1,5 +1,4 @@
 import { extractJsonEmit } from '../parse'
-import { MAX_OUTPUT_TOKENS } from './constants'
 
 /**
  * The backend Codex "Responses" transport (SSE). Unlike the Chat Completions
@@ -43,7 +42,10 @@ export function buildResponsesBody(args: {
     ],
     store: false,
     stream: true,
-    max_output_tokens: MAX_OUTPUT_TOKENS,
+    // NO max_output_tokens: the subscription backend validates a strict
+    // parameter allowlist and 400s on it ("Unsupported parameter") — confirmed
+    // by litellm#21193, codex-proxy API.md and opencode-openai-codex-auth,
+    // and hit on Alex's real linked account (14/07/2026).
   }
 }
 
