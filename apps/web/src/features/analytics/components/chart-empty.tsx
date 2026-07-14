@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { useT } from '@/lib/i18n'
 
 /**
  * Per-panel empty / low-data / error state that fills a chart's plot area
@@ -18,6 +19,7 @@ export function ChartEmpty({
   onRetry?: () => void
   height?: number
 }) {
+  const t = useT()
   return (
     <div
       className="flex flex-col items-center justify-center gap-2 px-6 text-center"
@@ -27,7 +29,7 @@ export function ChartEmpty({
       {hint && <p className="font-mono text-2xs text-text-faint">{hint}</p>}
       {variant === 'error' && onRetry && (
         <Button variant="secondary" size="sm" className="mt-1" onClick={onRetry}>
-          Réessayer
+          {t('common.retry')}
         </Button>
       )}
     </div>

@@ -13,6 +13,7 @@ import {
   type Phase,
   type SessionState,
 } from './session-reducer'
+import { useT } from '@/lib/i18n'
 import { createCardTimer, IDLE_MS, type CardTimer } from './session-timer'
 import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
@@ -59,6 +60,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   const navigate = useNavigate()
   const router = useRouter()
   const reduce = !!useReducedMotion()
+  const t = useT()
 
   const [initialNow] = useState(() => new Date().toISOString())
   const [state, dispatch] = useReducer(sessionReducer, initialNow, initialState)
@@ -187,13 +189,13 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     onError: (err) => {
       if (err instanceof ApiError && err.status === 404) {
         // The card vanished (deleted in parallel) — skip without counting.
-        toast('Carte introuvable — passée')
+        toast(t('toasts.cardGone'))
         dispatch({ type: 'RATE_SKIP' })
         return
       }
       dispatch({ type: 'RATE_FAIL' })
-      toast.error("Échec d'enregistrement", {
-        action: { label: 'Réessayer', onClick: () => retryRef.current() },
+      toast.error(t('toasts.reviewSaveError'), {
+        action: { label: t('common.retry'), onClick: () => retryRef.current() },
       })
     },
     onSettled: () => {

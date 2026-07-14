@@ -32,7 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { EmptyState } from '@/components/empty-state'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { CardsIllustration } from '@/components/illustrations'
 import { CardsTableSkeleton } from '@/components/skeletons'
@@ -92,6 +92,7 @@ function CardsPending() {
 
 function CardsError({ error }: { error: Error }) {
   const router = useRouter()
+  const t = useT()
   const { subjectId } = Route.useParams()
   const notFound = error instanceof ApiError && error.status === 404
   return (
@@ -101,7 +102,7 @@ function CardsError({ error }: { error: Error }) {
         ? {
             back: (
               <Link to="/subjects/$subjectId" params={{ subjectId }}>
-                Retour à la matière
+                {t('decks.backToSubject')}
               </Link>
             ),
           }
@@ -127,6 +128,7 @@ function CardsPage() {
   const { subjectId, deckId } = Route.useParams()
   const navigate = useNavigate()
   const t = useT()
+  const plural = usePlural()
   const coarse = useCoarsePointer()
 
   const subject = useQuery(subjectDetailOptions(subjectId)).data
@@ -256,7 +258,7 @@ function CardsPage() {
                   variant="ghost"
                   size="icon"
                   className="size-7 text-text-muted"
-                  aria-label="Actions de la carte"
+                  aria-label={t('cards.menuActions')}
                 >
                   <MoreHorizontal />
                 </Button>
@@ -264,7 +266,7 @@ function CardsPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setEditCard(c)}>
                   <Pencil />
-                  Éditer
+                  {t('common.edit')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -272,7 +274,7 @@ function CardsPage() {
                   onSelect={() => setDeleteCard(c)}
                 >
                   <Trash2 />
-                  Supprimer
+                  {t('common.delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -290,7 +292,7 @@ function CardsPage() {
         breadcrumb={
           <>
             <Link to="/subjects" className="text-text-muted transition-colors hover:text-text">
-              Matières
+              {t('pageTitle.subjects')}
             </Link>
             <span className="text-text-faint">/</span>
             <Link
@@ -313,7 +315,7 @@ function CardsPage() {
                 onClick={() => void navigate({ to: '/review', search: { deckId } })}
               >
                 <GraduationCap />
-                Réviser
+                {t('subjects.review')}
                 <span className="ml-1 font-mono text-xs tabular-nums text-text-muted">
                   {deckDue}
                 </span>
@@ -321,7 +323,7 @@ function CardsPage() {
             )}
             <Button onClick={() => composerRef.current?.focus()}>
               <Plus />
-              Ajouter une carte
+              {t('cards.add')}
               {!coarse && (
                 <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
               )}
@@ -332,7 +334,7 @@ function CardsPage() {
                   variant="ghost"
                   size="icon"
                   className="text-text-muted"
-                  aria-label="Actions du deck"
+                  aria-label={t('decks.menuActions')}
                 >
                   <MoreHorizontal />
                 </Button>
@@ -340,7 +342,7 @@ function CardsPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setEditDeckOpen(true)}>
                   <Pencil />
-                  Éditer le deck
+                  {t('decks.editDeck')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -348,7 +350,7 @@ function CardsPage() {
                   onSelect={() => setDeleteDeckOpen(true)}
                 >
                   <Trash2 />
-                  Supprimer
+                  {t('common.delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -384,27 +386,30 @@ function CardsPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-8">
                     <SortButton
-                      label="État"
+                      label={t('cards.colState')}
+                      dir="asc"
                       active={sort === 'state'}
                       onClick={() => setSort('state')}
                     />
                   </TableHead>
                   <TableHead>
                     <SortButton
-                      label="Recto"
+                      label={t('cards.colFront')}
+                      dir="desc"
                       active={sort === 'createdDesc'}
                       onClick={() => setSort('createdDesc')}
                     />
                   </TableHead>
-                  <TableHead className="hidden md:table-cell">Verso</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('cards.colBack')}</TableHead>
                   <TableHead className="w-24">
                     <SortButton
-                      label="Dû"
+                      label={t('cards.colDue')}
+                      dir="asc"
                       active={sort === 'dueAsc'}
                       onClick={() => setSort('dueAsc')}
                     />
                   </TableHead>
-                  <TableHead className="hidden w-16 xl:table-cell">Reps</TableHead>
+                  <TableHead className="hidden w-16 xl:table-cell">{t('cards.colReps')}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -443,8 +448,7 @@ function CardsPage() {
           </div>
           {truncated && (
             <p role="status" className="mt-2 px-3 text-xs text-text-muted">
-              Affichage limité aux {CARD_PAGE_LIMIT} premières cartes sur {total}. Scindez ce deck
-              pour tout consulter.
+              {t('cards.truncated', { limit: CARD_PAGE_LIMIT, total })}
             </p>
           )}
         </>
@@ -461,8 +465,8 @@ function CardsPage() {
       <ConfirmDelete
         open={deleteCard !== null}
         onOpenChange={(o) => !o && setDeleteCard(null)}
-        title="Supprimer cette carte ?"
-        description="Supprime cette carte et son historique de révision. Irréversible."
+        title={t('cards.deleteTitle')}
+        description={t('cards.deleteDesc')}
         onConfirm={() => deleteCard && deleteCardMut.mutate({ id: deleteCard.id })}
       />
 
@@ -480,11 +484,14 @@ function CardsPage() {
       <ConfirmDelete
         open={deleteDeckOpen}
         onOpenChange={setDeleteDeckOpen}
-        title={`Supprimer « ${deck.name} » ?`}
+        title={t('subjects.deleteTitle', { name: deck.name })}
         description={
           <>
-            Supprime définitivement ce deck, ses{' '}
-            <strong className="text-text">{total} cartes</strong> et leur historique. Irréversible.
+            {t('decks.deleteLead')}{' '}
+            <strong className="text-text">
+              {t(`listMeta.cards_${plural(total)}`, { count: total })}
+            </strong>
+            {t('decks.deleteTail')}
           </>
         }
         onConfirm={() => {
@@ -498,10 +505,13 @@ function CardsPage() {
 
 function SortButton({
   label,
+  dir,
   active,
   onClick,
 }: {
   label: string
+  /** Arrow shown when active: ascending (state/due) points up, descending (recency) down. */
+  dir: 'asc' | 'desc'
   active: boolean
   onClick: () => void
 }) {
@@ -517,11 +527,7 @@ function SortButton({
     >
       {label}
       {active &&
-        (label === 'Dû' || label === 'État' ? (
-          <ArrowUp className="size-3" />
-        ) : (
-          <ArrowDown className="size-3" />
-        ))}
+        (dir === 'asc' ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
     </button>
   )
 }

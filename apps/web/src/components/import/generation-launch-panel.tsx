@@ -56,9 +56,9 @@ export function GenerationLaunchPanel({
   const noDecks = deckGroups.every((g) => g.decks.length === 0)
   const canLaunch = !!deckId && !contentEmpty && !pending
   const hint = contentEmpty
-    ? 'Cette note ne contient pas de texte exploitable.'
+    ? t('generation.hintEmpty')
     : !deckId
-      ? 'Choisissez un deck cible.'
+      ? t('generation.hintNoDeck')
       : null
 
   return (
@@ -76,10 +76,10 @@ export function GenerationLaunchPanel({
       <Tabs value={kind} onValueChange={(v) => onKindChange(v as GenerationKind)}>
         <TabsList className="w-full">
           <TabsTrigger value="cards" className="flex-1">
-            Cartes
+            {t('generation.kindCards')}
           </TabsTrigger>
           <TabsTrigger value="quiz" className="flex-1">
-            Quiz
+            {t('generation.kindQuiz')}
           </TabsTrigger>
           <TabsTrigger value="mixed" className="flex-1">
             {t('generation.mixedTab')}
@@ -93,25 +93,25 @@ export function GenerationLaunchPanel({
 
       <div className="flex flex-col gap-1.5">
         <label className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-          Deck cible
+          {t('generation.targetDeck')}
         </label>
         {noDecks ? (
           <p className="text-xs text-text-muted">
-            Aucun deck disponible.{' '}
+            {t('generation.noDecks')}{' '}
             {onNewDeck && (
               <button
                 type="button"
                 onClick={onNewDeck}
                 className="text-accent underline-offset-2 hover:underline"
               >
-                Créer un deck
+                {t('generation.createDeck')}
               </button>
             )}
           </p>
         ) : (
           <Select value={deckId ?? ''} onValueChange={onDeckChange}>
-            <SelectTrigger aria-label="Deck cible">
-              <SelectValue placeholder="Choisir un deck…" />
+            <SelectTrigger aria-label={t('generation.targetDeck')}>
+              <SelectValue placeholder={t('generation.chooseDeck')} />
             </SelectTrigger>
             <SelectContent>
               {deckGroups
@@ -139,7 +139,7 @@ export function GenerationLaunchPanel({
             className="mt-0.5 inline-flex w-fit items-center gap-1 text-2xs text-text-faint transition-colors hover:text-text-muted"
           >
             <Plus className="size-3" />
-            Nouveau deck
+            {t('decks.new')}
           </button>
         )}
       </div>
@@ -148,13 +148,13 @@ export function GenerationLaunchPanel({
         <span className="text-2xs text-text-faint">
           {hint ?? (
             <span className="inline-flex items-center gap-1">
-              <Kbd>⌘↵</Kbd> pour générer
+              <Kbd>⌘↵</Kbd> {t('generation.kbdGenerate')}
             </span>
           )}
         </span>
         <Button onClick={onLaunch} disabled={!canLaunch}>
           <Sparkles />
-          Générer
+          {t('generation.generate')}
         </Button>
       </div>
     </div>

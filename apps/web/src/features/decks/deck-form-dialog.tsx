@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createDeckSchema, type Deck } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { EntityFormDialog } from '@/components/entity-form-dialog'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -15,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
  * (route param) and not edited here.
  */
 const deckFormSchema = createDeckSchema.pick({ name: true, description: true }).extend({
-  name: z.string().trim().min(1, 'Le nom est requis.'),
+  name: z.string().trim().min(1, 'forms.nameRequired'),
   description: z.string(),
 })
 
@@ -33,6 +34,7 @@ export function DeckFormDialog({
   deck?: Deck
   onSubmit: (values: DeckFormValues) => void
 }) {
+  const t = useT()
   const form = useForm<DeckFormValues>({
     resolver: zodResolver(deckFormSchema),
     defaultValues: initial(deck),
@@ -46,7 +48,7 @@ export function DeckFormDialog({
     <EntityFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={deck ? 'Modifier le deck' : 'Nouveau deck'}
+      title={deck ? t('dialogs.deckEdit') : t('dialogs.deckNew')}
       form={form}
       onSubmit={(values) => onSubmit({ name: values.name, description: values.description.trim() })}
       contentClassName="max-w-md"
@@ -56,11 +58,11 @@ export function DeckFormDialog({
         name="name"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Nom</FormLabel>
+            <FormLabel>{t('forms.name')}</FormLabel>
             <FormControl>
               <Input
                 autoFocus
-                placeholder="ex. Automates finis"
+                placeholder={t('forms.deckPlaceholder')}
                 className={cn(fieldState.error && 'border-danger')}
                 {...field}
               />
@@ -75,9 +77,9 @@ export function DeckFormDialog({
         name="description"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Description</FormLabel>
+            <FormLabel>{t('forms.description')}</FormLabel>
             <FormControl>
-              <Textarea placeholder="Optionnel" className="min-h-16" {...field} />
+              <Textarea placeholder={t('forms.optional')} className="min-h-16" {...field} />
             </FormControl>
           </FormItem>
         )}

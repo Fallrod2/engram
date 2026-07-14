@@ -10,6 +10,7 @@ import {
 } from '@engram/shared'
 import { api, qs } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { useT } from '@/lib/i18n'
 import { mergeDefined } from '@/lib/utils'
 
 const deckListSchema = z.array(deckSchema)
@@ -63,6 +64,7 @@ function useDeckMutation<Vars>(
   },
 ) {
   const qc = useQueryClient()
+  const t = useT()
   const key = qk.decks.listBySubject(subjectId)
   const mutation = useMutation({
     mutationFn: config.mutationFn,
@@ -75,7 +77,7 @@ function useDeckMutation<Vars>(
     onError: (_err, vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(key, ctx.previous)
       toast.error(config.errorTitle, {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     onSettled: () => {
@@ -94,6 +96,7 @@ function useDeckMutation<Vars>(
 
 export function useCreateDeck(subjectId: string) {
   const qc = useQueryClient()
+  const t = useT()
   const key = qk.decks.listBySubject(subjectId)
   const mutation = useMutation({
     mutationFn: (input: CreateDeck) => api.post('/decks', input, deckSchema),
@@ -116,8 +119,11 @@ export function useCreateDeck(subjectId: string) {
     },
     onError: (_err, input, ctx) => {
       if (ctx?.previous) qc.setQueryData(key, ctx.previous)
-      toast.error('Création du deck échouée', {
-        action: { label: 'Réessayer', onClick: () => void api.post('/decks', input, deckSchema) },
+      toast.error(t('toasts.deckCreateError'), {
+        action: {
+          label: t('common.retry'),
+          onClick: () => void api.post('/decks', input, deckSchema),
+        },
       })
     },
     onSuccess: (created, _input, ctx) => {
@@ -135,19 +141,21 @@ export function useCreateDeck(subjectId: string) {
 }
 
 export function useUpdateDeck(subjectId: string) {
+  const t = useT()
   return useDeckMutation<{ id: string; patch: UpdateDeck }>(subjectId, {
     mutationFn: ({ id, patch }) => api.patch(`/decks/${id}`, patch, deckSchema),
     optimistic: (list, { id, patch }) =>
       list.map((d) => (d.id === id ? mergeDefined(d, patch) : d)),
-    errorTitle: 'Modification du deck échouée',
+    errorTitle: t('toasts.deckUpdateError'),
   })
 }
 
 export function useDeleteDeck(subjectId: string) {
+  const t = useT()
   return useDeckMutation<{ id: string }>(subjectId, {
     mutationFn: ({ id }) => api.delete(`/decks/${id}`),
     optimistic: (list, { id }) => list.filter((d) => d.id !== id),
-    errorTitle: 'Suppression du deck échouée',
+    errorTitle: t('toasts.deckDeleteError'),
     invalidateDueCounts: true,
   })
 }

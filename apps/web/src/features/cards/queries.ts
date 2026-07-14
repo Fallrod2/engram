@@ -10,6 +10,7 @@ import {
 } from '@engram/shared'
 import { api, qs } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { useT } from '@/lib/i18n'
 import { mergeDefined } from '@/lib/utils'
 
 /**
@@ -77,6 +78,7 @@ function invalidateCardCounts(
 
 export function useCreateCard(deckId: string, subjectId: string) {
   const qc = useQueryClient()
+  const t = useT()
   const key = qk.cards.listByDeck(deckId)
   const mutation = useMutation({
     mutationFn: (input: CreateCard) => api.post('/cards', input, cardSchema),
@@ -101,8 +103,8 @@ export function useCreateCard(deckId: string, subjectId: string) {
     },
     onError: (_err, input, ctx) => {
       if (ctx?.previous) qc.setQueryData(key, ctx.previous)
-      toast.error('Ajout de la carte échoué', {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(input) },
+      toast.error(t('toasts.cardCreateError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(input) },
       })
     },
     onSuccess: (created, _input, ctx) => {
@@ -119,6 +121,7 @@ export function useCreateCard(deckId: string, subjectId: string) {
 
 export function useUpdateCard(deckId: string) {
   const qc = useQueryClient()
+  const t = useT()
   const key = qk.cards.listByDeck(deckId)
   const mutation = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateCard }) =>
@@ -135,8 +138,8 @@ export function useUpdateCard(deckId: string) {
     },
     onError: (_err, vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(key, ctx.previous)
-      toast.error('Modification de la carte échouée', {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+      toast.error(t('toasts.cardUpdateError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     // Editing front/back never touches FSRS state → only the card list moves.
@@ -147,6 +150,7 @@ export function useUpdateCard(deckId: string) {
 
 export function useDeleteCard(deckId: string, subjectId: string) {
   const qc = useQueryClient()
+  const t = useT()
   const key = qk.cards.listByDeck(deckId)
   const mutation = useMutation({
     mutationFn: ({ id }: { id: string }) => api.delete(`/cards/${id}`),
@@ -162,8 +166,8 @@ export function useDeleteCard(deckId: string, subjectId: string) {
     },
     onError: (_err, vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(key, ctx.previous)
-      toast.error('Suppression de la carte échouée', {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+      toast.error(t('toasts.cardDeleteError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     onSettled: () => invalidateCardCounts(qc, deckId, subjectId),

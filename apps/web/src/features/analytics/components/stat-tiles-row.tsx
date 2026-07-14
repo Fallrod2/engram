@@ -11,6 +11,7 @@ import {
   type RatingTotals,
 } from '../metrics'
 import type { AnalyticsDeltas } from '../queries'
+import { useT, usePlural } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 /**
@@ -35,28 +36,34 @@ export function StatTilesRow({
   windowLabel: string
   reduce: boolean
 }) {
+  const t = useT()
+  const plural = usePlural()
   const rate = successRate(totals)
-  const period = `sur ${windowLabel}`
+  const period = t('analytics.period', { label: windowLabel })
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatTile
-        label="Streak"
+        label={t('dashboard.streak.label')}
         icon={<Flame className="size-5" strokeWidth={1.75} aria-hidden />}
         value={
           <>
             {streaks.current}
-            <span className="ml-0.5 text-lg text-text-muted">j</span>
+            <span className="ml-0.5 text-lg text-text-muted">{t('analytics.dayUnit')}</span>
           </>
         }
-        meta={<span className="font-mono tabular-nums">record {streaks.longest} j</span>}
+        meta={
+          <span className="font-mono tabular-nums">
+            {t('analytics.streakRecord', { count: streaks.longest })}
+          </span>
+        }
         trend={
           spark.some((n) => n > 0) ? <StreakSparkline data={spark} reduce={reduce} /> : undefined
         }
       />
 
       <StatTile
-        label="Temps d'étude"
+        label={t('analytics.studyTime')}
         value={studyMs > 0 ? formatDuration(studyMs) : '0 min'}
         delta={computeDelta(studyMs, deltas ? deltas.studyMs : null)}
         deltaPeriod={period}
@@ -64,7 +71,7 @@ export function StatTilesRow({
       />
 
       <StatTile
-        label="Reviews"
+        label={t('analytics.reviews')}
         value={formatCount(totals.total)}
         delta={computeDelta(totals.total, deltas ? deltas.reviews : null)}
         deltaPeriod={period}
@@ -72,16 +79,18 @@ export function StatTilesRow({
       />
 
       <StatTile
-        label="Réussite"
+        label={t('analytics.success')}
         value={rate === null ? <span className="text-text-faint">—</span> : formatPercent(rate)}
         meta={
           rate === null ? (
             <span className={cn(totals.total > 0 && 'text-text-faint')}>
-              pas encore assez de données
+              {t('analytics.notEnoughData')}
             </span>
           ) : (
             <span className="font-mono tabular-nums">
-              {formatCount(totals.total)} review{totals.total > 1 ? 's' : ''}
+              {t(`analytics.reviewsCount_${plural(totals.total)}`, {
+                count: formatCount(totals.total),
+              })}
             </span>
           )
         }

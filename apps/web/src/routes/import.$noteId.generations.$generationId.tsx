@@ -6,6 +6,7 @@ import { MoreHorizontal, RotateCw, Sparkles, X } from 'lucide-react'
 import type { Deck, Generation } from '@engram/shared'
 import { ApiError } from '@/lib/api'
 import { formatRelativeTime } from '@/lib/format'
+import { useT, usePlural } from '@/lib/i18n'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { PageHeader } from '@/components/page-header'
@@ -65,6 +66,7 @@ export const Route = createFileRoute('/import/$noteId/generations/$generationId'
 
 function ReviewError({ error }: { error: Error }) {
   const router = useRouter()
+  const t = useT()
   const { noteId } = Route.useParams()
   const notFound = error instanceof ApiError && error.status === 404
   return (
@@ -74,7 +76,7 @@ function ReviewError({ error }: { error: Error }) {
         ? {
             back: (
               <Link to="/import/$noteId" params={{ noteId }}>
-                Retour à la note
+                {t('generation.backToNote')}
               </Link>
             ),
           }
@@ -107,6 +109,7 @@ function GhostCards({ count = 6 }: { count?: number }) {
 
 function GenerationReviewPage() {
   const { noteId, generationId } = Route.useParams()
+  const t = useT()
   const generation = useQuery(generationDetailOptions(generationId)).data
   const note = useQuery(noteDetailOptions(noteId)).data
   const decks = useQuery(allDecksOptions()).data ?? []
@@ -115,7 +118,11 @@ function GenerationReviewPage() {
   const deck = decks.find((d) => d.id === generation.deckId) ?? null
 
   const kindLabel =
-    generation.kind === 'quiz' ? 'Quiz' : generation.kind === 'mixed' ? 'Mixte' : 'Cartes'
+    generation.kind === 'quiz'
+      ? t('generation.kindQuiz')
+      : generation.kind === 'mixed'
+        ? t('generation.kindMixed')
+        : t('generation.kindCards')
 
   const header = (
     <ReviewHeader
@@ -153,9 +160,15 @@ function GenerationReviewPage() {
         {header}
         <EmptyState
           icon={Sparkles}
-          title="Aucune carte proposée"
-          meta="Claude n'a rien extrait d'exploitable de cette note."
-          action={<RelaunchButton noteId={noteId} generation={generation} label="Relancer" />}
+          title={t('generation.emptyTitle')}
+          meta={t('generation.emptyMeta')}
+          action={
+            <RelaunchButton
+              noteId={noteId}
+              generation={generation}
+              label={t('generation.relaunch')}
+            />
+          }
         />
       </div>
     )
@@ -183,12 +196,13 @@ function ReviewHeader({
   deckName: string | null
   generation: Generation
 }) {
+  const t = useT()
   return (
     <PageHeader
       breadcrumb={
         <>
           <Link to="/import" className="text-text-muted transition-colors hover:text-text">
-            Import
+            {t('pageTitle.import')}
           </Link>
           <span className="text-text-faint">/</span>
           <Link
@@ -205,7 +219,9 @@ function ReviewHeader({
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           {kindLabel}
           {deckName && (
-            <span className="font-mono text-sm font-normal text-text-muted">vers {deckName}</span>
+            <span className="font-mono text-sm font-normal text-text-muted">
+              {t('generation.towards', { name: deckName })}
+            </span>
           )}
           {/* Dated so the detail page (and its browser title) is no longer an
               anonymous "Cartes" (finding). */}
@@ -217,7 +233,12 @@ function ReviewHeader({
       actions={
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-text-muted" aria-label="Actions">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-text-muted"
+              aria-label={t('generation.actionsAria')}
+            >
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
@@ -226,7 +247,7 @@ function ReviewHeader({
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link to="/import/$noteId" params={{ noteId }}>
-                Retour à la note
+                {t('generation.backToNote')}
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -239,6 +260,7 @@ function ReviewHeader({
 /** Elapsed timer + indeterminate progress + ghost cards (spec §4.2). */
 function PendingView({ noteId, createdAt }: { noteId: string; createdAt: string }) {
   const navigate = useNavigate()
+  const t = useT()
   const [now, setNow] = useState(() => Date.now())
   const [waitBase, setWaitBase] = useState(() => Date.now())
 
@@ -255,9 +277,9 @@ function PendingView({ noteId, createdAt }: { noteId: string; createdAt: string 
   return (
     <div>
       <div className="mb-4 flex flex-col gap-2">
-        <Progress aria-label="Génération en cours" />
+        <Progress aria-label={t('generation.generatingAria')} />
         <div className="flex items-center justify-between">
-          <span className="text-sm text-text-muted">Génération en cours…</span>
+          <span className="text-sm text-text-muted">{t('generation.generating')}</span>
           <span className="font-mono text-xs tabular-nums text-text-faint">
             {mm}:{ss}
           </span>
@@ -266,17 +288,17 @@ function PendingView({ noteId, createdAt }: { noteId: string; createdAt: string 
 
       {tooLong && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface-2 px-4 py-3">
-          <p className="text-sm text-text-muted">La génération prend plus de temps que prévu.</p>
+          <p className="text-sm text-text-muted">{t('generation.tooLong')}</p>
           <div className="ml-auto flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => setWaitBase(Date.now())}>
-              Continuer d'attendre
+              {t('generation.keepWaiting')}
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => void navigate({ to: '/import/$noteId', params: { noteId } })}
             >
-              Annuler
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -289,6 +311,7 @@ function PendingView({ noteId, createdAt }: { noteId: string; createdAt: string 
 
 function FailedView({ noteId, generation }: { noteId: string; generation: Generation }) {
   const navigate = useNavigate()
+  const t = useT()
   const startGen = useStartGeneration()
   return (
     <GenerationErrorState
@@ -307,7 +330,7 @@ function FailedView({ noteId, generation }: { noteId: string; generation: Genera
                 to: '/import/$noteId/generations/$generationId',
                 params: { noteId, generationId: gen.id },
               }),
-            onError: () => toast.error('Relance échouée'),
+            onError: () => toast.error(t('generation.relaunchError')),
           },
         )
       }
@@ -325,6 +348,7 @@ function RelaunchButton({
   label: string
 }) {
   const navigate = useNavigate()
+  const t = useT()
   const startGen = useStartGeneration()
   return (
     <Button
@@ -342,7 +366,7 @@ function RelaunchButton({
                 to: '/import/$noteId/generations/$generationId',
                 params: { noteId, generationId: gen.id },
               }),
-            onError: () => toast.error('Relance échouée'),
+            onError: () => toast.error(t('generation.relaunchError')),
           },
         )
       }
@@ -355,6 +379,7 @@ function RelaunchButton({
 
 function RelaunchMenuItem({ noteId, generation }: { noteId: string; generation: Generation }) {
   const navigate = useNavigate()
+  const t = useT()
   const startGen = useStartGeneration()
   return (
     <DropdownMenuItem
@@ -371,13 +396,13 @@ function RelaunchMenuItem({ noteId, generation }: { noteId: string; generation: 
                 to: '/import/$noteId/generations/$generationId',
                 params: { noteId, generationId: gen.id },
               }),
-            onError: () => toast.error('Relance échouée'),
+            onError: () => toast.error(t('generation.relaunchError')),
           },
         )
       }
     >
       <RotateCw />
-      Relancer la génération
+      {t('generation.relaunchFull')}
     </DropdownMenuItem>
   )
 }
@@ -385,6 +410,8 @@ function RelaunchMenuItem({ noteId, generation }: { noteId: string; generation: 
 /** The keyboard triage board (spec §4.3–4.6). Local state until `resolve`. */
 function ReviewBoard({ generation, deck }: { generation: Generation; deck: Deck | null }) {
   const { noteId } = Route.useParams()
+  const t = useT()
+  const plural = usePlural()
   const [items, dispatch] = useReducer(reviewReducer, generation.items, initReviewItems)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -442,13 +469,12 @@ function ReviewBoard({ generation, deck }: { generation: Generation; deck: Deck 
       {
         onSuccess: (resolvedGen) => {
           const n = resolvedGen.items.filter((i) => i.cardId !== undefined).length
-          toast.success(
-            `${n} carte${n > 1 ? 's' : ''} ajoutée${n > 1 ? 's' : ''}${deck ? ` à ${deck.name}` : ''}`,
-          )
+          const inDeck = deck ? t('generation.toastInDeck', { name: deck.name }) : ''
+          toast.success(`${t(`generation.insertedToast_${plural(n)}`, { count: n })}${inDeck}`)
         },
         onError: () =>
-          toast.error("L'insertion a échoué", {
-            action: { label: 'Réessayer', onClick: () => insert() },
+          toast.error(t('generation.insertError'), {
+            action: { label: t('common.retry'), onClick: () => insert() },
           }),
       },
     )
@@ -463,24 +489,24 @@ function ReviewBoard({ generation, deck }: { generation: Generation; deck: Deck 
       {resolved && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface-2 px-4 py-3">
           <p className="text-sm text-text">
-            <span className="font-mono tabular-nums text-text">{insertedCount}</span> carte
-            {insertedCount > 1 ? 's' : ''} insérée{insertedCount > 1 ? 's' : ''}
-            {deck ? ` dans ${deck.name}` : ''}
+            <span className="font-mono tabular-nums text-text">{insertedCount}</span>{' '}
+            {t(`generation.resolvedInserted_${plural(insertedCount)}`)}
+            {deck ? t('generation.inDeck', { name: deck.name }) : ''}
             <span className="px-1.5 text-border-strong">·</span>
-            <span className="font-mono tabular-nums text-text-muted">{rejectedCount}</span> rejetée
-            {rejectedCount > 1 ? 's' : ''}
+            <span className="font-mono tabular-nums text-text-muted">{rejectedCount}</span>{' '}
+            {t(`generation.resolvedRejected_${plural(rejectedCount)}`)}
           </p>
           <div className="ml-auto flex items-center gap-2">
             {deck && insertedCount > 0 && (
               <Button asChild variant="secondary" size="sm">
                 <Link to="/review" search={{ deckId: deck.id }}>
-                  Réviser maintenant
+                  {t('common.reviewNow')}
                 </Link>
               </Button>
             )}
             <Button asChild variant="ghost" size="sm">
               <Link to="/import/$noteId" params={{ noteId }}>
-                Nouvelle génération
+                {t('generation.newGeneration')}
               </Link>
             </Button>
           </div>
@@ -564,22 +590,22 @@ function InsertConfirmDialog({
   deckName: string | null
   onConfirm: () => void
 }) {
+  const t = useT()
+  const plural = usePlural()
+  const inDeck = deckName ? t('generation.inDeck', { name: deckName }) : ''
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Insérer {count} carte{count > 1 ? 's' : ''}
-            {deckName ? ` dans ${deckName}` : ''} ?
+            {t(`generation.insertConfirmTitle_${plural(count)}`, { count, deck: inDeck })}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            Elles deviendront dues immédiatement (état New).
-          </AlertDialogDescription>
+          <AlertDialogDescription>{t('generation.insertConfirmDesc')}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>
             <X className="size-4" />
-            Annuler
+            {t('common.cancel')}
           </AlertDialogCancel>
           {/* Constructive action → accent variant + initial focus (safe here). */}
           <AlertDialogAction
@@ -587,7 +613,7 @@ function InsertConfirmDialog({
             className="bg-accent-fill text-accent-fg hover:bg-accent-fill-hover active:bg-accent-fill-active"
             onClick={onConfirm}
           >
-            Insérer
+            {t('generation.insert')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

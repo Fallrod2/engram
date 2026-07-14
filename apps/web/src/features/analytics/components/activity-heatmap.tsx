@@ -8,15 +8,14 @@ import {
   startOfDay,
   startOfWeekMonday,
 } from '@/lib/calendar'
-import { formatLongDay } from '@/lib/format'
+import { formatLongDay, heatmapWeekdayLabels, monthShort } from '@/lib/format'
+import { useT, usePlural, type TFunction, type PluralCategory } from '@/lib/i18n'
 import { heatLevel, HEAT_BG_CLASS } from '../heat-scale'
 import { cn } from '@/lib/utils'
 
 const CELL = 11
 const GAP = 3
 const PITCH = CELL + GAP // 14px
-
-const WEEKDAYS = ['Lun', '', 'Mer', '', 'Ven', '', ''] as const
 
 interface Cell {
   key: string
@@ -43,6 +42,9 @@ export function ActivityHeatmap({
   onYearChange: (dir: -1 | 1) => void
   minYear: number
 }) {
+  const t = useT()
+  const plural = usePlural()
+  const weekdays = heatmapWeekdayLabels()
   const model = useMemo(() => buildGrid(data, year), [data, year])
   const { weeks, monthLabels, gridStart } = model
 
@@ -183,7 +185,7 @@ export function ActivityHeatmap({
             <div className="flex gap-1.5">
               {/* Weekday labels */}
               <div className="flex flex-col" style={{ gap: GAP, width: 24 }}>
-                {WEEKDAYS.map((w, i) => (
+                {weekdays.map((w, i) => (
                   <span
                     key={i}
                     className="font-mono text-2xs leading-none text-text-faint"
@@ -197,7 +199,7 @@ export function ActivityHeatmap({
               {/* Cell grid */}
               <div
                 role="grid"
-                aria-label={`Activité ${year}`}
+                aria-label={t('analytics.heatmapAria', { year })}
                 onKeyDown={onKeyDown}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
@@ -217,7 +219,7 @@ export function ActivityHeatmap({
                           type="button"
                           role="gridcell"
                           tabIndex={cell.key === cursor ? 0 : -1}
-                          aria-label={ariaLabel(cell.count, cell.key)}
+                          aria-label={ariaLabel(t, plural, cell.count, cell.key)}
                           onFocus={() => setCursor(cell.key)}
                           onMouseEnter={() => setHoverKey(cell.key)}
                           onMouseLeave={() => setHoverKey((k) => (k === cell.key ? null : k))}
@@ -247,7 +249,7 @@ export function ActivityHeatmap({
                       `studyMs`, so the spec §4 "X reviews · Y min" format isn't
                       available here. The twin HeatmapTable is the exhaustive channel. */}
                     <div className="font-mono text-xs tabular-nums text-text">
-                      {tip.count} review{tip.count > 1 ? 's' : ''}
+                      {t(`analytics.heatmapTooltip_${plural(tip.count)}`, { count: tip.count })}
                     </div>
                     <div className="font-mono text-2xs text-text-faint">
                       {formatLongDay(tip.key)}
@@ -276,16 +278,21 @@ export function ActivityHeatmap({
       </div>
 
       {data.total === 0 && (
-        <p className="mt-3 text-sm text-text-muted">Aucune activité en {year}.</p>
+        <p className="mt-3 text-sm text-text-muted">{t('analytics.noActivity', { year })}</p>
       )}
     </div>
   )
 }
 
-function ariaLabel(count: number, key: string): string {
+function ariaLabel(
+  t: TFunction,
+  plural: (n: number) => PluralCategory,
+  count: number,
+  key: string,
+): string {
   const day = formatLongDay(key)
-  if (count === 0) return `Aucune review le ${day}`
-  return `${count} review${count > 1 ? 's' : ''} le ${day}`
+  if (count === 0) return t('analytics.ariaNoReview', { day })
+  return t(`analytics.ariaReview_${plural(count)}`, { count, day })
 }
 
 interface GridModel {
@@ -324,7 +331,7 @@ function buildGrid(data: HeatmapResponse, year: number): GridModel {
       if (m !== lastMonth) {
         monthLabels.push({
           week: w,
-          label: firstInYear.date.toLocaleDateString('fr-FR', { month: 'short' }),
+          label: monthShort(firstInYear.date),
         })
         lastMonth = m
       }

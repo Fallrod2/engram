@@ -10,6 +10,7 @@ import {
 } from '@/lib/calendar'
 import { formatLongDay, formatMonthLabel } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -29,6 +30,7 @@ export function DatePicker({
   onChange: (d: Date) => void
   invalid?: boolean
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(value))
   const matrix = monthMatrix(viewMonth)
@@ -58,7 +60,7 @@ export function DatePicker({
             variant="ghost"
             size="icon"
             className="size-7 text-text-muted"
-            aria-label="Mois précédent"
+            aria-label={t('planning.prevMonth')}
             onClick={() => setViewMonth((m) => addMonths(m, -1))}
           >
             <ChevronLeft />
@@ -71,7 +73,7 @@ export function DatePicker({
             variant="ghost"
             size="icon"
             className="size-7 text-text-muted"
-            aria-label="Mois suivant"
+            aria-label={t('planning.nextMonth')}
             onClick={() => setViewMonth((m) => addMonths(m, 1))}
           >
             <ChevronRight />

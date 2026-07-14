@@ -67,7 +67,7 @@ test('open review session has no axe violations', async ({ page }) => {
   await openDeck(page, `A11y sess deck ${uid}`)
   await addCards(page, [['Q session a11y', 'R session a11y']])
 
-  await page.getByRole('button', { name: 'Réviser' }).click()
+  await page.getByRole('button', { name: /^Réviser/ }).click()
   await expect(page).toHaveURL(/\/review/)
   await expect(page.getByText('pour révéler')).toBeVisible()
   await expectNoAxeViolations(page, 'review session (ASKING)')

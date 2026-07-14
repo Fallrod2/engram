@@ -114,15 +114,30 @@ export const sourceTypeSchema = z.enum(['md', 'pdf', 'image'])
 export const visionMediaTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp'])
 
 /**
+ * Structured OCR warning code (OCR spec §2.3). The server counts the uncertainty
+ * markers the prompt emits and returns language-agnostic codes; the client
+ * resolves them to localized text via the dictionary (mirrors the OCR error
+ * codes in `features/ocr/errors.ts`). `kind`:
+ *  - `uncertain`  → `count` `[?]` markers in the transcription
+ *  - `illegible`  → `count` `[illisible]` passages
+ */
+export const ocrWarningSchema = z.object({
+  kind: z.enum(['uncertain', 'illegible']),
+  count: z.number().int().nonnegative(),
+})
+export type OcrWarning = z.infer<typeof ocrWarningSchema>
+
+/**
  * Response of `POST /api/notes/extract-image` (OCR spec §2.4). The endpoint
  * NEVER writes a note — the transcription is previewed/corrected client-side
  * before `POST /api/notes` creates the note (`sourceType: 'image'`). `warnings`
- * are deterministic markers derived from the Markdown (`[?]` / `[illisible]`).
+ * are deterministic, language-agnostic codes derived from the Markdown
+ * (`[?]` / `[illisible]`), localized at the display point.
  */
 export const extractImageResponseSchema = z.object({
   markdown: z.string(),
   mediaType: visionMediaTypeSchema,
-  warnings: z.array(z.string()),
+  warnings: z.array(ocrWarningSchema),
 })
 
 export const noteSchema = z.object({

@@ -56,6 +56,8 @@ function SubjectsError() {
 type Tab = 'active' | 'archived'
 
 function SubjectsPage() {
+  const t = useT()
+  const plural = usePlural()
   const subjects = useQuery(subjectsListOptions()).data ?? []
   const allDecks = useQuery(allDecksOptions()).data
   const dueCounts = useQuery(dueCountsOptions()).data
@@ -114,10 +116,10 @@ function SubjectsPage() {
       { id: s.id, archived: !s.archived },
       {
         onSuccess: () => {
-          toast('Matière archivée', {
+          toast(t('subjects.archivedToast'), {
             action: !s.archived
               ? {
-                  label: 'Annuler',
+                  label: t('common.undo'),
                   onClick: () => archiveMut.mutate({ id: s.id, archived: false }),
                 }
               : undefined,
@@ -176,20 +178,20 @@ function SubjectsPage() {
                 else e.currentTarget.blur()
               }
             }}
-            placeholder="Filtrer…"
+            placeholder={t('cmd.filterPlaceholder')}
             className="w-full pl-8 sm:w-64"
-            aria-label="Filtrer les matières"
+            aria-label={t('subjects.filterAria')}
           />
         </div>
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList>
-            <TabsTrigger value="active">Actives</TabsTrigger>
-            <TabsTrigger value="archived">Archivées</TabsTrigger>
+            <TabsTrigger value="active">{t('subjects.tabActive')}</TabsTrigger>
+            <TabsTrigger value="archived">{t('subjects.tabArchived')}</TabsTrigger>
           </TabsList>
         </Tabs>
         <Button className="ml-auto" onClick={() => setCreateOpen(true)}>
           <Plus />
-          Nouvelle matière
+          {t('subjects.new')}
           {!coarse && (
             <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
           )}
@@ -229,14 +231,16 @@ function SubjectsPage() {
       <ConfirmDelete
         open={deleteSubject !== null}
         onOpenChange={(o) => !o && setDeleteSubject(null)}
-        title={`Supprimer « ${deleteSubject?.name} » ?`}
+        title={t('subjects.deleteTitle', { name: deleteSubject?.name ?? '' })}
         description={
           <>
-            Cela supprimera définitivement{' '}
+            {t('subjects.deleteLead')}{' '}
             <strong className="text-text">
-              {deckCountBySubject.get(deleteSubject?.id ?? '') ?? 0} decks
+              {t(`listMeta.decks_${plural(deckCountBySubject.get(deleteSubject?.id ?? '') ?? 0)}`, {
+                count: deckCountBySubject.get(deleteSubject?.id ?? '') ?? 0,
+              })}
             </strong>
-            , leurs cartes et tout l'historique de révision. Action irréversible.
+            {t('subjects.deleteTail')}
           </>
         }
         onConfirm={() => deleteSubject && deleteMut.mutate({ id: deleteSubject.id })}
@@ -288,7 +292,7 @@ function SubjectsBody({
         action={
           <Button onClick={onNew}>
             <Plus />
-            {t('cmd.actions.newSubject')}
+            {t('subjects.new')}
             {!coarse && (
               <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
             )}
@@ -302,16 +306,16 @@ function SubjectsBody({
     if (filter !== '') {
       return (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
-          <p className="text-sm text-text-muted">Aucune matière ne correspond à « {filter} ».</p>
+          <p className="text-sm text-text-muted">{t('subjects.noMatch', { filter })}</p>
           <Button variant="ghost" size="sm" onClick={onClearFilter}>
-            Effacer le filtre
+            {t('subjects.clearFilter')}
           </Button>
         </div>
       )
     }
     return (
       <p className="py-16 text-center text-sm text-text-muted">
-        {tab === 'archived' ? 'Aucune matière archivée.' : 'Aucune matière.'}
+        {tab === 'archived' ? t('subjects.noneArchived') : t('subjects.none')}
       </p>
     )
   }
@@ -320,10 +324,10 @@ function SubjectsBody({
     <div>
       {/* List header labels — hidden below sm, where rows use a stacked layout. */}
       <div className="hidden grid-cols-[1fr_64px_72px_88px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint sm:grid">
-        <span>Matière</span>
-        <span className="text-right">Decks</span>
-        <span className="text-right">Cartes</span>
-        <span className="text-right">Dues</span>
+        <span>{t('subjects.colName')}</span>
+        <span className="text-right">{t('subjects.colDecks')}</span>
+        <span className="text-right">{t('subjects.colCards')}</span>
+        <span className="text-right">{t('subjects.colDue')}</span>
         <span />
       </div>
 
@@ -402,6 +406,7 @@ function SubjectRowMenu({
   onArchive: (s: Subject) => void
   onDelete: (s: Subject) => void
 }) {
+  const t = useT()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -409,7 +414,7 @@ function SubjectRowMenu({
           variant="ghost"
           size="icon"
           className="size-7 pointer-coarse:size-11 text-text-muted"
-          aria-label={`Actions pour ${subject.name}`}
+          aria-label={t('subjects.rowActions', { name: subject.name })}
         >
           <MoreHorizontal />
         </Button>
@@ -417,11 +422,11 @@ function SubjectRowMenu({
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => onEdit(subject)}>
           <Pencil />
-          Éditer
+          {t('common.edit')}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onArchive(subject)}>
           {subject.archived ? <ArchiveRestore /> : <Archive />}
-          {subject.archived ? 'Désarchiver' : 'Archiver'}
+          {subject.archived ? t('subjects.unarchive') : t('common.archive')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -429,7 +434,7 @@ function SubjectRowMenu({
           onSelect={() => onDelete(subject)}
         >
           <Trash2 />
-          Supprimer
+          {t('common.delete')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

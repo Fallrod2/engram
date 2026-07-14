@@ -8,6 +8,7 @@
  * expect — computed against a stable client `now`, mirroring `lib/calendar`.
  */
 import { addDays, localDayKey } from '@/lib/calendar'
+import { isEn } from '@/lib/format'
 
 export type AnalyticsWindow = '30d' | '90d' | '365d' | 'all'
 
@@ -27,23 +28,24 @@ function windowDays(w: AnalyticsWindow): number | null {
   }
 }
 
-/** Short FR label for a tile/card subtitle. */
+/** Short locale-aware label for a tile/card subtitle. */
 export function windowLabel(w: AnalyticsWindow): string {
   switch (w) {
     case '30d':
-      return '30 j'
+      return isEn() ? '30d' : '30 j'
     case '90d':
-      return '90 j'
+      return isEn() ? '90d' : '90 j'
     case '365d':
-      return '12 mois'
+      return isEn() ? '12 mo' : '12 mois'
     case 'all':
-      return 'tout'
+      return isEn() ? 'all' : 'tout'
   }
 }
 
 /** Segmented-control label (same wording, standalone). */
 export function windowTabLabel(w: AnalyticsWindow): string {
-  return w === 'all' ? 'Tout' : windowLabel(w)
+  if (w === 'all') return isEn() ? 'All' : 'Tout'
+  return windowLabel(w)
 }
 
 export interface DayRange {

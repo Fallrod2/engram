@@ -10,6 +10,7 @@ import {
   type TooltipProps,
 } from 'recharts'
 import type { StudyTimeBucket, StudyTimeResponse } from '@engram/shared'
+import { useT, type TFunction } from '@/lib/i18n'
 import { formatLongDay } from '@/lib/format'
 import { accentSeries, chartInk } from '../chart-theme'
 import { formatAxisDay, formatDuration, formatDurationAxis } from '../metrics'
@@ -21,24 +22,32 @@ import { LowDataNote } from './low-data-note'
 
 const HEIGHT = 240
 
-const tableColumns: ChartColumn<StudyTimeBucket>[] = [
-  { key: 'date', header: 'Jour', render: (b) => b.date, mono: true },
-  {
-    key: 'ms',
-    header: 'Durée',
-    align: 'right',
-    mono: true,
-    render: (b) => formatDuration(b.durationMs),
-  },
-  { key: 'reviews', header: 'Reviews', align: 'right', mono: true, render: (b) => b.reviewCount },
-  {
-    key: 'measured',
-    header: 'Mesurées',
-    align: 'right',
-    mono: true,
-    render: (b) => b.measuredCount,
-  },
-]
+function buildTableColumns(t: TFunction): ChartColumn<StudyTimeBucket>[] {
+  return [
+    { key: 'date', header: t('analytics.colDay'), render: (b) => b.date, mono: true },
+    {
+      key: 'ms',
+      header: t('analytics.colDuration'),
+      align: 'right',
+      mono: true,
+      render: (b) => formatDuration(b.durationMs),
+    },
+    {
+      key: 'reviews',
+      header: t('analytics.colReviews'),
+      align: 'right',
+      mono: true,
+      render: (b) => b.reviewCount,
+    },
+    {
+      key: 'measured',
+      header: t('analytics.colMeasured'),
+      align: 'right',
+      mono: true,
+      render: (b) => b.measuredCount,
+    },
+  ]
+}
 
 export function StudyTimeChart({
   data,
@@ -55,6 +64,8 @@ export function StudyTimeChart({
   onRetry: () => void
   reduce: boolean
 }) {
+  const t = useT()
+  const tableColumns = buildTableColumns(t)
   const buckets = data?.buckets ?? []
   const empty = data !== undefined && data.totalMs === 0
   // A filled area needs at least two measured days to read as a trend; with one
@@ -71,7 +82,7 @@ export function StudyTimeChart({
     body = (
       <ChartEmpty
         variant="error"
-        title="Impossible de charger le temps d'étude."
+        title={t('analytics.studyError')}
         onRetry={onRetry}
         height={HEIGHT}
       />
@@ -79,8 +90,8 @@ export function StudyTimeChart({
   } else if (empty) {
     body = (
       <ChartEmpty
-        title="Pas de temps d'étude mesuré sur cette période."
-        hint="Les durées se mesurent pendant les sessions."
+        title={t('analytics.studyEmpty')}
+        hint={t('analytics.studyHint')}
         height={HEIGHT}
       />
     )
@@ -117,7 +128,7 @@ export function StudyTimeChart({
             />
             <Tooltip
               cursor={{ stroke: chartInk.axis, strokeWidth: 1 }}
-              content={renderTooltip}
+              content={(props: TooltipProps<number, string>) => renderTooltip(props, t)}
               isAnimationActive={false}
             />
             <Area
@@ -149,9 +160,7 @@ export function StudyTimeChart({
             </Area>
           </AreaChart>
         </ResponsiveContainer>
-        {lowData && (
-          <LowDataNote>Trop peu de jours mesurés pour tracer une tendance fiable.</LowDataNote>
-        )}
+        {lowData && <LowDataNote>{t('analytics.studyLowData')}</LowDataNote>}
       </div>
     )
     table = (
@@ -159,14 +168,14 @@ export function StudyTimeChart({
         columns={tableColumns}
         rows={buckets}
         rowKey={(b) => b.date}
-        caption="Temps d'étude par jour"
+        caption={t('analytics.studyCaption')}
       />
     )
   }
 
   return (
     <ChartCard
-      title="Temps d'étude"
+      title={t('analytics.studyTitle')}
       subtitle={windowLabel}
       isFetching={isFetching}
       showToggle={!empty && !(error && !data)}
@@ -177,7 +186,7 @@ export function StudyTimeChart({
   )
 }
 
-function renderTooltip({ active, payload }: TooltipProps<number, string>) {
+function renderTooltip({ active, payload }: TooltipProps<number, string>, t: TFunction) {
   if (!active || !payload || payload.length === 0) return null
   const bucket = payload[0]?.payload as StudyTimeBucket | undefined
   if (!bucket) return null
@@ -185,7 +194,7 @@ function renderTooltip({ active, payload }: TooltipProps<number, string>) {
     <TooltipShell date={formatLongDay(bucket.date)}>
       <TooltipRow
         colorVar={accentSeries.line}
-        label="Temps d'étude"
+        label={t('analytics.studyTime')}
         value={formatDuration(bucket.durationMs)}
         strong
       />

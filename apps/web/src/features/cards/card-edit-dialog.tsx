@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Eye, EyeOff } from 'lucide-react'
 import type { Card } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { EntityFormDialog } from '@/components/entity-form-dialog'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
@@ -17,8 +18,8 @@ import { MarkdownPreview } from '@/lib/markdown-preview'
  * to the shared `updateCardSchema` shape and never touches FSRS state.
  */
 const cardFormSchema = z.object({
-  front: z.string().trim().min(1, 'Ce champ est requis.'),
-  back: z.string().trim().min(1, 'Ce champ est requis.'),
+  front: z.string().trim().min(1, 'forms.fieldRequired'),
+  back: z.string().trim().min(1, 'forms.fieldRequired'),
 })
 
 type CardFormValues = z.infer<typeof cardFormSchema>
@@ -35,6 +36,7 @@ export function CardEditDialog({
   card: Card | null
   onSubmit: (values: CardFormValues) => void
 }) {
+  const t = useT()
   const [preview, setPreview] = useState(false)
   const form = useForm<CardFormValues>({
     resolver: zodResolver(cardFormSchema),
@@ -54,7 +56,7 @@ export function CardEditDialog({
     <EntityFormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Modifier la carte"
+      title={t('dialogs.cardEdit')}
       form={form}
       onSubmit={onSubmit}
       contentClassName="max-w-lg"
@@ -68,7 +70,7 @@ export function CardEditDialog({
           onClick={() => setPreview((p) => !p)}
         >
           {preview ? <EyeOff /> : <Eye />}
-          Markdown
+          {t('composer.markdown')}
         </Button>
       }
     >
@@ -77,7 +79,7 @@ export function CardEditDialog({
         name="front"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Recto</FormLabel>
+            <FormLabel>{t('forms.front')}</FormLabel>
             <FormControl>
               <Textarea
                 autoFocus
@@ -95,7 +97,7 @@ export function CardEditDialog({
         name="back"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Verso</FormLabel>
+            <FormLabel>{t('forms.back')}</FormLabel>
             <FormControl>
               <Textarea
                 className={cn('min-h-20', fieldState.error && 'border-danger')}

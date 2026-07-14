@@ -18,7 +18,7 @@ import { PayloadTooLargeError, ServiceUnavailableError, ValidationError } from '
 import { detectImageMedia, detectSourceType, extractText } from '../services/extract'
 import { createNote, deleteNote, getNote, listNotes, updateNote } from '../services/notes.service'
 import { resolveOcrProvider } from '../services/ai-config.service'
-import { computeOcrWarnings, getVisionExtractor } from '../ai/vision'
+import { computeOcrWarningCodes, getVisionExtractor } from '../ai/vision'
 import { OCR_INSTRUCTION, OCR_SYSTEM_PROMPT } from '../ai/prompts/ocr.v1'
 
 export const notesRouter = new Hono()
@@ -148,7 +148,7 @@ notesRouter.post('/extract-image', async (c) => {
   return ok(c, extractImageResponseSchema, {
     markdown,
     mediaType: media.mediaType,
-    warnings: computeOcrWarnings(markdown),
+    warnings: computeOcrWarningCodes(markdown),
   })
 })
 

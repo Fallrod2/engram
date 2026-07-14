@@ -20,6 +20,7 @@ import { Countdown } from '@/components/countdown'
 import { useRovingList } from '@/lib/use-roving'
 import { isEditableTarget } from '@/lib/use-hotkeys'
 import { useCoarsePointer } from '@/lib/use-media-query'
+import { useT } from '@/lib/i18n'
 
 /** Imperative handle: move focus into the list (grid `e` fallback, spec §2.4). */
 export type ExamListHandle = { focus: () => void }
@@ -46,6 +47,7 @@ export function ExamList({
   onEdit: (exam: Exam) => void
   onDelete: (exam: Exam) => void
 }) {
+  const t = useT()
   const coarse = useCoarsePointer()
   const todayKey = localDayKey(now)
   const { upcoming, past } = useMemo(() => {
@@ -82,8 +84,8 @@ export function ExamList({
     return (
       <EmptyState
         icon={GraduationCap}
-        title="Aucun examen à venir."
-        meta="Ajoute une échéance pour piloter tes révisions."
+        title={t('planning.examEmptyTitle')}
+        meta={t('planning.examEmptyMeta')}
         className="min-h-0 py-8"
         action={
           <Button variant="secondary" onClick={onNew}>

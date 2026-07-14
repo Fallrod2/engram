@@ -14,6 +14,8 @@
  * Kept pure (no React) so the freeze rule is unit-tested directly.
  */
 
+import type { OcrWarning } from '@engram/shared'
+
 export const PAGE_SEPARATOR = '\n\n---\n\n'
 
 export type OcrPageStatus = 'pending' | 'done' | 'error'
@@ -24,7 +26,7 @@ export interface OcrPage {
   status: OcrPageStatus
   /** Transcribed Markdown once `done` (the source of truth per page). */
   segment: string
-  warnings: string[]
+  warnings: OcrWarning[]
   error?: string
 }
 
@@ -39,7 +41,7 @@ export interface OcrState {
 }
 
 export type OcrAction =
-  | { type: 'resolved'; id: string; segment: string; warnings: string[] }
+  | { type: 'resolved'; id: string; segment: string; warnings: OcrWarning[] }
   | { type: 'failed'; id: string; error: string }
   | { type: 'retryStart'; id: string }
   | { type: 'edit'; text: string }

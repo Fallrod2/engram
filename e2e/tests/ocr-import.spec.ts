@@ -29,7 +29,7 @@ test('photo → downscale → OCR preview → correct → create note', async ({
   const textarea = page.getByLabel('Texte transcrit')
   await expect(textarea).toHaveValue(/Transcription factice/)
   // The `[?]` marker surfaces an uncertainty badge.
-  await expect(page.getByText(/marqueur\(s\) \[\?\]/)).toBeVisible()
+  await expect(page.getByText(/marqueurs? \[\?\]/)).toBeVisible()
 
   // Correct the text (a `question :: answer` line the fake generator can parse).
   await textarea.fill('Capitale de la France :: Paris')
