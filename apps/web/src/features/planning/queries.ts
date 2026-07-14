@@ -11,6 +11,7 @@ import {
 } from '@engram/shared'
 import { api, qs } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { useT } from '@/lib/i18n'
 import { mergeDefined } from '@/lib/utils'
 
 const examListSchema = z.array(examSchema)
@@ -72,6 +73,7 @@ function sortExams(list: Exam[]): Exam[] {
 
 export function useCreateExam() {
   const qc = useQueryClient()
+  const t = useT()
   const mutation = useMutation({
     mutationFn: (input: CreateExam) => api.post('/exams', input, examSchema),
     onMutate: async (input) => {
@@ -92,8 +94,8 @@ export function useCreateExam() {
     },
     onError: (_err, input, ctx) => {
       if (ctx?.previous) qc.setQueryData(LIST_KEY, ctx.previous)
-      toast.error("Création de l'examen échouée", {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(input) },
+      toast.error(t('toasts.examCreateError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(input) },
       })
     },
     onSuccess: (created, _input, ctx) => {
@@ -113,6 +115,7 @@ export function useCreateExam() {
 
 export function useUpdateExam() {
   const qc = useQueryClient()
+  const t = useT()
   const mutation = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateExam }) =>
       api.patch(`/exams/${id}`, patch, examSchema),
@@ -126,8 +129,8 @@ export function useUpdateExam() {
     },
     onError: (_err, vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(LIST_KEY, ctx.previous)
-      toast.error("Modification de l'examen échouée", {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+      toast.error(t('toasts.examUpdateError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     onSettled: (_data, _err, vars) => {
@@ -141,6 +144,7 @@ export function useUpdateExam() {
 
 export function useDeleteExam() {
   const qc = useQueryClient()
+  const t = useT()
   const mutation = useMutation({
     mutationFn: ({ id }: { id: string }) => api.delete(`/exams/${id}`),
     onMutate: async ({ id }) => {
@@ -151,8 +155,8 @@ export function useDeleteExam() {
     },
     onError: (_err, vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(LIST_KEY, ctx.previous)
-      toast.error("Suppression de l'examen échouée", {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+      toast.error(t('toasts.examDeleteError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     onSettled: () => {

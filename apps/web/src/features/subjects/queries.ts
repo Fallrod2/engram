@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { subjectSchema, type CreateSubject, type Subject, type UpdateSubject } from '@engram/shared'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { useT } from '@/lib/i18n'
 import { mergeDefined } from '@/lib/utils'
 
 const subjectListSchema = z.array(subjectSchema)
@@ -43,6 +44,7 @@ function useSubjectListMutation<Vars>(config: {
   invalidatePlanning?: boolean
 }) {
   const qc = useQueryClient()
+  const t = useT()
   const mutation = useMutation({
     mutationFn: config.mutationFn,
     onMutate: async (vars: Vars) => {
@@ -56,7 +58,7 @@ function useSubjectListMutation<Vars>(config: {
     onError: (_err, vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(LIST_KEY, ctx.previous)
       toast.error(config.errorTitle, {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     onSettled: () => {
@@ -76,6 +78,7 @@ function useSubjectListMutation<Vars>(config: {
 
 export function useCreateSubject() {
   const qc = useQueryClient()
+  const t = useT()
   return useMutation({
     mutationFn: (input: CreateSubject) => api.post('/subjects', input, subjectSchema),
     onMutate: async (input) => {
@@ -98,9 +101,9 @@ export function useCreateSubject() {
     },
     onError: (_err, input, ctx) => {
       if (ctx?.previous) qc.setQueryData(LIST_KEY, ctx.previous)
-      toast.error('Création de la matière échouée', {
+      toast.error(t('toasts.subjectCreateError'), {
         action: {
-          label: 'Réessayer',
+          label: t('common.retry'),
           onClick: () => void api.post('/subjects', input, subjectSchema),
         },
       })
@@ -116,30 +119,33 @@ export function useCreateSubject() {
 }
 
 export function useUpdateSubject() {
+  const t = useT()
   return useSubjectListMutation<{ id: string; patch: UpdateSubject }>({
     mutationFn: ({ id, patch }) => api.patch(`/subjects/${id}`, patch, subjectSchema),
     optimistic: (list, { id, patch }) =>
       list.map((s) => (s.id === id ? mergeDefined(s, patch) : s)),
-    errorTitle: 'Modification de la matière échouée',
+    errorTitle: t('toasts.subjectUpdateError'),
   })
 }
 
 export function useArchiveSubject() {
+  const t = useT()
   return useSubjectListMutation<{ id: string; archived: boolean }>({
     mutationFn: ({ id, archived }) =>
       api.post(`/subjects/${id}/${archived ? 'archive' : 'unarchive'}`, undefined, subjectSchema),
     optimistic: (list, { id, archived }) => list.map((s) => (s.id === id ? { ...s, archived } : s)),
-    errorTitle: 'Archivage échoué',
+    errorTitle: t('toasts.subjectArchiveError'),
     invalidateDueCounts: true,
     invalidatePlanning: true,
   })
 }
 
 export function useDeleteSubject() {
+  const t = useT()
   return useSubjectListMutation<{ id: string }>({
     mutationFn: ({ id }) => api.delete(`/subjects/${id}`),
     optimistic: (list, { id }) => list.filter((s) => s.id !== id),
-    errorTitle: 'Suppression de la matière échouée',
+    errorTitle: t('toasts.subjectDeleteError'),
     invalidateDueCounts: true,
     invalidateDecks: true,
     invalidatePlanning: true,

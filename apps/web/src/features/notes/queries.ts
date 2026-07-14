@@ -9,6 +9,7 @@ import {
 } from '@engram/shared'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { useT } from '@/lib/i18n'
 import { mergeDefined } from '@/lib/utils'
 
 /**
@@ -84,6 +85,7 @@ export function useCreateNote() {
 /** Rename / re-file a note (subject or title). */
 export function useUpdateNote() {
   const qc = useQueryClient()
+  const t = useT()
   const mutation = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateNote }) =>
       api.patch(`/notes/${id}`, patch, noteSchema),
@@ -101,8 +103,8 @@ export function useUpdateNote() {
     onError: (_err, vars, ctx) => {
       if (ctx?.previousList) qc.setQueryData(LIST_KEY, ctx.previousList)
       if (ctx?.previousDetail) qc.setQueryData(qk.notes.detail(vars.id), ctx.previousDetail)
-      toast.error('Modification de la note échouée', {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+      toast.error(t('toasts.noteUpdateError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     onSettled: (_data, _err, vars) => {
@@ -116,6 +118,7 @@ export function useUpdateNote() {
 /** Delete a note (cascades to its generations server-side). */
 export function useDeleteNote() {
   const qc = useQueryClient()
+  const t = useT()
   const mutation = useMutation({
     mutationFn: ({ id }: { id: string }) => api.delete(`/notes/${id}`),
     onMutate: async ({ id }) => {
@@ -126,8 +129,8 @@ export function useDeleteNote() {
     },
     onError: (_err, vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(LIST_KEY, ctx.previous)
-      toast.error('Suppression de la note échouée', {
-        action: { label: 'Réessayer', onClick: () => mutation.mutate(vars) },
+      toast.error(t('toasts.noteDeleteError'), {
+        action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
     onSettled: (_data, _err, vars) => {

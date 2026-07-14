@@ -27,6 +27,28 @@ export const dictFr = {
     skipToContent: 'Aller au contenu',
   },
 
+  // Error toasts raised by the feature mutations (queries.ts). Kept out of the
+  // per-feature sections so every write surface shares one translated set.
+  toasts: {
+    subjectCreateError: 'Création de la matière échouée',
+    subjectUpdateError: 'Modification de la matière échouée',
+    subjectArchiveError: 'Archivage échoué',
+    subjectDeleteError: 'Suppression de la matière échouée',
+    deckCreateError: 'Création du deck échouée',
+    deckUpdateError: 'Modification du deck échouée',
+    deckDeleteError: 'Suppression du deck échouée',
+    cardCreateError: 'Ajout de la carte échoué',
+    cardUpdateError: 'Modification de la carte échouée',
+    cardDeleteError: 'Suppression de la carte échouée',
+    noteUpdateError: 'Modification de la note échouée',
+    noteDeleteError: 'Suppression de la note échouée',
+    examCreateError: "Création de l'examen échouée",
+    examUpdateError: "Modification de l'examen échouée",
+    examDeleteError: "Suppression de l'examen échouée",
+    reviewSaveError: "Échec d'enregistrement",
+    cardGone: 'Carte introuvable — passée',
+  },
+
   nav: {
     groups: {
       review: 'Réviser',

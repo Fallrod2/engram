@@ -23,6 +23,26 @@ export const dictEn: Dict = {
     skipToContent: 'Skip to content',
   },
 
+  toasts: {
+    subjectCreateError: 'Could not create subject',
+    subjectUpdateError: 'Could not update subject',
+    subjectArchiveError: 'Could not archive subject',
+    subjectDeleteError: 'Could not delete subject',
+    deckCreateError: 'Could not create deck',
+    deckUpdateError: 'Could not update deck',
+    deckDeleteError: 'Could not delete deck',
+    cardCreateError: 'Could not add card',
+    cardUpdateError: 'Could not update card',
+    cardDeleteError: 'Could not delete card',
+    noteUpdateError: 'Could not update note',
+    noteDeleteError: 'Could not delete note',
+    examCreateError: 'Could not create exam',
+    examUpdateError: 'Could not update exam',
+    examDeleteError: 'Could not delete exam',
+    reviewSaveError: 'Could not save review',
+    cardGone: 'Card not found — skipped',
+  },
+
   nav: {
     groups: {
       review: 'Review',
