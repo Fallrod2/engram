@@ -24,7 +24,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCreateNote } from '@/features/notes/queries'
 import { useExtractImage } from './queries'
-import { classifyExtractError, ocrErrorMessageKey } from './errors'
+import { classifyExtractError, ocrErrorMessageKey, type OcrErrorKind } from './errors'
 import { getExtractionConcurrency, hasAnySegment, initOcrState, ocrReducer } from './state'
 
 const NO_SUBJECT = '__none__'
@@ -39,6 +39,13 @@ interface PhotoItem {
 function baseName(name: string): string {
   const dot = name.lastIndexOf('.')
   return dot > 0 ? name.slice(0, dot) : name
+}
+
+/** Banner variant (dict sub-key) for an OCR-config failure kind. */
+function providerBannerKey(kind: OcrErrorKind): 'noProvider' | 'noVision' | 'generic' {
+  if (kind === 'noProvider') return 'noProvider'
+  if (kind === 'noVision') return 'noVision'
+  return 'generic'
 }
 
 /** Bounded-concurrency pool (OCR spec §3.3.2). */
@@ -95,7 +102,10 @@ export function PhotoImport({
   )
   const [title, setTitle] = useState(() => baseName(files[0]?.name ?? t('ocr.defaultTitle')))
   const [subject, setSubject] = useState(subjectId ?? NO_SUBJECT)
-  const [providerError, setProviderError] = useState(false)
+  // Which OCR-config failure (if any) to surface as the top banner. Holds the
+  // specific 503 kind so the message + CTA are actionable and differentiated
+  // (no provider vs provider-can't-read-images).
+  const [providerError, setProviderError] = useState<OcrErrorKind | null>(null)
 
   const extract = useExtractImage()
   const extractMut = extract.mutateAsync
@@ -107,11 +117,13 @@ export function PhotoImport({
         const res = await extractMut(item.file)
         // A page extracted successfully → the provider/vision config is working
         // now (e.g. fixed in another tab), so clear a stale 503 banner.
-        setProviderError(false)
+        setProviderError(null)
         dispatch({ type: 'resolved', id: item.id, segment: res.markdown, warnings: res.warnings })
       } catch (e) {
         const kind = classifyExtractError(e)
-        if (kind === 'noVisionProvider') setProviderError(true)
+        if (kind === 'noProvider' || kind === 'noVision' || kind === 'noVisionProvider') {
+          setProviderError(kind)
+        }
         // Store the classification *code*; the display point resolves it to text.
         dispatch({ type: 'failed', id: item.id, error: kind })
       }
@@ -189,11 +201,17 @@ export function PhotoImport({
           <div className="flex items-start gap-3">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium text-text">{t('ocr.provider.title')}</p>
-              <p className="text-xs leading-relaxed text-text-muted">{t('ocr.provider.body')}</p>
+              <p className="text-sm font-medium text-text">
+                {t(`ocr.provider.${providerBannerKey(providerError)}.title`)}
+              </p>
+              <p className="text-xs leading-relaxed text-text-muted">
+                {t(`ocr.provider.${providerBannerKey(providerError)}.body`)}
+              </p>
               <div className="mt-1">
                 <Button asChild variant="secondary" size="sm">
-                  <Link to="/settings">{t('ocr.provider.cta')}</Link>
+                  <Link to="/settings">
+                    {t(`ocr.provider.${providerBannerKey(providerError)}.cta`)}
+                  </Link>
                 </Button>
               </div>
             </div>

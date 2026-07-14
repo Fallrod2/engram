@@ -633,6 +633,8 @@ export const dictEn: Dict = {
         provider: 'OCR provider',
         model: 'OCR model',
         keyShared: 'This provider’s API key and URL are shared with generation.',
+        visionUnsupported: '{provider} can’t read photos — pick a dedicated OCR provider below.',
+        codexShared: 'ChatGPT uses your linked account (section above). No key to enter here.',
       },
     },
   },
@@ -778,9 +780,21 @@ export const dictEn: Dict = {
     rejectUnsupported: 'Unsupported file type',
     rejectUnsupportedDetail: '{name} — .md, .pdf, or a photo',
     provider: {
-      title: 'No vision model configured',
-      body: 'Photo extraction needs a vision-capable AI provider (Claude, GPT-4o, llava…).',
-      cta: 'Configure a provider',
+      noProvider: {
+        title: 'No AI provider configured for OCR',
+        body: 'Set one up in Settings → Artificial intelligence to transcribe your photos.',
+        cta: 'Open Settings',
+      },
+      noVision: {
+        title: 'This provider can’t read images',
+        body: 'The configured provider doesn’t support image extraction. Pick a dedicated OCR provider in Settings → AI → OCR.',
+        cta: 'Choose an OCR provider',
+      },
+      generic: {
+        title: 'No vision model configured',
+        body: 'Photo extraction needs a vision-capable AI provider (Claude, GPT-4o, llava…).',
+        cta: 'Configure a provider',
+      },
     },
     aria: {
       moveUp: 'Move page up',
@@ -805,6 +819,9 @@ export const dictEn: Dict = {
       takePhoto: 'Take a photo',
     },
     error: {
+      noProvider: 'No AI provider configured for OCR (see Settings → AI).',
+      noVision:
+        'The configured provider can’t read images — pick a dedicated OCR provider (Settings → AI → OCR).',
       noVisionProvider:
         'Extraction unavailable: no vision model configured. Pick a vision model (Claude, GPT-4o, llava…) in Settings.',
       heic: 'HEIC format not supported. Set your iPhone camera to “Most Compatible” (JPEG), or convert the image.',

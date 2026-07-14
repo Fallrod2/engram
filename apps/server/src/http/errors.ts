@@ -77,7 +77,7 @@ export class UpstreamError extends ApiError {
 
 /** 503 — a feature is unavailable (e.g. AI generation with no API key configured). */
 export class ServiceUnavailableError extends ApiError {
-  constructor(message: string) {
-    super(503, 'service_unavailable', message)
+  constructor(message: string, details?: unknown) {
+    super(503, 'service_unavailable', message, details)
   }
 }

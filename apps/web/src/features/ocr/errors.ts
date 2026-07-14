@@ -10,12 +10,23 @@ import { DownscaleError } from './downscale'
  * outcome codes).
  */
 export type OcrErrorKind =
-  | 'noVisionProvider' // 503 — no provider / no vision capability (config banner)
+  | 'noProvider' // 503 details.reason=no_provider — nothing configured for OCR
+  | 'noVision' // 503 details.reason=no_vision — provider can't read images
+  | 'noVisionProvider' // 503 without a structured reason (generic config banner)
   | 'heic' // HEIC rejected (client filename or server magic bytes)
   | 'unsupported' // decode failed / non jpg-png-webp
   | 'tooLarge' // > 4 MB even after downscale, or server 413
   | 'illegible' // extraction empty / unreadable
   | 'generic' // everything else → per-page retry
+
+/** Read the structured `details.reason` the server attaches to the OCR 503. */
+function ocrUnavailableReason(details: unknown): 'no_provider' | 'no_vision' | undefined {
+  if (details !== null && typeof details === 'object' && 'reason' in details) {
+    const reason = (details as { reason?: unknown }).reason
+    if (reason === 'no_provider' || reason === 'no_vision') return reason
+  }
+  return undefined
+}
 
 export function classifyExtractError(err: unknown): OcrErrorKind {
   // Client-side downscale / pre-flight failures never round-trip.
@@ -24,7 +35,14 @@ export function classifyExtractError(err: unknown): OcrErrorKind {
     return err.code === 'tooLarge' ? 'tooLarge' : 'unsupported'
   }
   if (err instanceof ApiError) {
-    if (err.code === 'service_unavailable' || err.status === 503) return 'noVisionProvider'
+    if (err.code === 'service_unavailable' || err.status === 503) {
+      // The server tags the two distinct causes with a structured `reason`
+      // (never the FR text) so the banner is actionable + differentiated.
+      const reason = ocrUnavailableReason(err.details)
+      if (reason === 'no_provider') return 'noProvider'
+      if (reason === 'no_vision') return 'noVision'
+      return 'noVisionProvider'
+    }
     if (err.code === 'payload_too_large' || err.status === 413) return 'tooLarge'
     if (err.code === 'validation_error' || err.status === 400) {
       const m = (err.message ?? '').toLowerCase()
@@ -39,6 +57,8 @@ export function classifyExtractError(err: unknown): OcrErrorKind {
 
 /** Dict key carrying a clear, actionable message for each failure kind. */
 const MESSAGE_KEY: Record<OcrErrorKind, TKey> = {
+  noProvider: 'ocr.error.noProvider',
+  noVision: 'ocr.error.noVision',
   noVisionProvider: 'ocr.error.noVisionProvider',
   heic: 'ocr.error.heic',
   unsupported: 'ocr.error.unsupported',

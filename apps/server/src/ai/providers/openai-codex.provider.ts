@@ -4,15 +4,21 @@ import {
   CODEX_ORIGINATOR,
   codexResponsesUrl,
 } from './codex-constants'
-import { defaultFetch, unstructuredOutputError } from './constants'
+import { defaultFetch, toBase64, unstructuredOutputError } from './constants'
 import { buildResponsesBody, emitFromResponses, parseResponsesSse } from './openai-responses'
+import { openAiCodexSupportsVision } from './vision-support'
 import type { FetchFn, ProviderAdapter, ProviderModel, ResolvedProviderConfig } from './types'
+
+/** Vision MIME allowlist for the codex data-URL (defensive; the upstream
+ * pipeline already guarantees jpeg/png/webp and rejects HEIC). */
+const CODEX_VISION_MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 /**
  * Adapter for the ChatGPT/Codex SUBSCRIPTION backend (OAuth device-code linked).
  * Talks to `backend-api/codex/responses` (SSE) with a short-lived access token +
- * account id resolved upstream in `cfg.oauth` (the resolver refreshes it). NO
- * vision transport (→ automatic 503 for OCR). NEVER logs the token.
+ * account id resolved upstream in `cfg.oauth` (the resolver refreshes it).
+ * Carries a vision/OCR transport (`input_image` data-URL block in the same
+ * Responses form — verified in codex-rs, 14/07/2026). NEVER logs the token.
  *
  * Experimental: this rides OpenAI's tolerance of subscription OAuth in
  * third-party tools (see docs/subscription-providers-research.md) and may stop
@@ -67,13 +73,20 @@ async function codexErrorDetail(res: Response): Promise<string | undefined> {
 export function createOpenAiCodexAdapter(fetchFn: FetchFn = defaultFetch): ProviderAdapter {
   async function callResponses(
     cfg: ResolvedProviderConfig,
-    args: { system: string; userText: string; reinforceJson: boolean; signal?: AbortSignal },
+    args: {
+      system: string
+      userText: string
+      reinforceJson: boolean
+      imageDataUrl?: string
+      signal?: AbortSignal
+    },
   ): Promise<Response> {
     const body = buildResponsesBody({
       model: cfg.model,
       system: args.system,
       userText: args.userText,
       reinforceJson: args.reinforceJson,
+      ...(args.imageDataUrl ? { imageDataUrl: args.imageDataUrl } : {}),
     })
     return fetchFn(codexResponsesUrl(), {
       method: 'POST',
@@ -129,7 +142,42 @@ export function createOpenAiCodexAdapter(fetchFn: FetchFn = defaultFetch): Provi
       return CODEX_MODELS.map((id) => ({ id }))
     },
 
-    // No `supportsVision`/`completeVision`: OCR pointed at codex 503s cleanly.
+    // Vision/OCR: the subscription models are multimodal (permissive, like the
+    // openai-compat clouds). The pre-call guard uses this to avoid a confusing
+    // upstream error on a hypothetical text-only model.
+    supportsVision() {
+      return openAiCodexSupportsVision()
+    },
+
+    /**
+     * One image → Markdown transcription over the Responses form. The image is a
+     * bare data-URL string in an `input_image` block (contract verified in
+     * codex-rs, 14/07/2026); the OCR system prompt is the `instructions` and the
+     * per-page instruction is the `input_text`. Defensive MIME allowlist:
+     * jpeg/png/webp only (upstream already guarantees this + rejects HEIC).
+     */
+    async completeVision(cfg, args) {
+      if (!CODEX_VISION_MEDIA_TYPES.has(args.mediaType)) {
+        throw new Error(
+          `openai-codex: type d’image non supporté pour la vision (${args.mediaType}) — jpeg/png/webp uniquement.`,
+        )
+      }
+      const imageDataUrl = `data:${args.mediaType};base64,${toBase64(args.image)}`
+      const res = await callResponses(cfg, {
+        system: args.system,
+        userText: args.instruction,
+        reinforceJson: false,
+        imageDataUrl,
+        signal: args.signal,
+      })
+      if (!res.ok) throw codexHttpError(res.status, await codexErrorDetail(res))
+      const parsed = parseResponsesSse(await res.text())
+      return {
+        markdown: parsed.text,
+        promptTokens: parsed.promptTokens,
+        completionTokens: parsed.completionTokens,
+      }
+    },
   }
 }
 
