@@ -24,8 +24,30 @@ function ShellInner() {
     document.title = 'engram'
   }, [])
 
+  // Lock document scroll to the shell while it's mounted: only <main> scrolls, so
+  // a window-level scroll (drag scrollbar, PageDown/Space with focus on body,
+  // overscroll chaining) can never drift the whole app shell out of view
+  // (fix-mobile-shell §settings-scroll — /settings was the route that leaked).
+  // Scoped to the shell (not global CSS) so the public landing, which renders
+  // outside the shell, keeps its normal long-page window scroll.
+  useEffect(() => {
+    const html = document.documentElement
+    const prev = html.style.overflow
+    html.style.overflow = 'clip'
+    return () => {
+      html.style.overflow = prev
+    }
+  }, [])
+
   return (
-    <div id="app-shell" className="flex h-dvh w-full overflow-hidden bg-bg text-text">
+    // `relative` makes the shell (which is `overflow-hidden` + `h-dvh`) the
+    // containing block for any absolutely-positioned descendant — notably the
+    // sr-only file input in the backup card, whose static position on a long
+    // /settings page otherwise resolved against the viewport and stretched the
+    // document past the fold, defeating the scroll lock (fix-mobile-shell
+    // §settings-scroll). The `html { overflow: clip }` lock below stays as a
+    // belt-and-suspenders guard.
+    <div id="app-shell" className="relative flex h-dvh w-full overflow-hidden bg-bg text-text">
       {/* Skip link (a11y) — first in tab order. */}
       <a
         href="#main-content"
@@ -48,7 +70,10 @@ function ShellInner() {
           id="main-content"
           tabIndex={-1}
           onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}
-          className="flex-1 overflow-y-auto scroll-pt-12 outline-none"
+          // `overflow-x-clip` (not hidden — it doesn't force overflow-y to auto)
+          // guarantees no route can pan the whole page horizontally on mobile
+          // (fix-mobile-shell §toolbar).
+          className="flex-1 overflow-y-auto overflow-x-clip scroll-pt-12 outline-none"
         >
           <div className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 md:px-8 md:pb-8">
             {/*

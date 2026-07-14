@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { SubjectsIllustration } from '@/components/illustrations'
 import { SubjectsSkeleton } from '@/components/skeletons'
@@ -159,9 +159,11 @@ function SubjectsPage() {
 
   return (
     <div>
-      {/* Toolbar (the shell header already names the section "Matières"). */}
-      <div className="mb-4 flex items-center gap-3">
-        <div className="relative">
+      {/* Toolbar (the shell header already names the section "Matières"). Wraps
+          below sm: filter full-width on line 1, tabs + CTA on line 2, so the row
+          never forces horizontal page pan (fix-mobile-shell §toolbar). */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-auto">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-text-faint" />
           <Input
             id="subjects-filter"
@@ -175,7 +177,7 @@ function SubjectsPage() {
               }
             }}
             placeholder="Filtrer…"
-            className="w-64 pl-8"
+            className="w-full pl-8 sm:w-64"
             aria-label="Filtrer les matières"
           />
         </div>
@@ -276,6 +278,7 @@ function SubjectsBody({
 }) {
   const t = useT()
   const coarse = useCoarsePointer()
+  const plural = usePlural()
   if (subjects.filter((s) => !s.archived).length === 0 && tab === 'active' && filter === '') {
     return (
       <EmptyState
@@ -315,8 +318,8 @@ function SubjectsBody({
 
   return (
     <div>
-      {/* List header labels */}
-      <div className="grid grid-cols-[1fr_64px_72px_88px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
+      {/* List header labels — hidden below sm, where rows use a stacked layout. */}
+      <div className="hidden grid-cols-[1fr_64px_72px_88px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint sm:grid">
         <span>Matière</span>
         <span className="text-right">Decks</span>
         <span className="text-right">Cartes</span>
@@ -325,46 +328,64 @@ function SubjectsBody({
       </div>
 
       <ul className="flex flex-col" onKeyDown={roving.onKeyDown}>
-        {visible.map((s, i) => (
-          <EntityRow key={s.id}>
-            <Link
-              {...roving.getItemProps(i)}
-              to="/subjects/$subjectId"
-              params={{ subjectId: s.id }}
-              className={entityRowClass('grid grid-cols-[1fr_64px_72px_88px_40px] items-center')}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <SubjectDot color={s.color} muted={s.archived} />
-                <SubjectIcon
-                  name={s.icon}
-                  className={cn('shrink-0 text-text-muted', s.archived && 'opacity-60')}
-                />
-                <span className={cn('truncate', s.archived ? 'text-text-faint' : 'text-text')}>
-                  {s.name}
+        {visible.map((s, i) => {
+          const deckCount = deckCountsReady ? (deckCountBySubject.get(s.id) ?? 0) : undefined
+          const cardTotal = cardTotalBySubject.get(s.id)
+          const due = dueMap.get(s.id) ?? 0
+          return (
+            <EntityRow key={s.id}>
+              <Link
+                {...roving.getItemProps(i)}
+                to="/subjects/$subjectId"
+                params={{ subjectId: s.id }}
+                className={entityRowClass(
+                  // Stacked on phones (name full-width + meta sub-line), the dense
+                  // grid returns at sm (fix-mobile-shell §lists).
+                  'flex flex-col items-stretch justify-center gap-0.5 py-1.5 sm:grid sm:grid-cols-[1fr_64px_72px_88px_40px] sm:items-center sm:gap-0 sm:py-0',
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <SubjectDot color={s.color} muted={s.archived} />
+                  <SubjectIcon
+                    name={s.icon}
+                    className={cn('shrink-0 text-text-muted', s.archived && 'opacity-60')}
+                  />
+                  <span className={cn('truncate', s.archived ? 'text-text-faint' : 'text-text')}>
+                    {s.name}
+                  </span>
                 </span>
-              </span>
-              <CountStat
-                value={deckCountsReady ? (deckCountBySubject.get(s.id) ?? 0) : undefined}
-                className="justify-self-end"
-              />
-              <CountStat value={cardTotalBySubject.get(s.id)} className="justify-self-end" />
-              <DueCount
-                value={dueMap.get(s.id) ?? 0}
-                colorHex={s.color}
-                className="justify-self-end"
-              />
-              <span />
-            </Link>
-            <RowActions>
-              <SubjectRowMenu
-                subject={s}
-                onEdit={onEdit}
-                onArchive={onArchive}
-                onDelete={onDelete}
-              />
-            </RowActions>
-          </EntityRow>
-        ))}
+                {/* Mobile-only meta sub-line. */}
+                <span className="flex items-center gap-1.5 pl-[1.625rem] font-mono text-2xs tabular-nums text-text-muted sm:hidden">
+                  <span>
+                    {t(`listMeta.decks_${plural(deckCount ?? 0)}`, { count: deckCount ?? 0 })}
+                  </span>
+                  <span className="text-border-strong">·</span>
+                  <span>
+                    {t(`listMeta.cards_${plural(cardTotal ?? 0)}`, { count: cardTotal ?? 0 })}
+                  </span>
+                  <span className="text-border-strong">·</span>
+                  <span>{t(`listMeta.due_${plural(due)}`, { count: due })}</span>
+                </span>
+                <CountStat value={deckCount} className="hidden justify-self-end sm:block" />
+                <CountStat value={cardTotal} className="hidden justify-self-end sm:block" />
+                <DueCount
+                  value={due}
+                  colorHex={s.color}
+                  className="hidden justify-self-end sm:inline-flex"
+                />
+                <span className="hidden sm:block" />
+              </Link>
+              <RowActions>
+                <SubjectRowMenu
+                  subject={s}
+                  onEdit={onEdit}
+                  onArchive={onArchive}
+                  onDelete={onDelete}
+                />
+              </RowActions>
+            </EntityRow>
+          )
+        })}
       </ul>
     </div>
   )
@@ -387,7 +408,7 @@ function SubjectRowMenu({
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 text-text-muted"
+          className="size-7 pointer-coarse:size-11 text-text-muted"
           aria-label={`Actions pour ${subject.name}`}
         >
           <MoreHorizontal />

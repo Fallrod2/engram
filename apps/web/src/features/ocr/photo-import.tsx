@@ -240,7 +240,7 @@ export function PhotoImport({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-6 text-text-faint"
+                      className="size-6 pointer-coarse:size-11 text-text-faint"
                       aria-label={t('ocr.aria.moveUp')}
                       disabled={i === 0}
                       onClick={() => dispatch({ type: 'move', id: page.id, dir: -1 })}
@@ -250,7 +250,7 @@ export function PhotoImport({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-6 text-text-faint"
+                      className="size-6 pointer-coarse:size-11 text-text-faint"
                       aria-label={t('ocr.aria.moveDown')}
                       disabled={i === state.pages.length - 1}
                       onClick={() => dispatch({ type: 'move', id: page.id, dir: 1 })}
@@ -261,7 +261,7 @@ export function PhotoImport({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-6 text-text-faint"
+                        className="size-6 pointer-coarse:size-11 text-text-faint"
                         aria-label={t('ocr.aria.reextract')}
                         onClick={() => retry(page.id)}
                       >
@@ -271,7 +271,7 @@ export function PhotoImport({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="ml-auto size-6 text-text-faint hover:text-danger"
+                      className="ml-auto size-6 pointer-coarse:size-11 text-text-faint hover:text-danger"
                       aria-label={t('ocr.aria.removePage')}
                       onClick={() => remove(page.id)}
                     >

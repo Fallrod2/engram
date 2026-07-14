@@ -127,9 +127,13 @@ export function BackupCard() {
             ref={fileInputRef}
             type="file"
             accept="application/json,.json"
-            className="sr-only"
-            // Triggered by the button above; give it an accessible name and keep
-            // it out of the tab order so it is not a nameless duplicate stop (a11y).
+            // `hidden` (display:none), not `sr-only`: a `sr-only` file input is
+            // still laid out (position:absolute), so on a long /settings page its
+            // static position stretched the document past the fold and broke the
+            // shell scroll lock (fix-mobile-shell §settings-scroll). `display:none`
+            // removes it from flow entirely; `ref.click()` still opens the picker,
+            // and the button above carries the accessible name.
+            hidden
             aria-label={t('settings.dataImportAction')}
             tabIndex={-1}
             onChange={onFilePicked}

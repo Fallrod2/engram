@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
+import { Search, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMediaQuery } from '@/lib/use-media-query'
 import { useT } from '@/lib/i18n'
@@ -67,6 +67,13 @@ export function Header({
           className="text-text-muted"
         >
           <Search />
+        </Button>
+        {/* Settings gear — the mobile path to /settings (AI config), since the
+            sidebar footer is hidden below md (fix-mobile-shell §nav). */}
+        <Button variant="ghost" size="icon" asChild className="text-text-muted">
+          <Link to="/settings" aria-label={t('header.settings')}>
+            <Settings />
+          </Link>
         </Button>
         <ThemeToggle />
       </div>

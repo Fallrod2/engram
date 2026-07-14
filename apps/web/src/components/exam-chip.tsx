@@ -45,10 +45,15 @@ export function ExamChip({
           )}
         >
           <GraduationCap className="size-3 shrink-0 text-text-muted" strokeWidth={1.75} />
-          {shownDots.map((s) => (
-            <SubjectDot key={s.id} color={s.color} className="size-1.5" muted={s.archived} />
-          ))}
-          {overflow > 0 && (
+          {/* In the dense month grid (`compact`), the subject dots ate the width
+              that the title needs, leaving "Pa…"/"Th…" at ≤1024px. Drop them there
+              — the glyph already reads "exam" and the tooltip still lists subjects
+              (fix-mobile-shell §load-legend). */}
+          {!compact &&
+            shownDots.map((s) => (
+              <SubjectDot key={s.id} color={s.color} className="size-1.5" muted={s.archived} />
+            ))}
+          {!compact && overflow > 0 && (
             <span className="font-mono text-2xs tabular-nums text-text-faint">+{overflow}</span>
           )}
           <span className="truncate text-2xs text-text">{title}</span>

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { CalendarDays, ChartColumn, GraduationCap, Layers } from 'lucide-react'
+import { CalendarDays, ChartColumn, GraduationCap, ImageUp, Layers } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT, type TKey } from '@/lib/i18n'
@@ -11,12 +11,17 @@ interface TabEntry {
   icon: LucideIcon
 }
 
-/** Bottom tab bar for `<768px` (spec §5). Four entries, thumb-reachable. */
+/**
+ * Bottom tab bar for `<768px` (spec §5). Import joins the four core sections so
+ * the mobile-flagship photo flow is one tap away; Settings is reached from the
+ * header gear (fix-mobile-shell §nav).
+ */
 const TABS: TabEntry[] = [
   { label: 'tabbar.review', to: '/review', icon: GraduationCap },
   { label: 'tabbar.subjects', to: '/subjects', icon: Layers },
   { label: 'tabbar.planning', to: '/planning', icon: CalendarDays },
   { label: 'tabbar.stats', to: '/analytics', icon: ChartColumn },
+  { label: 'tabbar.import', to: '/import', icon: ImageUp },
 ]
 
 export function MobileTabBar() {

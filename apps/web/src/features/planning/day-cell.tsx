@@ -37,13 +37,17 @@ export function DayCell({
   const exams = day?.exams ?? []
   const shownExams = exams.slice(0, MAX_CHIPS)
   const overflow = exams.length - shownExams.length
+  // Legible summary for the otherwise cryptic "5 —" load indicator, on hover
+  // (native tooltip) and for assistive tech (fix-mobile-shell §load-legend).
+  const label = `${formatLongDay(cell.key)} — ${total} reviews prévues, ${exams.length} examens`
 
   return (
     <div
       {...cellProps}
       onClick={onSelect}
+      title={label}
       aria-selected={selected}
-      aria-label={`${formatLongDay(cell.key)} — ${total} reviews prévues, ${exams.length} examens`}
+      aria-label={label}
       className={cn(
         'group/cell relative flex min-h-[104px] cursor-pointer flex-col gap-1 p-1.5 text-left',
         'transition-colors duration-fast',

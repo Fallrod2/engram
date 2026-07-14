@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { DecksIllustration } from '@/components/illustrations'
 import { DecksSkeleton } from '@/components/skeletons'
@@ -73,6 +73,7 @@ function DecksPage() {
   const { subjectId } = Route.useParams()
   const navigate = useNavigate()
   const t = useT()
+  const plural = usePlural()
 
   const subject = useQuery(subjectDetailOptions(subjectId)).data
   const decks = useQuery(decksListOptions(subjectId)).data ?? []
@@ -248,68 +249,84 @@ function DecksPage() {
         />
       ) : (
         <div>
-          <div className="grid grid-cols-[1fr_72px_96px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
+          <div className="hidden grid-cols-[1fr_72px_96px_40px] items-center px-3 pb-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint sm:grid">
             <span>Deck</span>
             <span className="text-right">Cartes</span>
             <span className="text-right">Dues</span>
             <span />
           </div>
           <ul className="flex flex-col" onKeyDown={roving.onKeyDown}>
-            {sorted.map((d, i) => (
-              <EntityRow key={d.id}>
-                <Link
-                  {...roving.getItemProps(i)}
-                  to="/subjects/$subjectId/decks/$deckId"
-                  params={{ subjectId, deckId: d.id }}
-                  className={entityRowClass('grid grid-cols-[1fr_72px_96px_40px] items-center')}
-                >
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    <Layers className="size-4 shrink-0 text-text-muted" />
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-text">{d.name}</span>
-                      {d.description && (
-                        <span className="truncate text-xs text-text-muted">{d.description}</span>
-                      )}
+            {sorted.map((d, i) => {
+              const cards = cardCountByDeck.get(d.id)
+              const due = dueByDeck.get(d.id) ?? 0
+              return (
+                <EntityRow key={d.id}>
+                  <Link
+                    {...roving.getItemProps(i)}
+                    to="/subjects/$subjectId/decks/$deckId"
+                    params={{ subjectId, deckId: d.id }}
+                    className={entityRowClass(
+                      // Stacked on phones so the deck name gets the full width, the
+                      // dense grid returns at sm (fix-mobile-shell §lists).
+                      'flex flex-col items-stretch justify-center gap-0.5 py-1.5 sm:grid sm:grid-cols-[1fr_72px_96px_40px] sm:items-center sm:gap-0 sm:py-0',
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <Layers className="size-4 shrink-0 text-text-muted" />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate text-text">{d.name}</span>
+                        {d.description && (
+                          <span className="truncate text-xs text-text-muted">{d.description}</span>
+                        )}
+                      </span>
                     </span>
-                  </span>
-                  <CountStat value={cardCountByDeck.get(d.id)} className="justify-self-end" />
-                  <DueCount
-                    value={dueByDeck.get(d.id) ?? 0}
-                    colorHex={subject.color}
-                    className="justify-self-end"
-                  />
-                  <span />
-                </Link>
-                <RowActions>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-text-muted"
-                        aria-label={`Actions pour ${d.name}`}
-                      >
-                        <MoreHorizontal />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setEditDeck(d)}>
-                        <Pencil />
-                        Éditer
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-danger [&_svg]:text-danger"
-                        onSelect={() => setDeleteDeck(d)}
-                      >
-                        <Trash2 />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </RowActions>
-              </EntityRow>
-            ))}
+                    {/* Mobile-only meta sub-line. */}
+                    <span className="flex items-center gap-1.5 pl-[1.625rem] font-mono text-2xs tabular-nums text-text-muted sm:hidden">
+                      <span>
+                        {t(`listMeta.cards_${plural(cards ?? 0)}`, { count: cards ?? 0 })}
+                      </span>
+                      <span className="text-border-strong">·</span>
+                      <span>{t(`listMeta.due_${plural(due)}`, { count: due })}</span>
+                    </span>
+                    <CountStat value={cards} className="hidden justify-self-end sm:block" />
+                    <DueCount
+                      value={due}
+                      colorHex={subject.color}
+                      className="hidden justify-self-end sm:inline-flex"
+                    />
+                    <span className="hidden sm:block" />
+                  </Link>
+                  <RowActions>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 pointer-coarse:size-11 text-text-muted"
+                          aria-label={`Actions pour ${d.name}`}
+                        >
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setEditDeck(d)}>
+                          <Pencil />
+                          Éditer
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-danger [&_svg]:text-danger"
+                          onSelect={() => setDeleteDeck(d)}
+                        >
+                          <Trash2 />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </RowActions>
+                </EntityRow>
+              )
+            })}
           </ul>
         </div>
       )}

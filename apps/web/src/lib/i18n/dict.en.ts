@@ -66,6 +66,7 @@ export const dictEn: Dict = {
 
   header: {
     search: 'Search',
+    settings: 'Settings',
     backToDashboardAria: '{title} — go to dashboard',
   },
 
@@ -74,6 +75,18 @@ export const dictEn: Dict = {
     subjects: 'Subjects',
     planning: 'Planning',
     stats: 'Stats',
+    import: 'Import',
+  },
+
+  // Sub-line labels for the mobile 2-line list rows (fix-mobile-shell §lists).
+  // Pluralised via usePlural() so a count of 1 reads '1 deck', not '1 decks'.
+  listMeta: {
+    decks_one: '{count} deck',
+    decks_other: '{count} decks',
+    cards_one: '{count} card',
+    cards_other: '{count} cards',
+    due_one: '{count} due',
+    due_other: '{count} due',
   },
 
   cmd: {
