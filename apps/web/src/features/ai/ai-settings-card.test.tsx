@@ -11,8 +11,9 @@ import type { AiProviderStatus, AiSettings } from '@engram/shared'
  */
 
 const { updateMutate, setKeyMutate, deleteKeyMutate, testMutate } = vi.hoisted(() => ({
+  // setKey fires its onSuccess so the unified Save can chain into the model save.
   updateMutate: vi.fn(),
-  setKeyMutate: vi.fn(),
+  setKeyMutate: vi.fn((_args: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.()),
   deleteKeyMutate: vi.fn(),
   testMutate: vi.fn(),
 }))
@@ -106,14 +107,13 @@ describe('<OcrSettingsSection> PATCH partials', () => {
     fireEvent.change(screen.getByLabelText('Modèle OCR'), {
       target: { value: 'mistral-ocr-2505' },
     })
-    // Two "Enregistrer" buttons exist (key + model); the model save is the last.
-    const saves = screen.getAllByRole('button', { name: 'Enregistrer' })
-    fireEvent.click(saves[saves.length - 1]!)
+    // A single "Enregistrer" now saves the whole section (unified save model).
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
     expect(updateMutate).toHaveBeenCalledTimes(1)
     expect(updateMutate.mock.calls[0]![0]).toEqual({ ocr: { model: 'mistral-ocr-2505' } })
   })
 
-  it('saving a key targets the OCR provider (shared credential, no new endpoint)', () => {
+  it('the single Save persists the key too (no separate key button)', () => {
     render(
       <OcrSettingsSection
         settings={makeSettings({
@@ -125,10 +125,17 @@ describe('<OcrSettingsSection> PATCH partials', () => {
       />,
     )
     fireEvent.change(screen.getByLabelText('Clé API'), { target: { value: 'mist-key' } })
-    const saves = screen.getAllByRole('button', { name: 'Enregistrer' })
-    fireEvent.click(saves[0]!) // key save comes before the model save
+    fireEvent.change(screen.getByLabelText('Modèle OCR'), {
+      target: { value: 'mistral-ocr-2505' },
+    })
+    // Only one "Enregistrer" exists; clicking it saves the key AND the model.
+    expect(screen.getAllByRole('button', { name: 'Enregistrer' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
     expect(setKeyMutate).toHaveBeenCalledTimes(1)
     expect(setKeyMutate.mock.calls[0]![0]).toMatchObject({ provider: 'mistral', key: 'mist-key' })
+    // setKey's onSuccess chains into the model save.
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+    expect(updateMutate.mock.calls[0]![0]).toEqual({ ocr: { model: 'mistral-ocr-2505' } })
   })
 })
 
