@@ -43,8 +43,9 @@ test('subject → deck → cards → keyboard session → analytics', async ({ p
     ['Recto trois', 'Verso trois'],
   ])
 
-  // The "Réviser" entry appears with the due counter once cards exist.
-  const review = page.getByRole('button', { name: 'Réviser' })
+  // The "Réviser" entry appears with the due counter once cards exist. Anchored
+  // so it never matches the "À réviser" due-column header (both contain "réviser").
+  const review = page.getByRole('button', { name: /^Réviser/ })
   await expect(review).toBeVisible()
 
   // 6. Full keyboard session.
@@ -93,7 +94,7 @@ test('Échap quits an ungraded session', async ({ page }) => {
   await openDeck(page, deck)
   await addCards(page, [['Q échap', 'R échap']])
 
-  await page.getByRole('button', { name: 'Réviser' }).click()
+  await page.getByRole('button', { name: /^Réviser/ }).click()
   await expect(page).toHaveURL(/\/review/)
   await expect(page.getByText('pour révéler')).toBeVisible()
 
