@@ -14,7 +14,13 @@
  * the token never lingers in history. These functions are pure and unit-tested.
  */
 
-export type AuthLinkType = 'invite' | 'recovery'
+/**
+ * `signup` is the email-confirmation callback of the public sign-up flow (spec
+ * BYOK §2): the password is ALREADY set, so — unlike invite/recovery — it does
+ * NOT gate the `/set-password` screen; once the session is established it is a
+ * normal login (see `auth-store.ts` `init()`).
+ */
+export type AuthLinkType = 'invite' | 'recovery' | 'signup'
 
 export interface AuthLinkTokens {
   kind: 'tokens'
@@ -53,7 +59,7 @@ function toParams(raw: string): URLSearchParams {
 }
 
 function isLinkType(value: string | null): value is AuthLinkType {
-  return value === 'invite' || value === 'recovery'
+  return value === 'invite' || value === 'recovery' || value === 'signup'
 }
 
 /**

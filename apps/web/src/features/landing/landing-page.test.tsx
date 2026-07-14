@@ -82,11 +82,18 @@ describe('<LandingPage>', () => {
     expect(h1s[0]?.textContent).toBe('Retiens plus, en révisant moins.')
   })
 
-  it('every "Se connecter" CTA points at /login', () => {
+  it('the header "Se connecter" points at /login', () => {
     renderLanding()
-    const ctas = screen.getAllByRole('link', { name: 'Se connecter' })
-    expect(ctas.length).toBeGreaterThanOrEqual(2) // header + hero
-    for (const cta of ctas) expect(cta.getAttribute('href')).toBe('/login')
+    // After BYOK sign-up landed, the header keeps the sign-in link…
+    const signIn = screen.getAllByRole('link', { name: 'Se connecter' })
+    expect(signIn.length).toBeGreaterThanOrEqual(1)
+    for (const cta of signIn) expect(cta.getAttribute('href')).toBe('/login')
+  })
+
+  it('the hero CTA "Créer un compte" points at /signup', () => {
+    renderLanding()
+    const cta = screen.getByRole('link', { name: /Créer un compte/ })
+    expect(cta.getAttribute('href')).toBe('/signup')
   })
 
   it('the product screenshots carry alt text (a11y)', () => {
@@ -102,9 +109,11 @@ describe('<LandingPage>', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
       'Remember more, review less.',
     )
-    // The CTA copy follows the language too.
-    const ctas = screen.getAllByRole('link', { name: 'Sign in' })
-    expect(ctas.length).toBeGreaterThanOrEqual(2)
-    for (const cta of ctas) expect(cta.getAttribute('href')).toBe('/login')
+    // The CTA copy follows the language too: header → /login, hero → /signup.
+    const signIn = screen.getAllByRole('link', { name: 'Sign in' })
+    expect(signIn.length).toBeGreaterThanOrEqual(1)
+    for (const cta of signIn) expect(cta.getAttribute('href')).toBe('/login')
+    const create = screen.getByRole('link', { name: /Create an account/ })
+    expect(create.getAttribute('href')).toBe('/signup')
   })
 })

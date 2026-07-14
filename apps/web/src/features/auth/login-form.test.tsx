@@ -12,6 +12,9 @@ const { signInWithPassword } = vi.hoisted(() => ({ signInWithPassword: vi.fn() }
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
   useSearch: () => ({ redirect: undefined }),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={typeof to === 'string' ? to : '#'}>{children}</a>
+  ),
 }))
 vi.mock('@/lib/supabase', () => ({
   supabase: { auth: { signInWithPassword, signOut: vi.fn() } },
