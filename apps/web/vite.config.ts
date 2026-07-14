@@ -43,6 +43,21 @@ export default defineConfig({
         // stack (import + AI review only) must never land in the initial paint.
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
+          // KaTeX (~260 kB) + the whole math parsing/rendering stack are heavy and
+          // math-ONLY. Group them ALL here so `vendor-katex` is self-contained:
+          // its sole outgoing deps are the low-level hast/unist/micromark utils
+          // (shared, in `vendor-markdown`), and NOTHING in `vendor-markdown`
+          // imports a math package — so there is no `vendor-katex ↔ vendor-markdown`
+          // cycle and, crucially, no static edge from the base Markdown path into
+          // KaTeX. This rule runs FIRST so these packages never fall into the
+          // greedy markdown rule below. `vendor-katex` is imported only by the lazy
+          // `markdown-math` module, so it loads exclusively for math-bearing cards.
+          if (
+            /[\\/]node_modules[\\/](katex|rehype-katex|remark-math|mdast-util-math|micromark-extension-math)[\\/]/.test(
+              id,
+            )
+          )
+            return 'vendor-katex'
           // NOTE: recharts is deliberately NOT grouped here. `autoCodeSplitting`
           // already isolates it in the async /analytics route chunk. Forcing a
           // `vendor-charts` chunk backfired — a symbol recharts shares with common
