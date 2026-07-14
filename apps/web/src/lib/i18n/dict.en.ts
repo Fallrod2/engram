@@ -318,7 +318,6 @@ export const dictEn: Dict = {
       load: 'Review load',
       loadHint:
         'The bar shows how many reviews are scheduled that day, relative to the busiest day in view.',
-      exam: 'Exam',
     },
   },
 
@@ -471,6 +470,11 @@ export const dictEn: Dict = {
       fact: 'fact',
       concept: 'concept',
     },
+    // Accepted/rejected recap on a triaged generation-history row.
+    accepted_one: '{count} accepted',
+    accepted_other: '{count} accepted',
+    rejected_one: '{count} rejected',
+    rejected_other: '{count} rejected',
   },
 
   ocr: {

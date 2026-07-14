@@ -6,6 +6,7 @@ import { FileWarning, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Deck, Generation, GenerationKind, Subject } from '@engram/shared'
 import { ApiError } from '@/lib/api'
 import { formatRelativeTime } from '@/lib/format'
+import { useT, usePlural } from '@/lib/i18n'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { NoteSkeleton } from '@/components/skeletons'
@@ -77,13 +78,18 @@ function buildDeckGroups(subjects: Subject[], decks: Deck[]): DeckGroup[] {
 }
 
 /**
- * Accepted/rejected recap appended to a history row's meta line — only once a
- * generation has been triaged (its items carry a card id). Keeps the run
- * distinguishable at a glance (finding: rows were indistinguishable "Cartes ✓").
+ * Accepted/rejected recap appended to a history row's meta line — shown once a
+ * generation has been triaged (any item left the `pending` state). Detecting via
+ * the triage status, not the presence of a card id, keeps a fully REJECTED run
+ * (zero inserted cards) distinguishable too (finding: those rows fell back to the
+ * anonymous "Cartes ✓"). Accepted = items that actually produced a card
+ * (accepted + edited both carry a `cardId`).
  */
 function GenerationOutcome({ generation }: { generation: Generation }) {
+  const t = useT()
+  const plural = usePlural()
   if (generation.status !== 'succeeded') return null
-  const resolved = generation.items.some((it) => it.cardId !== undefined)
+  const resolved = generation.items.some((it) => it.status !== 'pending')
   if (!resolved) return null
   const accepted = generation.items.filter((it) => it.cardId !== undefined).length
   const rejected = generation.items.filter((it) => it.status === 'rejected').length
@@ -91,7 +97,8 @@ function GenerationOutcome({ generation }: { generation: Generation }) {
     <>
       <span className="px-1 text-border-strong">·</span>
       <span className="tabular-nums">
-        {accepted} acceptée{accepted > 1 ? 's' : ''} / {rejected} rejetée{rejected > 1 ? 's' : ''}
+        {t(`generation.accepted_${plural(accepted)}`, { count: accepted })} /{' '}
+        {t(`generation.rejected_${plural(rejected)}`, { count: rejected })}
       </span>
     </>
   )

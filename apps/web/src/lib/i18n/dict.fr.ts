@@ -322,7 +322,6 @@ export const dictFr = {
       load: 'Charge de révision',
       loadHint:
         'La barre indique le nombre de reviews prévues ce jour-là, relatif au maximum de la période.',
-      exam: 'Examen',
     },
   },
 
@@ -475,6 +474,11 @@ export const dictFr = {
       fact: 'fait',
       concept: 'concept',
     },
+    // Accepted/rejected recap on a triaged generation-history row.
+    accepted_one: '{count} acceptée',
+    accepted_other: '{count} acceptées',
+    rejected_one: '{count} rejetée',
+    rejected_other: '{count} rejetées',
   },
 
   ocr: {
