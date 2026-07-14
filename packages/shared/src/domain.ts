@@ -360,6 +360,8 @@ export const testConnectionDetailCodeSchema = z.enum([
   'forbidden',
   'unreachable',
   'incomplete_config',
+  // A key-requiring provider resolved NO key (BYOK: paste a key then Save).
+  'missing_key',
   'no_credentials',
   'http_error',
   // openai-codex: the device-code beta is off on the account (init refused).
