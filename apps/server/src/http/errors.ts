@@ -47,6 +47,17 @@ export class ForbiddenError extends ApiError {
   }
 }
 
+/**
+ * 403 — the account is suspended (IAM, spec §2.1 / amendment A15). A distinct
+ * code from `forbidden` so the web can route to the dedicated "account suspended"
+ * screen (via the api client's `onSuspended` hook) instead of a generic error.
+ */
+export class SuspendedError extends ApiError {
+  constructor(message = 'account suspended') {
+    super(403, 'suspended', message)
+  }
+}
+
 /** 404 — the path resource, or a foreign id referenced in the body, does not exist. */
 export class NotFoundError extends ApiError {
   constructor(message: string) {

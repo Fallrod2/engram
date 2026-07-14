@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from 'hono'
 import { sql } from 'drizzle-orm'
 import { db } from '../db/client'
 import { resolveAuthConfig } from '../auth/config'
+import { isDemoProfile } from '../services/profile.service'
 import { readDemoMarker, seedDemo, DEMO_NO_SESSION } from '../services/demo.service'
 
 /**
@@ -25,11 +26,16 @@ const DEMO_LOCK_KEY = 918273
 
 export function createDemoMiddleware(): MiddlewareHandler {
   return async (c, next) => {
-    const demoUserId = resolveAuthConfig(process.env).demoUserId
-    if (!demoUserId) return next() // demo disabled → no-op (no DB round-trip)
-
     const claims = c.get('authClaims')
-    if (!claims || claims.sub !== demoUserId) return next()
+    const sub = claims?.sub
+    if (typeof sub !== 'string' || sub.length === 0) return next() // health / preflight
+
+    // The demo account is resolved from the caller's own profile flag OR the env
+    // id (spec §2.2 / amendment A8): setting `is_demo=true` from /admin activates
+    // the reset + read-only behaviour without a redeploy. Non-demo → no-op.
+    const cfg = resolveAuthConfig(process.env)
+    if (!isDemoProfile(c.get('userProfile'), sub, cfg)) return next()
+    const demoUserId = sub
 
     const sessionId = typeof claims.session_id === 'string' ? claims.session_id : null
     const marker = sessionId ?? DEMO_NO_SESSION

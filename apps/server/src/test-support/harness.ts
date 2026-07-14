@@ -1,6 +1,7 @@
 import { createEmptyCard } from 'ts-fsrs'
 import type { DB } from '../db/client'
 import {
+  adminAudit,
   aiCredential,
   appSettings,
   card,
@@ -11,7 +12,9 @@ import {
   note,
   reviewLog,
   subject,
+  userProfile,
 } from '../db/schema'
+import type { UserRole, UserStatus } from '@engram/shared'
 import { fsrsCardToColumns } from '../db/mappers'
 import { localMidnight } from '../lib/day'
 import { DEFAULT_DEV_USER_ID } from '../auth/config'
@@ -45,6 +48,45 @@ export async function resetDb(db: DB): Promise<void> {
   // specs sharing the preloaded PGlite database.
   await db.delete(appSettings)
   await db.delete(aiCredential)
+  // IAM tables (spec §5.1). NOTE: the profile middleware RECREATES a caller's
+  // profile lazily during a route spec — seed AFTER resetDb, and never assert a
+  // profile COUNT without accounting for that lazy creation (amendment A9).
+  await db.delete(adminAudit)
+  await db.delete(userProfile)
+}
+
+/**
+ * Seed a `user_profile` row directly (spec §5 helper). Defaults to a plain active
+ * user; override role/status/isDemo to exercise the IAM guards. `lastSeenAt`
+ * defaults to now so the lazy middleware treats it as fresh (no touch write).
+ */
+export async function seedUserProfile(
+  db: DB,
+  o: {
+    userId: string
+    email?: string | null
+    role?: UserRole
+    status?: UserStatus
+    isDemo?: boolean
+    createdAt?: Date
+    lastSeenAt?: Date
+  },
+) {
+  const now = new Date()
+  const [row] = await db
+    .insert(userProfile)
+    .values({
+      userId: o.userId,
+      email: o.email ?? null,
+      role: o.role ?? 'user',
+      status: o.status ?? 'active',
+      isDemo: o.isDemo ?? false,
+      createdAt: o.createdAt ?? now,
+      updatedAt: now,
+      lastSeenAt: o.lastSeenAt ?? now,
+    })
+    .returning()
+  return row!
 }
 
 export async function seedSubject(
