@@ -334,6 +334,7 @@ export function requireAuth(opts: {
   if (
     opts.pathname === '/login' ||
     opts.pathname === '/signup' ||
+    opts.pathname === '/forgot-password' ||
     opts.pathname === '/set-password' ||
     opts.pathname === '/' ||
     opts.pathname === '/welcome'

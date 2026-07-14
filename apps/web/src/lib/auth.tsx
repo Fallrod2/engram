@@ -36,6 +36,14 @@ export interface AuthContextValue {
   ) => Promise<{ error: string | null; status: number | null }>
   signOut: () => Promise<void>
   /**
+   * Send a password-reset email (public "forgot password" flow). The recovery
+   * link lands on the site root with a `type=recovery` fragment, which
+   * `captureAuthLink` → `init()` promotes into the EXISTING set-password gate.
+   * Always resolves `error: null` on the happy path; the caller shows a neutral
+   * "email sent" screen regardless (anti-enumeration).
+   */
+  resetPassword: (email: string) => Promise<{ error: string | null }>
+  /**
    * Set the current user's password via the active session (invite/recovery
    * onboarding, or a change from Settings). Requires an active session.
    */
@@ -79,6 +87,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     signOut: async () => {
       await supabase?.auth.signOut()
+    },
+    resetPassword: async (email) => {
+      if (!supabase) return { error: null }
+      // The recovery email link lands on the site root; `captureAuthLink` parses
+      // the `type=recovery` fragment and `init()` establishes the recovery
+      // session, gating the existing `/set-password` screen.
+      const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo ? { redirectTo } : {},
+      )
+      return { error: error ? error.message : null }
     },
     setPassword: async (password) => {
       if (!supabase) return { error: null }
