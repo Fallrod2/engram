@@ -135,7 +135,7 @@ function ImportPage() {
           setUploads((prev) =>
             prev.map((u) => (u.id === id ? { ...u, status: 'error', error: message } : u)),
           )
-          toast.error('Import impossible', { description: file.name })
+          toast.error(t('import.importError'), { description: file.name })
         },
       },
     )
@@ -165,7 +165,9 @@ function ImportPage() {
         continue
       }
       if (file.size > MAX_UPLOAD_BYTES) {
-        toast.error('Fichier trop volumineux', { description: `${file.name} — max 10 Mo` })
+        toast.error(t('import.fileTooLarge'), {
+          description: t('import.fileTooLargeDetail', { name: file.name }),
+        })
         continue
       }
       startUpload(file, subjectId)
@@ -203,13 +205,13 @@ function ImportPage() {
     <div>
       <Dropzone onFiles={onFiles}>
         <div className="flex items-center justify-center gap-2 text-xs text-text-faint">
-          <span>Ranger dans</span>
+          <span>{t('import.fileInSubject')}</span>
           <Select value={fileInSubject} onValueChange={setFileInSubject}>
-            <SelectTrigger className="h-7 w-48" aria-label="Ranger les imports dans une matière">
+            <SelectTrigger className="h-7 w-48" aria-label={t('import.fileInSubjectAria')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_SUBJECT}>Sans matière</SelectItem>
+              <SelectItem value={NO_SUBJECT}>{t('forms.noSubjectOption')}</SelectItem>
               {subjects
                 .filter((s) => !s.archived)
                 .map((s) => (
@@ -261,7 +263,7 @@ function ImportPage() {
                       {group.subject.name}
                     </>
                   ) : (
-                    'Sans matière'
+                    t('forms.noSubjectOption')
                   )}
                 </div>
                 <ul className="flex flex-col">
@@ -294,8 +296,8 @@ function ImportPage() {
       <ConfirmDelete
         open={deleteTarget !== null}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title={`Supprimer « ${deleteTarget?.title} » ?`}
-        description="Supprime cette note et toutes ses générations. Les cartes déjà insérées ne sont pas touchées. Irréversible."
+        title={t('subjects.deleteTitle', { name: deleteTarget?.title ?? '' })}
+        description={t('import.deleteNoteDesc')}
         onConfirm={() => deleteTarget && deleteNote.mutate({ id: deleteTarget.id })}
       />
     </div>

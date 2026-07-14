@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import { useT, usePlural } from '@/lib/i18n'
 import type { ReviewCounts } from '@/features/generations/review-machine'
 
 /**
@@ -15,28 +16,35 @@ export function ReviewFooterBar({
   onInsert: () => void
   insertPending: boolean
 }) {
+  const t = useT()
+  const plural = usePlural()
   const n = counts.toInsert
   return (
     <div className="sticky bottom-0 z-10 -mx-4 mt-4 border-t border-border bg-surface-1/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
       <div className="mx-auto flex max-w-[900px] items-center gap-4">
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-mono text-xs tabular-nums text-text-muted">
-          <Counter value={counts.accepted} label="acceptées" />
+          <Counter value={counts.accepted} label={t('generation.footerAccepted')} />
           <Sep />
-          <Counter value={counts.edited} label="éditées" />
+          <Counter value={counts.edited} label={t('generation.footerEdited')} />
           <Sep />
-          <Counter value={counts.rejected} label="rejetées" />
+          <Counter value={counts.rejected} label={t('generation.footerRejected')} />
           <Sep />
-          <Counter value={counts.pending} label="restantes" muted={counts.pending === 0} />
+          <Counter
+            value={counts.pending}
+            label={t('generation.footerRemaining')}
+            muted={counts.pending === 0}
+          />
         </p>
         <div className="ml-auto flex items-center gap-2">
           {counts.pending > 0 && n > 0 && (
             <span className="hidden text-2xs text-text-faint sm:inline">
-              {counts.pending} non triée{counts.pending > 1 ? 's' : ''} ignorée
-              {counts.pending > 1 ? 's' : ''}
+              {t(`generation.footerUntriaged_${plural(counts.pending)}`, { count: counts.pending })}
             </span>
           )}
           <Button onClick={onInsert} disabled={n === 0 || insertPending}>
-            {insertPending ? 'Insertion…' : `Insérer ${n} carte${n > 1 ? 's' : ''}`}
+            {insertPending
+              ? t('generation.inserting')
+              : t(`generation.insertConfirm_${plural(n)}`, { count: n })}
             {!insertPending && (
               <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">⌘↵</Kbd>
             )}

@@ -6,6 +6,7 @@ import { FileWarning, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Deck, GenerationKind, Subject } from '@engram/shared'
 import { ApiError } from '@/lib/api'
 import { EmptyState } from '@/components/empty-state'
+import { useT } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { NoteSkeleton } from '@/components/skeletons'
 import { PageHeader } from '@/components/page-header'
@@ -50,12 +51,13 @@ export const Route = createFileRoute('/import/$noteId/')({
 
 function NoteError({ error }: { error: Error }) {
   const router = useRouter()
+  const t = useT()
   const notFound = error instanceof ApiError && error.status === 404
   return (
     <ErrorState
       kind="note"
       {...(notFound
-        ? { back: <Link to="/import">Retour à l'import</Link> }
+        ? { back: <Link to="/import">{t('ocr.route.backLink')}</Link> }
         : { onRetry: () => void router.invalidate() })}
     />
   )
@@ -78,6 +80,7 @@ function buildDeckGroups(subjects: Subject[], decks: Deck[]): DeckGroup[] {
 function NotePage() {
   const { noteId } = Route.useParams()
   const navigate = useNavigate()
+  const t = useT()
 
   const note = useQuery(noteDetailOptions(noteId)).data
   const subjects = useQuery(subjectsListOptions()).data ?? []
@@ -139,8 +142,8 @@ function NotePage() {
           if (classifyGenerationError(err) === 'apiKeyMissing') {
             setApiKeyMissing(true)
           } else {
-            toast.error('Lancement de la génération échoué', {
-              action: { label: 'Réessayer', onClick: () => launch() },
+            toast.error(t('generation.launchError'), {
+              action: { label: t('common.retry'), onClick: () => launch() },
             })
           }
         },
@@ -180,7 +183,7 @@ function NotePage() {
         breadcrumb={
           <>
             <Link to="/import" className="text-text-muted transition-colors hover:text-text">
-              Import
+              {t('pageTitle.import')}
             </Link>
             <span className="text-text-faint">/</span>
             {noteSubject && (
@@ -202,7 +205,7 @@ function NotePage() {
                 variant="ghost"
                 size="icon"
                 className="text-text-muted"
-                aria-label="Actions de la note"
+                aria-label={t('import.noteActions')}
               >
                 <MoreHorizontal />
               </Button>
@@ -210,7 +213,7 @@ function NotePage() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setEditOpen(true)}>
                 <Pencil />
-                Renommer / matière
+                {t('import.noteRename')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -218,7 +221,7 @@ function NotePage() {
                 onSelect={() => setDeleteOpen(true)}
               >
                 <Trash2 />
-                Supprimer
+                {t('common.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -244,12 +247,10 @@ function NotePage() {
 
           <div>
             <p className="mb-2 px-1 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-              Historique
+              {t('generation.history')}
             </p>
             {generations.length === 0 ? (
-              <p className="px-1 text-xs text-text-muted">
-                Aucune génération. Choisissez un type et un deck, puis Générer.
-              </p>
+              <p className="px-1 text-xs text-text-muted">{t('generation.historyEmpty')}</p>
             ) : (
               <ul className="flex flex-col" onKeyDown={roving.onKeyDown}>
                 {generations.map((g, i) => (
@@ -261,7 +262,11 @@ function NotePage() {
                       className={entityRowClass('gap-2')}
                     >
                       <span className="text-sm capitalize text-text">
-                        {g.kind === 'quiz' ? 'Quiz' : g.kind === 'mixed' ? 'Mixte' : 'Cartes'}
+                        {g.kind === 'quiz'
+                          ? t('generation.kindQuiz')
+                          : g.kind === 'mixed'
+                            ? t('generation.kindMixed')
+                            : t('generation.kindCards')}
                       </span>
                       <span className="ml-auto">
                         <GenerationStatusBadge generation={g} />
@@ -278,8 +283,8 @@ function NotePage() {
           {contentEmpty ? (
             <EmptyState
               icon={FileWarning}
-              title="Aucun texte extrait"
-              meta="Ce PDF ne contient probablement pas de texte sélectionnable."
+              title={t('import.noTextTitle')}
+              meta={t('import.noTextMeta')}
             />
           ) : (
             <ScrollArea className="max-h-[calc(100dvh-10rem)] rounded-lg border border-border bg-surface-1 p-4">
@@ -299,8 +304,8 @@ function NotePage() {
       <ConfirmDelete
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={`Supprimer « ${note.title} » ?`}
-        description="Supprime cette note et toutes ses générations. Les cartes déjà insérées ne sont pas touchées. Irréversible."
+        title={t('subjects.deleteTitle', { name: note.title })}
+        description={t('import.deleteNoteDesc')}
         onConfirm={() => {
           deleteNote.mutate({ id: note.id })
           void navigate({ to: '/import' })

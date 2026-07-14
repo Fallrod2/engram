@@ -47,17 +47,20 @@ export function GenerationErrorState({
   onRetry: () => void
   retrying?: boolean
 }) {
+  const t = useT()
   return (
     <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 px-6 text-center">
       <span className="flex size-12 items-center justify-center rounded-lg border border-border bg-surface-2 text-text-faint">
         <Unplug className="size-5" strokeWidth={1.75} aria-hidden />
       </span>
       <div className="flex max-w-md flex-col gap-1.5">
-        <p className="text-lg font-semibold tracking-[-0.01em] text-text">La génération a échoué</p>
+        <p className="text-lg font-semibold tracking-[-0.01em] text-text">
+          {t('generation.failedTitle')}
+        </p>
         {error && <p className="font-mono text-xs leading-relaxed text-text-muted">{error}</p>}
       </div>
       <Button onClick={onRetry} disabled={retrying}>
-        Relancer la génération
+        {t('generation.relaunchFull')}
       </Button>
     </div>
   )

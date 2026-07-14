@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Note } from '@engram/shared'
+import { useT, usePlural } from '@/lib/i18n'
+import { isEn, formatDayMonth } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -16,10 +18,10 @@ function formatImportedAt(iso: string, now: Date = new Date()): string {
   const then = new Date(iso)
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
   const days = Math.round((startOfDay(now) - startOfDay(then)) / 86_400_000)
-  if (days <= 0) return 'auj.'
-  if (days === 1) return 'hier'
-  if (days < 7) return `il y a ${days}j`
-  return then.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  if (days <= 0) return isEn() ? 'today' : 'auj.'
+  if (days === 1) return isEn() ? 'yesterday' : 'hier'
+  if (days < 7) return isEn() ? `${days}d ago` : `il y a ${days}j`
+  return formatDayMonth(iso)
 }
 
 /** Dense note row (spec §1.10): type badge + title + mono meta, kebab on hover. */
@@ -37,6 +39,8 @@ export function NoteRow({
   onEdit: (note: Note) => void
   onDelete: (note: Note) => void
 }) {
+  const t = useT()
+  const plural = usePlural()
   return (
     <EntityRow>
       <Link
@@ -50,7 +54,7 @@ export function NoteRow({
         </span>
         <span className="truncate font-medium text-text">{note.title}</span>
         <span className="ml-auto whitespace-nowrap font-mono text-xs tabular-nums text-text-faint">
-          {generationCount} génération{generationCount > 1 ? 's' : ''}
+          {t(`import.generationCount_${plural(generationCount)}`, { count: generationCount })}
           <span className="px-1 text-border-strong">·</span>
           {formatImportedAt(note.createdAt)}
         </span>
@@ -62,7 +66,7 @@ export function NoteRow({
               variant="ghost"
               size="icon"
               className="size-7 text-text-muted"
-              aria-label={`Actions pour ${note.title}`}
+              aria-label={t('subjects.rowActions', { name: note.title })}
             >
               <MoreHorizontal />
             </Button>
@@ -70,7 +74,7 @@ export function NoteRow({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => onEdit(note)}>
               <Pencil />
-              Renommer / matière
+              {t('import.noteRename')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -78,7 +82,7 @@ export function NoteRow({
               onSelect={() => onDelete(note)}
             >
               <Trash2 />
-              Supprimer
+              {t('common.delete')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

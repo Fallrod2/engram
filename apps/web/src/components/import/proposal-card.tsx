@@ -94,6 +94,7 @@ export function ProposalCard({
   onStartEdit: () => void
   onCancelEdit: () => void
 }) {
+  const t = useT()
   const rejected = item.status === 'rejected'
 
   return (
@@ -123,10 +124,10 @@ export function ProposalCard({
             <ProposalEditor item={item} onSave={onEdit} onCancel={onCancelEdit} />
           ) : (
             <div className="flex flex-col gap-2">
-              <Face label="Recto" struck={rejected}>
+              <Face label={t('forms.front')} struck={rejected}>
                 <Markdown source={item.front} />
               </Face>
-              <Face label="Verso" muted struck={rejected}>
+              <Face label={t('forms.back')} muted struck={rejected}>
                 <Markdown source={item.back} />
               </Face>
             </div>
@@ -136,7 +137,7 @@ export function ProposalCard({
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           {item.status === 'edited' && (
             <span className="rounded-xs bg-surface-3 px-1 font-mono text-2xs text-text-muted">
-              modifié
+              {t('generation.proposalEdited')}
             </span>
           )}
           {item.frozen && deckLink && (
@@ -145,7 +146,7 @@ export function ProposalCard({
               params={deckLink.params}
               className="text-2xs text-accent underline-offset-2 hover:underline"
             >
-              voir dans le deck
+              {t('generation.viewInDeck')}
             </Link>
           )}
         </div>
@@ -164,21 +165,21 @@ export function ProposalCard({
             onClick={onAccept}
             className="inline-flex items-center gap-1 hover:text-text-muted"
           >
-            <Kbd>a</Kbd> accepter
+            <Kbd>a</Kbd> {t('generation.legendAccept')}
           </button>
           <button
             type="button"
             onClick={onStartEdit}
             className="inline-flex items-center gap-1 hover:text-text-muted"
           >
-            <Kbd>e</Kbd> éditer
+            <Kbd>e</Kbd> {t('generation.legendEdit')}
           </button>
           <button
             type="button"
             onClick={onReject}
             className="inline-flex items-center gap-1 hover:text-text-muted"
           >
-            <Kbd>r</Kbd> rejeter
+            <Kbd>r</Kbd> {t('generation.legendReject')}
           </button>
           {item.history.length > 0 && (
             <button
@@ -186,7 +187,7 @@ export function ProposalCard({
               onClick={onUndo}
               className="inline-flex items-center gap-1 hover:text-text-muted"
             >
-              <Kbd>u</Kbd> annuler
+              <Kbd>u</Kbd> {t('generation.legendUndo')}
             </button>
           )}
         </div>
@@ -234,6 +235,7 @@ function ProposalEditor({
   onSave: (front: string, back: string) => void
   onCancel: () => void
 }) {
+  const t = useT()
   const [front, setFront] = useState(item.front)
   const [back, setBack] = useState(item.back)
   const [touched, setTouched] = useState(false)
@@ -270,20 +272,25 @@ function ProposalEditor({
   return (
     <div className="flex flex-col gap-2" onKeyDown={onKeyDown}>
       <EditorField
-        label="Recto"
+        label={t('forms.front')}
         value={front}
         onChange={setFront}
         error={touched && frontEmpty}
         textareaRef={frontRef}
       />
-      <EditorField label="Verso" value={back} onChange={setBack} error={touched && backEmpty} />
+      <EditorField
+        label={t('forms.back')}
+        value={back}
+        onChange={setBack}
+        error={touched && backEmpty}
+      />
       <div className="flex items-center gap-2 text-2xs text-text-faint">
         <span className="inline-flex items-center gap-1">
-          <Kbd>⌘↵</Kbd> valider
+          <Kbd>⌘↵</Kbd> {t('generation.editorSave')}
         </span>
         <span className="text-border-strong">·</span>
         <span className="inline-flex items-center gap-1">
-          <Kbd>esc</Kbd> annuler
+          <Kbd>esc</Kbd> {t('generation.editorCancel')}
         </span>
       </div>
     </div>
@@ -303,6 +310,7 @@ function EditorField({
   error: boolean
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>
 }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-1">
       <label className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
@@ -321,7 +329,7 @@ function EditorField({
           error ? 'border-danger' : 'border-border hover:border-border-strong',
         )}
       />
-      {error && <p className="text-2xs text-danger">Ce champ est requis.</p>}
+      {error && <p className="text-2xs text-danger">{t('forms.fieldRequired')}</p>}
     </div>
   )
 }

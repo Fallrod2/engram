@@ -1,6 +1,7 @@
 import { Check, Slash } from 'lucide-react'
 import type { Generation } from '@engram/shared'
 import { cn } from '@/lib/utils'
+import { useT, usePlural } from '@/lib/i18n'
 
 /**
  * Run-status pill for a generation (spec §1.10, §5). Encoded **monochrome +
@@ -17,6 +18,8 @@ export function GenerationStatusBadge({
   className?: string
 }) {
   const { status, items } = generation
+  const t = useT()
+  const plural = usePlural()
 
   if (status === 'pending') {
     return (
@@ -25,7 +28,7 @@ export function GenerationStatusBadge({
           className="size-1.5 animate-pulse rounded-full bg-text-muted motion-reduce:animate-none"
           aria-hidden
         />
-        en cours
+        {t('generation.statusPending')}
       </span>
     )
   }
@@ -34,7 +37,7 @@ export function GenerationStatusBadge({
     return (
       <span className={cn('inline-flex items-center gap-1 text-xs text-text-faint', className)}>
         <Slash className="size-3.5" strokeWidth={2} aria-hidden />
-        échec
+        {t('generation.statusFailed')}
       </span>
     )
   }
@@ -44,8 +47,8 @@ export function GenerationStatusBadge({
   return (
     <span className={cn('inline-flex items-center gap-1 text-xs text-text-muted', className)}>
       <Check className="size-3.5 text-text" strokeWidth={2.25} aria-hidden />
-      <span className="font-mono tabular-nums">{count}</span>
-      {count > 1 ? ' cartes' : ' carte'}
+      <span className="font-mono tabular-nums">{count}</span>{' '}
+      {t(`generation.badgeCard_${plural(count)}`)}
     </span>
   )
 }
