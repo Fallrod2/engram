@@ -4,6 +4,7 @@ import { useAuthLink } from '@/lib/auth'
 import { authStore } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { AuthBrand } from '@/features/auth/auth-brand'
 import { SetPasswordForm } from '@/features/auth/set-password-form'
 
 /**
@@ -29,21 +30,10 @@ export const Route = createFileRoute('/set-password')({
 })
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const t = useT()
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <span
-            className="flex size-6 items-center justify-center rounded-sm bg-accent text-accent-fg"
-            aria-hidden
-          >
-            <span className="text-2xs">◆</span>
-          </span>
-          <span className="text-sm font-semibold tracking-[-0.01em] text-text">
-            {t('auth.title')}
-          </span>
-        </div>
+        <AuthBrand />
         <Card>{children}</Card>
       </div>
     </div>
@@ -68,11 +58,17 @@ function SetPasswordPage() {
             {t('auth.link.expiredTitle')}
           </h1>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-text-muted">{t('auth.link.expiredDesc')}</p>
+          {/* Primary escape from the account dead-end: request a fresh reset link.
+              Clear the terminal error state before navigating so the root guard
+              does not immediately bounce us back here. */}
+          <Button asChild className="w-full">
+            <Link to="/forgot-password" onClick={() => authStore.clearLinkState()}>
+              {t('auth.link.resetLink')}
+            </Link>
+          </Button>
           <Button asChild variant="outline" className="w-full">
-            {/* Clear the terminal error state before navigating so the root guard
-                does not immediately bounce us back here (dead-end). */}
             <Link to="/login" onClick={() => authStore.clearLinkState()}>
               {t('auth.link.backToLogin')}
             </Link>

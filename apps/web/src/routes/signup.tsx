@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { useT } from '@/lib/i18n'
 import { sanitizeRedirect } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { AuthBrand } from '@/features/auth/auth-brand'
 import { SignupForm } from '@/features/auth/signup-form'
 
 /**
@@ -31,17 +32,7 @@ function SignupPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <span
-            className="flex size-6 items-center justify-center rounded-sm bg-accent text-accent-fg"
-            aria-hidden
-          >
-            <span className="text-2xs">◆</span>
-          </span>
-          <span className="text-sm font-semibold tracking-[-0.01em] text-text">
-            {t('auth.title')}
-          </span>
-        </div>
+        <AuthBrand />
         <Card>
           {sent ? (
             <>

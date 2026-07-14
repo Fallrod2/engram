@@ -7,9 +7,11 @@ import { useT, type TFunction } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { AUTH_INPUT_CLASS, PasswordInput } from '@/components/ui/password-input'
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -82,6 +84,7 @@ export function SignupForm({ onSent }: { onSent: () => void }) {
                   autoComplete="email"
                   autoFocus
                   disabled={submitting}
+                  className={AUTH_INPUT_CLASS}
                   {...field}
                 />
               </FormControl>
@@ -96,13 +99,10 @@ export function SignupForm({ onSent }: { onSent: () => void }) {
             <FormItem>
               <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  disabled={submitting}
-                  {...field}
-                />
+                <PasswordInput autoComplete="new-password" disabled={submitting} {...field} />
               </FormControl>
+              {/* Length rule stated up-front, before any error (audit POLISH). */}
+              <FormDescription>{t('auth.passwordMinHint')}</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -114,12 +114,7 @@ export function SignupForm({ onSent }: { onSent: () => void }) {
             <FormItem>
               <FormLabel>{t('auth.signup.confirm')}</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  disabled={submitting}
-                  {...field}
-                />
+                <PasswordInput autoComplete="new-password" disabled={submitting} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

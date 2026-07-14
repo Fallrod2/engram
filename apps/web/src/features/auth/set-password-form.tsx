@@ -5,10 +5,11 @@ import { z } from 'zod'
 import { useT, type TFunction } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -79,14 +80,15 @@ export function SetPasswordForm({
             <FormItem>
               <FormLabel>{t('auth.setPassword.newPassword')}</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
+                <PasswordInput
                   autoComplete="new-password"
                   autoFocus
                   disabled={submitting}
                   {...field}
                 />
               </FormControl>
+              {/* Length rule stated up-front, before any error (audit POLISH). */}
+              <FormDescription>{t('auth.passwordMinHint')}</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -98,12 +100,7 @@ export function SetPasswordForm({
             <FormItem>
               <FormLabel>{t('auth.setPassword.confirm')}</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  disabled={submitting}
-                  {...field}
-                />
+                <PasswordInput autoComplete="new-password" disabled={submitting} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
