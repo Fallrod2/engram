@@ -573,6 +573,7 @@ export const apiErrorCodeSchema = z.enum([
   'not_found',
   'unauthorized', // 401 — access token absent, malformed, invalid or expired (auth gate)
   'forbidden', // 403 — authenticated but not allowed (admin-only route)
+  'suspended', // 403 — the account is suspended (IAM, spec §2.1 / amendment A15)
   'conflict',
   'payload_too_large', // 413 — uploaded file exceeds the size limit
   'service_unavailable', // 503 — AI generation unavailable (no ANTHROPIC_API_KEY)
