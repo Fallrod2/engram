@@ -65,6 +65,26 @@ describe('openAiCodexAdapter.complete', () => {
     expect(body).not.toHaveProperty('max_output_tokens')
   })
 
+  it('normalizes question/answer key aliases to front/back (real-account deviation)', async () => {
+    const { fetchFn } = stubFetch(() =>
+      sse([
+        {
+          type: 'response.output_text.delta',
+          delta: '{"cards":[{"question":"Q1","answer":"A1"},{"recto":"Q2","verso":"A2"}]}',
+        },
+        { type: 'response.completed', response: { usage: { input_tokens: 5, output_tokens: 3 } } },
+      ]),
+    )
+    const adapter = createOpenAiCodexAdapter(fetchFn)
+    const res = await adapter.complete(cfg, args)
+    expect(res.emitInput).toMatchObject({
+      cards: [
+        { front: 'Q1', back: 'A1' },
+        { front: 'Q2', back: 'A2' },
+      ],
+    })
+  })
+
   it('surfaces the backend {"detail"} body in non-ok errors (names the bad parameter)', async () => {
     const { fetchFn } = stubFetch(
       () =>

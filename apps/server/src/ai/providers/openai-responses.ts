@@ -14,13 +14,19 @@ import { extractJsonEmit } from '../parse'
  * pattern.
  */
 
-/** Extra directive appended to the instructions so the model emits pure JSON. */
+/**
+ * Extra directive appended to the instructions so the model emits pure JSON.
+ * The subscription backend has NO forced-schema mode (no tools/json_schema),
+ * so the exact key names MUST be spelled out — a real linked account emitted
+ * {"cards":[{question,answer}]} when the directive only said "conforme au
+ * schéma demandé" (Alex, 14/07/2026).
+ */
 const JSON_DIRECTIVE =
-  'Réponds UNIQUEMENT avec un objet JSON de forme {"cards":[...]} conforme au schéma demandé, sans texte ni balises autour.'
+  'Réponds UNIQUEMENT avec un objet JSON conforme au schéma décrit dans les instructions, sans texte ni balises autour. Respecte EXACTEMENT les noms de champs du schéma — pour des cartes simples : {"cards":[{"front":"…","back":"…"}]}. N’invente JAMAIS d’autres noms de clés (pas de "question"/"answer", pas de "recto"/"verso").'
 
-/** Stronger directive for the 2nd attempt (the 1st returned unparseable text). */
+/** Stronger directive for the 2nd attempt (the 1st returned unusable output). */
 const JSON_DIRECTIVE_STRICT =
-  'IMPORTANT : ta réponse précédente n’était pas du JSON exploitable. Renvoie EXCLUSIVEMENT un objet JSON {"cards":[...]} — aucun autre caractère, aucune explication, aucune balise Markdown.'
+  'IMPORTANT : ta réponse précédente n’était pas exploitable (JSON invalide ou mauvais noms de champs). Renvoie EXCLUSIVEMENT un objet JSON avec les noms de champs EXACTS du schéma demandé — pour des cartes simples : {"cards":[{"front":"…","back":"…"}]} — aucun autre caractère, aucune explication, aucune balise Markdown, aucun nom de clé alternatif.'
 
 /** Build the backend request body (Codex/Responses form). */
 export function buildResponsesBody(args: {
@@ -147,12 +153,42 @@ function aggregateOutput(r: ResponsesEvent['response']): string | null {
   return null
 }
 
+/**
+ * Common key aliases the subscription models emit despite the directive
+ * (observed on a real linked account). Only applied when `front`/`back` are
+ * absent AND the item is not a cloze draft (those legitimately carry
+ * kind/clozeText instead) — unknown shapes still fail Zod loudly downstream.
+ */
+const FRONT_ALIASES = ['question', 'recto', 'prompt']
+const BACK_ALIASES = ['answer', 'verso', 'reponse', 'réponse']
+
+function normalizeCardAliases(emit: unknown): unknown {
+  if (typeof emit !== 'object' || emit === null) return emit
+  const obj = emit as { cards?: unknown }
+  if (!Array.isArray(obj.cards)) return emit
+  const cards = obj.cards.map((item) => {
+    if (typeof item !== 'object' || item === null) return item
+    const card = { ...(item as Record<string, unknown>) }
+    if (card.kind === 'cloze' || typeof card.clozeText === 'string') return item
+    if (typeof card.front !== 'string') {
+      const alias = FRONT_ALIASES.find((k) => typeof card[k] === 'string')
+      if (alias) card.front = card[alias]
+    }
+    if (typeof card.back !== 'string') {
+      const alias = BACK_ALIASES.find((k) => typeof card[k] === 'string')
+      if (alias) card.back = card[alias]
+    }
+    return card
+  })
+  return { ...obj, cards }
+}
+
 /** Parse the aggregated text into an emit object (or null → unstructured error). */
 export function emitFromResponses(result: ResponsesResult): unknown | null {
   const text = result.text.trim()
   if (text.length === 0) return null
   try {
-    return extractJsonEmit(text)
+    return normalizeCardAliases(extractJsonEmit(text))
   } catch {
     return null
   }
