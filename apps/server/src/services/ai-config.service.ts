@@ -15,6 +15,8 @@ import { ValidationError } from '../http/errors'
 import { hasAnthropicKey } from '../ai/client'
 import { resolveAuthConfig, resolveAdminUserId } from '../auth/config'
 import type { ResolvedProviderConfig } from '../ai/providers/types'
+import { CODEX_DEFAULT_MODEL, CODEX_ENABLE_ENV } from '../ai/providers/codex-constants'
+import { resolveCodexAccess } from './codex-access.service'
 
 /** The single key under which the AI config blob lives in `app_settings`. */
 const AI_KEY = 'ai'
@@ -35,13 +37,17 @@ const AI_KEY = 'ai'
  *   resolves AS the admin). A public signup with no app key gets `keySource:null`
  *   → unusable → the existing clean 503, never Alex's key.
  */
-function resolveScope(userId: string): { effectiveUserId: string; allowEnv: boolean } {
+function resolveScope(userId: string): {
+  effectiveUserId: string
+  allowEnv: boolean
+  isDemoAlias: boolean
+} {
   const cfg = resolveAuthConfig(process.env)
   const adminUserId = resolveAdminUserId(cfg)
-  const effectiveUserId =
-    cfg.demoUserId && userId === cfg.demoUserId ? (adminUserId ?? userId) : userId
+  const isDemoAlias = Boolean(cfg.demoUserId && userId === cfg.demoUserId)
+  const effectiveUserId = isDemoAlias ? (adminUserId ?? userId) : userId
   const allowEnv = adminUserId !== undefined && effectiveUserId === adminUserId
-  return { effectiveUserId, allowEnv }
+  return { effectiveUserId, allowEnv, isDemoAlias }
 }
 
 /** Whether the env fallback is allowed for `userId` WITHOUT the demo alias (GET status). */
@@ -56,7 +62,21 @@ export const PROVIDER_IDS: AiProviderId[] = [
   'ollama',
   'openai-compat',
   'mistral',
+  'openai-codex',
 ]
+
+/**
+ * Codex kill-switch (spec §3). PURE like `resolveAuthConfig`: reads the env,
+ * never throws. The provider is inert unless `ENGRAM_ENABLE_CODEX === '1'` — the
+ * orchestrator sets it on Vercel post-merge (Alex's decision). Resolved ONCE at
+ * the entry of every resolver and of the status surface so the two never diverge
+ * (audit C12).
+ */
+export function resolveCodexConfig(env: Record<string, string | undefined>): {
+  enabled: boolean
+} {
+  return { enabled: env[CODEX_ENABLE_ENV] === '1' }
+}
 
 /** Optional env-var fallback per provider (retro-compat + convenience). */
 const ENV_KEY_VAR: Partial<Record<AiProviderId, string>> = {
@@ -75,6 +95,7 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
     ollama: { baseUrl: 'http://localhost:11434', model: 'llama3.1' },
     'openai-compat': { baseUrl: '', model: '' },
     mistral: { model: 'mistral-small-latest' },
+    'openai-codex': { model: CODEX_DEFAULT_MODEL },
   },
   // `mode: 'same'` → OCR follows the active generation provider (historical
   // behaviour). Custom mode defaults to Mistral's dedicated OCR API.
@@ -192,6 +213,7 @@ function isUsable(
   model: string,
   hasKey: boolean,
   baseUrl: string | undefined,
+  codexEnabled: boolean,
 ): boolean {
   if (model.trim().length === 0) return false
   const hasBase = (baseUrl ?? '').trim().length > 0
@@ -204,6 +226,35 @@ function isUsable(
       return hasBase
     case 'openai-compat':
       return hasKey && hasBase
+    case 'openai-codex':
+      // hasKey here means "an OAuth credential row exists"; the flag gates it.
+      return codexEnabled && hasKey
+  }
+}
+
+/**
+ * Codex resolution shared by the three resolvers (audit C13): flag check + demo
+ * exclusion + refresh-in-band + shape into a `ResolvedProviderConfig`. Returns
+ * null (→ clean 503) when disabled, when the demo alias is active (ToS/quota —
+ * a public demo must NEVER generate on Alex's personal subscription, audit C10),
+ * when not linked, or when the model is empty.
+ */
+async function resolveCodex(
+  db: DB,
+  effectiveUserId: string,
+  isDemoAlias: boolean,
+  model: string,
+): Promise<ResolvedProviderConfig | null> {
+  if (!resolveCodexConfig(process.env).enabled) return null
+  if (isDemoAlias) return null
+  if (model.trim().length === 0) return null
+  const access = await resolveCodexAccess(db, effectiveUserId)
+  if (!access) return null
+  return {
+    providerId: 'openai-codex',
+    model: model.trim(),
+    keySource: 'app',
+    oauth: { accessToken: access.accessToken, accountId: access.accountId },
   }
 }
 
@@ -215,17 +266,24 @@ export async function resolveActiveProvider(
   db: DB,
   userId: string,
 ): Promise<ResolvedProviderConfig | null> {
-  const { effectiveUserId, allowEnv } = resolveScope(userId)
+  const { effectiveUserId, allowEnv, isDemoAlias } = resolveScope(userId)
   const settings = await readSettings(db, effectiveUserId)
   const provider = settings.activeProvider
   const pc = settings.providers[provider]
+
+  // OAuth provider: its own resolution path (flag + refresh + no secret).
+  if (provider === 'openai-codex') {
+    return resolveCodex(db, effectiveUserId, isDemoAlias, pc.model)
+  }
+
   const appSecret =
     provider === 'ollama' ? undefined : await getCredentialSecret(db, effectiveUserId, provider)
   const { secret, keySource } = resolveSecret(provider, appSecret, allowEnv)
   const model = pc.model.trim()
   const baseUrl = pc.baseUrl?.trim() || undefined
+  const codexEnabled = resolveCodexConfig(process.env).enabled
 
-  if (!isUsable(provider, model, keySource !== null, baseUrl)) return null
+  if (!isUsable(provider, model, keySource !== null, baseUrl, codexEnabled)) return null
 
   return {
     providerId: provider,
@@ -256,19 +314,27 @@ export async function resolveOcrProvider(
   db: DB,
   userId: string,
 ): Promise<ResolvedProviderConfig | null> {
-  const { effectiveUserId, allowEnv } = resolveScope(userId)
+  const { effectiveUserId, allowEnv, isDemoAlias } = resolveScope(userId)
   const settings = await readSettings(db, effectiveUserId)
   if (settings.ocr.mode === 'same') return resolveActiveProvider(db, userId)
 
   const provider = settings.ocr.provider
   const pc = settings.providers[provider]
+
+  // A custom OCR slot pointed at codex resolves a usable config; the vision
+  // guard then 503s cleanly (codex has no vision transport, audit C14).
+  if (provider === 'openai-codex') {
+    return resolveCodex(db, effectiveUserId, isDemoAlias, settings.ocr.model)
+  }
+
   const appSecret =
     provider === 'ollama' ? undefined : await getCredentialSecret(db, effectiveUserId, provider)
   const { secret, keySource } = resolveSecret(provider, appSecret, allowEnv)
   const model = settings.ocr.model.trim()
   const baseUrl = pc.baseUrl?.trim() || undefined
+  const codexEnabled = resolveCodexConfig(process.env).enabled
 
-  if (!isUsable(provider, model, keySource !== null, baseUrl)) return null
+  if (!isUsable(provider, model, keySource !== null, baseUrl, codexEnabled)) return null
 
   return {
     providerId: provider,
@@ -288,6 +354,7 @@ async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatu
   const settings = await readSettings(db, userId)
   const keyed = await keyedProviders(db, userId)
   const ocrProvider = ocrProviderId(settings)
+  const codexEnabled = resolveCodexConfig(process.env).enabled
   return PROVIDER_IDS.map((provider) => {
     const pc = settings.providers[provider]
     let hasKey = false
@@ -296,11 +363,13 @@ async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatu
       if (keyed.has(provider)) {
         hasKey = true
         keySource = 'app'
-      } else if (allowEnv && envKey(provider)) {
+      } else if (provider !== 'openai-codex' && allowEnv && envKey(provider)) {
+        // No env fallback for the OAuth provider — it is linked or it is not.
         hasKey = true
         keySource = 'env'
       }
     }
+    const isCodex = provider === 'openai-codex'
     return {
       provider,
       requiresKey: provider !== 'ollama',
@@ -310,6 +379,9 @@ async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatu
       ...(pc.baseUrl !== undefined ? { baseUrl: pc.baseUrl } : {}),
       active: settings.activeProvider === provider,
       ocrActive: ocrProvider === provider,
+      // OAuth signals for the UI (audit C11): explicit link state + the
+      // kill-switch so the client can show "unavailable on this instance".
+      ...(isCodex ? { linked: keyed.has('openai-codex'), unavailable: !codexEnabled } : {}),
     }
   })
 }
@@ -373,12 +445,48 @@ export async function setAiKey(
   if (provider === 'ollama') {
     throw new ValidationError('ollama does not use an API key')
   }
+  // The OAuth provider has no key: a PUT key must NOT create a fake `secret` row
+  // (it would make the status show "linked" and shadow the real OAuth, audit C9).
+  if (provider === 'openai-codex') {
+    throw new ValidationError('openai-codex is linked via OAuth, not an API key')
+  }
   await db
     .insert(aiCredential)
     .values({ userId, provider, secret: key })
     .onConflictDoUpdate({
       target: [aiCredential.userId, aiCredential.provider],
       set: { secret: key, updatedAt: new Date() },
+    })
+}
+
+/**
+ * Persist an OAuth credential for openai-codex (spec §2). Upserts the composite
+ * PK; the access token lands in `secret`, the rest in the dedicated columns. Like
+ * a key, these are WRITE-ONLY — no DTO ever reads them back.
+ */
+export async function setOauthCredential(
+  db: DB,
+  userId: string,
+  provider: AiProviderId,
+  tokens: {
+    accessToken: string
+    refreshToken: string | undefined
+    expiresAt: Date | undefined
+    accountId: string | undefined
+  },
+): Promise<void> {
+  const row = {
+    secret: tokens.accessToken,
+    refreshToken: tokens.refreshToken ?? null,
+    expiresAt: tokens.expiresAt ?? null,
+    accountId: tokens.accountId ?? null,
+  }
+  await db
+    .insert(aiCredential)
+    .values({ userId, provider, ...row })
+    .onConflictDoUpdate({
+      target: [aiCredential.userId, aiCredential.provider],
+      set: { ...row, updatedAt: new Date() },
     })
 }
 
@@ -422,6 +530,13 @@ export async function resolveProviderForTest(
   const pc = settings.providers[provider]
   const model = (candidate.model ?? pc.model).trim()
   if (model.length === 0) return null
+
+  // OAuth provider: IGNORE any candidate.key (audit C9) — resolve via the linked
+  // credential (refreshed). Not demo-aliased here, like the rest of this path.
+  if (provider === 'openai-codex') {
+    return resolveCodex(db, effectiveUserId, false, model)
+  }
+
   const baseUrl = (candidate.baseUrl ?? pc.baseUrl ?? '').trim() || undefined
 
   let secret: string | undefined

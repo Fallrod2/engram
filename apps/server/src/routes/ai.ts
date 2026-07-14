@@ -1,6 +1,9 @@
 import { Hono } from 'hono'
 import {
   aiSettingsResponseSchema,
+  codexLinkPollRequestSchema,
+  codexLinkPollResponseSchema,
+  codexLinkStartResponseSchema,
   listModelsResponseSchema,
   providerParamSchema,
   setAiKeySchema,
@@ -11,15 +14,28 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
+import { ServiceUnavailableError } from '../http/errors'
 import { requireUserId, requireNotDemo } from '../http/identity'
 import { PROVIDERS } from '../ai/providers'
 import {
   deleteAiKey,
   getAiSettings,
+  resolveCodexConfig,
   resolveProviderForTest,
   setAiKey,
+  setOauthCredential,
   updateAiSettings,
 } from '../services/ai-config.service'
+import {
+  DeviceAuthDisabledError,
+  pollDeviceAuth,
+  startDeviceAuth,
+} from '../ai/providers/codex-oauth'
+import { openHandle, sealHandle } from '../ai/providers/codex-handle'
+import {
+  CODEX_DEVICE_EXPIRES_IN_SECONDS,
+  CODEX_VERIFICATION_URI,
+} from '../ai/providers/codex-constants'
 
 /**
  * `/api/ai` — multi-provider config surface, now PER USER (spec BYOK §1.3).
@@ -49,6 +65,73 @@ aiRouter.patch('/settings', zValidator('json', updateAiSettingsSchema), async (c
     aiSettingsResponseSchema,
     await updateAiSettings(db, requireNotDemo(c), c.req.valid('json')),
   )
+})
+
+// --- openai-codex device-code link flow -----------------------------------
+//
+// Writes only (requireNotDemo — the demo can never link a subscription). Guarded
+// by the kill-switch: a disabled instance 503s honestly. NO token is ever sent
+// to the client; the handle is an opaque, user-bound HMAC blob (Vercel-safe).
+
+/** Guard: refuse the whole link surface when the provider is off (spec §3). */
+function assertCodexEnabled(): void {
+  if (!resolveCodexConfig(process.env).enabled) {
+    throw new ServiceUnavailableError('openai-codex is disabled on this instance')
+  }
+}
+
+// POST /api/ai/providers/openai-codex/link/start — begin device-code auth.
+aiRouter.post('/providers/openai-codex/link/start', async (c) => {
+  assertCodexEnabled()
+  const userId = requireNotDemo(c)
+  try {
+    const start = await startDeviceAuth()
+    const handle = sealHandle({
+      deviceAuthId: start.deviceAuthId,
+      userCode: start.userCode,
+      userId,
+    })
+    return ok(c, codexLinkStartResponseSchema, {
+      userCode: start.userCode,
+      verificationUri: CODEX_VERIFICATION_URI,
+      expiresIn: CODEX_DEVICE_EXPIRES_IN_SECONDS,
+      handle,
+    })
+  } catch (e) {
+    if (e instanceof DeviceAuthDisabledError) {
+      throw new ServiceUnavailableError(
+        'device code login is disabled on this ChatGPT account (enable it in Settings → Security)',
+      )
+    }
+    throw e
+  }
+})
+
+// POST /api/ai/providers/openai-codex/link/poll — poll + exchange server-side.
+aiRouter.post(
+  '/providers/openai-codex/link/poll',
+  zValidator('json', codexLinkPollRequestSchema),
+  async (c) => {
+    assertCodexEnabled()
+    const userId = requireNotDemo(c)
+    const opened = openHandle(c.req.valid('json').handle, userId)
+    // Invalid/expired/other-user handle → treat as expired (restart the flow).
+    if (!opened) return ok(c, codexLinkPollResponseSchema, { status: 'expired' })
+
+    const poll = await pollDeviceAuth(opened)
+    if (poll.status === 'pending') return ok(c, codexLinkPollResponseSchema, { status: 'pending' })
+    if (poll.status === 'denied') return ok(c, codexLinkPollResponseSchema, { status: 'denied' })
+
+    // Linked: persist the tokens (write-only) and report success.
+    await setOauthCredential(db, userId, 'openai-codex', poll.tokens)
+    return ok(c, codexLinkPollResponseSchema, { status: 'linked' })
+  },
+)
+
+// DELETE /api/ai/providers/openai-codex/link — unlink (remove the credential).
+aiRouter.delete('/providers/openai-codex/link', async (c) => {
+  await deleteAiKey(db, requireNotDemo(c), 'openai-codex')
+  return c.body(null, 204)
 })
 
 // PUT /api/ai/providers/:provider/key — write-only upsert → 204.
