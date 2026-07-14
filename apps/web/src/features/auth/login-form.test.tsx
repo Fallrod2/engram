@@ -79,4 +79,29 @@ describe('<LoginForm>', () => {
     )
     resolve({ error: null })
   })
+
+  it('offers a "forgot password" link to /forgot-password (no account dead-end)', () => {
+    renderForm()
+    const link = screen.getByRole('link', { name: 'Mot de passe oublié ?' })
+    expect(link.getAttribute('href')).toBe('/forgot-password')
+  })
+
+  it('surfaces a LOCALIZED invalid-email message (not the default Zod string)', async () => {
+    renderForm()
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'not-an-email' } })
+    fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'hunter2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Se connecter' }))
+    expect(await screen.findByText('Adresse e-mail invalide.')).toBeTruthy()
+    expect(signInWithPassword).not.toHaveBeenCalled()
+  })
+
+  it('reveals the password when the eye toggle is tapped', () => {
+    renderForm()
+    const password = screen.getByLabelText('Mot de passe') as HTMLInputElement
+    expect(password.type).toBe('password')
+    fireEvent.click(screen.getByRole('button', { name: 'Afficher le mot de passe' }))
+    expect(password.type).toBe('text')
+    fireEvent.click(screen.getByRole('button', { name: 'Masquer le mot de passe' }))
+    expect(password.type).toBe('password')
+  })
 })

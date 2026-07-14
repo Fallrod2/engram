@@ -529,6 +529,22 @@ export const dictFr = {
       invalid: 'E-mail ou mot de passe incorrect.',
       generic: 'Connexion impossible. Réessaie.',
     },
+    invalidEmail: 'Adresse e-mail invalide.',
+    passwordRequired: 'Saisis ton mot de passe.',
+    passwordMinHint: '8 caractères minimum',
+    showPassword: 'Afficher le mot de passe',
+    hidePassword: 'Masquer le mot de passe',
+    forgot: {
+      title: 'Mot de passe oublié',
+      subtitle:
+        'Saisis ton adresse e-mail : nous t’enverrons un lien pour réinitialiser ton mot de passe.',
+      submit: 'Envoyer le lien',
+      submitting: 'Envoi…',
+      sentTitle: 'Vérifie ta boîte mail',
+      sentDesc:
+        'Si un compte existe pour cette adresse, un lien de réinitialisation vient d’être envoyé. Clique dessus pour choisir un nouveau mot de passe.',
+      backToLogin: 'Retour à la connexion',
+    },
     setPassword: {
       title: 'Définir un mot de passe',
       titleRecovery: 'Réinitialiser le mot de passe',
@@ -545,12 +561,14 @@ export const dictFr = {
     link: {
       expiredTitle: 'Lien expiré',
       expiredDesc:
-        'Ce lien est invalide ou a déjà été utilisé. Demande un nouveau lien d’invitation ou de réinitialisation.',
+        'Ce lien est invalide ou a déjà été utilisé. Demande un nouveau lien de réinitialisation.',
       backToLogin: 'Retour à la connexion',
+      resetLink: 'Réinitialiser mon mot de passe',
     },
     login: {
       noAccount: 'Pas encore de compte ?',
       signUpLink: 'Créer un compte',
+      forgot: 'Mot de passe oublié ?',
     },
     signup: {
       title: 'Créer un compte',
@@ -558,7 +576,6 @@ export const dictFr = {
       submit: 'Créer mon compte',
       submitting: 'Création…',
       confirm: 'Confirmer le mot de passe',
-      invalidEmail: 'Adresse e-mail invalide.',
       tooShort: 'Au moins 8 caractères.',
       mismatch: 'Les mots de passe ne correspondent pas.',
       haveAccount: 'Déjà un compte ?',

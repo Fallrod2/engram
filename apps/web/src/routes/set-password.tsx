@@ -4,46 +4,44 @@ import { useAuthLink } from '@/lib/auth'
 import { authStore } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { AuthBrand } from '@/features/auth/auth-brand'
 import { SetPasswordForm } from '@/features/auth/set-password-form'
 
 /**
  * Set-password screen (invite/recovery onboarding) — rendered OUTSIDE the app
  * shell (RootLayout shows a bare `<Outlet/>` while a link flow is active), same
- * visual family as `/login`. Reached only through an email link: the root guard
- * redirects a pending flow here; a direct visit with no active flow bounces home
- * or to /login.
+ * visual family as `/login`. Reached through an email link: the root guard
+ * redirects a pending flow here. A signed-in user visiting directly bounces home;
+ * a token-less anonymous visit shows the "expired link" dead-end (with its escape
+ * to /forgot-password) rather than a silent /login redirect (spec fix-auth-public,
+ * MAJOR 1).
  */
 export const Route = createFileRoute('/set-password')({
   beforeLoad: async ({ context }) => {
     await context.auth.ready
     const linkState = context.auth.getLinkState()
     if (linkState.kind === 'none') {
-      // No invite/recovery flow in progress: this screen is not meant to be
-      // visited directly. Send a signed-in user home, everyone else to /login.
-      throw redirect({
-        to: context.auth.getState().status === 'authenticated' ? '/' : '/login',
-      })
+      // A signed-in user hitting this screen directly has nothing to set up.
+      if (context.auth.getState().status === 'authenticated') {
+        throw redirect({ to: '/' })
+      }
+      // Anonymous direct visit / an expired link whose token never reached the
+      // store: DON'T bounce silently to /login — render the dead-end screen so the
+      // user gets an escape to /forgot-password. `noToken` lets the component tell
+      // this apart from the transient `none` seen while a finished flow navigates
+      // away (which must render nothing, not the expired screen).
+      return { noToken: true }
     }
+    return { noToken: false }
   },
   component: SetPasswordPage,
 })
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const t = useT()
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <span
-            className="flex size-6 items-center justify-center rounded-sm bg-accent text-accent-fg"
-            aria-hidden
-          >
-            <span className="text-2xs">◆</span>
-          </span>
-          <span className="text-sm font-semibold tracking-[-0.01em] text-text">
-            {t('auth.title')}
-          </span>
-        </div>
+        <AuthBrand />
         <Card>{children}</Card>
       </div>
     </div>
@@ -54,13 +52,11 @@ function SetPasswordPage() {
   const t = useT()
   const navigate = useNavigate()
   const linkState = useAuthLink()
+  const { noToken } = Route.useRouteContext()
 
-  // The link flow just ended (password set, or the user is escaping the expired
-  // screen): the store cleared `linkState` and a navigation is already in flight.
-  // Render nothing rather than flashing the raw set-password form for a frame.
-  if (linkState.kind === 'none') return null
-
-  if (linkState.kind === 'error') {
+  // Terminal dead-end: an expired/used link, OR a token-less direct visit. Same
+  // screen, same escape to /forgot-password — never a silent redirect.
+  if (linkState.kind === 'error' || (noToken && linkState.kind === 'none')) {
     return (
       <Shell>
         <CardHeader>
@@ -68,11 +64,17 @@ function SetPasswordPage() {
             {t('auth.link.expiredTitle')}
           </h1>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-text-muted">{t('auth.link.expiredDesc')}</p>
+          {/* Primary escape from the account dead-end: request a fresh reset link.
+              Clear the terminal error state before navigating so the root guard
+              does not immediately bounce us back here. */}
+          <Button asChild className="w-full">
+            <Link to="/forgot-password" onClick={() => authStore.clearLinkState()}>
+              {t('auth.link.resetLink')}
+            </Link>
+          </Button>
           <Button asChild variant="outline" className="w-full">
-            {/* Clear the terminal error state before navigating so the root guard
-                does not immediately bounce us back here (dead-end). */}
             <Link to="/login" onClick={() => authStore.clearLinkState()}>
               {t('auth.link.backToLogin')}
             </Link>
@@ -81,6 +83,11 @@ function SetPasswordPage() {
       </Shell>
     )
   }
+
+  // The link flow just ended (password set, or the user is escaping the dead-end
+  // screen): the store cleared `linkState` and a navigation is already in flight.
+  // Render nothing rather than flashing the raw set-password form for a frame.
+  if (linkState.kind === 'none') return null
 
   const recovery = linkState.kind === 'setup' && linkState.linkType === 'recovery'
   return (

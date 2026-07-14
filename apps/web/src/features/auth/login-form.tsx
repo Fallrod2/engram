@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate, useSearch, Link } from '@tanstack/react-router'
-import { useT } from '@/lib/i18n'
+import { useT, type TFunction } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
 import { sanitizeRedirect } from '@/lib/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { AUTH_INPUT_CLASS, PasswordInput } from '@/components/ui/password-input'
 import {
   Form,
   FormControl,
@@ -23,17 +24,22 @@ import {
  * captured `redirect` (or `/`). The error is deliberately generic — GoTrue does
  * not distinguish an unknown email from a wrong password.
  */
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-})
-type Values = z.infer<typeof schema>
+type Values = { email: string; password: string }
+
+/** Schema with i18n messages (like `/signup`) so no default Zod string leaks. */
+function makeSchema(t: TFunction) {
+  return z.object({
+    email: z.string().email(t('auth.invalidEmail')),
+    password: z.string().min(1, t('auth.passwordRequired')),
+  })
+}
 
 export function LoginForm() {
   const t = useT()
   const { signIn } = useAuth()
   const navigate = useNavigate()
   const search = useSearch({ from: '/login' })
+  const schema = useMemo(() => makeSchema(t), [t])
   const [error, setError] = useState<string | null>(null)
 
   const form = useForm<Values>({
@@ -69,6 +75,7 @@ export function LoginForm() {
                   autoComplete="email"
                   autoFocus
                   disabled={submitting}
+                  className={AUTH_INPUT_CLASS}
                   {...field}
                 />
               </FormControl>
@@ -83,13 +90,16 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
-                  autoComplete="current-password"
-                  disabled={submitting}
-                  {...field}
-                />
+                <PasswordInput autoComplete="current-password" disabled={submitting} {...field} />
               </FormControl>
+              <div className="flex justify-end">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-accent hover:underline"
+                >
+                  {t('auth.login.forgot')}
+                </Link>
+              </div>
               <FormMessage />
             </FormItem>
           )}

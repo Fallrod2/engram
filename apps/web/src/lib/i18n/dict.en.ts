@@ -525,6 +525,21 @@ export const dictEn: Dict = {
       invalid: 'Invalid email or password.',
       generic: 'Sign-in failed. Try again.',
     },
+    invalidEmail: 'Invalid email address.',
+    passwordRequired: 'Enter your password.',
+    passwordMinHint: 'At least 8 characters',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    forgot: {
+      title: 'Forgot your password',
+      subtitle: 'Enter your email and we’ll send you a link to reset your password.',
+      submit: 'Send reset link',
+      submitting: 'Sending…',
+      sentTitle: 'Check your email',
+      sentDesc:
+        'If an account exists for this address, a reset link is on its way. Click it to choose a new password.',
+      backToLogin: 'Back to sign in',
+    },
     setPassword: {
       title: 'Set a password',
       titleRecovery: 'Reset your password',
@@ -540,13 +555,14 @@ export const dictEn: Dict = {
     },
     link: {
       expiredTitle: 'Link expired',
-      expiredDesc:
-        'This link is invalid or has already been used. Ask for a new invitation or reset link.',
+      expiredDesc: 'This link is invalid or has already been used. Ask for a new reset link.',
       backToLogin: 'Back to sign in',
+      resetLink: 'Reset my password',
     },
     login: {
       noAccount: 'No account yet?',
       signUpLink: 'Create an account',
+      forgot: 'Forgot your password?',
     },
     signup: {
       title: 'Create an account',
@@ -554,7 +570,6 @@ export const dictEn: Dict = {
       submit: 'Create my account',
       submitting: 'Creating…',
       confirm: 'Confirm password',
-      invalidEmail: 'Invalid email address.',
       tooShort: 'At least 8 characters.',
       mismatch: 'Passwords do not match.',
       haveAccount: 'Already have an account?',
