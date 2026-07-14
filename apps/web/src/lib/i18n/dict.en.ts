@@ -323,7 +323,7 @@ export const dictEn: Dict = {
     dataImportAction: 'Import…',
     dataImportConfirmTitle: 'Replace the whole database?',
     dataImportConfirmDesc:
-      'All current data will be deleted and replaced by this backup. This action cannot be undone.',
+      'Replace the whole database with “{name}” ({size})? All current data will be deleted. This action cannot be undone.',
     dataImportConfirmAction: 'Replace data',
     dataImportDone: 'Database restored ({subjects} subjects, {cards} cards).',
     dataImportError: 'Import failed.',
@@ -372,6 +372,7 @@ export const dictEn: Dict = {
         forbidden: 'Access denied.',
         unreachable: 'Provider unreachable.',
         incomplete_config: 'Incomplete configuration (missing model or URL).',
+        missing_key: 'API key missing — paste your key then Save.',
         no_credentials: 'No valid credentials.',
         http_error: 'Connection failed.',
         device_auth_disabled: 'Device code login is disabled on this account.',
@@ -380,8 +381,22 @@ export const dictEn: Dict = {
       statusConfiguredEnv: 'Configured (env)',
       statusNotConfigured: 'Not configured',
       noModels: 'No models detected. Check the URL and refresh.',
+      ollamaUnreachable: 'Ollama unreachable at {url} — make sure it is running, then refresh.',
+      getKey: 'Get an API key →',
+      keyLooksLike: 'The key looks like {example}',
+      presetsLabel: 'Suggested models',
+      unavailableBadge: 'Unavailable',
+      deleteKeyConfirmTitle: 'Delete key?',
+      deleteKeyConfirmDesc:
+        'The key will be permanently removed from the server. You will need to paste it again from the provider console to reuse it.',
+      switchConfirmTitle: 'Switch provider?',
+      switchConfirmDesc:
+        'You have unsaved changes (model, URL or key). Switching provider will discard them.',
+      switchConfirmAction: 'Switch without saving',
+      codexUnavailable:
+        'ChatGPT (subscription) is disabled on this instance. To enable it, start the server with ENGRAM_ENABLE_CODEX=1.',
       claudeHint:
-        'For Claude without a direct Anthropic key: pick OpenRouter with an “anthropic/claude-*” model, or run “ant auth login” on the machine then test the Anthropic connection.',
+        'No Anthropic key? Pick OpenRouter with an “anthropic/claude-*” model: the same Claude models with a single OpenRouter key.',
       codexHint:
         'Uses your ChatGPT/Codex subscription. Experimental feature that relies on OpenAI’s tolerance — it may stop working at any time. Your subscription limits apply (the connection test consumes one message). Enable “Allow device code login” in ChatGPT → Settings → Security.',
       codex: {
@@ -404,10 +419,10 @@ export const dictEn: Dict = {
       ocr: {
         title: 'OCR / Photo import',
         desc: 'Provider used to transcribe photos. Same as card generation by default.',
-        mode: 'OCR provider',
+        mode: 'Mode',
         modeSame: 'Same as generation',
         modeCustom: 'Dedicated provider',
-        provider: 'Provider',
+        provider: 'OCR provider',
         model: 'OCR model',
         keyShared: 'This provider’s API key and URL are shared with generation.',
       },

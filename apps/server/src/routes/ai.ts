@@ -166,11 +166,16 @@ aiRouter.post(
     // `new Anthropic()` would read the admin's `ANTHROPIC_API_KEY` from
     // process.env — leaking a validity oracle + the admin account's model list
     // to a public (BYOK) caller. Short-circuit to `incomplete_config` first.
-    if (!cfg || (adapter.requiresKey && cfg.keySource === null)) {
-      return ok(c, testConnectionResponseSchema, {
-        ok: false,
-        detailCode: 'incomplete_config',
-      })
+    // `cfg === null` means the model (or, for ollama/openai-compat, the base URL)
+    // is missing → genuine `incomplete_config`. A resolved config that still has
+    // no key for a key-requiring provider is a DISTINCT case: the model/URL are
+    // fine, only the key is missing → `missing_key` (so the guided flow points at
+    // the right field instead of sending the user in circles, audit fix).
+    if (!cfg) {
+      return ok(c, testConnectionResponseSchema, { ok: false, detailCode: 'incomplete_config' })
+    }
+    if (adapter.requiresKey && cfg.keySource === null) {
+      return ok(c, testConnectionResponseSchema, { ok: false, detailCode: 'missing_key' })
     }
     const result = await adapter.testConnection(cfg)
     return ok(c, testConnectionResponseSchema, result)

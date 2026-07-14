@@ -19,6 +19,19 @@ import {
 } from '@/components/ui/alert-dialog'
 import { downloadBackup, importBackupFile } from './queries'
 
+/** Human-readable file size (e.g. 1.2 MB), locale-agnostic units. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB']
+  let size = bytes / 1024
+  let unit = 0
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024
+    unit += 1
+  }
+  return `${size.toFixed(1)} ${units[unit]}`
+}
+
 /**
  * Settings "Données" card: export the whole database as JSON, or restore a
  * backup file. Import is destructive (replace-all), so it goes through an
@@ -133,7 +146,14 @@ export function BackupCard() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('settings.dataImportConfirmTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('settings.dataImportConfirmDesc')}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {pendingFile
+                ? t('settings.dataImportConfirmDesc', {
+                    name: pendingFile.name,
+                    size: formatBytes(pendingFile.size),
+                  })
+                : null}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>

@@ -327,7 +327,7 @@ export const dictFr = {
     dataImportAction: 'Importer…',
     dataImportConfirmTitle: 'Remplacer toute la base ?',
     dataImportConfirmDesc:
-      'Toutes les données actuelles seront supprimées et remplacées par cette sauvegarde. Cette action est irréversible.',
+      'Remplacer toute la base par « {name} » ({size}) ? Toutes les données actuelles seront supprimées. Cette action est irréversible.',
     dataImportConfirmAction: 'Remplacer les données',
     dataImportDone: 'Base restaurée ({subjects} matières, {cards} cartes).',
     dataImportError: 'Échec de l’import.',
@@ -376,6 +376,7 @@ export const dictFr = {
         forbidden: 'Accès refusé.',
         unreachable: 'Provider injoignable.',
         incomplete_config: 'Configuration incomplète (modèle ou URL manquant).',
+        missing_key: 'Clé API manquante — colle ta clé puis Enregistrer.',
         no_credentials: 'Aucune credential valide.',
         http_error: 'Échec de la connexion.',
         device_auth_disabled: 'Connexion par code d’appareil désactivée sur ce compte.',
@@ -384,8 +385,22 @@ export const dictFr = {
       statusConfiguredEnv: 'Configurée (env)',
       statusNotConfigured: 'Non configurée',
       noModels: 'Aucun modèle détecté. Vérifie l’URL puis rafraîchis.',
+      ollamaUnreachable: 'Ollama injoignable sur {url} — vérifie qu’il tourne puis rafraîchis.',
+      getKey: 'Obtenir une clé API →',
+      keyLooksLike: 'La clé ressemble à {example}',
+      presetsLabel: 'Modèles suggérés',
+      unavailableBadge: 'Indisponible',
+      deleteKeyConfirmTitle: 'Supprimer la clé ?',
+      deleteKeyConfirmDesc:
+        'La clé sera définitivement supprimée du serveur. Il faudra la recoller depuis la console du provider pour la réutiliser.',
+      switchConfirmTitle: 'Changer de provider ?',
+      switchConfirmDesc:
+        'Tu as des modifications non enregistrées (modèle, URL ou clé). Changer de provider les abandonnera.',
+      switchConfirmAction: 'Changer sans enregistrer',
+      codexUnavailable:
+        'ChatGPT (abonnement) est désactivé sur cette instance. Pour l’activer, démarre le serveur avec ENGRAM_ENABLE_CODEX=1.',
       claudeHint:
-        'Pour du Claude sans clé Anthropic directe : choisis OpenRouter avec un modèle « anthropic/claude-* », ou lance « ant auth login » sur la machine puis teste la connexion Anthropic.',
+        'Pas de clé Anthropic ? Choisis OpenRouter avec un modèle « anthropic/claude-* » : mêmes modèles Claude, une seule clé OpenRouter.',
       codexHint:
         'Utilise ton abonnement ChatGPT/Codex. Fonctionnalité expérimentale qui dépend de la tolérance d’OpenAI — peut cesser de fonctionner à tout moment. Tes limites d’abonnement s’appliquent (le test de connexion consomme un message). Active « Allow device code login » dans ChatGPT → Réglages → Sécurité.',
       codex: {
@@ -408,10 +423,10 @@ export const dictFr = {
       ocr: {
         title: 'OCR / Import photo',
         desc: 'Provider utilisé pour transcrire les photos. Par défaut, identique à la génération de cartes.',
-        mode: 'Provider OCR',
+        mode: 'Mode',
         modeSame: 'Identique à la génération',
         modeCustom: 'Provider dédié',
-        provider: 'Provider',
+        provider: 'Provider OCR',
         model: 'Modèle OCR',
         keyShared: 'La clé API et l’URL de ce provider sont partagées avec la génération.',
       },
