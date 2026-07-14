@@ -10,8 +10,9 @@ import {
 /**
  * Invite/recovery onboarding (auth ON, no GoTrue). Covers the branches that need no
  * network: an expired/used link surfaces a clear message on the bare `/set-password`
- * screen AND its "back to login" escape works; a direct visit with no active flow
- * bounces to /login; and a reload mid-onboarding stays gated (no auth bypass). The
+ * screen AND its "back to login" escape works; a token-less direct visit shows that
+ * same dead-end screen (no silent /login bounce) with a working escape; and a reload
+ * mid-onboarding stays gated (no auth bypass). The
  * happy path (setSession + updateUser) needs a GoTrue endpoint and is covered by
  * unit tests + manual functional verification. Run: `test:e2e:auth`.
  */
@@ -41,8 +42,15 @@ test.describe('invite/recovery onboarding', () => {
     await expect(page).not.toHaveURL(/\/set-password/)
   })
 
-  test('direct visit with no active flow → redirect to /login', async ({ page }) => {
+  test('token-less direct visit → expired dead-end screen (no silent redirect), escape works', async ({
+    page,
+  }) => {
     await page.goto('/set-password')
+    // No silent bounce to /login: stays on the bare set-password dead-end screen.
+    await expect(page).toHaveURL(/\/set-password/)
+    await expect(page.getByRole('heading', { name: 'Lien expiré' })).toBeVisible()
+    // The escape to /login works (no dead-end).
+    await page.getByRole('link', { name: 'Retour à la connexion' }).click()
     await expect(page).toHaveURL(/\/login/)
     await expect(page.getByLabel('E-mail')).toBeVisible()
   })
