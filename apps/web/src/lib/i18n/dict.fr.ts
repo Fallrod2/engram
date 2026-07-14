@@ -344,6 +344,9 @@ export const dictFr = {
     planError: 'Impossible de charger la charge prévue.',
     deleteExamTitle: 'Supprimer « {title} » ?',
     deleteExamDesc: 'Supprime cet examen. L’échéance disparaît du planning. Irréversible.',
+    examEmptyTitle: 'Aucun examen à venir.',
+    examEmptyMeta: 'Ajoute une échéance pour piloter tes révisions.',
+    subjectFallback: 'Matière',
   },
 
   analytics: {
@@ -356,6 +359,8 @@ export const dictFr = {
     ariaReview_other: '{count} reviews le {day}',
     heatmapTooltip_one: '{count} review',
     heatmapTooltip_other: '{count} reviews',
+    legendLess: 'Moins',
+    legendMore: 'Plus',
     colDay: 'Jour',
     colReviews: 'Reviews',
     volumeTitle: 'Volume par jour',
@@ -492,6 +497,9 @@ export const dictFr = {
     examEdit: "Modifier l'examen",
     examNew: 'Nouvel examen',
     noteEdit: 'Modifier la note',
+    iconPickerTrigger: 'Choisir une icône',
+    iconPickerSearch: 'Rechercher une icône…',
+    iconPickerEmpty: 'Aucune icône.',
   },
   apiStatus: {
     online: 'API en ligne · {service}',
@@ -632,7 +640,7 @@ export const dictFr = {
   generation: {
     noProviderTitle: 'Aucun provider IA configuré',
     noProviderBody:
-      'Configurez un provider (Anthropic, OpenRouter, Ollama…) dans Réglages → Intelligence artificielle.',
+      'Configure un provider (Anthropic, OpenRouter, Ollama…) dans Réglages → Intelligence artificielle.',
     noProviderCta: 'Réglages',
     // 'Mixte auto' generation mode (cloze feature). New strings only — the rest of
     // the import/generation flow keeps its inherited hardcoded FR (documented debt).
@@ -693,6 +701,8 @@ export const dictFr = {
     newGeneration: 'Nouvelle génération',
     insertConfirm_one: 'Insérer {count} carte',
     insertConfirm_other: 'Insérer {count} cartes',
+    insertConfirmTitle_one: 'Insérer {count} carte{deck} ?',
+    insertConfirmTitle_other: 'Insérer {count} cartes{deck} ?',
     insertConfirmDesc: 'Elles seront à réviser immédiatement (état New).',
     insert: 'Insérer',
     inserting: 'Insertion…',
@@ -737,7 +747,8 @@ export const dictFr = {
     pagesCount: 'Pages ({count})',
     pageExtracted: 'extraite',
     warning: {
-      uncertain: 'transcription incertaine : {count} marqueur(s) [?]',
+      uncertain_one: 'transcription incertaine : {count} marqueur [?]',
+      uncertain_other: 'transcription incertaine : {count} marqueurs [?]',
       illegible_one: '{count} passage illisible',
       illegible_other: '{count} passages illisibles',
     },

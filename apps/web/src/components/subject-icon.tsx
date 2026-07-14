@@ -48,6 +48,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -125,18 +126,24 @@ export function SubjectIconPicker({
   onChange: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const t = useT()
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="secondary" size="icon" aria-label="Choisir une icône">
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          aria-label={t('dialogs.iconPickerTrigger')}
+        >
           <SubjectIcon name={value} />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>
-          <CommandInput placeholder="Rechercher une icône…" />
+          <CommandInput placeholder={t('dialogs.iconPickerSearch')} />
           <CommandList>
-            <CommandEmpty>Aucune icône.</CommandEmpty>
+            <CommandEmpty>{t('dialogs.iconPickerEmpty')}</CommandEmpty>
             <CommandGroup>
               <div className="grid grid-cols-6 gap-1 p-1">
                 {SUBJECT_ICONS.map(({ id, icon: Icon, keywords }) => (

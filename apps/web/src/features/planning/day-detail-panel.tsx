@@ -5,6 +5,7 @@ import { localDayKey } from '@/lib/calendar'
 import { formatLongDay, formatRelativeDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { SUBJECT_BG_CLASS, pigmentSlotForHex } from '@/lib/pigments'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ export const DayDetailPanel = forwardRef<
   { dayKey, day, exams, subjectsById, isToday, now, onEditExam, onDeleteExam },
   ref,
 ) {
+  const t = useT()
   const total = day?.total ?? 0
   const segments = useMemo(() => daySegments(day, subjectsById), [day, subjectsById])
   const maxSeg = segments.reduce((m, s) => Math.max(m, s.count), 0)
@@ -79,7 +81,7 @@ export const DayDetailPanel = forwardRef<
                         <li key={s.subjectId} className="flex items-center gap-2">
                           <SubjectDot color={s.colorHex} muted={!!subject?.archived} />
                           <span className="min-w-0 flex-1 truncate text-sm text-text">
-                            {subject?.name ?? 'Matière'}
+                            {subject?.name ?? t('planning.subjectFallback')}
                           </span>
                           <span
                             className="h-1 w-10 overflow-hidden rounded-full bg-surface-3"

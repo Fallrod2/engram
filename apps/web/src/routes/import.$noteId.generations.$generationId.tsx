@@ -592,7 +592,7 @@ function InsertConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {`${t(`generation.insertConfirm_${plural(count)}`, { count })}${inDeck} ?`}
+            {t(`generation.insertConfirmTitle_${plural(count)}`, { count, deck: inDeck })}
           </AlertDialogTitle>
           <AlertDialogDescription>{t('generation.insertConfirmDesc')}</AlertDialogDescription>
         </AlertDialogHeader>

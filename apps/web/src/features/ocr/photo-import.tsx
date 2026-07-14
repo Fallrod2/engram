@@ -230,7 +230,7 @@ export function PhotoImport({
                         .map((w) =>
                           w.kind === 'illegible'
                             ? t(`ocr.warning.illegible_${plural(w.count)}`, { count: w.count })
-                            : t('ocr.warning.uncertain', { count: w.count }),
+                            : t(`ocr.warning.uncertain_${plural(w.count)}`, { count: w.count }),
                         )
                         .join(' · ')}
                     </Badge>

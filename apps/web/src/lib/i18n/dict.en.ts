@@ -338,6 +338,9 @@ export const dictEn: Dict = {
     planError: 'Could not load the forecast.',
     deleteExamTitle: 'Delete “{title}”?',
     deleteExamDesc: 'Deletes this exam. The deadline disappears from the planner. Irreversible.',
+    examEmptyTitle: 'No upcoming exams.',
+    examEmptyMeta: 'Add a deadline to steer your reviews.',
+    subjectFallback: 'Subject',
   },
 
   analytics: {
@@ -350,6 +353,8 @@ export const dictEn: Dict = {
     ariaReview_other: '{count} reviews on {day}',
     heatmapTooltip_one: '{count} review',
     heatmapTooltip_other: '{count} reviews',
+    legendLess: 'Less',
+    legendMore: 'More',
     colDay: 'Day',
     colReviews: 'Reviews',
     volumeTitle: 'Volume per day',
@@ -485,6 +490,9 @@ export const dictEn: Dict = {
     examEdit: 'Edit exam',
     examNew: 'New exam',
     noteEdit: 'Edit note',
+    iconPickerTrigger: 'Choose an icon',
+    iconPickerSearch: 'Search for an icon…',
+    iconPickerEmpty: 'No icon.',
   },
   apiStatus: {
     online: 'API online · {service}',
@@ -684,6 +692,8 @@ export const dictEn: Dict = {
     newGeneration: 'New generation',
     insertConfirm_one: 'Insert {count} card',
     insertConfirm_other: 'Insert {count} cards',
+    insertConfirmTitle_one: 'Insert {count} card{deck}?',
+    insertConfirmTitle_other: 'Insert {count} cards{deck}?',
     insertConfirmDesc: 'They become due immediately (New state).',
     insert: 'Insert',
     inserting: 'Inserting…',
@@ -728,7 +738,8 @@ export const dictEn: Dict = {
     pagesCount: 'Pages ({count})',
     pageExtracted: 'extracted',
     warning: {
-      uncertain: 'uncertain transcription: {count} [?] marker(s)',
+      uncertain_one: 'uncertain transcription: {count} [?] marker',
+      uncertain_other: 'uncertain transcription: {count} [?] markers',
       illegible_one: '{count} illegible passage',
       illegible_other: '{count} illegible passages',
     },
