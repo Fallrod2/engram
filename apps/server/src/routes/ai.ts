@@ -14,7 +14,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
-import { ServiceUnavailableError } from '../http/errors'
+import { ServiceUnavailableError, UpstreamError } from '../http/errors'
 import { requireUserId, requireNotDemo } from '../http/identity'
 import { PROVIDERS } from '../ai/providers'
 import {
@@ -28,6 +28,7 @@ import {
 } from '../services/ai-config.service'
 import {
   DeviceAuthDisabledError,
+  DeviceAuthUpstreamError,
   pollDeviceAuth,
   startDeviceAuth,
 } from '../ai/providers/codex-oauth'
@@ -99,9 +100,18 @@ aiRouter.post('/providers/openai-codex/link/start', async (c) => {
     })
   } catch (e) {
     if (e instanceof DeviceAuthDisabledError) {
+      // 503 service_unavailable → the front's reliable "enable the toggle" message.
       throw new ServiceUnavailableError(
         'device code login is disabled on this ChatGPT account (enable it in Settings → Security)',
       )
+    }
+    if (e instanceof DeviceAuthUpstreamError) {
+      // 502 upstream_error → OpenAI refused/failed the initiation; report it
+      // honestly (upstream status in the message + details) instead of blaming
+      // the account. The front shows a "try again later" message, not "disabled".
+      throw new UpstreamError(`OpenAI refused the device-code initiation (HTTP ${e.httpStatus})`, {
+        upstreamStatus: e.httpStatus,
+      })
     }
     throw e
   }

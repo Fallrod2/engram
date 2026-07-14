@@ -554,6 +554,7 @@ export const apiErrorCodeSchema = z.enum([
   'conflict',
   'payload_too_large', // 413 — uploaded file exceeds the size limit
   'service_unavailable', // 503 — AI generation unavailable (no ANTHROPIC_API_KEY)
+  'upstream_error', // 502 — a trusted upstream (e.g. OpenAI device-code init) refused/failed
   'internal_error',
 ])
 export const apiErrorSchema = z.object({

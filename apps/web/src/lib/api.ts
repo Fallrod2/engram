@@ -23,12 +23,15 @@ import {
 export class ApiError extends Error {
   readonly status: number
   readonly code: ApiErrorCode | undefined
+  /** Optional structured payload the server attaches (e.g. an upstream status). */
+  readonly details: unknown
 
-  constructor(status: number, message: string, code?: ApiErrorCode) {
+  constructor(status: number, message: string, code?: ApiErrorCode, details?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.details = details
   }
 }
 
@@ -36,7 +39,12 @@ async function toApiError(res: Response): Promise<ApiError> {
   try {
     const parsed = apiErrorSchema.safeParse(await res.json())
     if (parsed.success) {
-      return new ApiError(res.status, parsed.data.error.message, parsed.data.error.code)
+      return new ApiError(
+        res.status,
+        parsed.data.error.message,
+        parsed.data.error.code,
+        parsed.data.error.details,
+      )
     }
   } catch {
     // fall through to a generic message

@@ -430,6 +430,7 @@ export const dictEn: Dict = {
           denied: 'Authorization denied.',
           device_auth_disabled:
             'Device code login is disabled on this ChatGPT account (Settings → Security).',
+          upstream_error: 'OpenAI refused the initiation (HTTP {status}). Try again later.',
         },
       },
       ocr: {

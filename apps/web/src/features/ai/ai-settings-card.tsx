@@ -625,6 +625,35 @@ function AiSettingsBody({
  * - not linked: "Lier mon compte ChatGPT" → shows the user code + verification
  *   link + auto-polls until linked/expired. NO token ever reaches the client.
  */
+/** Read the upstream HTTP status the server attaches to an `upstream_error`. */
+function upstreamStatus(details: unknown): number | string {
+  if (details && typeof details === 'object' && 'upstreamStatus' in details) {
+    const v = (details as { upstreamStatus: unknown }).upstreamStatus
+    if (typeof v === 'number') return v
+  }
+  return '—'
+}
+
+/**
+ * Map a failed `link/start` to the message the user sees. Only a 503
+ * `service_unavailable` is the reliable "device login disabled on this account"
+ * signal (upstream init 404); a 502 `upstream_error` means OpenAI refused/failed
+ * the initiation → an honest "try again later" carrying the upstream HTTP status,
+ * NOT a false "enable the toggle". Anything else → the generic start error.
+ * Exported for unit testing (the false-diagnosis regression that started this fix).
+ */
+export function startErrorMessage(err: unknown, t: TFunction): string {
+  if (err instanceof ApiError) {
+    if (err.code === 'service_unavailable') {
+      return t('settings.ai.codex.status.device_auth_disabled')
+    }
+    if (err.code === 'upstream_error') {
+      return t('settings.ai.codex.status.upstream_error', { status: upstreamStatus(err.details) })
+    }
+  }
+  return t('settings.ai.codex.startError')
+}
+
 function CodexLinkSection({ status }: { status: AiProviderStatus }) {
   const t = useT()
   const qc = useQueryClient()
@@ -663,12 +692,7 @@ function CodexLinkSection({ status }: { status: AiProviderStatus }) {
     setError(null)
     startLink.mutate(undefined, {
       onSuccess: (data) => setSession(data),
-      onError: (err) =>
-        setError(
-          err instanceof ApiError && err.code === 'service_unavailable'
-            ? t('settings.ai.codex.status.device_auth_disabled')
-            : t('settings.ai.codex.startError'),
-        ),
+      onError: (err) => setError(startErrorMessage(err, t)),
     })
   }
 

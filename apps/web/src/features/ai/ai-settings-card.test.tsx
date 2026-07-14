@@ -27,7 +27,9 @@ vi.mock('./queries', () => ({
   useProviderModels: () => ({ data: undefined, refetch: vi.fn(), isFetching: false }),
 }))
 
-import { OcrSettingsSection } from './ai-settings-card'
+import { OcrSettingsSection, startErrorMessage } from './ai-settings-card'
+import { ApiError } from '@/lib/api'
+import type { TFunction } from '@/lib/i18n'
 
 const PROVIDER_CONFIG = {
   anthropic: { model: 'claude-sonnet-4-6' },
@@ -136,6 +138,34 @@ describe('<OcrSettingsSection> PATCH partials', () => {
     // setKey's onSuccess chains into the model save.
     expect(updateMutate).toHaveBeenCalledTimes(1)
     expect(updateMutate.mock.calls[0]![0]).toEqual({ ocr: { model: 'mistral-ocr-2505' } })
+  })
+})
+
+describe('startErrorMessage — codex link/start false-diagnosis fix', () => {
+  // A stub t: echo the key plus any interpolated status, so we assert the mapping.
+  const t = ((key: string, vars?: Record<string, unknown>) =>
+    vars ? `${key}|${String(vars.status)}` : key) as unknown as TFunction
+
+  it('503 service_unavailable → the reliable "device login disabled" message', () => {
+    const err = new ApiError(503, 'disabled', 'service_unavailable')
+    expect(startErrorMessage(err, t)).toBe('settings.ai.codex.status.device_auth_disabled')
+  })
+
+  it('502 upstream_error → an honest message carrying the upstream HTTP status', () => {
+    const err = new ApiError(502, 'boom', 'upstream_error', { upstreamStatus: 500 })
+    expect(startErrorMessage(err, t)).toBe('settings.ai.codex.status.upstream_error|500')
+  })
+
+  it('upstream_error without a numeric status still resolves (dash placeholder)', () => {
+    const err = new ApiError(502, 'boom', 'upstream_error', undefined)
+    expect(startErrorMessage(err, t)).toBe('settings.ai.codex.status.upstream_error|—')
+  })
+
+  it('any other error → the generic start error (never a false "disabled")', () => {
+    expect(startErrorMessage(new ApiError(500, 'x', 'internal_error'), t)).toBe(
+      'settings.ai.codex.startError',
+    )
+    expect(startErrorMessage(new Error('network'), t)).toBe('settings.ai.codex.startError')
   })
 })
 

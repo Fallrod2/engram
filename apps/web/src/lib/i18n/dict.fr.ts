@@ -434,6 +434,7 @@ export const dictFr = {
           denied: 'Autorisation refusée.',
           device_auth_disabled:
             'La connexion par code d’appareil est désactivée sur ce compte ChatGPT (Réglages → Sécurité).',
+          upstream_error: 'OpenAI a refusé l’initiation (HTTP {status}). Réessaie plus tard.',
         },
       },
       ocr: {
