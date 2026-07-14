@@ -352,8 +352,8 @@ function PlanningPage() {
       <ConfirmDelete
         open={deleteTarget !== null}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title={deleteTarget ? `Supprimer « ${deleteTarget.title} » ?` : ''}
-        description="Supprime cet examen. L'échéance disparaît du planning. Irréversible."
+        title={deleteTarget ? t('planning.deleteExamTitle', { title: deleteTarget.title }) : ''}
+        description={t('planning.deleteExamDesc')}
         onConfirm={() => deleteTarget && deleteExam.mutate({ id: deleteTarget.id })}
       />
     </div>

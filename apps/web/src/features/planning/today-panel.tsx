@@ -148,7 +148,8 @@ function ExamPrompt({
     <div className="flex items-start gap-2 rounded-md border border-border bg-surface-2 px-2.5 py-2">
       <GraduationCap className="mt-0.5 size-3.5 shrink-0 text-text-muted" strokeWidth={1.75} />
       <p className="text-xs text-text-muted">
-        {t('today.examPrompt')} <span className="text-text">« {prompt.title} »</span> —{' '}
+        {t('today.examPrompt')}{' '}
+        <span className="text-text">{t('today.examTitle', { title: prompt.title })}</span> —{' '}
         <Countdown dateIso={prompt.date} {...(now ? { now } : {})} className="text-xs" />
         {names.length > 0 && <>{t('today.examPriorise', { names: names.join(', ') })}</>}
       </p>

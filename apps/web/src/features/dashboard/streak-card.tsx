@@ -32,7 +32,7 @@ export function StreakCard({ streaks }: { streaks: StreaksResponse }) {
         </span>
       </div>
       <p className="font-mono text-xs tabular-nums text-text-faint">
-        {t('dashboard.streak.record', {
+        {t(`dashboard.streak.record_${plural(streaks.totalStudyDays)}`, {
           longest: streaks.longest,
           days: streaks.totalStudyDays,
         })}

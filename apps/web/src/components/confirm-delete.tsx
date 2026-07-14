@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useT } from '@/lib/i18n'
 
 /**
  * Destructive confirmation (spec §1.10), built on the shadcn `alert-dialog`.
@@ -21,7 +22,7 @@ export function ConfirmDelete({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Supprimer',
+  confirmLabel,
   onConfirm,
 }: {
   open: boolean
@@ -31,6 +32,7 @@ export function ConfirmDelete({
   confirmLabel?: string
   onConfirm: () => void
 }) {
+  const t = useT()
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -39,8 +41,10 @@ export function ConfirmDelete({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>{confirmLabel}</AlertDialogAction>
+          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>
+            {confirmLabel ?? t('common.delete')}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
