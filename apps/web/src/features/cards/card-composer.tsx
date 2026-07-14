@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import { MarkdownPreview } from '@/lib/markdown-preview'
 
 export interface CardComposerHandle {
@@ -38,6 +39,7 @@ export function CardComposer({
   })
   const [added, setAdded] = useState(0)
   const [preview, setPreview] = useState(false)
+  const coarse = useCoarsePointer()
 
   const frontRef = useRef<HTMLTextAreaElement>(null)
   const backRef = useRef<HTMLTextAreaElement>(null)
@@ -132,11 +134,15 @@ export function CardComposer({
           Markdown
         </Button>
 
-        <span className="flex items-center gap-1.5 text-2xs text-text-faint">
-          <Kbd>⌘↵</Kbd> Ajouter et continuer
-          <span className="text-border-strong">·</span>
-          <Kbd>esc</Kbd>
-        </span>
+        {/* Keyboard cheat-sheet — hidden on touch, where it is inoperative
+            noise (fix-session §3). */}
+        {!coarse && (
+          <span className="flex items-center gap-1.5 text-2xs text-text-faint">
+            <Kbd>⌘↵</Kbd> Ajouter et continuer
+            <span className="text-border-strong">·</span>
+            <Kbd>esc</Kbd>
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-3">
           {added > 0 && (
