@@ -2,21 +2,22 @@
  * Reproducible landing product-capture generator (finding: captures were stale —
  * old indigo, FR shots on the EN landing, an impossible "rating buttons without a
  * revealed answer" review state). Regenerates `apps/web/public/landing/*.webp`
- * from the CURRENT UI, dark + light, against a deterministic seeded stack.
+ * from the CURRENT UI against a deterministic seeded stack.
  *
- * Localization choice (documented, per the fix brief): product screenshots are
- * captured in the app's default language (FR — the primary EPITA audience) and
- * reused on both the FR and EN landings. The landing's screenshot swap keys on
- * THEME only (`ThemedShot`), which we keep: the shots are dense UI (numbers,
- * charts, a card) whose meaning survives the copy, and a 2×2×3 (lang×theme×screen)
- * matrix is not worth the maintenance. Re-run this after any material UI change.
+ * Localization: each product screen is captured in FOUR variants — theme (dark ×
+ * light) × language (fr × en) — written as `<screen>-<theme>-<lang>.webp`, so the
+ * EN landing shows EN app chrome instead of reusing the FR shots (`ThemedShot`
+ * keys on both theme and language). Card *content* stays French — it is seeded
+ * user data — only the UI chrome localizes. It also regenerates the social card
+ * `og.png` (the landing hero at the declared 1200×630) so every asset the landing
+ * ships is script-reproducible. Re-run after any material UI change.
  *
  * Isolation: a throwaway `engram_fixlandingpolish_*` database on the LOCAL
  * Supabase Postgres (127.0.0.1:54322) — created + migrated + dropped here, never
  * touching the shared `postgres` db. Dev ports 3004 (API) / 5176 (web), never the
  * 3001/5173 dev or 3100/3110 e2e ranges. Everything is torn down in `finally`.
  *
- *   bun scripts/generate-landing-shots.ts            # product captures + verify shots
+ *   bun scripts/generate-landing-shots.ts            # product captures + og + verify shots
  *   bun scripts/generate-landing-shots.ts --verify   # only the before/after verify shots
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
@@ -62,6 +63,13 @@ async function waitFor(url: string, label: string, timeoutMs = 120_000) {
 function toWebp(png: string, webp: string) {
   execFileSync('cwebp', ['-quiet', '-q', '90', png, '-o', webp])
   rmSync(png, { force: true })
+}
+
+/** Screenshot the current page to `<LANDING_DIR>/<name>.webp` (via a temp PNG). */
+async function shot(page: Page, name: string) {
+  const png = `${LANDING_DIR}/${name}.png`
+  await page.screenshot({ path: png })
+  toWebp(png, `${LANDING_DIR}/${name}.webp`)
 }
 
 /** Set theme + language before any app script runs, and skip onboarding. */
@@ -128,37 +136,59 @@ async function main() {
     mkdirSync(VERIFY_DIR, { recursive: true })
     const browser = await chromium.launch()
     try {
+      if (!verifyOnly) {
+        // -- Product captures: theme × language (four variants per screen). --
+        for (const theme of ['dark', 'light'] as const) {
+          for (const lang of ['fr', 'en'] as const) {
+            const ctx = await browser.newContext({ deviceScaleFactor: 2 })
+            const page = await ctx.newPage()
+            await primeContext(page, theme, lang)
+            const suffix = `${theme}-${lang}`
+
+            await page.setViewportSize({ width: 1440, height: 780 })
+            await page.goto(`${WEB}/`, { waitUntil: 'networkidle' })
+            await page.waitForTimeout(1200)
+            await shot(page, `dashboard-${suffix}`)
+
+            await page.setViewportSize({ width: 1080, height: 840 })
+            await page.goto(`${WEB}/review`, { waitUntil: 'networkidle' })
+            await page.waitForTimeout(800)
+            // Reveal the answer so the capture shows the flipped card WITH the
+            // question recall + the four ratings (the state that actually exists).
+            await page.keyboard.press('Space')
+            await page.waitForTimeout(700)
+            await shot(page, `review-${suffix}`)
+
+            await page.setViewportSize({ width: 1440, height: 980 })
+            await page.goto(`${WEB}/analytics`, { waitUntil: 'networkidle' })
+            await page.waitForTimeout(1400)
+            await shot(page, `analytics-${suffix}`)
+
+            await ctx.close()
+          }
+        }
+
+        // -- Social card (og.png): the landing hero at the declared 1200×630,
+        //    deviceScaleFactor 1 so the file matches og:image:width/height. --
+        const ogCtx = await browser.newContext({ deviceScaleFactor: 1 })
+        const ogPage = await ogCtx.newPage()
+        await primeContext(ogPage, 'dark', 'fr')
+        await ogPage.setViewportSize({ width: 1200, height: 630 })
+        await ogPage.goto(`${WEB}/welcome`, { waitUntil: 'networkidle' })
+        await ogPage.waitForTimeout(800)
+        await ogPage.screenshot({
+          path: `${LANDING_DIR}/og.png`,
+          clip: { x: 0, y: 0, width: 1200, height: 630 },
+        })
+        await ogCtx.close()
+      }
+
+      // -- Verification shots (FR), each fix at its cited viewport. --
       for (const theme of ['dark', 'light'] as const) {
         const ctx = await browser.newContext({ deviceScaleFactor: 2 })
         const page = await ctx.newPage()
         await primeContext(page, theme, 'fr')
 
-        if (!verifyOnly) {
-          // -- Product captures (dark + light). --
-          await page.setViewportSize({ width: 1440, height: 780 })
-          await page.goto(`${WEB}/`, { waitUntil: 'networkidle' })
-          await page.waitForTimeout(1200)
-          await page.screenshot({ path: `${LANDING_DIR}/dashboard-${theme}.png` })
-          toWebp(`${LANDING_DIR}/dashboard-${theme}.png`, `${LANDING_DIR}/dashboard-${theme}.webp`)
-
-          await page.setViewportSize({ width: 1080, height: 840 })
-          await page.goto(`${WEB}/review`, { waitUntil: 'networkidle' })
-          await page.waitForTimeout(800)
-          // Reveal the answer so the capture shows the flipped card WITH the
-          // question recall + the four ratings (the state that actually exists).
-          await page.keyboard.press('Space')
-          await page.waitForTimeout(700)
-          await page.screenshot({ path: `${LANDING_DIR}/review-${theme}.png` })
-          toWebp(`${LANDING_DIR}/review-${theme}.png`, `${LANDING_DIR}/review-${theme}.webp`)
-
-          await page.setViewportSize({ width: 1440, height: 980 })
-          await page.goto(`${WEB}/analytics`, { waitUntil: 'networkidle' })
-          await page.waitForTimeout(1400)
-          await page.screenshot({ path: `${LANDING_DIR}/analytics-${theme}.png` })
-          toWebp(`${LANDING_DIR}/analytics-${theme}.png`, `${LANDING_DIR}/analytics-${theme}.webp`)
-        }
-
-        // -- Verification shots (each fix, at cited viewports). --
         // Landing desktop (header CTA + toggle, final CTA at page foot).
         await page.setViewportSize({ width: 1280, height: 900 })
         await page.goto(`${WEB}/welcome`, { waitUntil: 'networkidle' })

@@ -113,9 +113,9 @@ describe('<LandingPage>', () => {
 
   it('the product screenshots carry alt text (a11y)', () => {
     renderLanding()
-    // Dark theme by default → the dark WebP, with the localized alt.
+    // Dark theme + FR default → the dark FR WebP, with the localized alt.
     const shot = screen.getByAltText(/Tableau de bord d’engram/)
-    expect(shot.getAttribute('src')).toBe('/landing/dashboard-dark.webp')
+    expect(shot.getAttribute('src')).toBe('/landing/dashboard-dark-fr.webp')
   })
 
   it('defaults to English when the browser language is English and nothing is stored', () => {
