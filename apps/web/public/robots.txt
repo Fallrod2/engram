@@ -1,0 +1,14 @@
+# engram — https://engram.alexabriel.com
+User-agent: *
+Allow: /
+
+# The authenticated app lives behind sign-in; only the public marketing and auth
+# pages are meant to be indexed. Keep the deep app routes out of the index.
+Disallow: /review
+Disallow: /planning
+Disallow: /analytics
+Disallow: /subjects
+Disallow: /import
+Disallow: /settings
+
+Sitemap: https://engram.alexabriel.com/sitemap.xml

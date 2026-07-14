@@ -91,7 +91,13 @@ export function StudyTimeChart({
           <AreaChart
             accessibilityLayer
             data={buckets}
-            margin={{ top: 8, right: 12, bottom: 0, left: -4 }}
+            // A modest right margin keeps the last X-axis tick from touching the
+            // edge. The value label on the LAST point is NOT fixed by margin — the
+            // last datum sits at the plot's right clip boundary and that boundary
+            // moves WITH the point, so any margin leaves the end-anchored glyph on
+            // the clip line (finding: the final "s" was sliced). It's nudged inward
+            // instead (LastPointLabel `dx`), landing fully inside the clip.
+            margin={{ top: 8, right: 16, bottom: 0, left: -4 }}
           >
             <CartesianGrid stroke={chartInk.grid} vertical={false} />
             <XAxis
@@ -204,6 +210,10 @@ function LastPointLabel(props: {
     <text
       x={x}
       y={y - 10}
+      // End-anchored at the last point, then pulled 6px left so its right edge
+      // clears the plot's clip boundary (which coincides with the last point x).
+      // Without this the final glyph is sliced regardless of chart margin.
+      dx={-6}
       textAnchor="end"
       fill="var(--color-text-muted)"
       fontSize={11}

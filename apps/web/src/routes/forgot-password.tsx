@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, redirect, Link } from '@tanstack/react-router'
 import { useT } from '@/lib/i18n'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { AuthBrand } from '@/features/auth/auth-brand'
 import { ForgotPasswordForm } from '@/features/auth/forgot-password-form'
@@ -24,6 +25,7 @@ export const Route = createFileRoute('/forgot-password')({
 
 function ForgotPasswordPage() {
   const t = useT()
+  useDocumentTitle(t('auth.meta.forgot'))
   const [sent, setSent] = useState(false)
 
   return (

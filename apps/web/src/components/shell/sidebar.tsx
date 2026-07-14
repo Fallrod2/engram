@@ -142,10 +142,14 @@ export function Sidebar() {
             </TooltipContent>
           </Tooltip>
         ) : (
+          // A ghost shortcut ROW (not a second filled search box): the topbar owns
+          // the search-field affordance, so the sidebar entry reads as a coherent
+          // keyboard shortcut instead of a duplicate ⌘K control (finding: two
+          // identical search inputs at ≥lg). Still opens the palette.
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="flex h-8 w-full items-center gap-2 rounded-sm bg-surface-2 px-2.5 text-text-faint transition-colors duration-fast hover:bg-surface-3"
+            className="flex h-8 w-full items-center gap-2 rounded-sm px-2 text-text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-text"
           >
             <Search className="size-4 shrink-0" />
             <span className="text-sm">{t('sidebar.searchPlaceholder')}</span>

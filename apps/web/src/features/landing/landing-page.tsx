@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Keyboard, LineChart, ScanLine } from 'lucide-react'
@@ -25,13 +25,18 @@ const GITHUB_URL = 'https://github.com/Fallrod2/engram'
 export default function LandingPage() {
   const t = useT()
 
-  // Marketing tab title on the landing; the authenticated shell resets it to
+  // Marketing tab title + social/description meta on the landing, kept in sync
+  // with the active language (the static index.html ships the FR default for
+  // crawlers; here we localize once the SPA hydrates — documented SEO debt of a
+  // client-rendered marketing page). The authenticated shell resets the title to
   // 'engram' at mount (see app-shell). Not a loading state — invisible effect.
   useEffect(() => {
     const previous = document.title
     document.title = t('landing.meta.title')
+    const restore = setMetaContent('name', 'description', t('landing.meta.description'))
     return () => {
       document.title = previous
+      restore()
     }
   }, [t])
 
@@ -45,10 +50,34 @@ export default function LandingPage() {
         <Showcase />
         <HowItWorks />
         <Providers />
+        <FinalCta />
       </main>
       <LandingFooter />
     </div>
   )
+}
+
+/**
+ * Set a `<meta>` tag's content by attribute (`name`/`property`), returning a
+ * restore fn so unmount reverts to the static HTML value. Creates the tag if the
+ * SPA is the first to need it.
+ */
+function setMetaContent(attr: 'name' | 'property', key: string, value: string): () => void {
+  if (typeof document === 'undefined') return () => {}
+  const selector = `meta[${attr}="${key}"]`
+  let el = document.head.querySelector<HTMLMetaElement>(selector)
+  const created = el === null
+  if (!el) {
+    el = document.createElement('meta')
+    el.setAttribute(attr, key)
+    document.head.appendChild(el)
+  }
+  const previous = el.getAttribute('content')
+  el.setAttribute('content', value)
+  return () => {
+    if (created) el?.remove()
+    else if (previous !== null) el?.setAttribute('content', previous)
+  }
 }
 
 /* ------------------------------------------------------------------ header -- */
@@ -85,25 +114,62 @@ function LandingHeader() {
         scrolled ? 'border-b border-border bg-bg/80 backdrop-blur' : 'border-b border-transparent',
       )}
     >
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-1.5 px-4 sm:gap-2 sm:px-6 lg:px-8">
         <Wordmark />
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          {/* Language toggle promoted from the footer so an anglophone visitor
+              (e.g. from GitHub) discovers the EN copy without scrolling 7 screens. */}
+          <LangToggle />
           <a
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
             aria-label={t('landing.nav.githubAria')}
-            className="flex size-8 items-center justify-center rounded-sm text-text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-text"
+            className="hidden size-8 items-center justify-center rounded-sm text-text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-text sm:flex"
           >
             <GithubMark className="size-4" />
           </a>
           <ThemeToggle />
-          <Button asChild size="default">
+          {/* Sign-in stays available; the primary conversion action is the
+              account CTA (repeated at the foot of the page too). */}
+          <Button asChild variant="ghost" size="default" className="hidden sm:inline-flex">
             <Link to="/login">{t('landing.nav.signIn')}</Link>
+          </Button>
+          <Button asChild size="default">
+            <Link to="/signup">{t('landing.nav.createAccount')}</Link>
           </Button>
         </div>
       </div>
     </header>
+  )
+}
+
+/** Compact FR/EN segmented toggle, shared by the header and (historically) the
+ *  footer. Single instance now lives in the header. */
+function LangToggle() {
+  const t = useT()
+  const { lang, setLang } = useLang()
+  return (
+    <div
+      className="inline-flex rounded-sm border border-border p-0.5"
+      role="group"
+      aria-label={t('landing.nav.language')}
+    >
+      {(['fr', 'en'] as const).map((code) => (
+        <button
+          key={code}
+          type="button"
+          onClick={() => setLang(code)}
+          aria-pressed={lang === code}
+          className={cn(
+            'rounded-[4px] px-2 py-1 text-xs font-medium uppercase transition-colors duration-fast',
+            lang === code ? 'bg-surface-2 text-text' : 'text-text-faint hover:text-text-muted',
+          )}
+        >
+          {code}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -191,6 +257,26 @@ function RhythmStrip() {
   const t = useT()
   const unit = t('landing.rhythm.unit')
 
+  // Scroll-driven right-edge fade: it signals "more to scroll" on narrow screens,
+  // then lifts once the strip is scrolled to the end so the final pill (+55 j) is
+  // never left veiled at its destination (finding: static fade masked the last
+  // glyph). Recomputed on scroll + resize; a non-overflowing strip reads as
+  // "already at end", so no fade shows.
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [atEnd, setAtEnd] = useState(true)
+
+  const syncFade = useCallback(() => {
+    const el = scrollerRef.current
+    if (!el) return
+    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1)
+  }, [])
+
+  useEffect(() => {
+    syncFade()
+    window.addEventListener('resize', syncFade)
+    return () => window.removeEventListener('resize', syncFade)
+  }, [syncFade])
+
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <div className="rounded-lg border border-border bg-surface-1 p-6 sm:p-8">
@@ -198,25 +284,36 @@ function RhythmStrip() {
         {/* Focusable + named: the strip scrolls horizontally below ~520px, so it
             must be reachable by keyboard (axe scrollable-region-focusable) — the
             page is mobile-first and claims 100% keyboard operability. */}
-        <div
-          className="mt-6 overflow-x-auto pb-1"
-          role="group"
-          tabIndex={0}
-          aria-label={t('landing.rhythm.label')}
-        >
-          <div className="flex min-w-[520px] items-center gap-2">
-            <RhythmPill accent>{t('landing.rhythm.today')}</RhythmPill>
-            {INTERVALS.map((n) => (
-              <div key={n} className="flex flex-1 items-center gap-2">
-                <span
-                  aria-hidden
-                  className="h-px flex-1 bg-gradient-to-r from-accent/45 to-border"
-                  style={{ flexGrow: n }}
-                />
-                <RhythmPill>{`+${n}\u00A0${unit}`}</RhythmPill>
-              </div>
-            ))}
+        <div className="relative mt-6">
+          <div
+            ref={scrollerRef}
+            onScroll={syncFade}
+            className="overflow-x-auto pb-1"
+            role="group"
+            tabIndex={0}
+            aria-label={t('landing.rhythm.label')}
+          >
+            <div className="flex min-w-[520px] items-center gap-2">
+              <RhythmPill accent>{t('landing.rhythm.today')}</RhythmPill>
+              {INTERVALS.map((n) => (
+                <div key={n} className="flex flex-1 items-center gap-2">
+                  <span
+                    aria-hidden
+                    className="h-px flex-1 bg-gradient-to-r from-accent/45 to-border"
+                    style={{ flexGrow: n }}
+                  />
+                  <RhythmPill>{`+${n}\u00A0${unit}`}</RhythmPill>
+                </div>
+              ))}
+            </div>
           </div>
+          <div
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface-1 to-transparent transition-opacity duration-200 sm:hidden',
+              atEnd && 'opacity-0',
+            )}
+          />
         </div>
         <p className="mt-6 max-w-2xl text-sm leading-relaxed text-text-muted">
           {t('landing.rhythm.caption')}
@@ -403,9 +500,41 @@ function Providers() {
 
 /* ------------------------------------------------------------------ footer -- */
 
+function FinalCta() {
+  const t = useT()
+  return (
+    <section className="mx-auto w-full max-w-6xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
+      <div className="relative overflow-hidden rounded-lg border border-border bg-surface-1 px-6 py-12 text-center sm:px-10 sm:py-16">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-full overflow-hidden"
+        >
+          <div className="absolute left-1/2 top-[-60px] h-[280px] w-[560px] max-w-[130vw] -translate-x-1/2 rounded-full bg-accent/12 blur-[100px]" />
+        </div>
+        <h2 className="mx-auto max-w-2xl text-balance text-2xl font-semibold tracking-[-0.02em] text-text sm:text-[2rem]">
+          {t('landing.finalCta.title')}
+        </h2>
+        <p className="mx-auto mt-4 max-w-xl text-pretty text-sm leading-relaxed text-text-muted sm:text-base">
+          {t('landing.finalCta.body')}
+        </p>
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Button asChild size="lg" className="min-w-44">
+            <Link to="/signup">
+              {t('landing.nav.createAccount')}
+              <ArrowRight />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link to="/login">{t('landing.nav.signIn')}</Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function LandingFooter() {
   const t = useT()
-  const { lang, setLang } = useLang()
 
   return (
     <footer className="border-t border-border">
@@ -425,29 +554,6 @@ function LandingFooter() {
             <GithubMark className="size-3.5" />
             {t('landing.footer.github')}
           </a>
-
-          <div
-            className="inline-flex rounded-sm border border-border p-0.5"
-            role="group"
-            aria-label={t('landing.footer.language')}
-          >
-            {(['fr', 'en'] as const).map((code) => (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setLang(code)}
-                aria-pressed={lang === code}
-                className={cn(
-                  'rounded-[4px] px-2.5 py-1 text-xs font-medium uppercase transition-colors duration-fast',
-                  lang === code
-                    ? 'bg-surface-2 text-text'
-                    : 'text-text-faint hover:text-text-muted',
-                )}
-              >
-                {code}
-              </button>
-            ))}
-          </div>
 
           <ThemeToggle />
         </div>
@@ -502,19 +608,26 @@ type ShotBase = 'dashboard' | 'review' | 'analytics'
  * the loaded image's, so there is no layout shift as each shot decodes.
  */
 const SHOT_SIZE: Record<ShotBase, { width: number; height: number }> = {
-  dashboard: { width: 1920, height: 780 },
-  review: { width: 980, height: 838 },
-  analytics: { width: 1920, height: 1200 },
+  // Intrinsic pixel size of the regenerated captures (scripts/generate-landing-shots.ts,
+  // deviceScaleFactor 2). Only the ratio matters — it reserves the correct box so
+  // the shot decodes without layout shift.
+  dashboard: { width: 2880, height: 1560 },
+  review: { width: 2160, height: 1680 },
+  analytics: { width: 2880, height: 1960 },
 }
 
 /**
- * Theme-aware product screenshot. Picks the dark/light WebP from the resolved
- * theme (synchronous from the theme context — no flash, no extra loading state).
- * Served from `public/landing/`, so it never touches the JS bundle (§5.4).
+ * Theme- AND language-aware product screenshot. Picks the WebP for the resolved
+ * theme × active language (both synchronous from context — no flash, no extra
+ * loading state), so the EN landing shows an EN-chrome app instead of reusing the
+ * FR captures (finding: EN landing shipped 100% FR shots). Served from
+ * `public/landing/`, so it never touches the JS bundle (§5.4). The four variants
+ * per screen are regenerated by scripts/generate-landing-shots.ts.
  */
 function ThemedShot({ base, alt, priority }: { base: ShotBase; alt: string; priority?: boolean }) {
   const { resolved } = useTheme()
-  const src = `/landing/${base}-${resolved}.webp`
+  const { lang } = useLang()
+  const src = `/landing/${base}-${resolved}-${lang}.webp`
   const { width, height } = SHOT_SIZE[base]
   return (
     <img

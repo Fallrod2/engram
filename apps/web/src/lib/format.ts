@@ -55,6 +55,28 @@ export function formatDateTime(iso: string): string {
   })
 }
 
+/**
+ * Relative wall-clock label for a past/future instant, e.g. `il y a 2 h` /
+ * `2 hr ago`. Minute/hour/day/week granularity via `Intl.RelativeTimeFormat`
+ * (locale-correct); anything older than ~4 weeks falls back to the absolute
+ * day+month so a months-old timestamp never reads as `il y a 8 semaines`.
+ */
+export function formatRelativeTime(iso: string, now: Date = new Date()): string {
+  const diffMs = new Date(iso).getTime() - now.getTime()
+  const abs = Math.abs(diffMs)
+  const MIN = 60_000
+  const HOUR = 3_600_000
+  const DAY = 86_400_000
+  const WEEK = 7 * DAY
+  const rtf = new Intl.RelativeTimeFormat(currentLocale, { numeric: 'auto' })
+  if (abs < MIN) return rtf.format(0, 'minute') // "à l'instant" / "now"
+  if (abs < HOUR) return rtf.format(Math.round(diffMs / MIN), 'minute')
+  if (abs < DAY) return rtf.format(Math.round(diffMs / HOUR), 'hour')
+  if (abs < WEEK) return rtf.format(Math.round(diffMs / DAY), 'day')
+  if (abs < 4 * WEEK) return rtf.format(Math.round(diffMs / WEEK), 'week')
+  return formatDayMonth(iso)
+}
+
 /** Compact day + month for an ISO instant, e.g. `15 juil.` / `Jul 15`. */
 export function formatDayMonth(iso: string): string {
   return new Date(iso).toLocaleDateString(currentLocale, {

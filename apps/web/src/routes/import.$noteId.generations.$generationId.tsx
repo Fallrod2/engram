@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { MoreHorizontal, RotateCw, Sparkles, X } from 'lucide-react'
 import type { Deck, Generation } from '@engram/shared'
 import { ApiError } from '@/lib/api'
+import { formatRelativeTime } from '@/lib/format'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { PageHeader } from '@/components/page-header'
@@ -201,11 +202,16 @@ function ReviewHeader({
         </>
       }
       title={
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           {kindLabel}
           {deckName && (
             <span className="font-mono text-sm font-normal text-text-muted">vers {deckName}</span>
           )}
+          {/* Dated so the detail page (and its browser title) is no longer an
+              anonymous "Cartes" (finding). */}
+          <span className="text-sm font-normal text-text-faint">
+            · {formatRelativeTime(generation.createdAt)}
+          </span>
         </span>
       }
       actions={

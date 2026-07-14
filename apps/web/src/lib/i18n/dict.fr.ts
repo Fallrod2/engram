@@ -215,6 +215,7 @@ export const dictFr = {
     },
     activity: {
       label: 'Activité récente',
+      help: 'Chaque bloc représente un jour des 14 derniers ; plus il est teinté, plus tu as révisé de cartes ce jour-là.',
       viewAnalytics: 'Voir les analytics',
       tooltip_one: '{date} · {count} review',
       tooltip_other: '{date} · {count} reviews',
@@ -317,6 +318,11 @@ export const dictFr = {
     nextWeek: 'Semaine suivante',
     examsError: 'Impossible de charger les examens.',
     planError: 'Impossible de charger la charge prévue.',
+    legend: {
+      load: 'Charge de révision',
+      loadHint:
+        'La barre indique le nombre de reviews prévues ce jour-là, relatif au maximum de la période.',
+    },
   },
 
   settings: {
@@ -469,6 +475,11 @@ export const dictFr = {
       fact: 'fait',
       concept: 'concept',
     },
+    // Accepted/rejected recap on a triaged generation-history row.
+    accepted_one: '{count} acceptée',
+    accepted_other: '{count} acceptées',
+    rejected_one: '{count} rejetée',
+    rejected_other: '{count} rejetées',
   },
 
   ocr: {
@@ -538,6 +549,14 @@ export const dictFr = {
 
   auth: {
     title: 'engram',
+    // Short, page-specific tab titles (the static index.html ships the long
+    // marketing title; auth screens override it with a concise one).
+    meta: {
+      login: 'Connexion — engram',
+      signup: 'Inscription — engram',
+      forgot: 'Mot de passe oublié — engram',
+      setPassword: 'Mot de passe — engram',
+    },
     subtitle: 'Connexion',
     email: 'E-mail',
     password: 'Mot de passe',
@@ -617,7 +636,13 @@ export const dictFr = {
     },
     nav: {
       signIn: 'Se connecter',
+      createAccount: 'Créer un compte',
       githubAria: 'Code source sur GitHub',
+      language: 'Langue',
+    },
+    finalCta: {
+      title: 'Commence à retenir dès aujourd’hui.',
+      body: 'Crée ton compte, importe un cours et lance ta première session en moins de deux minutes. Gratuit, self-hosted, open source.',
     },
     hero: {
       eyebrow: 'Répétition espacée · FSRS v5',

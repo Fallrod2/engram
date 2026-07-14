@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { useT } from '@/lib/i18n'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { sanitizeRedirect } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { AuthBrand } from '@/features/auth/auth-brand'
@@ -26,6 +27,7 @@ export const Route = createFileRoute('/login')({
 
 function LoginPage() {
   const t = useT()
+  useDocumentTitle(t('auth.meta.login'))
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">

@@ -40,6 +40,10 @@ export default defineConfig({
   use: {
     baseURL: WEB_URL,
     trace: 'retain-on-failure',
+    // Pin the browser language: the app now seeds its initial UI language from
+    // `navigator.language` when no choice is stored, and Playwright defaults to
+    // en-US. The specs assert the French default copy, so force fr-FR.
+    locale: 'fr-FR',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
