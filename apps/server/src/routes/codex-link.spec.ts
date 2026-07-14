@@ -40,10 +40,15 @@ const res = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
 /** Route the mocked OpenAI endpoints by URL substring. */
-function mockOpenAi(opts: { pollPending?: boolean } = {}) {
+function mockOpenAi(opts: { pollPending?: boolean; initStatus?: number } = {}) {
   globalThis.fetch = (async (url: string | URL | Request) => {
     const u = typeof url === 'string' ? url : url.toString()
-    if (u.includes('/deviceauth/usercode')) {
+    // The correct upstream URL carries `/api/accounts` (the real prod-bug fix).
+    if (u.includes('/api/accounts/deviceauth/usercode')) {
+      if (opts.initStatus && opts.initStatus !== 200) {
+        return new Response('', { status: opts.initStatus })
+      }
+      // Upstream sends `interval` as a STRING — the mock mirrors the real contract.
       return res({ device_auth_id: 'dev-1', user_code: 'ABCD-1234', interval: '5' })
     }
     if (u.includes('/deviceauth/token')) {
@@ -78,6 +83,26 @@ describe('POST /providers/openai-codex/link/start', () => {
     mockOpenAi()
     const r = await json('/api/ai/providers/openai-codex/link/start', 'POST', {})
     expect(r.status).toBe(503)
+  })
+
+  it('upstream init 404 → 503 service_unavailable (device login disabled)', async () => {
+    mockOpenAi({ initStatus: 404 })
+    const r = await json('/api/ai/providers/openai-codex/link/start', 'POST', {})
+    expect(r.status).toBe(503)
+    const body = (await r.json()) as { error: { code: string } }
+    expect(body.error.code).toBe('service_unavailable')
+  })
+
+  it('upstream init 500 → 502 upstream_error (honest, NOT "disabled")', async () => {
+    mockOpenAi({ initStatus: 500 })
+    const r = await json('/api/ai/providers/openai-codex/link/start', 'POST', {})
+    expect(r.status).toBe(502)
+    const body = (await r.json()) as {
+      error: { code: string; message: string; details: unknown }
+    }
+    expect(body.error.code).toBe('upstream_error')
+    expect(body.error.message).toContain('500')
+    expect(body.error.details).toEqual({ upstreamStatus: 500 })
   })
 })
 

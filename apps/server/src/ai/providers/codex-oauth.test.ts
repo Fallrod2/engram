@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   claimAccountId,
+  DeviceAuthDisabledError,
+  DeviceAuthUpstreamError,
   deriveExpiresAt,
   pollDeviceAuth,
   refreshTokens,
@@ -40,13 +42,42 @@ describe('startDeviceAuth', () => {
     )
     const res = await startDeviceAuth(fetchFn)
     expect(res).toEqual({ deviceAuthId: 'dev-1', userCode: 'ABCD-1234', intervalSeconds: 5 })
-    expect(calls[0]!.url).toContain('/deviceauth/usercode')
+    // The URL MUST carry the `/api/accounts` prefix (the real prod-bug fix).
+    expect(calls[0]!.url).toContain('/api/accounts/deviceauth/usercode')
     expect(JSON.parse(calls[0]!.init!.body as string).client_id).toMatch(/^app_/)
   })
 
-  it('throws DeviceAuthDisabledError when initiation is refused', async () => {
-    const { fetchFn } = stubFetch(() => new Response('', { status: 403 }))
-    await expect(startDeviceAuth(fetchFn)).rejects.toThrow(/disabled/i)
+  it('parses a numeric interval too, defaulting to 5 when absent/invalid', async () => {
+    const s7 = await startDeviceAuth(
+      stubFetch(() => json({ device_auth_id: 'd', user_code: 'C', interval: 7 })).fetchFn,
+    )
+    expect(s7.intervalSeconds).toBe(7)
+    const sDefault = await startDeviceAuth(
+      stubFetch(() => json({ device_auth_id: 'd', user_code: 'C' })).fetchFn,
+    )
+    expect(sDefault.intervalSeconds).toBe(5)
+  })
+
+  it('404 → DeviceAuthDisabledError (the ONE honest "toggle is off" signal)', async () => {
+    const { fetchFn } = stubFetch(() => new Response('', { status: 404 }))
+    await expect(startDeviceAuth(fetchFn)).rejects.toBeInstanceOf(DeviceAuthDisabledError)
+  })
+
+  it('any non-404 failure → DeviceAuthUpstreamError carrying the status', async () => {
+    for (const status of [403, 429, 500, 502]) {
+      const { fetchFn } = stubFetch(() => new Response('', { status }))
+      await expect(startDeviceAuth(fetchFn)).rejects.toMatchObject({
+        name: 'DeviceAuthUpstreamError',
+        httpStatus: status,
+      })
+    }
+  })
+
+  it('200 with an unusable body → DeviceAuthUpstreamError (not disabled)', async () => {
+    const { fetchFn } = stubFetch(() => json({ interval: '5' }))
+    const err = await startDeviceAuth(fetchFn).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(DeviceAuthUpstreamError)
+    expect((err as DeviceAuthUpstreamError).httpStatus).toBe(200)
   })
 })
 

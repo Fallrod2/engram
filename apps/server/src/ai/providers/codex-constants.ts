@@ -9,9 +9,17 @@
  * Sources (verified online 2026-07-14):
  * - developers.openai.com/codex/auth — device-code beta, must be enabled in
  *   ChatGPT → Settings → Security → "Allow device code login".
- * - openai/codex codex-rs/login/src/device_code_auth.rs — `deviceauth/usercode`
- *   (init) + `deviceauth/token` (poll); pending = HTTP 403/404; 15-min cap;
- *   PKCE generated server-side and returned in the poll success body.
+ * - openai/codex codex-rs/login/src/device_code_auth.rs + server.rs —
+ *   `api_base_url = "{issuer}/api/accounts"`, so the device-code endpoints are
+ *   `{issuer}/api/accounts/deviceauth/usercode` (init) +
+ *   `{issuer}/api/accounts/deviceauth/token` (poll). Pending = HTTP 403/404;
+ *   PKCE generated server-side and returned in the poll success body. The final
+ *   `oauth/token` exchange and the `deviceauth/callback` redirect stay on the
+ *   bare issuer (NO `/api/accounts`). Verified against the real host 2026-07-14:
+ *   `POST {issuer}/api/accounts/deviceauth/usercode {client_id}` → 200 with
+ *   `{ device_auth_id, user_code, interval:"5", expires_at }` (interval is a
+ *   STRING). The old un-prefixed URLs 404'd — which the flow must read as
+ *   "device login disabled on the account" ONLY for the init 404, nothing else.
  * - openai/codex codex-rs/login/src/server.rs — `oauth/token` exchange
  *   (form-urlencoded, authorization_code) + `chatgpt_account_id` id_token claim.
  * - openai/codex codex-rs/login/src/auth/manager.rs — refresh (JSON,
@@ -39,14 +47,23 @@ export function codexAuthBase(): string {
   return (process.env.ENGRAM_CODEX_AUTH_BASE || DEFAULT_AUTH_BASE).replace(/\/+$/, '')
 }
 
+/**
+ * Accounts API base: `{issuer}/api/accounts` (upstream `api_base_url`). The
+ * device-code endpoints live here — the missing `/api/accounts` prefix was the
+ * real prod bug (every init 404'd → false "disabled on this account").
+ */
+export function codexAccountsBase(): string {
+  return `${codexAuthBase()}/api/accounts`
+}
+
 /** Device-code initiation: POST JSON `{ client_id }`. */
 export function codexUsercodeUrl(): string {
-  return `${codexAuthBase()}/deviceauth/usercode`
+  return `${codexAccountsBase()}/deviceauth/usercode`
 }
 
 /** Device-code polling: POST JSON `{ device_auth_id, user_code }`. */
 export function codexDeviceTokenUrl(): string {
-  return `${codexAuthBase()}/deviceauth/token`
+  return `${codexAccountsBase()}/deviceauth/token`
 }
 
 /** OAuth token endpoint — used for BOTH the code exchange and the refresh. */

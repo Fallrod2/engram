@@ -45,11 +45,27 @@ export type CodexRefresh =
   | { status: 'invalid_grant' } // token revoked → unlink
   | { status: 'error'; httpStatus?: number } // transient (network/5xx) → keep
 
-/** Raised when device-code login is disabled on the account (init 4xx). */
+/**
+ * Raised when device-code login is disabled on the account — the ONE honest
+ * signal is an init 404 on the correct `/api/accounts/deviceauth/usercode` URL.
+ */
 export class DeviceAuthDisabledError extends Error {
   constructor() {
     super('codex device auth disabled')
     this.name = 'DeviceAuthDisabledError'
+  }
+}
+
+/**
+ * Raised when the init endpoint fails for any reason OTHER than a 404 (a 5xx, a
+ * 4xx that is not 404, or a 200 with a missing body). Carries the upstream HTTP
+ * status so the route can report an honest `upstream_error` instead of blaming
+ * the user's account settings.
+ */
+export class DeviceAuthUpstreamError extends Error {
+  constructor(readonly httpStatus: number) {
+    super(`codex device auth init failed (HTTP ${httpStatus})`)
+    this.name = 'DeviceAuthUpstreamError'
   }
 }
 
@@ -61,8 +77,11 @@ export async function startDeviceAuth(fetchFn: FetchFn = defaultFetch): Promise<
     body: JSON.stringify({ client_id: CODEX_CLIENT_ID }),
   })
   if (!res.ok) {
-    // A refused initiation almost always means the beta toggle is off.
-    throw new DeviceAuthDisabledError()
+    // 404 is the ONLY status that means "device login disabled on the account".
+    // Everything else is an upstream failure, reported honestly (not a false
+    // "enable the toggle" — the prod bug that started this fix).
+    if (res.status === 404) throw new DeviceAuthDisabledError()
+    throw new DeviceAuthUpstreamError(res.status)
   }
   const json = (await res.json()) as {
     device_auth_id?: string
@@ -70,7 +89,9 @@ export async function startDeviceAuth(fetchFn: FetchFn = defaultFetch): Promise<
     interval?: string | number
   }
   if (!json.device_auth_id || !json.user_code) {
-    throw new DeviceAuthDisabledError()
+    // A 200 with an unusable body is an upstream contract breach, not a disabled
+    // account. Report it honestly (status 200) rather than blaming the toggle.
+    throw new DeviceAuthUpstreamError(res.status)
   }
   const intervalSeconds = Number(json.interval)
   return {

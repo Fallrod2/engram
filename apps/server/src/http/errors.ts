@@ -68,6 +68,13 @@ export class PayloadTooLargeError extends ApiError {
   }
 }
 
+/** 502 — a trusted upstream refused or failed (e.g. OpenAI device-code initiation). */
+export class UpstreamError extends ApiError {
+  constructor(message: string, details?: unknown) {
+    super(502, 'upstream_error', message, details)
+  }
+}
+
 /** 503 — a feature is unavailable (e.g. AI generation with no API key configured). */
 export class ServiceUnavailableError extends ApiError {
   constructor(message: string) {

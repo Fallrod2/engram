@@ -75,7 +75,7 @@ app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not fou
 
 app.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json(err.toResponse(), err.status as 400 | 401 | 403 | 404 | 409 | 413 | 503)
+    return c.json(err.toResponse(), err.status as 400 | 401 | 403 | 404 | 409 | 413 | 502 | 503)
   }
   // Hono-level failures (e.g. malformed JSON body → HTTPException 400) mapped
   // to the single error envelope so they never surface as an opaque 500.
