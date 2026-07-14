@@ -50,7 +50,7 @@ export function CalendarWeek({
       role="grid"
       aria-label="Calendrier hebdomadaire"
       onKeyDown={onKeyDown}
-      className="grid min-h-[60vh] grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border"
+      className="grid min-h-[24rem] grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border"
     >
       {days.map((cell, i) => (
         <WeekColumn
@@ -107,13 +107,17 @@ function WeekColumn({
       )}
     >
       {selected && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" aria-hidden />}
-      <div className="flex items-center justify-between border-b border-border px-2 py-1.5">
+      {/* Below sm the header stacks (single day letter above the number) so the
+          columns don't collide and the "today" ring isn't clipped at 360
+          (fix-mobile-shell §calendar). */}
+      <div className="flex flex-col items-center gap-0.5 border-b border-border px-1 py-1.5 sm:flex-row sm:justify-between sm:px-2">
         <span className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-          {abbr}
+          <span className="sm:hidden">{abbr.charAt(0)}</span>
+          <span className="hidden sm:inline">{abbr}</span>
         </span>
         <span
           className={cn(
-            'flex size-5 items-center justify-center rounded-full font-mono text-xs tabular-nums',
+            'flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-xs tabular-nums',
             cell.isToday && 'ring-1 ring-accent',
             cell.isWeekend ? 'text-text-faint' : 'text-text',
           )}

@@ -91,20 +91,24 @@ export function TodayPanel({
       )}
 
       {counts && counts.bySubject.length > 0 && (
-        <ul className="flex flex-col gap-1">
+        <ul className="-mx-2 flex flex-col">
           {counts.bySubject.map((b) => {
             const s = subjectsById.get(b.subjectId)
             if (!s) return null
             return (
-              <li key={b.subjectId} className="flex items-center gap-2">
-                <SubjectDot color={s.color} muted={s.archived} />
-                <span className="min-w-0 flex-1 truncate text-sm text-text">{s.name}</span>
+              <li key={b.subjectId}>
+                {/* Whole row is the tap target (≥44px), not just the count
+                    (fix-mobile-shell §touch-targets). */}
                 <Link
                   to="/review"
                   search={{ subjectId: b.subjectId }}
-                  className="font-mono text-xs tabular-nums text-text-muted transition-colors hover:text-accent"
+                  className="group flex min-h-11 items-center gap-2 rounded-sm px-2 transition-colors hover:bg-surface-2"
                 >
-                  {b.dueCount}
+                  <SubjectDot color={s.color} muted={s.archived} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-text">{s.name}</span>
+                  <span className="font-mono text-xs tabular-nums text-text-muted transition-colors group-hover:text-accent">
+                    {b.dueCount}
+                  </span>
                 </Link>
               </li>
             )

@@ -134,6 +134,8 @@ export function Dropzone({
           }}
           className={cn(
             'mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-1 px-2.5 py-1 text-xs text-text-muted',
+            // ≥44px hit target on touch devices (fix-mobile-shell §touch-targets).
+            'pointer-coarse:min-h-11 pointer-coarse:px-3.5',
             'transition-colors hover:border-border-strong hover:text-text',
             disabled && 'cursor-not-allowed opacity-60',
           )}
