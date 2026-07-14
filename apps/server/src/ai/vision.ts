@@ -1,4 +1,4 @@
-import type { VisionMediaType } from '@engram/shared'
+import type { OcrWarning, VisionMediaType } from '@engram/shared'
 import { PROVIDERS } from './providers'
 import type { ResolvedProviderConfig } from './providers/types'
 
@@ -122,17 +122,29 @@ export function resetVisionExtractor(): void {
 /**
  * Deterministic post-processing of a transcription (spec §2.3): count the
  * uncertainty markers the OCR prompt emits (`[?]`, `[illisible]`) into
- * human-readable warnings for the preview UI. Pure — no model call.
+ * language-agnostic warning codes for the preview UI, which the client localizes
+ * via the dictionary. Pure — no model call.
  */
-export function computeOcrWarnings(markdown: string): string[] {
-  const warnings: string[] = []
+export function computeOcrWarningCodes(markdown: string): OcrWarning[] {
+  const codes: OcrWarning[] = []
   const uncertain = (markdown.match(/\[\?\]/g) ?? []).length
   const illegible = (markdown.match(/\[illisible\]/gi) ?? []).length
-  if (uncertain > 0) {
-    warnings.push(`transcription incertaine : ${uncertain} marqueur(s) [?]`)
-  }
-  if (illegible > 0) {
-    warnings.push(illegible === 1 ? '1 passage illisible' : `${illegible} passages illisibles`)
-  }
-  return warnings
+  if (uncertain > 0) codes.push({ kind: 'uncertain', count: uncertain })
+  if (illegible > 0) codes.push({ kind: 'illegible', count: illegible })
+  return codes
+}
+
+/**
+ * FR rendering of the warning codes. Retained as the reference formatter behind
+ * `computeOcrWarningCodes` (unit-tested directly); the live UI localizes the
+ * codes client-side instead of consuming these strings.
+ */
+export function computeOcrWarnings(markdown: string): string[] {
+  return computeOcrWarningCodes(markdown).map((w) =>
+    w.kind === 'uncertain'
+      ? `transcription incertaine : ${w.count} marqueur(s) [?]`
+      : w.count === 1
+        ? '1 passage illisible'
+        : `${w.count} passages illisibles`,
+  )
 }

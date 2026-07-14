@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { ArrowDown, ArrowUp, ImageOff, RefreshCw, TriangleAlert, X } from 'lucide-react'
 import type { Subject } from '@engram/shared'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { Markdown } from '@/components/markdown'
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader } from '@/components/page-header'
@@ -78,6 +78,7 @@ export function PhotoImport({
 }) {
   const navigate = useNavigate()
   const t = useT()
+  const plural = usePlural()
 
   const [items] = useState<PhotoItem[]>(() =>
     files.map((f) => ({
@@ -225,7 +226,13 @@ export function PhotoImport({
                   {page.status === 'done' && page.warnings.length > 0 && (
                     <Badge variant="warning" className="w-fit gap-1">
                       <TriangleAlert className="size-3" aria-hidden />
-                      {page.warnings.join(' · ')}
+                      {page.warnings
+                        .map((w) =>
+                          w.kind === 'illegible'
+                            ? t(`ocr.warning.illegible_${plural(w.count)}`, { count: w.count })
+                            : t('ocr.warning.uncertain', { count: w.count }),
+                        )
+                        .join(' · ')}
                     </Badge>
                   )}
                   {page.status === 'done' && page.warnings.length === 0 && (

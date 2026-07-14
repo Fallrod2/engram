@@ -25,7 +25,12 @@ describe('ocrReducer — freeze rule (§3.3.1)', () => {
     s = ocrReducer(s, { type: 'edit', text: 'Ma correction' })
     expect(s.dirty).toBe(true)
     // A still-pending page resolves AFTER the edit: textarea must stay intact.
-    s = ocrReducer(s, { type: 'resolved', id: 'b', segment: 'Page B', warnings: ['x'] })
+    s = ocrReducer(s, {
+      type: 'resolved',
+      id: 'b',
+      segment: 'Page B',
+      warnings: [{ kind: 'uncertain', count: 1 }],
+    })
     expect(s.assembledText).toBe('Ma correction')
     expect(s.staleSinceEdit).toBe(true)
     // But the segment IS captured (visible to a later re-apply).

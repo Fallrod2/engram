@@ -63,9 +63,9 @@ describe('POST /api/notes/extract-image', () => {
     const body = extractImageResponseSchema.parse(await res.json())
     expect(body.markdown).toContain('Titre')
     expect(body.mediaType).toBe('image/jpeg')
-    // The `[?]` marker from the fake yields exactly one warning.
+    // The `[?]` marker from the fake yields exactly one structured warning code.
     expect(body.warnings).toHaveLength(1)
-    expect(body.warnings[0]).toContain('[?]')
+    expect(body.warnings[0]).toEqual({ kind: 'uncertain', count: 1 })
     // Proof the fake path ran (never the real @anthropic-ai/sdk transport).
     expect(calls).toBe(1)
     expect((lastArgs as { mediaType: string }).mediaType).toBe('image/jpeg')
