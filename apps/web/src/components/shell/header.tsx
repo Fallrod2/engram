@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils'
 import { useMediaQuery } from '@/lib/use-media-query'
 import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
-import { Kbd } from '@/components/ui/kbd'
 import { ThemeToggle } from './theme-toggle'
 import { useShell } from './shell-context'
 
@@ -77,19 +76,9 @@ export function Header({
         </Button>
         <ThemeToggle />
       </div>
-
-      <div className="ml-auto hidden items-center gap-2 md:flex">
-        <button
-          type="button"
-          onClick={() => setCommandOpen(true)}
-          className="hidden h-8 items-center gap-2 rounded-sm border border-border bg-surface-1 px-2.5 text-text-faint transition-colors duration-fast hover:bg-surface-2 lg:flex"
-          aria-label={t('header.search')}
-        >
-          <Search className="size-3.5" />
-          <span className="text-xs">{t('header.search')}</span>
-          <Kbd className="ml-1">⌘K</Kbd>
-        </button>
-      </div>
+      {/* Desktop search lives solely in the sidebar (its ghost ⌘K row) — a single
+          search affordance on ≥md, not the former sidebar+topbar pair (finding:
+          double ⌘K control at ≥lg). ⌘K still opens the palette from anywhere. */}
     </header>
   )
 }
