@@ -389,10 +389,18 @@ export async function deleteAiKey(db: DB, userId: string, provider: AiProviderId
 }
 
 /**
- * Build a config for the TEST-CONNECTION endpoint: overlays an optional
- * not-yet-saved candidate (key / baseUrl / model) on the stored config. Reads
- * the stored secret ONLY here (internal). Returns null if the provider has no
- * usable model (nothing to test).
+ * Build a config for the TEST-CONNECTION (and models) endpoint: overlays an
+ * optional not-yet-saved candidate (key / baseUrl / model) on the stored config.
+ * Reads the stored secret ONLY here (internal). Returns null if the provider has
+ * no usable model (nothing to test).
+ *
+ * SECURITY (audit fix): unlike the generation/OCR resolvers, this path does NOT
+ * apply the demo→admin read alias. Aliasing it let the demo pair an
+ * attacker-supplied `baseUrl` with the admin's resolved secret and exfiltrate
+ * `Authorization: Bearer <admin key>` to an arbitrary host (POST test is
+ * reachable by the demo via `requireUserId`). The demo therefore tests against
+ * ITS OWN config — consistent with GET /settings not being aliased (amendment
+ * §5) — and this overrides the "POST test aliased" note of spec §1.2 / §5.
  */
 export async function resolveProviderForTest(
   db: DB,
@@ -404,7 +412,12 @@ export async function resolveProviderForTest(
     model?: string | undefined
   },
 ): Promise<ResolvedProviderConfig | null> {
-  const { effectiveUserId, allowEnv } = resolveScope(userId)
+  // No demo alias here (see the SECURITY note above): resolve against the
+  // caller's OWN config + admin-only env fallback, exactly like the status
+  // surface. This is what stops the admin key from ever reaching a demo-supplied
+  // baseUrl.
+  const effectiveUserId = userId
+  const allowEnv = envAllowedFor(userId)
   const settings = await readSettings(db, effectiveUserId)
   const pc = settings.providers[provider]
   const model = (candidate.model ?? pc.model).trim()

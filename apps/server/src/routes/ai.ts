@@ -30,7 +30,9 @@ import {
  * Every route is scoped to the caller (`requireUserId`): each user brings their
  * own key (BYOK) and sees only their own config. The env fallback (Alex's
  * `ANTHROPIC_API_KEY`) is admin-only in the service, so a public signup never
- * consumes it. The demo account may READ (via the admin alias) and TEST, but
+ * consumes it. The demo account may READ generation/OCR via the admin alias; its
+ * TEST/models calls run against its OWN config (NOT aliased — audit fix, so the
+ * admin's key can't be exfiltrated to a demo-supplied baseUrl), and
  * `requireNotDemo` blocks it from WRITING config (its data is wiped each login).
  */
 export const aiRouter = new Hono()

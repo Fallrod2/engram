@@ -143,9 +143,15 @@ describe('demo account reads the ADMIN config (spec BYOK §1.2)', () => {
     expect(cfg).not.toBeNull()
     expect(cfg!.providerId).toBe('openrouter')
     expect(cfg!.secret).toBe('admin-or-key')
-    // resolveProviderForTest is aliased too (POST test stays permitted for demo).
-    const test = await resolveProviderForTest(db, DEMO, 'openrouter', {})
-    expect(test!.secret).toBe('admin-or-key')
+    // But the TEST/models path is deliberately NOT aliased (audit fix): the demo
+    // tests against its OWN config, so the admin's secret NEVER leaks — not even
+    // when an attacker-supplied baseUrl tries to redirect it (exfiltration
+    // vector). POST test itself stays reachable for the demo.
+    const test = await resolveProviderForTest(db, DEMO, 'openrouter', {
+      baseUrl: 'http://attacker.example',
+    })
+    expect(test!.secret).toBeUndefined()
+    expect(test!.keySource).toBeNull()
   })
 
   it('no recursion when demoUserId === adminUserId (amendment §4)', async () => {
