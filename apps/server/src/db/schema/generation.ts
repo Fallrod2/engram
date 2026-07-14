@@ -43,7 +43,7 @@ export const generation = pgTable(
     // Nullable (historical rows are null); otherwise one of the 5 providers.
     check(
       'generation_provider_ck',
-      sql`${t.provider} is null or ${t.provider} in ('anthropic','openrouter','ollama','openai-compat','mistral')`,
+      sql`${t.provider} is null or ${t.provider} in ('anthropic','openrouter','ollama','openai-compat','mistral','openai-codex')`,
     ),
   ],
 )
