@@ -16,8 +16,10 @@ export const AUTH_INPUT_CLASS = 'h-11 text-md sm:h-8 sm:text-sm'
  * including the `id` / `aria-*` injected by `FormControl`'s Radix `Slot` and the
  * react-hook-form `ref` — straight onto the inner `<Input>` so label association
  * and validation state stay wired to the real input, not the wrapper. The toggle
- * button carries a localized `aria-label` and is `type="button"` so it never
- * submits the form.
+ * button carries a localized `aria-label`, is `type="button"` so it never submits
+ * the form, and stays in the natural tab order (spec: everything reachable by
+ * keyboard) — the global `:focus-visible` double-ring (styles.css) is its focus
+ * indicator, so we never suppress the outline/ring here.
  */
 function PasswordInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   const t = useT()
@@ -37,11 +39,12 @@ function PasswordInput({ className, ...props }: React.InputHTMLAttributes<HTMLIn
         className={cn(
           'absolute inset-y-0 right-0 flex items-center px-3 text-text-faint',
           'transition-colors duration-fast ease-out hover:text-text',
-          'focus-visible:outline-none focus-visible:text-text',
+          // Only shift the icon color on focus — the global `:focus-visible`
+          // double-ring paints the actual focus indicator; never suppress it.
+          'focus-visible:text-text',
           'disabled:cursor-not-allowed disabled:opacity-50',
         )}
         disabled={props.disabled}
-        tabIndex={-1}
       >
         {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
       </button>
