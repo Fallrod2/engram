@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Check, RotateCw, X } from 'lucide-react'
 import type {
@@ -7,10 +7,12 @@ import type {
   AiProviderId,
   AiProviderStatus,
   AiSettings,
+  CodexLinkStartResponse,
   TestConnectionResponse,
   UpdateAiSettings,
 } from '@engram/shared'
 import { ApiError } from '@/lib/api'
+import { qk } from '@/lib/query-keys'
 import { useT, type TFunction } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,10 +30,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   aiSettingsOptions,
+  pollCodexLink,
   useDeleteAiKey,
   useProviderModels,
   useSetAiKey,
+  useStartCodexLink,
   useTestConnection,
+  useUnlinkCodex,
   useUpdateAiSettings,
 } from './queries'
 
@@ -41,7 +46,14 @@ const PROVIDER_ORDER: AiProviderId[] = [
   'ollama',
   'openai-compat',
   'mistral',
+  'openai-codex',
 ]
+
+/**
+ * Providers offered in the OCR provider Select. openai-codex is EXCLUDED (audit
+ * C14): it has no vision transport, so an OCR slot pointed at it would only 503.
+ */
+const OCR_PROVIDER_ORDER: AiProviderId[] = PROVIDER_ORDER.filter((p) => p !== 'openai-codex')
 
 /** Free-entry presets (datalist suggestions), per provider. */
 const MODEL_PRESETS: Record<AiProviderId, string[]> = {
@@ -54,11 +66,13 @@ const MODEL_PRESETS: Record<AiProviderId, string[]> = {
   ollama: [],
   'openai-compat': [],
   mistral: ['mistral-small-latest', 'mistral-large-latest', 'pixtral-large-latest'],
+  'openai-codex': ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
 }
 
 /**
  * Presets for the dedicated OCR slot (datalist), per provider. Mistral leads
  * with its dedicated OCR model; the others reuse their vision-capable models.
+ * openai-codex has no vision → empty (kept for the exhaustive Record).
  */
 const OCR_MODEL_PRESETS: Record<AiProviderId, string[]> = {
   mistral: ['mistral-ocr-latest', 'pixtral-large-latest'],
@@ -66,6 +80,7 @@ const OCR_MODEL_PRESETS: Record<AiProviderId, string[]> = {
   openrouter: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o-mini'],
   ollama: [],
   'openai-compat': [],
+  'openai-codex': [],
 }
 
 /** First sensible OCR model for a provider (used when switching OCR provider). */
@@ -91,6 +106,8 @@ function providerLabel(t: TFunction, p: AiProviderId): string {
       return t('settings.ai.providerOpenaiCompat')
     case 'mistral':
       return t('settings.ai.providerMistral')
+    case 'openai-codex':
+      return t('settings.ai.providerCodex')
   }
 }
 
@@ -144,7 +161,8 @@ function AiSettingsBody({
   const deleteKey = useDeleteAiKey()
   const testConn = useTestConnection()
 
-  const requiresKey = active !== 'ollama'
+  const isCodex = active === 'openai-codex'
+  const requiresKey = active !== 'ollama' && !isCodex
   const hasBaseUrl = active === 'ollama' || active === 'openai-compat'
   const isOllama = active === 'ollama'
 
@@ -254,6 +272,9 @@ function AiSettingsBody({
                 <span className="flex items-center gap-2">
                   {providerLabel(t, p)}
                   {p === 'ollama' && <Badge variant="success">{t('settings.ai.localBadge')}</Badge>}
+                  {p === 'openai-codex' && (
+                    <Badge variant="warning">{t('settings.ai.experimentalBadge')}</Badge>
+                  )}
                 </span>
               </SelectItem>
             ))}
@@ -324,6 +345,9 @@ function AiSettingsBody({
         )}
       </div>
 
+      {/* openai-codex: OAuth link flow instead of an API key */}
+      {isCodex && status && <CodexLinkSection status={status} />}
+
       {/* API key — write-only */}
       {requiresKey && status && (
         <div className="flex flex-col gap-1.5">
@@ -380,7 +404,122 @@ function AiSettingsBody({
         )}
       </div>
 
-      <p className="text-xs leading-relaxed text-text-muted">{t('settings.ai.claudeHint')}</p>
+      <p className="text-xs leading-relaxed text-text-muted">
+        {isCodex ? t('settings.ai.codexHint') : t('settings.ai.claudeHint')}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * openai-codex OAuth link surface (spec §4.3). Replaces the API key field for the
+ * subscription provider. Three states:
+ * - unavailable (kill-switch off): honest "unavailable on this instance".
+ * - linked: "Compte lié" badge + Délier.
+ * - not linked: "Lier mon compte ChatGPT" → shows the user code + verification
+ *   link + auto-polls until linked/expired. NO token ever reaches the client.
+ */
+function CodexLinkSection({ status }: { status: AiProviderStatus }) {
+  const t = useT()
+  const qc = useQueryClient()
+  const startLink = useStartCodexLink()
+  const unlink = useUnlinkCodex()
+  const [session, setSession] = useState<CodexLinkStartResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Auto-poll while a link session is active; stops on any terminal status.
+  // `refetchIntervalInBackground` is REQUIRED here: the user switches to the
+  // ChatGPT tab to authorize, which backgrounds engram's tab — without this the
+  // interval would freeze and the link would never complete.
+  const pollQ = useQuery({
+    queryKey: ['codex-link-poll', session?.handle],
+    queryFn: () => pollCodexLink(session!.handle),
+    enabled: session !== null,
+    refetchInterval: (q) => (q.state.data && q.state.data.status !== 'pending' ? false : 4000),
+    refetchIntervalInBackground: true,
+  })
+
+  useEffect(() => {
+    const s = pollQ.data?.status
+    if (!s || s === 'pending') return
+    if (s === 'linked') {
+      setSession(null)
+      toast.success(t('settings.ai.codex.linked'))
+      void qc.invalidateQueries({ queryKey: qk.ai.settings })
+      return
+    }
+    // expired / denied / device_auth_disabled → surface a message, allow retry.
+    setSession(null)
+    setError(t(`settings.ai.codex.status.${s}`))
+  }, [pollQ.data, qc, t])
+
+  function startFlow() {
+    setError(null)
+    startLink.mutate(undefined, {
+      onSuccess: (data) => setSession(data),
+      onError: (err) =>
+        setError(
+          err instanceof ApiError && err.code === 'service_unavailable'
+            ? t('settings.ai.codex.status.device_auth_disabled')
+            : t('settings.ai.codex.startError'),
+        ),
+    })
+  }
+
+  if (status.unavailable) {
+    return (
+      <div className="rounded-md border border-border bg-surface-2 px-3 py-2.5">
+        <p className="text-xs leading-relaxed text-text-muted">
+          {t('settings.ai.codex.unavailable')}
+        </p>
+      </div>
+    )
+  }
+
+  if (status.linked) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <Badge variant="success">{t('settings.ai.codex.linkedBadge')}</Badge>
+        <Button variant="outline" onClick={() => unlink.mutate()} disabled={unlink.isPending}>
+          {t('settings.ai.codex.unlink')}
+        </Button>
+      </div>
+    )
+  }
+
+  if (session) {
+    return (
+      <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 px-3 py-3">
+        <p className="text-xs leading-relaxed text-text-muted">
+          {t('settings.ai.codex.instructions')}
+        </p>
+        <div className="flex items-center gap-3">
+          <code className="rounded bg-surface px-2 py-1 font-mono text-sm tracking-widest text-text">
+            {session.userCode}
+          </code>
+          <a
+            href={session.verificationUri}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-medium text-primary underline"
+          >
+            {t('settings.ai.codex.openPage')}
+          </a>
+        </div>
+        <p className="flex items-center gap-1.5 text-xs text-text-muted">
+          <RotateCw className="size-3 animate-spin" aria-hidden />
+          {t('settings.ai.codex.waiting')}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Button variant="secondary" onClick={startFlow} disabled={startLink.isPending}>
+        {t('settings.ai.codex.link')}
+      </Button>
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   )
 }
@@ -543,7 +682,7 @@ export function OcrSettingsSection({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PROVIDER_ORDER.map((p) => (
+                {OCR_PROVIDER_ORDER.map((p) => (
                   <SelectItem key={p} value={p}>
                     <span className="flex items-center gap-2">
                       {providerLabel(t, p)}

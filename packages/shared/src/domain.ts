@@ -231,6 +231,8 @@ export const aiProviderIdSchema = z.enum([
   'ollama',
   'openai-compat',
   'mistral',
+  // Subscription provider: linked via ChatGPT/Codex OAuth device-code, not a key.
+  'openai-codex',
 ])
 
 /**
@@ -254,6 +256,7 @@ export const aiProvidersSchema = z.object({
   ollama: aiProviderConfigSchema,
   'openai-compat': aiProviderConfigSchema,
   mistral: aiProviderConfigSchema,
+  'openai-codex': aiProviderConfigSchema,
 })
 
 /**
@@ -293,6 +296,18 @@ export const aiProviderStatusSchema = z.object({
   active: z.boolean(),
   /** True for the provider effectively used by the OCR slot (spec §1.1). */
   ocrActive: z.boolean(),
+  /**
+   * Only meaningful for OAuth providers (openai-codex): the account is LINKED
+   * (a credential row exists). Key-based providers surface link state via
+   * `hasKey`; this is the explicit OAuth signal the UI uses for its badge.
+   */
+  linked: z.boolean().optional(),
+  /**
+   * True when the provider is disabled on THIS instance (openai-codex with the
+   * `ENGRAM_ENABLE_CODEX` kill-switch off). The UI shows "unavailable on this
+   * instance" instead of the link controls (audit C11).
+   */
+  unavailable: z.boolean().optional(),
 })
 
 export const aiSettingsResponseSchema = z.object({
@@ -315,6 +330,7 @@ export const updateAiSettingsSchema = z.object({
       ollama: partialProviderConfigSchema,
       'openai-compat': partialProviderConfigSchema,
       mistral: partialProviderConfigSchema,
+      'openai-codex': partialProviderConfigSchema,
     })
     .partial()
     .optional(),
@@ -346,6 +362,8 @@ export const testConnectionDetailCodeSchema = z.enum([
   'incomplete_config',
   'no_credentials',
   'http_error',
+  // openai-codex: the device-code beta is off on the account (init refused).
+  'device_auth_disabled',
 ])
 export const testConnectionResponseSchema = z.object({
   ok: z.boolean(),
@@ -357,6 +375,41 @@ export const listModelsResponseSchema = z.object({ models: z.array(aiModelSchema
 
 /** `:provider` path param for the `/api/ai/providers/:provider/*` routes. */
 export const providerParamSchema = z.object({ provider: aiProviderIdSchema })
+
+// --- openai-codex device-code link flow -----------------------------------
+//
+// The subscription provider is linked via a device-code OAuth flow, NOT a key.
+// `link/start` returns a user code + verification page + an OPAQUE handle
+// (HMAC-signed, bound to the user, carrying the device_auth_id — no server
+// state, Vercel-safe). The client polls `link/poll` with that handle until the
+// status is terminal. NO token is EVER returned to the client (write-only).
+
+/** `POST /providers/openai-codex/link/start` response. */
+export const codexLinkStartResponseSchema = z.object({
+  /** Code the user types on the verification page. */
+  userCode: z.string(),
+  /** Page the user opens to authorize. */
+  verificationUri: z.string(),
+  /** Poll window in seconds (device-code cap). */
+  expiresIn: z.number().int(),
+  /** Opaque, signed, user-bound handle to pass back to `link/poll`. */
+  handle: z.string(),
+})
+
+/** `POST /providers/openai-codex/link/poll` request. */
+export const codexLinkPollRequestSchema = z.object({ handle: z.string().min(1) })
+
+/** Terminal + transient states of the link poll. */
+export const codexLinkStatusSchema = z.enum([
+  'pending', // keep polling
+  'linked', // success — credential persisted
+  'expired', // handle/device code expired — restart
+  'denied', // user denied or upstream refused
+  'device_auth_disabled', // beta toggle off on the account
+])
+
+/** `POST /providers/openai-codex/link/poll` response. */
+export const codexLinkPollResponseSchema = z.object({ status: codexLinkStatusSchema })
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
@@ -372,6 +425,10 @@ export type TestConnectionDetailCode = z.infer<typeof testConnectionDetailCodeSc
 export type TestConnectionResponse = z.infer<typeof testConnectionResponseSchema>
 export type ListModelsResponse = z.infer<typeof listModelsResponseSchema>
 export type ProviderParam = z.infer<typeof providerParamSchema>
+export type CodexLinkStartResponse = z.infer<typeof codexLinkStartResponseSchema>
+export type CodexLinkPollRequest = z.infer<typeof codexLinkPollRequestSchema>
+export type CodexLinkStatus = z.infer<typeof codexLinkStatusSchema>
+export type CodexLinkPollResponse = z.infer<typeof codexLinkPollResponseSchema>
 
 // --- Payloads (create / update) -------------------------------------------
 

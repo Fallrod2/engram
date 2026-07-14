@@ -1,9 +1,13 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   aiSettingsResponseSchema,
+  codexLinkPollResponseSchema,
+  codexLinkStartResponseSchema,
   listModelsResponseSchema,
   testConnectionResponseSchema,
   type AiProviderId,
+  type CodexLinkPollResponse,
+  type CodexLinkStartResponse,
   type TestConnectionRequest,
   type TestConnectionResponse,
   type UpdateAiSettings,
@@ -60,6 +64,33 @@ export function useTestConnection() {
   >({
     mutationFn: ({ provider, candidate }) =>
       api.post(`/ai/providers/${provider}/test`, candidate, testConnectionResponseSchema),
+  })
+}
+
+// --- openai-codex device-code link flow -----------------------------------
+
+/** Start device-code auth → `{ userCode, verificationUri, expiresIn, handle }`. */
+export function useStartCodexLink() {
+  return useMutation<CodexLinkStartResponse, unknown, void>({
+    mutationFn: () =>
+      api.post('/ai/providers/openai-codex/link/start', {}, codexLinkStartResponseSchema),
+  })
+}
+
+/**
+ * Poll the link once with a handle. The component drives repeated polling via a
+ * useQuery `refetchInterval`; this is the single-shot request it calls.
+ */
+export function pollCodexLink(handle: string): Promise<CodexLinkPollResponse> {
+  return api.post('/ai/providers/openai-codex/link/poll', { handle }, codexLinkPollResponseSchema)
+}
+
+/** Unlink the ChatGPT account (DELETE the credential) → refetch settings. */
+export function useUnlinkCodex() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.delete('/ai/providers/openai-codex/link'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.ai.settings }),
   })
 }
 

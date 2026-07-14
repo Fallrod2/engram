@@ -57,7 +57,7 @@ describe('GET /api/ai/settings', () => {
     expect(r.status).toBe(200)
     const parsed = aiSettingsResponseSchema.parse(await r.json())
     expect(parsed.settings.activeProvider).toBe('anthropic')
-    expect(parsed.statuses).toHaveLength(5)
+    expect(parsed.statuses).toHaveLength(6)
     const ollama = parsed.statuses.find((s) => s.provider === 'ollama')!
     expect(ollama.requiresKey).toBe(false)
     // Mistral is now a first-class provider (requires a key like anthropic).

@@ -14,6 +14,13 @@ export interface ResolvedProviderConfig {
   /** API key; absent for ollama; may come from the DB OR the env. */
   secret?: string
   keySource: 'app' | 'env' | null
+  /**
+   * OAuth access, for subscription providers (openai-codex). Distinct from
+   * `secret`: the adapter sees ONLY a fresh access token (+ account id), never
+   * the refresh token, which the resolver rotates in the DB (audit A2/B6). The
+   * `accountId` is the required `chatgpt-account-id` backend header.
+   */
+  oauth?: { accessToken: string; accountId?: string | undefined }
 }
 
 /**

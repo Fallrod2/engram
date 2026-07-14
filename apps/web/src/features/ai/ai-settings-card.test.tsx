@@ -34,6 +34,7 @@ const PROVIDER_CONFIG = {
   ollama: { baseUrl: 'http://localhost:11434', model: 'llama3.1' },
   'openai-compat': { baseUrl: '', model: '' },
   mistral: { model: 'mistral-small-latest' },
+  'openai-codex': { model: 'gpt-5.5' },
 }
 
 function makeSettings(ocr: AiSettings['ocr']): AiSettings {
