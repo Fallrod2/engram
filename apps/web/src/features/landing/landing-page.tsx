@@ -585,9 +585,12 @@ type ShotBase = 'dashboard' | 'review' | 'analytics'
  * the loaded image's, so there is no layout shift as each shot decodes.
  */
 const SHOT_SIZE: Record<ShotBase, { width: number; height: number }> = {
-  dashboard: { width: 1920, height: 780 },
-  review: { width: 980, height: 838 },
-  analytics: { width: 1920, height: 1200 },
+  // Intrinsic pixel size of the regenerated captures (scripts/generate-landing-shots.ts,
+  // deviceScaleFactor 2). Only the ratio matters — it reserves the correct box so
+  // the shot decodes without layout shift.
+  dashboard: { width: 2880, height: 1560 },
+  review: { width: 2160, height: 1680 },
+  analytics: { width: 2880, height: 1960 },
 }
 
 /**
