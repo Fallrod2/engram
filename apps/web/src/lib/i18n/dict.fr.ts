@@ -351,7 +351,9 @@ export const dictFr = {
       providerOllama: 'Ollama',
       providerOpenaiCompat: 'OpenAI-compatible',
       providerMistral: 'Mistral',
+      providerCodex: 'ChatGPT (abonnement)',
       localBadge: 'local · gratuit',
+      experimentalBadge: 'Expérimental',
       activeBadge: 'Actif',
       baseUrl: 'URL de base',
       baseUrlPlaceholder: 'https://…',
@@ -376,6 +378,7 @@ export const dictFr = {
         incomplete_config: 'Configuration incomplète (modèle ou URL manquant).',
         no_credentials: 'Aucune credential valide.',
         http_error: 'Échec de la connexion.',
+        device_auth_disabled: 'Connexion par code d’appareil désactivée sur ce compte.',
       },
       statusConfigured: 'Configurée',
       statusConfiguredEnv: 'Configurée (env)',
@@ -383,6 +386,25 @@ export const dictFr = {
       noModels: 'Aucun modèle détecté. Vérifie l’URL puis rafraîchis.',
       claudeHint:
         'Pour du Claude sans clé Anthropic directe : choisis OpenRouter avec un modèle « anthropic/claude-* », ou lance « ant auth login » sur la machine puis teste la connexion Anthropic.',
+      codexHint:
+        'Utilise ton abonnement ChatGPT/Codex. Fonctionnalité expérimentale qui dépend de la tolérance d’OpenAI — peut cesser de fonctionner à tout moment. Tes limites d’abonnement s’appliquent (le test de connexion consomme un message). Active « Allow device code login » dans ChatGPT → Réglages → Sécurité.',
+      codex: {
+        link: 'Lier mon compte ChatGPT',
+        linkedBadge: 'Compte lié',
+        unlink: 'Délier',
+        unavailable: 'Indisponible sur cette instance.',
+        instructions: 'Ouvre la page de vérification et saisis ce code pour autoriser engram :',
+        openPage: 'Ouvrir la page de vérification',
+        waiting: 'En attente de l’autorisation…',
+        linked: 'Compte ChatGPT lié.',
+        startError: 'Impossible de démarrer la liaison. Réessaie.',
+        status: {
+          expired: 'Le code a expiré. Relance la liaison.',
+          denied: 'Autorisation refusée.',
+          device_auth_disabled:
+            'La connexion par code d’appareil est désactivée sur ce compte ChatGPT (Réglages → Sécurité).',
+        },
+      },
       ocr: {
         title: 'OCR / Import photo',
         desc: 'Provider utilisé pour transcrire les photos. Par défaut, identique à la génération de cartes.',

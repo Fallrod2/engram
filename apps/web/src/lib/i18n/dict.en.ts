@@ -347,7 +347,9 @@ export const dictEn: Dict = {
       providerOllama: 'Ollama',
       providerOpenaiCompat: 'OpenAI-compatible',
       providerMistral: 'Mistral',
+      providerCodex: 'ChatGPT (subscription)',
       localBadge: 'local · free',
+      experimentalBadge: 'Experimental',
       activeBadge: 'Active',
       baseUrl: 'Base URL',
       baseUrlPlaceholder: 'https://…',
@@ -372,6 +374,7 @@ export const dictEn: Dict = {
         incomplete_config: 'Incomplete configuration (missing model or URL).',
         no_credentials: 'No valid credentials.',
         http_error: 'Connection failed.',
+        device_auth_disabled: 'Device code login is disabled on this account.',
       },
       statusConfigured: 'Configured',
       statusConfiguredEnv: 'Configured (env)',
@@ -379,6 +382,25 @@ export const dictEn: Dict = {
       noModels: 'No models detected. Check the URL and refresh.',
       claudeHint:
         'For Claude without a direct Anthropic key: pick OpenRouter with an “anthropic/claude-*” model, or run “ant auth login” on the machine then test the Anthropic connection.',
+      codexHint:
+        'Uses your ChatGPT/Codex subscription. Experimental feature that relies on OpenAI’s tolerance — it may stop working at any time. Your subscription limits apply (the connection test consumes one message). Enable “Allow device code login” in ChatGPT → Settings → Security.',
+      codex: {
+        link: 'Link my ChatGPT account',
+        linkedBadge: 'Account linked',
+        unlink: 'Unlink',
+        unavailable: 'Unavailable on this instance.',
+        instructions: 'Open the verification page and enter this code to authorize engram:',
+        openPage: 'Open the verification page',
+        waiting: 'Waiting for authorization…',
+        linked: 'ChatGPT account linked.',
+        startError: 'Could not start linking. Try again.',
+        status: {
+          expired: 'The code expired. Start the linking again.',
+          denied: 'Authorization denied.',
+          device_auth_disabled:
+            'Device code login is disabled on this ChatGPT account (Settings → Security).',
+        },
+      },
       ocr: {
         title: 'OCR / Photo import',
         desc: 'Provider used to transcribe photos. Same as card generation by default.',
