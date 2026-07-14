@@ -35,3 +35,14 @@ export function ollamaSupportsVision(model: string): boolean {
 export function openAiCompatSupportsVision(): boolean {
   return true
 }
+
+/**
+ * ChatGPT/Codex subscription models (gpt-5.5, gpt-5.6-*, gpt-5.x-codex): all our
+ * presets are multimodal, and the subscription backend accepts arbitrary model
+ * ids we cannot enumerate → permissive `true`, like the openai-compat clouds. A
+ * genuinely text-only model would surface its own upstream `{detail}` error,
+ * which now bubbles to the client for a per-page retry.
+ */
+export function openAiCodexSupportsVision(): boolean {
+  return true
+}

@@ -122,14 +122,18 @@ notesRouter.post('/extract-image', async (c) => {
   // Resolves the OCR slot — the SAME provider as generation, or a dedicated one.
   const cfg = await resolveOcrProvider(db, userId)
   if (!cfg) {
+    // Structured `reason` (not the FR text) so the client maps to an actionable,
+    // localized banner without string-parsing (fix-codex-vision §B).
     throw new ServiceUnavailableError(
       'Extraction indisponible : aucun fournisseur IA configuré pour l’OCR.',
+      { reason: 'no_provider' },
     )
   }
   const extractor = getVisionExtractor()
   if (!extractor.supportsVision(cfg)) {
     throw new ServiceUnavailableError(
       'Le fournisseur IA configuré ne supporte pas la vision. Choisissez un modèle vision (Claude, GPT-4o, llava…).',
+      { reason: 'no_vision' },
     )
   }
 

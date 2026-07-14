@@ -15,6 +15,7 @@ import { ValidationError } from '../http/errors'
 import { hasAnthropicKey } from '../ai/client'
 import { resolveAuthConfig, resolveAdminUserId } from '../auth/config'
 import type { ResolvedProviderConfig } from '../ai/providers/types'
+import { PROVIDERS } from '../ai/providers'
 import { CODEX_DEFAULT_MODEL, CODEX_ENABLE_ENV } from '../ai/providers/codex-constants'
 import { resolveCodexAccess } from './codex-access.service'
 
@@ -321,8 +322,9 @@ export async function resolveOcrProvider(
   const provider = settings.ocr.provider
   const pc = settings.providers[provider]
 
-  // A custom OCR slot pointed at codex resolves a usable config; the vision
-  // guard then 503s cleanly (codex has no vision transport, audit C14).
+  // A custom OCR slot pointed at codex resolves a usable config; codex now
+  // carries a vision transport (input_image data-URL), so the OCR runs on the
+  // linked ChatGPT subscription (fix-codex-vision, supersedes audit C14).
   if (provider === 'openai-codex') {
     return resolveCodex(db, effectiveUserId, isDemoAlias, settings.ocr.model)
   }
@@ -346,6 +348,19 @@ export async function resolveOcrProvider(
 }
 
 // --- status surface (write-only: never carries a secret) -------------------
+
+/**
+ * Best-effort vision capability for a (provider, model) couple — the SAME
+ * heuristic the OCR guard uses (adapter has a `completeVision` transport AND its
+ * `supportsVision` accepts the model). Drives the Settings OCR "text-only
+ * provider" warning (fix-codex-vision §B). Model-name only: no secret/network.
+ */
+function providerVisionCapable(provider: AiProviderId, model: string): boolean {
+  const adapter = PROVIDERS[provider]
+  if (adapter.completeVision === undefined) return false
+  const probe = { providerId: provider, model, keySource: null } as ResolvedProviderConfig
+  return adapter.supportsVision?.(probe) ?? false
+}
 
 async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatus[]> {
   // GET status is NOT demo-aliased (amendment §5): a user sees THEIR OWN config.
@@ -379,6 +394,7 @@ async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatu
       ...(pc.baseUrl !== undefined ? { baseUrl: pc.baseUrl } : {}),
       active: settings.activeProvider === provider,
       ocrActive: ocrProvider === provider,
+      visionCapable: providerVisionCapable(provider, pc.model),
       // OAuth signals for the UI (audit C11): explicit link state + the
       // kill-switch so the client can show "unavailable on this instance".
       ...(isCodex ? { linked: keyed.has('openai-codex'), unavailable: !codexEnabled } : {}),

@@ -174,9 +174,95 @@ describe('openAiCodexAdapter.testConnection + listModels', () => {
     expect(models.map((m) => m.id)).toContain('gpt-5.5')
   })
 
-  it('has no vision transport', () => {
+  it('supportsVision is true for the multimodal subscription presets', () => {
     const adapter = createOpenAiCodexAdapter(stubFetch(() => sse([])).fetchFn)
-    expect(adapter.completeVision).toBeUndefined()
-    expect(adapter.supportsVision).toBeUndefined()
+    expect(adapter.supportsVision?.(cfg)).toBe(true)
+  })
+})
+
+describe('openAiCodexAdapter.completeVision', () => {
+  const visionArgs = {
+    system: 'OCR faithfully',
+    instruction: 'Transcribe this page',
+    image: new Uint8Array([137, 80, 78, 71]),
+    mediaType: 'image/png' as const,
+    signal: AbortSignal.timeout(1000),
+  }
+
+  it('sends an input_image data-URL block and NO forbidden parameter', async () => {
+    const { fetchFn, calls } = stubFetch(() =>
+      sse([
+        {
+          type: 'response.completed',
+          response: {
+            output_text: '# Transcription\n\ncontenu',
+            usage: { input_tokens: 20, output_tokens: 9 },
+          },
+        },
+      ]),
+    )
+    const adapter = createOpenAiCodexAdapter(fetchFn)
+    const res = await adapter.completeVision!(cfg, visionArgs)
+    expect(res.markdown).toContain('Transcription')
+    expect(res.promptTokens).toBe(20)
+    expect(res.completionTokens).toBe(9)
+
+    const body = JSON.parse(calls[0]!.init!.body as string)
+    // input_text + input_image in the SAME content array.
+    const content = body.input[0].content as { type: string; image_url?: string }[]
+    expect(content[0]!.type).toBe('input_text')
+    expect(content[1]!.type).toBe('input_image')
+    // Bare data-URI STRING (not the Chat Completions {url} object), png MIME.
+    expect(content[1]!.image_url).toBe('data:image/png;base64,iVBORw==')
+    expect(typeof content[1]!.image_url).toBe('string')
+    // Strict allowlist: no vision-only or generation-only extra fields.
+    expect(body).not.toHaveProperty('max_output_tokens')
+    expect(body).not.toHaveProperty('detail')
+    expect(body.store).toBe(false)
+    expect(body.stream).toBe(true)
+    // OCR path drops the JSON directive (free Markdown, not a {cards} object).
+    expect(body.instructions).not.toMatch(/JSON/i)
+    expect(body.instructions).toBe('OCR faithfully')
+  })
+
+  it('builds a jpeg data-URL for image/jpeg', async () => {
+    const { fetchFn, calls } = stubFetch(() =>
+      sse([{ type: 'response.completed', response: { output_text: 'ok' } }]),
+    )
+    const adapter = createOpenAiCodexAdapter(fetchFn)
+    await adapter.completeVision!(cfg, { ...visionArgs, mediaType: 'image/jpeg' })
+    const body = JSON.parse(calls[0]!.init!.body as string)
+    const content = body.input[0].content as { image_url?: string }[]
+    expect(content[1]!.image_url).toMatch(/^data:image\/jpeg;base64,/)
+  })
+
+  it('rejects an exotic media type with a clear error (no network call)', async () => {
+    const { fetchFn, calls } = stubFetch(() => sse([]))
+    const adapter = createOpenAiCodexAdapter(fetchFn)
+    await expect(
+      // @ts-expect-error — deliberately passing an out-of-allowlist MIME
+      adapter.completeVision!(cfg, { ...visionArgs, mediaType: 'image/gif' }),
+    ).rejects.toThrow(/non support|jpeg\/png\/webp/i)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('surfaces a non-ok backend error with its {detail} body', async () => {
+    const { fetchFn } = stubFetch(
+      () =>
+        new Response(JSON.stringify({ detail: 'Expected a base64-encoded data URL' }), {
+          status: 400,
+        }),
+    )
+    const adapter = createOpenAiCodexAdapter(fetchFn)
+    await expect(adapter.completeVision!(cfg, visionArgs)).rejects.toThrow(
+      /HTTP 400.*base64-encoded data URL/,
+    )
+  })
+
+  it('never interpolates the access token into a vision error', async () => {
+    const { fetchFn } = stubFetch(() => new Response('', { status: 500 }))
+    const adapter = createOpenAiCodexAdapter(fetchFn)
+    const err = await adapter.completeVision!(cfg, visionArgs).catch((e: unknown) => e)
+    expect((err as Error).message).not.toContain('access-abc')
   })
 })

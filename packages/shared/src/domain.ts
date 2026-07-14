@@ -308,6 +308,13 @@ export const aiProviderStatusSchema = z.object({
    * instance" instead of the link controls (audit C11).
    */
   unavailable: z.boolean().optional(),
+  /**
+   * Whether this provider + its configured model can accept an image for OCR
+   * (best-effort, model-name driven — same heuristic the server guards with).
+   * The Settings OCR section uses it to warn when "same as generation" points at
+   * a text-only provider (fix-codex-vision §B).
+   */
+  visionCapable: z.boolean().optional(),
 })
 
 export const aiSettingsResponseSchema = z.object({

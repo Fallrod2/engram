@@ -4,10 +4,24 @@ import { classifyExtractError, ocrErrorMessageKey } from './errors'
 import { DownscaleError } from './downscale'
 
 describe('classifyExtractError', () => {
-  it('503 → noVisionProvider', () => {
+  it('503 without a structured reason → noVisionProvider (generic)', () => {
     expect(classifyExtractError(new ApiError(503, 'x', 'service_unavailable'))).toBe(
       'noVisionProvider',
     )
+  })
+
+  it('503 details.reason=no_provider → noProvider', () => {
+    expect(
+      classifyExtractError(
+        new ApiError(503, 'x', 'service_unavailable', { reason: 'no_provider' }),
+      ),
+    ).toBe('noProvider')
+  })
+
+  it('503 details.reason=no_vision → noVision', () => {
+    expect(
+      classifyExtractError(new ApiError(503, 'x', 'service_unavailable', { reason: 'no_vision' })),
+    ).toBe('noVision')
   })
 
   it('413 → tooLarge', () => {
@@ -53,6 +67,8 @@ describe('classifyExtractError', () => {
 
 describe('ocrErrorMessageKey', () => {
   it('maps each error kind to its dict key', () => {
+    expect(ocrErrorMessageKey('noProvider')).toBe('ocr.error.noProvider')
+    expect(ocrErrorMessageKey('noVision')).toBe('ocr.error.noVision')
     expect(ocrErrorMessageKey('noVisionProvider')).toBe('ocr.error.noVisionProvider')
     expect(ocrErrorMessageKey('heic')).toBe('ocr.error.heic')
     expect(ocrErrorMessageKey('unsupported')).toBe('ocr.error.unsupported')

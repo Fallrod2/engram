@@ -22,14 +22,30 @@ const JSON_DIRECTIVE =
 const JSON_DIRECTIVE_STRICT =
   'IMPORTANT : ta réponse précédente n’était pas du JSON exploitable. Renvoie EXCLUSIVEMENT un objet JSON {"cards":[...]} — aucun autre caractère, aucune explication, aucune balise Markdown.'
 
-/** Build the backend request body (Codex/Responses form). */
+/**
+ * Build the backend request body (Codex/Responses form).
+ *
+ * When `imageDataUrl` is set (vision/OCR path), the user content also carries an
+ * `input_image` block (a bare data-URI string in `image_url`, NOT the Chat
+ * Completions `{url}` object — verified in codex-rs protocol/src/models.rs,
+ * 14/07/2026) and the JSON directive is dropped: OCR returns free Markdown, not
+ * a `{cards}` object. The body allowlist stays STRICT — no field beyond
+ * `input_image` is added (leçon du 400 max_output_tokens).
+ */
 export function buildResponsesBody(args: {
   model: string
   system: string
   userText: string
   reinforceJson: boolean
+  imageDataUrl?: string
 }): Record<string, unknown> {
-  const instructions = `${args.system}\n\n${args.reinforceJson ? JSON_DIRECTIVE_STRICT : JSON_DIRECTIVE}`
+  const instructions = args.imageDataUrl
+    ? args.system
+    : `${args.system}\n\n${args.reinforceJson ? JSON_DIRECTIVE_STRICT : JSON_DIRECTIVE}`
+  const content: Record<string, unknown>[] = [{ type: 'input_text', text: args.userText }]
+  if (args.imageDataUrl) {
+    content.push({ type: 'input_image', image_url: args.imageDataUrl })
+  }
   return {
     model: args.model,
     instructions,
@@ -37,7 +53,7 @@ export function buildResponsesBody(args: {
       {
         type: 'message',
         role: 'user',
-        content: [{ type: 'input_text', text: args.userText }],
+        content,
       },
     ],
     store: false,

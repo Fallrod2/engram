@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   anthropicSupportsVision,
   ollamaSupportsVision,
+  openAiCodexSupportsVision,
   openAiCompatSupportsVision,
 } from './vision-support'
 
@@ -33,5 +34,11 @@ describe('ollamaSupportsVision', () => {
 describe('openAiCompatSupportsVision', () => {
   it('is permissive (cannot enumerate cloud models)', () => {
     expect(openAiCompatSupportsVision()).toBe(true)
+  })
+})
+
+describe('openAiCodexSupportsVision', () => {
+  it('is permissive (all subscription presets are multimodal)', () => {
+    expect(openAiCodexSupportsVision()).toBe(true)
   })
 })

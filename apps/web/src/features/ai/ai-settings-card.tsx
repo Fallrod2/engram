@@ -55,10 +55,11 @@ const PROVIDER_ORDER: AiProviderId[] = [
 ]
 
 /**
- * Providers offered in the OCR provider Select. openai-codex is EXCLUDED (audit
- * C14): it has no vision transport, so an OCR slot pointed at it would only 503.
+ * Providers offered in the OCR provider Select. openai-codex is now INCLUDED
+ * (fix-codex-vision, supersedes audit C14): it carries a vision transport
+ * (input_image data-URL), so OCR can run on the linked ChatGPT subscription.
  */
-const OCR_PROVIDER_ORDER: AiProviderId[] = PROVIDER_ORDER.filter((p) => p !== 'openai-codex')
+const OCR_PROVIDER_ORDER: AiProviderId[] = PROVIDER_ORDER
 
 /** Clickable model presets shown as chips under the model field, per provider. */
 const MODEL_PRESETS: Record<AiProviderId, string[]> = {
@@ -77,7 +78,7 @@ const MODEL_PRESETS: Record<AiProviderId, string[]> = {
 /**
  * Model preset chips for the dedicated OCR slot, per provider. Mistral leads
  * with its dedicated OCR model; the others reuse their vision-capable models.
- * openai-codex has no vision → empty (kept for the exhaustive Record).
+ * openai-codex reuses its multimodal subscription presets (CODEX_MODELS).
  */
 const OCR_MODEL_PRESETS: Record<AiProviderId, string[]> = {
   mistral: ['mistral-ocr-latest', 'pixtral-large-latest'],
@@ -85,7 +86,7 @@ const OCR_MODEL_PRESETS: Record<AiProviderId, string[]> = {
   openrouter: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o-mini'],
   ollama: [],
   'openai-compat': [],
-  'openai-codex': [],
+  'openai-codex': ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
 }
 
 /** Console URL where a non-tech user obtains a key, per key-based provider. */
@@ -789,8 +790,15 @@ export function OcrSettingsSection({
   const deleteKey = useDeleteAiKey()
   const testConn = useTestConnection()
 
-  const requiresKey = ocrProvider !== 'ollama'
+  // codex authenticates via the linked ChatGPT account (OAuth), not a key field.
+  const isCodex = ocrProvider === 'openai-codex'
+  const requiresKey = ocrProvider !== 'ollama' && !isCodex
   const isOllama = ocrProvider === 'ollama'
+
+  // "Same as generation" pointed at a text-only provider can't do OCR — warn
+  // inline and steer the user to a dedicated provider (fix-codex-vision §B).
+  const activeStatus = statuses.find((s) => s.provider === settings.activeProvider)
+  const sameModeNoVision = mode === 'same' && activeStatus?.visionCapable === false
 
   // Editable OCR model, resynced when the mode/provider/stored model changes.
   const [model, setModel] = useState(ocr.model)
@@ -933,6 +941,17 @@ export function OcrSettingsSection({
         </Select>
       </div>
 
+      {/* "Same as generation" but the active provider can't read images. */}
+      {sameModeNoVision && (
+        <div className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2">
+          <p className="text-xs leading-relaxed text-text">
+            {t('settings.ai.ocr.visionUnsupported', {
+              provider: providerShortLabel(t, settings.activeProvider),
+            })}
+          </p>
+        </div>
+      )}
+
       {mode === 'custom' && (
         <>
           {/* Dedicated OCR provider */}
@@ -1017,6 +1036,13 @@ export function OcrSettingsSection({
               />
             )}
           </div>
+
+          {/* codex has no key field: it rides the linked ChatGPT account. */}
+          {isCodex && (
+            <p className="text-xs leading-relaxed text-text-muted">
+              {t('settings.ai.ocr.codexShared')}
+            </p>
+          )}
 
           {/* API key — shared with generation for this provider (write-only) */}
           {requiresKey && status && (

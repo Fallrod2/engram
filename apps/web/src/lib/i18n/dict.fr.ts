@@ -452,6 +452,9 @@ export const dictFr = {
         provider: 'Provider OCR',
         model: 'Modèle OCR',
         keyShared: 'La clé API et l’URL de ce provider sont partagées avec la génération.',
+        visionUnsupported:
+          '{provider} ne peut pas extraire les photos — choisis un provider OCR dédié ci-dessous.',
+        codexShared: 'ChatGPT utilise ton compte lié (section ci-dessus). Aucune clé à saisir ici.',
       },
     },
   },
@@ -510,9 +513,21 @@ export const dictFr = {
     rejectUnsupported: 'Type de fichier non supporté',
     rejectUnsupportedDetail: '{name} — .md, .pdf ou photo',
     provider: {
-      title: 'Aucun modèle de vision configuré',
-      body: 'L’extraction photo a besoin d’un fournisseur IA compatible vision (Claude, GPT-4o, llava…).',
-      cta: 'Configurer un fournisseur',
+      noProvider: {
+        title: 'Aucun fournisseur IA configuré pour l’OCR',
+        body: 'Configure-le dans Réglages → Intelligence artificielle pour transcrire tes photos.',
+        cta: 'Ouvrir les Réglages',
+      },
+      noVision: {
+        title: 'Ce fournisseur ne lit pas les images',
+        body: 'Le fournisseur configuré ne prend pas en charge l’extraction d’images. Choisis un provider OCR dédié dans Réglages → IA → OCR.',
+        cta: 'Choisir un provider OCR',
+      },
+      generic: {
+        title: 'Aucun modèle de vision configuré',
+        body: 'L’extraction photo a besoin d’un fournisseur IA compatible vision (Claude, GPT-4o, llava…).',
+        cta: 'Configurer un fournisseur',
+      },
     },
     aria: {
       moveUp: 'Monter la page',
@@ -537,6 +552,9 @@ export const dictFr = {
       takePhoto: 'Prendre une photo',
     },
     error: {
+      noProvider: 'Aucun fournisseur IA configuré pour l’OCR (voir Réglages → IA).',
+      noVision:
+        'Le fournisseur configuré ne lit pas les images — choisis un provider OCR dédié (Réglages → IA → OCR).',
       noVisionProvider:
         'Extraction indisponible : aucun modèle de vision configuré. Choisissez un modèle vision (Claude, GPT-4o, llava…) dans les Réglages.',
       heic: 'Format HEIC non supporté. Réglez l’appareil photo iPhone sur « Le plus compatible » (JPEG), ou convertissez l’image.',
