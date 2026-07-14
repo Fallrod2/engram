@@ -43,6 +43,13 @@
       "when": 1783984534088,
       "tag": "0005_massive_ultron",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783985534088,
+      "tag": "0006_byok_per_user",
+      "breakpoints": true
     }
   ]
 }

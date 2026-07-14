@@ -45,8 +45,18 @@ describe('parseAuthLinkParams', () => {
     })
   })
 
+  it('parses a signup confirmation token fragment (BYOK §2)', () => {
+    const hash = '#access_token=stok&refresh_token=sref&type=signup'
+    expect(parseAuthLinkParams(hash)).toEqual({
+      kind: 'tokens',
+      accessToken: 'stok',
+      refreshToken: 'sref',
+      type: 'signup',
+    })
+  })
+
   it('ignores an unknown type', () => {
-    expect(parseAuthLinkParams('#access_token=t&refresh_token=r&type=signup')).toBeNull()
+    expect(parseAuthLinkParams('#access_token=t&refresh_token=r&type=magiclink')).toBeNull()
   })
 
   it('ignores a token fragment missing the refresh token', () => {

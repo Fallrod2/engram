@@ -19,6 +19,12 @@ import { studyPlan, studyToday } from './study-plan.service'
 import { deckSuccess, heatmap, retention, reviewVolume, streaks } from './analytics.service'
 import { exportBackup, importBackup } from './backup.service'
 import { requireGenerationRow, resolveGeneration } from './generations.service'
+import {
+  getAiSettings,
+  resolveActiveProvider,
+  setAiKey,
+  updateAiSettings,
+} from './ai-config.service'
 import { generation, reviewLog } from '../db/schema'
 import { eq } from 'drizzle-orm'
 
@@ -178,6 +184,25 @@ describe('generation scoping', () => {
     await expect(resolveGeneration(db, B, gen!.id, { items: [] })).rejects.toThrow(NotFoundError)
     // A can read it.
     expect((await requireGenerationRow(db, A, gen!.id)).id).toBe(gen!.id)
+  })
+})
+
+describe('AI config is per-user (spec BYOK §1)', () => {
+  it('B sees none of A’s AI config or key, and cannot resolve A’s provider', async () => {
+    // A configures openrouter with its own key; A and B are both non-admin
+    // (neither is the dev/admin identity) so neither gets any env fallback.
+    await updateAiSettings(db, A, { activeProvider: 'openrouter' })
+    await setAiKey(db, A, 'openrouter', 'a-openrouter-secret')
+
+    // B's config is the pristine default (anthropic, no key) → unusable.
+    const bSettings = await getAiSettings(db, B)
+    expect(bSettings.settings.activeProvider).toBe('anthropic')
+    expect(bSettings.statuses.find((s) => s.provider === 'openrouter')!.hasKey).toBe(false)
+    expect(await resolveActiveProvider(db, B)).toBeNull()
+
+    // A's config resolves to A's own secret; the serialized status never leaks it.
+    expect((await resolveActiveProvider(db, A))!.secret).toBe('a-openrouter-secret')
+    expect(JSON.stringify(bSettings)).not.toContain('a-openrouter-secret')
   })
 })
 

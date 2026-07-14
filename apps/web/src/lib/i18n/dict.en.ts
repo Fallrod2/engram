@@ -507,6 +507,30 @@ export const dictEn: Dict = {
         'This link is invalid or has already been used. Ask for a new invitation or reset link.',
       backToLogin: 'Back to sign in',
     },
+    login: {
+      noAccount: 'No account yet?',
+      signUpLink: 'Create an account',
+    },
+    signup: {
+      title: 'Create an account',
+      subtitle: 'Start reviewing in seconds.',
+      submit: 'Create my account',
+      submitting: 'Creating…',
+      confirm: 'Confirm password',
+      invalidEmail: 'Invalid email address.',
+      tooShort: 'At least 8 characters.',
+      mismatch: 'Passwords do not match.',
+      haveAccount: 'Already have an account?',
+      signInLink: 'Sign in',
+      checkEmailTitle: 'Check your email',
+      checkEmailDesc:
+        'We sent you a confirmation link. Click it to activate your account, then come back to sign in.',
+      error: {
+        weakPassword: 'Password too weak. Pick a longer or less common one.',
+        rateLimit: 'Too many attempts. Try again in a few minutes.',
+        generic: 'Sign-up is unavailable right now. Please try again.',
+      },
+    },
   },
 
   landing: {
@@ -524,7 +548,7 @@ export const dictEn: Dict = {
       title: 'Remember more, review less.',
       subtitle:
         'engram schedules every review at the right time and turns your notes — Markdown, PDF or a photo of a lecture — into cards ready to study.',
-      cta: 'Sign in',
+      cta: 'Create an account',
       demoCta: 'Try the demo',
       note: 'Free, self-hosted, open source.',
       shotAlt: 'engram dashboard: cards due today, review streak and recent activity.',

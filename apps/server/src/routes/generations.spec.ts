@@ -63,7 +63,7 @@ describe('generations routes', () => {
 
   it('POST with a keyless provider (ollama) configured → 202, provider stamped', async () => {
     delete process.env.ANTHROPIC_API_KEY
-    await updateAiSettings(db, { activeProvider: 'ollama' })
+    await updateAiSettings(db, U, { activeProvider: 'ollama' })
     const noteId = await seedNote()
     const res = await postJson('/api/generations', { noteId, kind: 'cards' })
     expect(res.status).toBe(202)

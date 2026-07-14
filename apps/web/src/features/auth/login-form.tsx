@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch, Link } from '@tanstack/react-router'
 import { useT } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
 import { sanitizeRedirect } from '@/lib/auth-store'
@@ -102,6 +102,12 @@ export function LoginForm() {
         <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? t('auth.submitting') : t('auth.submit')}
         </Button>
+        <p className="text-center text-xs text-text-muted">
+          {t('auth.login.noAccount')}{' '}
+          <Link to="/signup" className="font-medium text-accent hover:underline">
+            {t('auth.login.signUpLink')}
+          </Link>
+        </p>
       </form>
     </Form>
   )

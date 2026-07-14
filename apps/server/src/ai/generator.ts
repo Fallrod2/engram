@@ -46,6 +46,13 @@ export interface GenerateArgs {
    * absent only for direct calls, where the configured generator re-resolves it.
    */
   provider?: ResolvedProviderConfig
+  /**
+   * Owner id for the rare direct-call re-resolve path (spec BYOK §1.3): the AI
+   * config is per-user, so a resolution WITHOUT an explicit identity is refused
+   * rather than silently reaching for an unscoped/admin config. Ignored when
+   * `provider` is already supplied (the nominal job path).
+   */
+  userId?: string
 }
 
 export interface GenerateResult {
@@ -116,10 +123,14 @@ export const configuredGenerator: CardGenerator = {
     let cfg = args.provider
     if (!cfg) {
       // Rare direct-call path: re-resolve against the live DB (lazy import keeps
-      // this module free of a hard `db` dependency for the nominal flow).
+      // this module free of a hard `db` dependency for the nominal flow). The
+      // per-user config REQUIRES an explicit identity — no resolution without one.
+      if (!args.userId) {
+        throw new Error('AI generation: a userId is required to resolve the provider config')
+      }
       const { db } = await import('../db/client')
       const { resolveActiveProvider } = await import('../services/ai-config.service')
-      cfg = (await resolveActiveProvider(db)) ?? undefined
+      cfg = (await resolveActiveProvider(db, args.userId)) ?? undefined
     }
     if (!cfg) throw new Error('AI generation unavailable: no provider configured')
     const adapter = PROVIDERS[cfg.providerId]

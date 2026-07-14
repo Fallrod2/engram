@@ -23,6 +23,17 @@ export interface AuthContextValue {
   email: string | null
   /** Generic result — GoTrue does not distinguish unknown email vs wrong password. */
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  /**
+   * Register a new account (spec BYOK §2). With email confirmation ON, GoTrue
+   * returns NO session — the user must click the confirmation link — and, for
+   * anti-enumeration, does NOT error when the email already exists. So on
+   * `error: null` the caller shows a neutral "check your email" screen. `status`
+   * (422 weak password, 429 rate limit) lets the caller map actionable errors.
+   */
+  signUp: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: string | null; status: number | null }>
   signOut: () => Promise<void>
   /**
    * Set the current user's password via the active session (invite/recovery
@@ -52,6 +63,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!supabase) return { error: null }
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       return { error: error ? error.message : null }
+    },
+    signUp: async (email, password) => {
+      if (!supabase) return { error: null, status: null }
+      // Confirmation link lands on the site root; `captureAuthLink` parses the
+      // `type=signup` fragment and `init()` promotes it to a normal session.
+      const emailRedirectTo =
+        typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
+      })
+      return { error: error ? error.message : null, status: error?.status ?? null }
     },
     signOut: async () => {
       await supabase?.auth.signOut()

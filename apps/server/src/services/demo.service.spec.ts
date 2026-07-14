@@ -54,7 +54,7 @@ describe('seedDemo', () => {
 
   it('stores the session marker', async () => {
     await runSeed('sess-abc')
-    expect(await readDemoMarker(db)).toBe('sess-abc')
+    expect(await readDemoMarker(db, DEMO)).toBe('sess-abc')
   })
 
   it('is idempotent under the same marker (no doubling)', async () => {
@@ -69,7 +69,7 @@ describe('seedDemo', () => {
     // Simulate a user edit that a reset must erase.
     await db.update(subject).set({ name: 'EDITED' }).where(eq(subject.userId, DEMO))
     await runSeed('sess-2')
-    expect(await readDemoMarker(db)).toBe('sess-2')
+    expect(await readDemoMarker(db, DEMO)).toBe('sess-2')
     const names = (await db.select().from(subject).where(eq(subject.userId, DEMO))).map(
       (s) => s.name,
     )

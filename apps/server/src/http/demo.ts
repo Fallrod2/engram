@@ -34,13 +34,14 @@ export function createDemoMiddleware(): MiddlewareHandler {
     const sessionId = typeof claims.session_id === 'string' ? claims.session_id : null
     const marker = sessionId ?? DEMO_NO_SESSION
 
-    // Fast path: already seeded for this session (one cheap read, no lock).
-    if ((await readDemoMarker(db)) === marker) return next()
+    // Fast path: already seeded for this session (one cheap read, no lock). The
+    // marker lives under the demo user's own row `(demoUserId, 'demo')`.
+    if ((await readDemoMarker(db, demoUserId)) === marker) return next()
 
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${DEMO_LOCK_KEY})`)
       // Re-check under the lock: a racing request may have just seeded.
-      if ((await readDemoMarker(tx)) === marker) return
+      if ((await readDemoMarker(tx, demoUserId)) === marker) return
       await seedDemo(tx, demoUserId, marker)
     })
     return next()

@@ -155,7 +155,7 @@ function Hero() {
 
           <motion.div {...rise(0.18)} className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
             <Button asChild size="lg" className="min-w-40">
-              <Link to="/login">
+              <Link to="/signup">
                 {t('landing.hero.cta')}
                 <ArrowRight />
               </Link>

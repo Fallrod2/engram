@@ -115,6 +115,23 @@ describe('auth-store — invite/recovery link flow', () => {
     expect(store.getState().status).toBe('authenticated')
   })
 
+  it('captured signup tokens → session established WITHOUT the set-password gate (BYOK §2)', async () => {
+    const session = { access_token: 'signuptok', user: { email: 'new@x.co' } }
+    const setSession = vi.fn().mockResolvedValue({ data: { session }, error: null })
+    mockSupabase({ setSession })
+    const store = await import('./auth-store')
+    store.captureAuthLink({
+      hash: '#access_token=at&refresh_token=rt&type=signup',
+      search: '',
+    })
+    await store.init()
+    expect(setSession).toHaveBeenCalledWith({ access_token: 'at', refresh_token: 'rt' })
+    // Signup already has a password → NO setup gate; it is a normal login.
+    expect(store.getLinkState()).toEqual({ kind: 'none' })
+    expect(store.isPasswordSetupPending()).toBe(false)
+    expect(store.getState().status).toBe('authenticated')
+  })
+
   it('setSession failure → error link state + unauthenticated', async () => {
     const setSession = vi
       .fn()
@@ -221,6 +238,11 @@ describe('requireAuth guard', () => {
     expect(
       requireAuth({ auth: anon, pathname: '/set-password', href: '/set-password' }),
     ).toBeUndefined()
+  })
+
+  it('/signup is exempt even when unauthenticated (public sign-up, BYOK §2)', async () => {
+    const { requireAuth } = await import('./auth-store')
+    expect(requireAuth({ auth: anon, pathname: '/signup', href: '/signup' })).toBeUndefined()
   })
 
   it('/ is exempt when unauthenticated → public landing, no redirect (landing §1)', async () => {

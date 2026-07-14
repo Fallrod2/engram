@@ -94,6 +94,10 @@ notesRouter.post('/upload', async (c) => {
 // image per request → a Markdown transcription. NEVER writes a note: the client
 // previews/corrects the text, then creates the note via `POST /api/notes`.
 notesRouter.post('/extract-image', async (c) => {
+  // Scope the OCR provider resolution to the caller (spec BYOK §1.3): this
+  // handler previously skipped `requireUserId`, which would have let it resolve
+  // an unscoped provider. A public user without their own key → clean 503.
+  const userId = requireUserId(c)
   const body = await c.req.parseBody()
   const file = body['file']
   if (!(file instanceof File)) {
@@ -116,7 +120,7 @@ notesRouter.post('/extract-image', async (c) => {
 
   // Capacity guard BEFORE any call (mirror of the generations.ts provider guard).
   // Resolves the OCR slot — the SAME provider as generation, or a dedicated one.
-  const cfg = await resolveOcrProvider(db)
+  const cfg = await resolveOcrProvider(db, userId)
   if (!cfg) {
     throw new ServiceUnavailableError(
       'Extraction indisponible : aucun fournisseur IA configuré pour l’OCR.',

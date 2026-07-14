@@ -25,18 +25,15 @@ export const generationsRouter = new Hono()
 
 // POST /api/generations — launch a fire-and-forget generation job (202).
 generationsRouter.post('/', zValidator('json', startGenerationSchema), async (c) => {
+  const userId = requireUserId(c)
   // Resolve the active provider ONCE (single DB read, no TOCTOU): it is both the
-  // 503 guard and the config stamped on the row + passed to the job.
-  const cfg = await resolveActiveProvider(db)
+  // 503 guard and the config stamped on the row + passed to the job. Scoped to
+  // the caller (spec BYOK §1.3) — a user without their own key gets a clean 503.
+  const cfg = await resolveActiveProvider(db, userId)
   if (!cfg) {
     throw new ServiceUnavailableError('AI generation unavailable: no provider configured')
   }
-  return ok(
-    c,
-    generationSchema,
-    await startGeneration(db, requireUserId(c), c.req.valid('json'), cfg),
-    202,
-  )
+  return ok(c, generationSchema, await startGeneration(db, userId, c.req.valid('json'), cfg), 202)
 })
 
 // GET /api/generations — list, optional noteId filter.

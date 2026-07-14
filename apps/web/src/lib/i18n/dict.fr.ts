@@ -511,6 +511,30 @@ export const dictFr = {
         'Ce lien est invalide ou a déjà été utilisé. Demande un nouveau lien d’invitation ou de réinitialisation.',
       backToLogin: 'Retour à la connexion',
     },
+    login: {
+      noAccount: 'Pas encore de compte ?',
+      signUpLink: 'Créer un compte',
+    },
+    signup: {
+      title: 'Créer un compte',
+      subtitle: 'Commence à réviser en quelques secondes.',
+      submit: 'Créer mon compte',
+      submitting: 'Création…',
+      confirm: 'Confirmer le mot de passe',
+      invalidEmail: 'Adresse e-mail invalide.',
+      tooShort: 'Au moins 8 caractères.',
+      mismatch: 'Les mots de passe ne correspondent pas.',
+      haveAccount: 'Déjà un compte ?',
+      signInLink: 'Se connecter',
+      checkEmailTitle: 'Vérifie ta boîte mail',
+      checkEmailDesc:
+        'Nous t’avons envoyé un lien de confirmation. Clique dessus pour activer ton compte, puis reviens te connecter.',
+      error: {
+        weakPassword: 'Mot de passe trop faible. Choisis-en un plus long ou moins courant.',
+        rateLimit: 'Trop de tentatives. Réessaie dans quelques minutes.',
+        generic: 'Inscription impossible pour le moment. Réessaie.',
+      },
+    },
   },
 
   landing: {
@@ -528,7 +552,7 @@ export const dictFr = {
       title: 'Retiens plus, en révisant moins.',
       subtitle:
         'engram programme chaque révision au bon moment et transforme tes notes — Markdown, PDF ou photo de cours — en cartes prêtes à réviser.',
-      cta: 'Se connecter',
+      cta: 'Créer un compte',
       demoCta: 'Essayer la démo',
       note: 'Gratuit, self-hosted, open source.',
       shotAlt:

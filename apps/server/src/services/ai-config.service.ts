@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import {
   aiOcrSettingsSchema,
   aiProviderConfigSchema,
@@ -13,10 +13,42 @@ import type { DB } from '../db/client'
 import { appSettings, aiCredential } from '../db/schema'
 import { ValidationError } from '../http/errors'
 import { hasAnthropicKey } from '../ai/client'
+import { resolveAuthConfig, resolveAdminUserId } from '../auth/config'
 import type { ResolvedProviderConfig } from '../ai/providers/types'
 
 /** The single key under which the AI config blob lives in `app_settings`. */
 const AI_KEY = 'ai'
+
+/**
+ * Per-user scope context (spec BYOK §1.2). Two orthogonal decisions, resolved
+ * ONCE at the entry of each resolver from the pure auth config:
+ *
+ * - `effectiveUserId` — the demo account is a READ ALIAS of the admin config: a
+ *   controlled showcase reads Alex's config so generation/OCR work for it, while
+ *   a public signup never can. This is a NON-recursive substitution (amendment
+ *   §4): we swap the id and read the admin's rows directly — never re-enter a
+ *   resolver with the admin id (the `demoUserId === adminUserId` bypass case
+ *   would recurse forever).
+ *
+ * - `allowEnv` — THE security fix. The process env fallback (Alex's
+ *   `ANTHROPIC_API_KEY` etc.) is consulted ONLY for the admin (or the demo, which
+ *   resolves AS the admin). A public signup with no app key gets `keySource:null`
+ *   → unusable → the existing clean 503, never Alex's key.
+ */
+function resolveScope(userId: string): { effectiveUserId: string; allowEnv: boolean } {
+  const cfg = resolveAuthConfig(process.env)
+  const adminUserId = resolveAdminUserId(cfg)
+  const effectiveUserId =
+    cfg.demoUserId && userId === cfg.demoUserId ? (adminUserId ?? userId) : userId
+  const allowEnv = adminUserId !== undefined && effectiveUserId === adminUserId
+  return { effectiveUserId, allowEnv }
+}
+
+/** Whether the env fallback is allowed for `userId` WITHOUT the demo alias (GET status). */
+function envAllowedFor(userId: string): boolean {
+  const adminUserId = resolveAdminUserId(resolveAuthConfig(process.env))
+  return adminUserId !== undefined && userId === adminUserId
+}
 
 export const PROVIDER_IDS: AiProviderId[] = [
   'anthropic',
@@ -76,20 +108,20 @@ function coerceSettings(raw: unknown): AiSettings {
   return base
 }
 
-async function readSettings(db: DB): Promise<AiSettings> {
+async function readSettings(db: DB, userId: string): Promise<AiSettings> {
   const [row] = await db
     .select({ value: appSettings.value })
     .from(appSettings)
-    .where(eq(appSettings.key, AI_KEY))
+    .where(and(eq(appSettings.userId, userId), eq(appSettings.key, AI_KEY)))
   return coerceSettings(row?.value)
 }
 
-async function writeSettings(db: DB, settings: AiSettings): Promise<void> {
+async function writeSettings(db: DB, userId: string, settings: AiSettings): Promise<void> {
   await db
     .insert(appSettings)
-    .values({ key: AI_KEY, value: settings })
+    .values({ userId, key: AI_KEY, value: settings })
     .onConflictDoUpdate({
-      target: appSettings.key,
+      target: [appSettings.userId, appSettings.key],
       set: { value: settings, updatedAt: new Date() },
     })
 }
@@ -97,17 +129,24 @@ async function writeSettings(db: DB, settings: AiSettings): Promise<void> {
 // --- secret access (internal only — the write-only boundary) ---------------
 
 /** Read one stored app credential. INTERNAL ONLY (resolver + test endpoint). */
-async function getCredentialSecret(db: DB, provider: AiProviderId): Promise<string | undefined> {
+async function getCredentialSecret(
+  db: DB,
+  userId: string,
+  provider: AiProviderId,
+): Promise<string | undefined> {
   const [row] = await db
     .select({ secret: aiCredential.secret })
     .from(aiCredential)
-    .where(eq(aiCredential.provider, provider))
+    .where(and(eq(aiCredential.userId, userId), eq(aiCredential.provider, provider)))
   return row?.secret
 }
 
 /** Providers that currently have an app credential row (NEVER reads the secret). */
-async function keyedProviders(db: DB): Promise<Set<AiProviderId>> {
-  const rows = await db.select({ provider: aiCredential.provider }).from(aiCredential)
+async function keyedProviders(db: DB, userId: string): Promise<Set<AiProviderId>> {
+  const rows = await db
+    .select({ provider: aiCredential.provider })
+    .from(aiCredential)
+    .where(eq(aiCredential.userId, userId))
   return new Set(rows.map((r) => r.provider as AiProviderId))
 }
 
@@ -123,12 +162,19 @@ function envKey(provider: AiProviderId): string | undefined {
  * Resolve the secret + source for a provider. For anthropic in env mode we
  * return `secret=undefined` (the SDK reads `ANTHROPIC_API_KEY` itself); for the
  * fetch providers we return the actual env value so the adapter can send it.
+ *
+ * `allowEnv` is THE security gate (spec BYOK §1.2): the process-env fallback is
+ * consulted ONLY for the admin (and the demo, which resolves as admin). A public
+ * user with no app key gets `keySource:null` → unusable → clean 503, so a signup
+ * can NEVER consume Alex's env key.
  */
 function resolveSecret(
   provider: AiProviderId,
   appSecret: string | undefined,
+  allowEnv: boolean,
 ): { secret: string | undefined; keySource: 'app' | 'env' | null } {
   if (appSecret) return { secret: appSecret, keySource: 'app' }
+  if (!allowEnv) return { secret: undefined, keySource: null }
   if (provider === 'anthropic') {
     // The SDK reads ANTHROPIC_API_KEY (and machine profiles) itself, so we only
     // detect presence here via the shared `hasAnthropicKey()` fallback helper.
@@ -165,12 +211,17 @@ function isUsable(
  * Resolve the ACTIVE provider into a full config (secret included), or `null`
  * if it is not usable (→ the 503 in `/api/generations`). ONE DB read path.
  */
-export async function resolveActiveProvider(db: DB): Promise<ResolvedProviderConfig | null> {
-  const settings = await readSettings(db)
+export async function resolveActiveProvider(
+  db: DB,
+  userId: string,
+): Promise<ResolvedProviderConfig | null> {
+  const { effectiveUserId, allowEnv } = resolveScope(userId)
+  const settings = await readSettings(db, effectiveUserId)
   const provider = settings.activeProvider
   const pc = settings.providers[provider]
-  const appSecret = provider === 'ollama' ? undefined : await getCredentialSecret(db, provider)
-  const { secret, keySource } = resolveSecret(provider, appSecret)
+  const appSecret =
+    provider === 'ollama' ? undefined : await getCredentialSecret(db, effectiveUserId, provider)
+  const { secret, keySource } = resolveSecret(provider, appSecret, allowEnv)
   const model = pc.model.trim()
   const baseUrl = pc.baseUrl?.trim() || undefined
 
@@ -185,8 +236,8 @@ export async function resolveActiveProvider(db: DB): Promise<ResolvedProviderCon
   }
 }
 
-export async function isAiConfigured(db: DB): Promise<boolean> {
-  return (await resolveActiveProvider(db)) !== null
+export async function isAiConfigured(db: DB, userId: string): Promise<boolean> {
+  return (await resolveActiveProvider(db, userId)) !== null
 }
 
 /** The provider id effectively used by the OCR slot (spec §1.1). */
@@ -201,14 +252,19 @@ function ocrProviderId(settings: AiSettings): AiProviderId {
  * the dedicated `(ocr.provider, ocr.model)` couple with THAT provider's stored
  * key + base URL. This is what makes the OCR provider independent of generation.
  */
-export async function resolveOcrProvider(db: DB): Promise<ResolvedProviderConfig | null> {
-  const settings = await readSettings(db)
-  if (settings.ocr.mode === 'same') return resolveActiveProvider(db)
+export async function resolveOcrProvider(
+  db: DB,
+  userId: string,
+): Promise<ResolvedProviderConfig | null> {
+  const { effectiveUserId, allowEnv } = resolveScope(userId)
+  const settings = await readSettings(db, effectiveUserId)
+  if (settings.ocr.mode === 'same') return resolveActiveProvider(db, userId)
 
   const provider = settings.ocr.provider
   const pc = settings.providers[provider]
-  const appSecret = provider === 'ollama' ? undefined : await getCredentialSecret(db, provider)
-  const { secret, keySource } = resolveSecret(provider, appSecret)
+  const appSecret =
+    provider === 'ollama' ? undefined : await getCredentialSecret(db, effectiveUserId, provider)
+  const { secret, keySource } = resolveSecret(provider, appSecret, allowEnv)
   const model = settings.ocr.model.trim()
   const baseUrl = pc.baseUrl?.trim() || undefined
 
@@ -225,9 +281,12 @@ export async function resolveOcrProvider(db: DB): Promise<ResolvedProviderConfig
 
 // --- status surface (write-only: never carries a secret) -------------------
 
-async function providerStatuses(db: DB): Promise<AiProviderStatus[]> {
-  const settings = await readSettings(db)
-  const keyed = await keyedProviders(db)
+async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatus[]> {
+  // GET status is NOT demo-aliased (amendment §5): a user sees THEIR OWN config.
+  // The env badge ("configuré (env)") therefore only ever appears for the admin.
+  const allowEnv = envAllowedFor(userId)
+  const settings = await readSettings(db, userId)
+  const keyed = await keyedProviders(db, userId)
   const ocrProvider = ocrProviderId(settings)
   return PROVIDER_IDS.map((provider) => {
     const pc = settings.providers[provider]
@@ -237,7 +296,7 @@ async function providerStatuses(db: DB): Promise<AiProviderStatus[]> {
       if (keyed.has(provider)) {
         hasKey = true
         keySource = 'app'
-      } else if (envKey(provider)) {
+      } else if (allowEnv && envKey(provider)) {
         hasKey = true
         keySource = 'env'
       }
@@ -255,8 +314,11 @@ async function providerStatuses(db: DB): Promise<AiProviderStatus[]> {
   })
 }
 
-export async function getAiSettings(db: DB): Promise<AiSettingsResponse> {
-  const [settings, statuses] = await Promise.all([readSettings(db), providerStatuses(db)])
+export async function getAiSettings(db: DB, userId: string): Promise<AiSettingsResponse> {
+  const [settings, statuses] = await Promise.all([
+    readSettings(db, userId),
+    providerStatuses(db, userId),
+  ])
   return { settings, statuses }
 }
 
@@ -280,9 +342,10 @@ function mergeProviders(
 
 export async function updateAiSettings(
   db: DB,
+  userId: string,
   input: UpdateAiSettings,
 ): Promise<AiSettingsResponse> {
-  const current = await readSettings(db)
+  const current = await readSettings(db, userId)
   const next: AiSettings = {
     activeProvider: input.activeProvider ?? current.activeProvider,
     providers: mergeProviders(current.providers, input.providers),
@@ -295,37 +358,53 @@ export async function updateAiSettings(
     },
   }
   // Validate (URLs, shape) before persisting — a bad base URL is a 400.
-  await writeSettings(db, aiSettingsSchema.parse(next))
-  return getAiSettings(db)
+  await writeSettings(db, userId, aiSettingsSchema.parse(next))
+  return getAiSettings(db, userId)
 }
 
 // --- credential set / delete (write-only; routes return 204) ---------------
 
-export async function setAiKey(db: DB, provider: AiProviderId, key: string): Promise<void> {
+export async function setAiKey(
+  db: DB,
+  userId: string,
+  provider: AiProviderId,
+  key: string,
+): Promise<void> {
   if (provider === 'ollama') {
     throw new ValidationError('ollama does not use an API key')
   }
   await db
     .insert(aiCredential)
-    .values({ provider, secret: key })
+    .values({ userId, provider, secret: key })
     .onConflictDoUpdate({
-      target: aiCredential.provider,
+      target: [aiCredential.userId, aiCredential.provider],
       set: { secret: key, updatedAt: new Date() },
     })
 }
 
-export async function deleteAiKey(db: DB, provider: AiProviderId): Promise<void> {
-  await db.delete(aiCredential).where(eq(aiCredential.provider, provider))
+export async function deleteAiKey(db: DB, userId: string, provider: AiProviderId): Promise<void> {
+  await db
+    .delete(aiCredential)
+    .where(and(eq(aiCredential.userId, userId), eq(aiCredential.provider, provider)))
 }
 
 /**
- * Build a config for the TEST-CONNECTION endpoint: overlays an optional
- * not-yet-saved candidate (key / baseUrl / model) on the stored config. Reads
- * the stored secret ONLY here (internal). Returns null if the provider has no
- * usable model (nothing to test).
+ * Build a config for the TEST-CONNECTION (and models) endpoint: overlays an
+ * optional not-yet-saved candidate (key / baseUrl / model) on the stored config.
+ * Reads the stored secret ONLY here (internal). Returns null if the provider has
+ * no usable model (nothing to test).
+ *
+ * SECURITY (audit fix): unlike the generation/OCR resolvers, this path does NOT
+ * apply the demo→admin read alias. Aliasing it let the demo pair an
+ * attacker-supplied `baseUrl` with the admin's resolved secret and exfiltrate
+ * `Authorization: Bearer <admin key>` to an arbitrary host (POST test is
+ * reachable by the demo via `requireUserId`). The demo therefore tests against
+ * ITS OWN config — consistent with GET /settings not being aliased (amendment
+ * §5) — and this overrides the "POST test aliased" note of spec §1.2 / §5.
  */
 export async function resolveProviderForTest(
   db: DB,
+  userId: string,
   provider: AiProviderId,
   candidate: {
     key?: string | undefined
@@ -333,7 +412,13 @@ export async function resolveProviderForTest(
     model?: string | undefined
   },
 ): Promise<ResolvedProviderConfig | null> {
-  const settings = await readSettings(db)
+  // No demo alias here (see the SECURITY note above): resolve against the
+  // caller's OWN config + admin-only env fallback, exactly like the status
+  // surface. This is what stops the admin key from ever reaching a demo-supplied
+  // baseUrl.
+  const effectiveUserId = userId
+  const allowEnv = envAllowedFor(userId)
+  const settings = await readSettings(db, effectiveUserId)
   const pc = settings.providers[provider]
   const model = (candidate.model ?? pc.model).trim()
   if (model.length === 0) return null
@@ -346,8 +431,8 @@ export async function resolveProviderForTest(
       secret = candidate.key.trim()
       keySource = 'app'
     } else {
-      const appSecret = await getCredentialSecret(db, provider)
-      const resolved = resolveSecret(provider, appSecret)
+      const appSecret = await getCredentialSecret(db, effectiveUserId, provider)
+      const resolved = resolveSecret(provider, appSecret, allowEnv)
       secret = resolved.secret
       keySource = resolved.keySource
     }

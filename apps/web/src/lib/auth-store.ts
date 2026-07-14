@@ -39,9 +39,17 @@ let onSignedOut: () => void = () => {}
  * invite/recovery session is active and the user must choose a password before
  * entering the app; `error` means the one-time link was expired or already used.
  */
+/**
+ * The link types that gate the `/set-password` setup screen. `signup` is
+ * deliberately EXCLUDED (spec BYOK §2 / amendment §8): a confirmed sign-up
+ * already has its password, so it flows straight to an authenticated session
+ * without ever entering the setup gate.
+ */
+export type SetupLinkType = Exclude<AuthLinkType, 'signup'>
+
 export type LinkState =
   | { kind: 'none' }
-  | { kind: 'setup'; linkType: AuthLinkType }
+  | { kind: 'setup'; linkType: SetupLinkType }
   | { kind: 'error'; error: AuthLinkError }
 
 let linkState: LinkState = { kind: 'none' }
@@ -62,7 +70,7 @@ let pendingLink: AuthLinkTokens | null = null
  */
 const LINK_SETUP_STORAGE_KEY = 'engram-auth-link'
 
-function persistLinkSetup(linkType: AuthLinkType): void {
+function persistLinkSetup(linkType: SetupLinkType): void {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(LINK_SETUP_STORAGE_KEY, linkType)
@@ -72,7 +80,7 @@ function persistLinkSetup(linkType: AuthLinkType): void {
   }
 }
 
-function readPersistedLinkSetup(): AuthLinkType | null {
+function readPersistedLinkSetup(): SetupLinkType | null {
   if (typeof window === 'undefined') return null
   try {
     const value = window.localStorage.getItem(LINK_SETUP_STORAGE_KEY)
@@ -220,6 +228,7 @@ export function init(): Promise<void> {
           refresh_token: pendingLink.refreshToken,
         })
         .then(({ data, error }) => {
+          const linkType = pendingLink!.type
           if (error || !data.session) {
             setLinkState({
               kind: 'error',
@@ -231,11 +240,16 @@ export function init(): Promise<void> {
               },
             })
             setState({ status: 'unauthenticated', session: null })
+          } else if (linkType === 'signup') {
+            // A confirmed sign-up already has its password (spec BYOK §2 /
+            // amendment §8): NO setup gate, NO persisted marker — the session is a
+            // normal login. `linkState` stays 'none', so `linkRedirect` is untouched.
+            setState({ status: 'authenticated', session: data.session })
           } else {
-            // Persist the setup intent so a reload BEFORE the password is set
-            // re-enters this gate instead of leaking into the app (see marker doc).
-            persistLinkSetup(pendingLink!.type)
-            setLinkState({ kind: 'setup', linkType: pendingLink!.type })
+            // Invite/recovery: persist the setup intent so a reload BEFORE the
+            // password is set re-enters this gate instead of leaking into the app.
+            persistLinkSetup(linkType)
+            setLinkState({ kind: 'setup', linkType })
             setState({ status: 'authenticated', session: data.session })
           }
         })
@@ -312,12 +326,14 @@ export function requireAuth(opts: {
   pathname: string
   href: string
 }): { to: '/login'; search: { redirect: string } } | undefined {
-  // Anti-loop / public routes exempt. `/login` (audit §8) and `/set-password`
-  // (invite/recovery flow) render bare and manage their own redirects; `/` and
-  // `/welcome` are the public landing (the route component itself shows the
-  // dashboard once authenticated) — never bounce any of them back here.
+  // Anti-loop / public routes exempt. `/login`, `/signup` (public sign-up, spec
+  // BYOK §2) and `/set-password` (invite/recovery flow) render bare and manage
+  // their own redirects; `/` and `/welcome` are the public landing (the route
+  // component itself shows the dashboard once authenticated) — never bounce any
+  // of them back here.
   if (
     opts.pathname === '/login' ||
+    opts.pathname === '/signup' ||
     opts.pathname === '/set-password' ||
     opts.pathname === '/' ||
     opts.pathname === '/welcome'

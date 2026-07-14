@@ -72,4 +72,45 @@ test.describe('multi-user isolation (ON, HS256)', () => {
     await expect(page.locator('#app-shell')).toBeVisible()
     await expect(page.getByText(SUBJECT_NAME)).toHaveCount(0)
   })
+
+  test('AI config + key are per-user: B never sees A’s key (BYOK §1)', async ({ request }) => {
+    const a = token('ai-iso-user-a')
+    const b = token('ai-iso-user-b')
+
+    // A brings its OWN key (BYOK) and switches its active provider.
+    const put = await request.put(`${AUTH_API_BASE}/api/ai/providers/openrouter/key`, {
+      headers: { Authorization: `Bearer ${a}` },
+      data: { key: 'a-openrouter-secret' },
+    })
+    expect(put.status()).toBe(204)
+    const patch = await request.patch(`${AUTH_API_BASE}/api/ai/settings`, {
+      headers: { Authorization: `Bearer ${a}` },
+      data: { activeProvider: 'openrouter' },
+    })
+    expect(patch.status()).toBe(200)
+
+    // A sees its config; the secret is never echoed back.
+    const aRes = await request.get(`${AUTH_API_BASE}/api/ai/settings`, {
+      headers: { Authorization: `Bearer ${a}` },
+    })
+    const aBody = (await aRes.json()) as {
+      settings: { activeProvider: string }
+      statuses: { provider: string; hasKey: boolean }[]
+    }
+    expect(aBody.settings.activeProvider).toBe('openrouter')
+    expect(aBody.statuses.find((s) => s.provider === 'openrouter')?.hasKey).toBe(true)
+    expect(JSON.stringify(aBody)).not.toContain('a-openrouter-secret')
+
+    // B sees a pristine config with NO key — strict isolation.
+    const bRes = await request.get(`${AUTH_API_BASE}/api/ai/settings`, {
+      headers: { Authorization: `Bearer ${b}` },
+    })
+    const bBody = (await bRes.json()) as {
+      settings: { activeProvider: string }
+      statuses: { provider: string; hasKey: boolean }[]
+    }
+    expect(bBody.settings.activeProvider).toBe('anthropic')
+    expect(bBody.statuses.find((s) => s.provider === 'openrouter')?.hasKey).toBe(false)
+    expect(JSON.stringify(bBody)).not.toContain('a-openrouter-secret')
+  })
 })

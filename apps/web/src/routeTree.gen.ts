@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as ReviewRouteImport } from './routes/review'
@@ -28,6 +29,11 @@ import { Route as ImportNoteIdGenerationsGenerationIdRouteImport } from './route
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
   '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
   '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import': typeof ImportIndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
   '/welcome': typeof WelcomeRoute
   '/import/photo': typeof ImportPhotoRoute
   '/import/': typeof ImportIndexRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/signup'
     | '/welcome'
     | '/import/photo'
     | '/import/'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/signup'
     | '/welcome'
     | '/import/photo'
     | '/import'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/review'
     | '/set-password'
     | '/settings'
+    | '/signup'
     | '/welcome'
     | '/import/photo'
     | '/import/'
@@ -217,6 +229,7 @@ export interface RootRouteChildren {
   ReviewRoute: typeof ReviewRoute
   SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
+  SignupRoute: typeof SignupRoute
   WelcomeRoute: typeof WelcomeRoute
   ImportPhotoRoute: typeof ImportPhotoRoute
   ImportIndexRoute: typeof ImportIndexRoute
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/welcome'
       fullPath: '/welcome'
       preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -345,6 +365,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewRoute: ReviewRoute,
   SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
+  SignupRoute: SignupRoute,
   WelcomeRoute: WelcomeRoute,
   ImportPhotoRoute: ImportPhotoRoute,
   ImportIndexRoute: ImportIndexRoute,
