@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
 import { useT, usePlural } from '@/lib/i18n'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import { RATINGS } from './labels'
 import type { SessionSummary as Summary } from './summary'
 import { formatDurationClock, formatSeconds } from './interval-format'
@@ -39,6 +40,8 @@ export function SessionSummary({
 }) {
   const t = useT()
   const plural = usePlural()
+  // No keyboard on touch → drop the Entrée/R chips (fix-session §3).
+  const coarse = useCoarsePointer()
   const { viewed, byGrade, totalMs, avgMs, successRate } = summary
 
   return (
@@ -89,15 +92,17 @@ export function SessionSummary({
       <div className="flex flex-col items-center gap-2">
         <Button autoFocus onClick={onExit}>
           {t('common.backToDashboard')}
-          <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">
-            {t('session.keyEnter')}
-          </Kbd>
+          {!coarse && (
+            <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">
+              {t('session.keyEnter')}
+            </Kbd>
+          )}
         </Button>
         {canReviewAgain && (
           <Button variant="ghost" onClick={onReviewAgain} className="text-text-muted">
             <RotateCcw className="size-4" />
             {t('session.summary.reviewAgain')}
-            <Kbd className="ml-1">R</Kbd>
+            {!coarse && <Kbd className="ml-1">R</Kbd>}
           </Button>
         )}
       </div>

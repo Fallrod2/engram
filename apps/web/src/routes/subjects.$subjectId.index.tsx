@@ -27,6 +27,7 @@ import { DueCount } from '@/components/due-count'
 import { ConfirmDelete } from '@/components/confirm-delete'
 import { useHotkeys } from '@/lib/use-hotkeys'
 import { useRovingList } from '@/lib/use-roving'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import {
   subjectDetailOptions,
   useArchiveSubject,
@@ -76,6 +77,8 @@ function DecksPage() {
   const subject = useQuery(subjectDetailOptions(subjectId)).data
   const decks = useQuery(decksListOptions(subjectId)).data ?? []
   const dueCounts = useQuery(dueCountsOptions()).data
+  // Hide the `n` shortcut chip on touch (fix-session §3, cohérence transversale).
+  const coarse = useCoarsePointer()
 
   // Per-deck card totals from ONE aggregate request (Phase 7 §2.2) — no more
   // per-deck `limit=1` probe fan-out. Undefined until loaded (→ skeleton); a
@@ -181,7 +184,9 @@ function DecksPage() {
             <Button onClick={() => setCreateOpen(true)}>
               <Plus />
               Nouveau deck
-              <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+              {!coarse && (
+                <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+              )}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -235,7 +240,9 @@ function DecksPage() {
             <Button onClick={() => setCreateOpen(true)}>
               <Plus />
               {t('shortcuts.keys.newDeck')}
-              <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+              {!coarse && (
+                <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+              )}
             </Button>
           }
         />

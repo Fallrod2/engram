@@ -15,7 +15,7 @@ import {
 } from '@/lib/calendar'
 import { formatLongDay, formatMonthLabel, formatWeekLabel } from '@/lib/format'
 import { useHotkeys } from '@/lib/use-hotkeys'
-import { useMediaQuery } from '@/lib/use-media-query'
+import { useMediaQuery, useCoarsePointer } from '@/lib/use-media-query'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -99,6 +99,9 @@ function PlanningPage() {
   // desktop restores the user's chosen view. The month/week tabs hide < md.
   const isMobile = useMediaQuery('(max-width: 767px)')
   const effectiveView: CalendarView = isMobile ? 'week' : view
+  // Hide the keyboard shortcut chips on touch (fix-session §3, in-page coherence
+  // with the gated empty-state action below).
+  const coarse = useCoarsePointer()
 
   // Bottom Sheet holds the day detail on mobile (the side rail is hidden < md).
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
@@ -224,13 +227,15 @@ function PlanningPage() {
         </div>
         <Button variant="secondary" onClick={() => setDay(todayKey)}>
           {t('planning.today')}
-          <Kbd className="ml-1">t</Kbd>
+          {!coarse && <Kbd className="ml-1">t</Kbd>}
         </Button>
         <div className="ml-auto flex items-center gap-2">
           <Button onClick={() => openExam('new')}>
             <Plus />
             {t('planning.newExam')}
-            <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+            {!coarse && (
+              <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+            )}
           </Button>
           <Tabs
             value={view}
@@ -240,11 +245,11 @@ function PlanningPage() {
             <TabsList>
               <TabsTrigger value="month">
                 {t('planning.month')}
-                <Kbd className="ml-1.5 border-transparent bg-transparent">m</Kbd>
+                {!coarse && <Kbd className="ml-1.5 border-transparent bg-transparent">m</Kbd>}
               </TabsTrigger>
               <TabsTrigger value="week">
                 {t('planning.week')}
-                <Kbd className="ml-1.5 border-transparent bg-transparent">s</Kbd>
+                {!coarse && <Kbd className="ml-1.5 border-transparent bg-transparent">s</Kbd>}
               </TabsTrigger>
             </TabsList>
           </Tabs>

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import { useCoarsePointer } from '@/lib/use-media-query'
 
 /**
  * Exit confirmation (spec §3.6, §4.6). Rendered inside the session overlay (not
@@ -10,6 +11,8 @@ import { Kbd } from '@/components/ui/kbd'
  * stray keystroke mid-flow.
  */
 export function ExitConfirm({ onResume, onQuit }: { onResume: () => void; onQuit: () => void }) {
+  // No keyboard on touch → drop the Échap/Q chips (fix-session §3).
+  const coarse = useCoarsePointer()
   return (
     <div
       className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
@@ -28,11 +31,13 @@ export function ExitConfirm({ onResume, onQuit }: { onResume: () => void; onQuit
         <div className="mt-5 flex justify-end gap-2">
           <Button autoFocus variant="secondary" onClick={onResume}>
             Reprendre
-            <Kbd className="ml-1">Échap</Kbd>
+            {!coarse && <Kbd className="ml-1">Échap</Kbd>}
           </Button>
           <Button variant="destructive" onClick={onQuit}>
             Quitter
-            <Kbd className="ml-1 border-danger-fg/30 bg-transparent text-danger-fg">Q</Kbd>
+            {!coarse && (
+              <Kbd className="ml-1 border-danger-fg/30 bg-transparent text-danger-fg">Q</Kbd>
+            )}
           </Button>
         </div>
       </div>

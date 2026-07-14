@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
 import { useT, type TKey } from '@/lib/i18n'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import { navChordFor } from '@/lib/keymap'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import { allDecksOptions } from '@/features/decks/queries'
@@ -103,6 +104,9 @@ export function CommandMenu() {
   const navigate = useNavigate()
   const { resolved, toggle } = useTheme()
   const t = useT()
+  // Keyboard chords are meaningless without a keyboard — hide the chips on touch
+  // (fix-session §3). Due counters below are data, not shortcuts, so they stay.
+  const coarse = useCoarsePointer()
 
   const [page, setPage] = useState<Page>('root')
   const [search, setSearch] = useState('')
@@ -193,7 +197,7 @@ export function CommandMenu() {
                 >
                   <item.icon />
                   {t(item.label)}
-                  {navChordFor(item.to) && (
+                  {!coarse && navChordFor(item.to) && (
                     <CommandShortcut>{navChordFor(item.to)}</CommandShortcut>
                   )}
                 </CommandItem>
@@ -302,7 +306,7 @@ export function CommandMenu() {
               >
                 <Keyboard />
                 {t('cmd.actions.showShortcuts')}
-                <CommandShortcut>?</CommandShortcut>
+                {!coarse && <CommandShortcut>?</CommandShortcut>}
               </CommandItem>
             </CommandGroup>
           </>
