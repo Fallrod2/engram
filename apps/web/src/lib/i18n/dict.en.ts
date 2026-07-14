@@ -66,6 +66,7 @@ export const dictEn: Dict = {
 
   header: {
     search: 'Search',
+    settings: 'Settings',
     backToDashboardAria: '{title} — go to dashboard',
   },
 
@@ -74,6 +75,14 @@ export const dictEn: Dict = {
     subjects: 'Subjects',
     planning: 'Planning',
     stats: 'Stats',
+    import: 'Import',
+  },
+
+  // Sub-line labels for the mobile 2-line list rows (fix-mobile-shell §lists).
+  listMeta: {
+    decks: '{count} decks',
+    cards: '{count} cards',
+    due: '{count} due',
   },
 
   cmd: {

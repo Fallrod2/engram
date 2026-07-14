@@ -49,7 +49,9 @@ export function ChartCard({
       onKeyDown={onKeyDown}
       className={cn('rounded-md bg-surface-2 p-4', className)}
     >
-      <header className="mb-3 flex items-center gap-3">
+      {/* Stack under sm so the title keeps its own line instead of being
+          truncated to "A." by the toolbar/toggle (fix-mobile-shell §heatmap). */}
+      <header className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <div className="min-w-0">
           <h2 id={labelId} className="truncate text-lg font-semibold tracking-[-0.01em] text-text">
             {title}
@@ -60,7 +62,7 @@ export function ChartCard({
             </p>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:ml-auto">
           {toolbar}
           {canToggle && (
             <div

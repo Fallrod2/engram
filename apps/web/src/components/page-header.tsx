@@ -23,16 +23,21 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('mb-6 flex items-start gap-3', className)}>
+    // Below `sm` the header stacks (breadcrumb / title full-width / actions on
+    // their own wrapping row) so the title is never squeezed to 0px by the
+    // right-aligned action buttons on a phone (fix-mobile-shell §PageHeader).
+    <div className={cn('mb-6 flex flex-col gap-3 sm:flex-row sm:items-start', className)}>
       <div className="min-w-0">
         {breadcrumb && <div className="mb-1 flex items-center gap-1.5 text-xs">{breadcrumb}</div>}
         {title !== undefined && (
-          <h1 className="flex items-center gap-2 truncate text-xl font-semibold tracking-[-0.02em] text-text">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-text">
             {title}
           </h1>
         )}
       </div>
-      {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:flex-nowrap">{actions}</div>
+      )}
     </div>
   )
 }

@@ -70,6 +70,7 @@ export const dictFr = {
 
   header: {
     search: 'Rechercher',
+    settings: 'Réglages',
     backToDashboardAria: '{title} — aller au tableau de bord',
   },
 
@@ -78,6 +79,14 @@ export const dictFr = {
     subjects: 'Matières',
     planning: 'Planning',
     stats: 'Stats',
+    import: 'Import',
+  },
+
+  // Sub-line labels for the mobile 2-line list rows (fix-mobile-shell §lists).
+  listMeta: {
+    decks: '{count} decks',
+    cards: '{count} cartes',
+    due: '{count} à réviser',
   },
 
   cmd: {

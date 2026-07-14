@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
  */
 export function entityRowClass(className?: string): string {
   return cn(
-    'group/row-link relative flex h-11 items-center gap-3 rounded-sm pl-3 pr-2',
+    'group/row-link relative flex min-h-11 items-center gap-3 rounded-sm pl-3 pr-2',
     'text-left transition-colors duration-fast ease-out',
     'hover:bg-surface-2 data-[active]:bg-surface-2',
     // Accent edge bar on keyboard selection.
