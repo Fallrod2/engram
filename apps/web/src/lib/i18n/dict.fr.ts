@@ -83,10 +83,14 @@ export const dictFr = {
   },
 
   // Sub-line labels for the mobile 2-line list rows (fix-mobile-shell §lists).
+  // Pluralised via usePlural() so a count of 1 reads '1 deck', not '1 decks'.
   listMeta: {
-    decks: '{count} decks',
-    cards: '{count} cartes',
-    due: '{count} à réviser',
+    decks_one: '{count} deck',
+    decks_other: '{count} decks',
+    cards_one: '{count} carte',
+    cards_other: '{count} cartes',
+    due_one: '{count} à réviser',
+    due_other: '{count} à réviser',
   },
 
   cmd: {

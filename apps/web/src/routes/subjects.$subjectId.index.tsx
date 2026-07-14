@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { DecksIllustration } from '@/components/illustrations'
 import { DecksSkeleton } from '@/components/skeletons'
@@ -72,6 +72,7 @@ function DecksPage() {
   const { subjectId } = Route.useParams()
   const navigate = useNavigate()
   const t = useT()
+  const plural = usePlural()
 
   const subject = useQuery(subjectDetailOptions(subjectId)).data
   const decks = useQuery(decksListOptions(subjectId)).data ?? []
@@ -274,9 +275,11 @@ function DecksPage() {
                     </span>
                     {/* Mobile-only meta sub-line. */}
                     <span className="flex items-center gap-1.5 pl-[1.625rem] font-mono text-2xs tabular-nums text-text-muted sm:hidden">
-                      <span>{t('listMeta.cards', { count: cards ?? 0 })}</span>
+                      <span>
+                        {t(`listMeta.cards_${plural(cards ?? 0)}`, { count: cards ?? 0 })}
+                      </span>
                       <span className="text-border-strong">·</span>
-                      <span>{t('listMeta.due', { count: due })}</span>
+                      <span>{t(`listMeta.due_${plural(due)}`, { count: due })}</span>
                     </span>
                     <CountStat value={cards} className="hidden justify-self-end sm:block" />
                     <DueCount
@@ -292,7 +295,7 @@ function DecksPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 text-text-muted"
+                          className="size-7 pointer-coarse:size-11 text-text-muted"
                           aria-label={`Actions pour ${d.name}`}
                         >
                           <MoreHorizontal />

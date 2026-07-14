@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/empty-state'
-import { useT } from '@/lib/i18n'
+import { useT, usePlural } from '@/lib/i18n'
 import { ErrorState } from '@/components/error-state'
 import { SubjectsIllustration } from '@/components/illustrations'
 import { SubjectsSkeleton } from '@/components/skeletons'
@@ -273,6 +273,7 @@ function SubjectsBody({
   onClearFilter: () => void
 }) {
   const t = useT()
+  const plural = usePlural()
   if (subjects.filter((s) => !s.archived).length === 0 && tab === 'active' && filter === '') {
     return (
       <EmptyState
@@ -348,11 +349,15 @@ function SubjectsBody({
                 </span>
                 {/* Mobile-only meta sub-line. */}
                 <span className="flex items-center gap-1.5 pl-[1.625rem] font-mono text-2xs tabular-nums text-text-muted sm:hidden">
-                  <span>{t('listMeta.decks', { count: deckCount ?? 0 })}</span>
+                  <span>
+                    {t(`listMeta.decks_${plural(deckCount ?? 0)}`, { count: deckCount ?? 0 })}
+                  </span>
                   <span className="text-border-strong">·</span>
-                  <span>{t('listMeta.cards', { count: cardTotal ?? 0 })}</span>
+                  <span>
+                    {t(`listMeta.cards_${plural(cardTotal ?? 0)}`, { count: cardTotal ?? 0 })}
+                  </span>
                   <span className="text-border-strong">·</span>
-                  <span>{t('listMeta.due', { count: due })}</span>
+                  <span>{t(`listMeta.due_${plural(due)}`, { count: due })}</span>
                 </span>
                 <CountStat value={deckCount} className="hidden justify-self-end sm:block" />
                 <CountStat value={cardTotal} className="hidden justify-self-end sm:block" />
@@ -396,7 +401,7 @@ function SubjectRowMenu({
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 text-text-muted"
+          className="size-7 pointer-coarse:size-11 text-text-muted"
           aria-label={`Actions pour ${subject.name}`}
         >
           <MoreHorizontal />
