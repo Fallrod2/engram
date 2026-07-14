@@ -82,11 +82,10 @@ export function codexResponsesUrl(): string {
 }
 
 /**
- * The page the user opens to authorize. The Codex CLI builds `{base}/codex/device`
- * (base = chatgpt.com); the user-facing doc also shows `auth.openai.com/device`.
- * openPoint: confirm the exact URL against a REAL account (Alex).
+ * The page the user opens to authorize. Confirmed against a REAL device link
+ * (14/07/2026): `auth.openai.com/codex/device` — `chatgpt.com/codex/device` 404s.
  */
-export const CODEX_VERIFICATION_URI = 'https://chatgpt.com/codex/device'
+export const CODEX_VERIFICATION_URI = 'https://auth.openai.com/codex/device'
 
 /** The CLI hard-caps device polling at 15 minutes; no expires_in is returned. */
 export const CODEX_DEVICE_EXPIRES_IN_SECONDS = 15 * 60
