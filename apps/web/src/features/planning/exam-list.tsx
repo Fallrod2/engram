@@ -19,6 +19,7 @@ import { SubjectDot } from '@/components/subject-dot'
 import { Countdown } from '@/components/countdown'
 import { useRovingList } from '@/lib/use-roving'
 import { isEditableTarget } from '@/lib/use-hotkeys'
+import { useCoarsePointer } from '@/lib/use-media-query'
 
 /** Imperative handle: move focus into the list (grid `e` fallback, spec §2.4). */
 export type ExamListHandle = { focus: () => void }
@@ -45,6 +46,7 @@ export function ExamList({
   onEdit: (exam: Exam) => void
   onDelete: (exam: Exam) => void
 }) {
+  const coarse = useCoarsePointer()
   const todayKey = localDayKey(now)
   const { upcoming, past } = useMemo(() => {
     const up: Exam[] = []
@@ -86,7 +88,7 @@ export function ExamList({
         action={
           <Button variant="secondary" onClick={onNew}>
             Nouvel examen
-            <Kbd className="ml-1">n</Kbd>
+            {!coarse && <Kbd className="ml-1">n</Kbd>}
           </Button>
         }
       />

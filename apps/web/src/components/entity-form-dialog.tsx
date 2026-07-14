@@ -10,6 +10,7 @@ import {
 import { Form } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import { cn } from '@/lib/utils'
 
 /**
@@ -40,6 +41,7 @@ export function EntityFormDialog<TFieldValues extends FieldValues>({
   /** Left-aligned footer slot (e.g. the card Markdown toggle). */
   footerExtra?: ReactNode
 }) {
+  const coarse = useCoarsePointer()
   const submit = form.handleSubmit((values) => {
     onSubmit(values)
     onOpenChange(false)
@@ -70,8 +72,12 @@ export function EntityFormDialog<TFieldValues extends FieldValues>({
                   Annuler
                 </Button>
                 <Button type="submit">
-                  {submitLabel}{' '}
-                  <Kbd className="ml-1.5 border-accent-fg/30 bg-transparent text-accent-fg">⌘↵</Kbd>
+                  {submitLabel}
+                  {!coarse && (
+                    <Kbd className="ml-1.5 border-accent-fg/30 bg-transparent text-accent-fg">
+                      ⌘↵
+                    </Kbd>
+                  )}
                 </Button>
               </div>
             </DialogFooter>

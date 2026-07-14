@@ -29,6 +29,7 @@ import { ConfirmDelete } from '@/components/confirm-delete'
 import { cn } from '@/lib/utils'
 import { useHotkeys } from '@/lib/use-hotkeys'
 import { useRovingList } from '@/lib/use-roving'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import {
   subjectsListOptions,
   useCreateSubject,
@@ -69,6 +70,7 @@ function SubjectsPage() {
   const updateMut = useUpdateSubject()
   const archiveMut = useArchiveSubject()
   const deleteMut = useDeleteSubject()
+  const coarse = useCoarsePointer()
 
   const deckCountBySubject = useMemo(() => {
     const m = new Map<string, number>()
@@ -186,7 +188,9 @@ function SubjectsPage() {
         <Button className="ml-auto" onClick={() => setCreateOpen(true)}>
           <Plus />
           Nouvelle matière
-          <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+          {!coarse && (
+            <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+          )}
         </Button>
       </div>
 
@@ -271,6 +275,7 @@ function SubjectsBody({
   onClearFilter: () => void
 }) {
   const t = useT()
+  const coarse = useCoarsePointer()
   if (subjects.filter((s) => !s.archived).length === 0 && tab === 'active' && filter === '') {
     return (
       <EmptyState
@@ -281,7 +286,9 @@ function SubjectsBody({
           <Button onClick={onNew}>
             <Plus />
             {t('cmd.actions.newSubject')}
-            <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+            {!coarse && (
+              <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+            )}
           </Button>
         }
       />

@@ -43,6 +43,7 @@ import { FsrsStateGlyph } from '@/components/fsrs-state-glyph'
 import { ConfirmDelete } from '@/components/confirm-delete'
 import { useHotkeys } from '@/lib/use-hotkeys'
 import { useRovingList } from '@/lib/use-roving'
+import { useCoarsePointer } from '@/lib/use-media-query'
 import { flattenMarkdown } from '@/lib/markdown'
 import { formatDateTime, formatDue, formatReps } from '@/lib/format'
 import { subjectDetailOptions } from '@/features/subjects/queries'
@@ -126,6 +127,7 @@ function CardsPage() {
   const { subjectId, deckId } = Route.useParams()
   const navigate = useNavigate()
   const t = useT()
+  const coarse = useCoarsePointer()
 
   const subject = useQuery(subjectDetailOptions(subjectId)).data
   const deck = useQuery(deckDetailOptions(deckId)).data
@@ -320,7 +322,9 @@ function CardsPage() {
             <Button onClick={() => composerRef.current?.focus()}>
               <Plus />
               Ajouter une carte
-              <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+              {!coarse && (
+                <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">n</Kbd>
+              )}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
