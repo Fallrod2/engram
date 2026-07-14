@@ -13,11 +13,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-accent text-accent-fg hover:bg-accent-hover active:bg-accent-active',
+        // AA variant B: buttons use the dedicated deep `-fill` tokens; `accent`
+        // itself (text, focus ring, progress, switch) is untouched.
+        default:
+          'bg-accent-fill text-accent-fg hover:bg-accent-fill-hover active:bg-accent-fill-active',
         secondary: 'bg-surface-2 text-text hover:bg-surface-3',
         ghost: 'text-text hover:bg-surface-2',
         outline: 'border border-border bg-transparent text-text hover:bg-surface-2',
-        destructive: 'bg-danger text-danger-fg hover:brightness-110',
+        destructive: 'bg-danger-fill text-danger-fg hover:bg-danger-fill-hover',
         link: 'text-accent underline-offset-4 hover:underline',
       },
       size: {
