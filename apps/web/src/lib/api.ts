@@ -83,7 +83,14 @@ async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T
     onUnauthorized()
     throw await toApiError(res)
   }
-  if (!res.ok) throw await toApiError(res)
+  if (!res.ok) {
+    const err = await toApiError(res)
+    // A newly-suspended account mid-use (IAM, amendment A3): route to the
+    // dedicated "account suspended" screen instead of letting every query fail
+    // silently. `/api/me` still 200s, so the screen can explain the lockout.
+    if (res.status === 403 && err.code === 'suspended') onSuspended()
+    throw err
+  }
   if (res.status === 204 || !schema) return undefined as T
   return schema.parse(await res.json())
 }
@@ -95,16 +102,20 @@ async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T
  */
 let authHeader: () => Record<string, string> = () => ({})
 let onUnauthorized: () => void = () => {}
+let onSuspended: () => void = () => {}
 
 export function configureAuth(opts: {
   getAccessToken: () => string | null
   onUnauthorized: () => void
+  /** Called once when a request 403s with code `suspended` (IAM, amendment A3). */
+  onSuspended?: () => void
 }): void {
   authHeader = () => {
     const token = opts.getAccessToken()
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
   onUnauthorized = opts.onUnauthorized
+  onSuspended = opts.onSuspended ?? (() => {})
 }
 
 export const api = {
@@ -117,6 +128,9 @@ export const api = {
   /** Write-only PUT (e.g. an API key): sends `body`, expects `204` (no schema). */
   put: (path: string, body: unknown) => request<void>(path, { method: 'PUT', body }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
+  /** DELETE that returns (and validates) a body — e.g. the admin GDPR delete result. */
+  deleteWith: <T>(path: string, schema: z.ZodType<T>) =>
+    request<T>(path, { method: 'DELETE', schema }),
   /** Multipart POST (file upload). `body` is a `FormData`; parsed via `schema`. */
   upload: <T>(path: string, body: FormData, schema: z.ZodType<T>) =>
     request<T>(path, { method: 'POST', body, schema }),

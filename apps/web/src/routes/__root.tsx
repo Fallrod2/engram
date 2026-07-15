@@ -65,6 +65,9 @@ function RootLayout() {
   // landing locally (landing spec §1). Placed AFTER the link branch to preserve
   // the invite/recovery flow.
   if (pathname === '/welcome') return <Outlet />
+  // The suspended screen renders bare (outside the shell) even though the user is
+  // authenticated — the shell's data queries would just 403 `suspended` (A3).
+  if (pathname === '/suspended') return <Outlet />
   if (status === 'unauthenticated') return <Outlet /> // /login and `/` landing render bare
   return <AppShell /> // AppShell already contains its own <Outlet/>
 }

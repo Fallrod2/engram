@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { resolveAuthConfig } from './config'
+import { resolveAuthConfig, resolveAdminUserId } from './config'
 
 /**
  * `resolveAuthConfig` matrix (spec §2.3/§6.1). A PURE function that NEVER throws
@@ -76,5 +76,28 @@ describe('resolveAuthConfig', () => {
     const cfg = resolveAuthConfig({ SUPABASE_JWT_SECRET: 'shhh' })
     expect(cfg.enforced).toBe(true)
     expect(cfg.jwtSecret).toBe('shhh')
+  })
+})
+
+/** `resolveAdminUserId` — the env anti-lockout filet (spec §2.2, amendment A9). */
+describe('resolveAdminUserId', () => {
+  it('bypass/dev (not enforced): the dev identity is the admin', () => {
+    const cfg = resolveAuthConfig({})
+    expect(resolveAdminUserId(cfg)).toBe('dev-user')
+  })
+
+  it('bypass with an explicit admin id: that id wins over the dev default', () => {
+    const cfg = resolveAuthConfig({ ENGRAM_ADMIN_USER_ID: 'root' })
+    expect(resolveAdminUserId(cfg)).toBe('root')
+  })
+
+  it('enforced with an admin id: strictly that id', () => {
+    const cfg = resolveAuthConfig({ SUPABASE_JWT_SECRET: 'shhh', ENGRAM_ADMIN_USER_ID: 'root' })
+    expect(resolveAdminUserId(cfg)).toBe('root')
+  })
+
+  it('enforced WITHOUT an admin id: undefined (no env filet — DB roles only)', () => {
+    const cfg = resolveAuthConfig({ SUPABASE_JWT_SECRET: 'shhh' })
+    expect(resolveAdminUserId(cfg)).toBeUndefined()
   })
 })

@@ -4,6 +4,16 @@
  * `queryOptions()` that combine one of these keys with its `queryFn`.
  */
 export const qk = {
+  /** The caller's own identity (`GET /api/me`) — drives the guard + admin nav. */
+  me: ['me'] as const,
+  admin: {
+    all: ['admin'] as const,
+    users: (q: { query: string | undefined; page: number; sort: string; dir: string }) =>
+      ['admin', 'users', q] as const,
+    userDetail: (userId: string) => ['admin', 'user', userId] as const,
+    stats: ['admin', 'stats'] as const,
+    audit: (page: number) => ['admin', 'audit', page] as const,
+  },
   subjects: {
     all: ['subjects'] as const,
     list: (opts: { includeArchived: boolean }) => ['subjects', 'list', opts] as const,

@@ -6,6 +6,7 @@ import { healthResponseSchema, type HealthResponse, type ApiErrorCode } from '@e
 import { ApiError } from './http/errors'
 import { resolveAuthConfig } from './auth/config'
 import { createAuthMiddleware } from './http/auth'
+import { createProfileMiddleware } from './http/profile'
 import { createDemoMiddleware } from './http/demo'
 import { getCardGenerator, configuredGenerator } from './ai/generator'
 import { subjectsRouter } from './routes/subjects'
@@ -19,6 +20,8 @@ import { studyPlanRouter } from './routes/study-plan'
 import { analyticsRouter } from './routes/analytics'
 import { backupRouter } from './routes/backup'
 import { aiRouter } from './routes/ai'
+import { meRouter } from './routes/me'
+import { adminRouter } from './routes/admin'
 
 /**
  * The Hono application, exported without a server binding so it can be
@@ -32,9 +35,14 @@ app.use('/api/*', cors({ origin: 'http://localhost:5173' }))
 // the routers. It resolves its config PER REQUEST from `process.env` — nothing is
 // read at this module's top level, so importing `app.ts` never throws (audit §6).
 app.use('/api/*', createAuthMiddleware())
-// Demo-account reset (spec §4). AFTER auth (needs the resolved identity) and
-// BEFORE the routers. No-op unless `ENGRAM_DEMO_USER_ID` is set AND the caller is
-// that demo user — so prod/dev/e2e without a demo account pay nothing.
+// IAM profile (spec §2.1). AFTER auth (needs `authClaims`) and BEFORE demo (which
+// reads the resolved `is_demo`). Lazily upserts the caller's `user_profile`,
+// stashes it in the context for the sync admin/demo guards, and enforces
+// suspension (403 `suspended`, except GET /api/me + the env-admin filet).
+app.use('/api/*', createProfileMiddleware())
+// Demo-account reset (spec §4). AFTER the profile middleware (reads `is_demo`)
+// and BEFORE the routers. No-op unless the caller is the demo account (profile
+// flag OR `ENGRAM_DEMO_USER_ID`) — so prod/dev/e2e without one pay nothing.
 app.use('/api/*', createDemoMiddleware())
 
 app.get('/api/health', (c) => {
@@ -70,6 +78,8 @@ app.route('/api/study-plan', studyPlanRouter) // projected load + "today" sugges
 app.route('/api/analytics', analyticsRouter) // heatmap, streaks, study-time, volume, retention, deck-success
 app.route('/api/backup', backupRouter) // full-database JSON export + restore
 app.route('/api/ai', aiRouter) // multi-provider AI config (settings, keys, test, models)
+app.route('/api/me', meRouter) // authenticated identity probe (guard + nav + suspended screen)
+app.route('/api/admin', adminRouter) // IAM console: users, role/status/demo, delete, stats, audit
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
 

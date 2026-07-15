@@ -48,6 +48,10 @@ authStore.setOnSignedOut(() => {
 configureAuth({
   getAccessToken: () => authStore.token(),
   onUnauthorized: () => authStore.forceSignOut(),
+  // A newly-suspended account mid-use (IAM, amendment A3): route to the dedicated
+  // screen instead of a silent cascade of failing queries. Idempotent — repeated
+  // 403s just re-navigate to the same bare route.
+  onSuspended: () => void router.navigate({ to: '/suspended' }),
 })
 
 // Capture any invite/recovery email link from the URL BEFORE hydration (so the

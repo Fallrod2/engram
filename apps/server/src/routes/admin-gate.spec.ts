@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { SignJWT } from 'jose'
 import { app } from '../app'
 import { db } from '../db/client'
-import { resetDb } from '../test-support/harness'
+import { resetDb, seedUserProfile } from '../test-support/harness'
 
 /**
  * Route-level authorization after the BYOK per-user switch (spec BYOK §1.3,
@@ -123,5 +123,19 @@ describe('backup routes — admin only (v1)', () => {
   it('admin (dev identity) → export succeeds', async () => {
     const r = await app.request('/api/backup/export')
     expect(r.status).toBe(200)
+  })
+
+  // The admin gate now resolves via the DB profile (spec §3, amendment A9): a user
+  // promoted to admin IN THE DB reaches the admin-only backup WITHOUT any env var.
+  it('a DB-promoted admin reaches backup export with NO env admin set', async () => {
+    process.env.SUPABASE_JWT_SECRET = SECRET // enforced; no ENGRAM_ADMIN_USER_ID
+    await seedUserProfile(db, { userId: 'db-admin', role: 'admin' })
+    const h = await bearer('db-admin')
+    const ok = await app.request('/api/backup/export', { headers: h })
+    expect(ok.status).toBe(200)
+    // A plain DB user (no env filet, role user) stays blocked.
+    await seedUserProfile(db, { userId: 'db-user' })
+    const denied = await app.request('/api/backup/export', { headers: await bearer('db-user') })
+    expect(denied.status).toBe(403)
   })
 })

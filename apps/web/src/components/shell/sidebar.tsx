@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { PanelLeftClose, PanelLeftOpen, Search, Settings } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck } from 'lucide-react'
 import type { Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SubjectDot } from '@/components/subject-dot'
 import { DueBadge, DueCount } from '@/components/due-count'
 import { subjectsListOptions } from '@/features/subjects/queries'
+import { meQuery } from '@/features/admin/queries'
 import { dueCountsOptions, bySubjectMap } from '@/features/due-counts/queries'
 import { streaksOptions } from '@/features/analytics/queries'
 import { useShell } from './shell-context'
@@ -28,6 +29,10 @@ export function Sidebar() {
   const subjectsQuery = useQuery(subjectsListOptions())
   const dueQuery = useQuery(dueCountsOptions())
   const dueLoading = dueQuery.isPending
+  // Conditional "Administration" entry (spec §4). Driven by the SAME shared
+  // /api/me cache as the /admin guard (amendment A12) and hidden while pending —
+  // so it never flashes in for a non-admin.
+  const isAdmin = useQuery(meQuery()).data?.isAdmin === true
 
   // Real streak for the footer pill (was hard-coded `days={0}`, spec §5.3bis).
   // A stable `now` keeps the query from churning across renders.
@@ -230,6 +235,29 @@ export function Sidebar() {
         )}
       >
         <div className={cn('flex items-center gap-1', collapsed && 'flex-col')}>
+          {isAdmin &&
+            (collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    to="/admin"
+                    aria-label={t('sidebar.admin')}
+                    className="flex size-8 items-center justify-center rounded-sm text-text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-text data-[status=active]:bg-accent-subtle data-[status=active]:text-accent"
+                  >
+                    <ShieldCheck className="size-4" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">{t('sidebar.admin')}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Link
+                to="/admin"
+                className="flex h-8 items-center gap-2 rounded-sm px-2 text-sm text-text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-text data-[status=active]:bg-accent-subtle data-[status=active]:text-accent"
+              >
+                <ShieldCheck className="size-4" />
+                {t('sidebar.admin')}
+              </Link>
+            ))}
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>

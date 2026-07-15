@@ -6,6 +6,7 @@ import {
   AUTH_WEB_URL,
   AUTH_API_HEALTH_URL,
   AUTH_TEST_SECRET,
+  AUTH_ADMIN_SUB,
 } from './fixtures/auth-env'
 
 /**
@@ -56,6 +57,9 @@ export default defineConfig({
         DATABASE_URL: runDb.url,
         ENGRAM_FAKE_AI: '1',
         SUPABASE_JWT_SECRET: AUTH_TEST_SECRET,
+        // The instance admin for the /admin scenarios (admin.spec.ts). Recognised
+        // via the permanent env filet; every other minted `sub` is a plain user.
+        ENGRAM_ADMIN_USER_ID: AUTH_ADMIN_SUB,
         ANTHROPIC_API_KEY: 'e2e-fake-key',
         TZ: 'Europe/Paris',
       },

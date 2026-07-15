@@ -38,3 +38,4 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>
 
 export * from './domain'
 export * from './backup'
+export * from './admin'
