@@ -169,7 +169,9 @@ test.describe('Delegated administration (ON, HS256)', () => {
     await expect(form).toBeVisible()
     await form.getByPlaceholder('ex. Modérateurs').fill(groupName)
     await form.getByRole('button', { name: 'Voir les utilisateurs' }).click()
-    await form.getByRole('button', { name: 'Créer' }).click()
+    // `exact` — the `groups.manage` permission toggle's description also contains
+    // the word "Créer", so a substring match would be ambiguous.
+    await form.getByRole('button', { name: 'Créer', exact: true }).click()
     await expect(form).toBeHidden()
 
     // The new card shows the name and the granted-permission badge.
