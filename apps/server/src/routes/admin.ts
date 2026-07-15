@@ -19,6 +19,7 @@ import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
 import { requireAdmin, requirePermission } from '../http/identity'
+import { isAdminProfile } from '../services/profile.service'
 import { resolveAuthConfig } from '../auth/config'
 import { resolveAdminAuthClient, resolveInviteRedirect } from '../auth/admin-client'
 import { AccountMgmtUnavailableError } from '../http/errors'
@@ -91,8 +92,13 @@ adminRouter.post('/users', zValidator('json', adminCreateUserSchema), async (c) 
 
 /**
  * Edit an account's email (spec §2, amendment A11) — `requirePermission('users.manage')`
- * (not an escalation, so no `requireAdmin`). GoTrue is the unicity authority (a
- * clash → 409 `email_taken`). Unavailable config → clean 503.
+ * for a plain user (not an escalation). But editing an ADMIN target's email IS an
+ * admin-target action (wave-1b review): a `users.manage`-only delegate must not be
+ * able to repoint an admin's login email and seize the account via forgot-password,
+ * so the service demands the actor be an admin when the target is one. We resolve
+ * the actor's admin status here (same predicate as `requireAdmin`) and pass it in;
+ * the target's admin status is checked inside the service, before any GoTrue write.
+ * GoTrue is the unicity authority (a clash → 409 `email_taken`). No config → 503.
  */
 adminRouter.patch(
   '/users/:id',
@@ -101,11 +107,16 @@ adminRouter.patch(
   async (c) => {
     const actor = requirePermission(c, 'users.manage')
     const cfg = resolveAuthConfig(process.env)
+    const actorIsAdmin = isAdminProfile(c.get('userProfile'), actor, cfg)
     const client = resolveAdminAuthClient(cfg)
     if (!client) throw new AccountMgmtUnavailableError()
     const { id } = c.req.valid('param')
     const { email } = c.req.valid('json')
-    return ok(c, adminUserSummarySchema, await updateUserEmailAccount(db, actor, client, id, email))
+    return ok(
+      c,
+      adminUserSummarySchema,
+      await updateUserEmailAccount(db, actor, actorIsAdmin, client, id, email),
+    )
   },
 )
 

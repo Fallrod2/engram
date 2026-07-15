@@ -323,6 +323,81 @@ describe('PATCH /api/admin/users/:id — edit email', () => {
     const res = await req('/api/admin/users/u-edit', 'PATCH', { email: 'dupe@x.io' })
     expect(res.status).toBe(409)
   })
+
+  // A `users.manage` delegate must NOT be able to repoint an admin's login email and
+  // then seize the account through the public forgot-password flow (wave-1b review).
+  it('a users.manage delegate editing an ADMIN target → 403, no GoTrue call', async () => {
+    enforced()
+    await seedUserProfile(db, { userId: 'boss', role: 'admin', email: 'boss@x.io' })
+    await seedUserProfile(db, { userId: 'manager' })
+    const g = await seedGroup(db, { name: 'M' })
+    await seedGroupMember(db, g.id, 'manager')
+    await seedGroupPermission(db, g.id, 'users.manage')
+    const { calls } = mockClient()
+
+    const res = await req(
+      '/api/admin/users/boss',
+      'PATCH',
+      { email: 'attacker@evil.io' },
+      await bearer('manager'),
+    )
+    expect(res.status).toBe(403)
+    expect(calls.updateEmail).toHaveLength(0)
+    const [profile] = await db.select().from(userProfile).where(eq(userProfile.userId, 'boss'))
+    expect(profile!.email).toBe('boss@x.io')
+  })
+
+  it('an admin CAN edit another admin’s email', async () => {
+    enforced()
+    await seedUserProfile(db, { userId: 'boss', role: 'admin' })
+    await seedUserProfile(db, { userId: 'other-admin', role: 'admin', email: 'old@x.io' })
+    const { calls } = mockClient()
+
+    const res = await req(
+      '/api/admin/users/other-admin',
+      'PATCH',
+      { email: 'new@x.io' },
+      await bearer('boss'),
+    )
+    expect(res.status).toBe(200)
+    expect(calls.updateEmail).toEqual([{ id: 'other-admin', email: 'new@x.io' }])
+    const [profile] = await db
+      .select()
+      .from(userProfile)
+      .where(eq(userProfile.userId, 'other-admin'))
+    expect(profile!.email).toBe('new@x.io')
+  })
+})
+
+// --- Create never MUTATES an existing account (hardening, wave-1b) ----------
+
+describe('POST /api/admin/users — create never overwrites an existing account', () => {
+  it('a returned already-known sub → 409, existing role/email untouched', async () => {
+    // Pre-existing ADMIN row at the sub GoTrue will hand back. Bypass mode → the
+    // dev-user is admin; the body omits `role` (defaults to 'user'). The old upsert
+    // would have DEMOTED this admin to 'user' and relabelled it `user.create`.
+    await seedUserProfile(db, { userId: NEW_SUB, role: 'admin', email: 'existing@x.io' })
+    const g = await seedGroup(db, { name: 'Team' })
+    const { calls } = mockClient()
+
+    const res = await req('/api/admin/users', 'POST', {
+      mode: 'invite',
+      email: 'newbie@x.io',
+      groupIds: [g.id],
+    })
+    expect(res.status).toBe(409)
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('email_taken')
+
+    // The existing account is intact: role, email, no phantom group, no bogus audit.
+    const [profile] = await db.select().from(userProfile).where(eq(userProfile.userId, NEW_SUB))
+    expect(profile!.role).toBe('admin')
+    expect(profile!.email).toBe('existing@x.io')
+    expect(calls.invite).toHaveLength(1) // GoTrue was called before the conflict surfaced
+    const members = await db.select().from(groupMember).where(eq(groupMember.userId, NEW_SUB))
+    expect(members).toHaveLength(0)
+    const audits = await db.select().from(adminAudit).where(eq(adminAudit.action, 'user.create'))
+    expect(audits).toHaveLength(0)
+  })
 })
 
 // --- No secret ever surfaces in identity/health ----------------------------

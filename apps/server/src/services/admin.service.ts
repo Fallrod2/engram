@@ -45,6 +45,7 @@ import {
   effectiveActiveAdminIds,
   getEmailsByIds,
   getProfile,
+  isAdminProfile,
   lockAdminGuard,
   wouldBeLastActiveAdmin,
 } from './profile.service'
@@ -640,7 +641,7 @@ export async function createUserAccount(
 
   await db.transaction(async (tx) => {
     const now = new Date()
-    await tx
+    const inserted = await tx
       .insert(userProfile)
       .values({
         userId: newSub,
@@ -650,10 +651,15 @@ export async function createUserAccount(
         updatedAt: now,
         lastSeenAt: now,
       })
-      .onConflictDoUpdate({
-        target: userProfile.userId,
-        set: { email: input.email, role: input.role, updatedAt: now },
-      })
+      // A CREATE endpoint must never MUTATE an existing account (hardening, wave-1b
+      // review): a role/email upsert here would bypass `setRole`'s last-admin +
+      // audit invariants and mis-label the change as `user.create`. Insert-or-abort.
+      // GoTrue is the unicity authority, so a confirmed dup already 409s upstream;
+      // if it ever returned an already-known sub (e.g. re-inviting an unconfirmed
+      // user), we surface `email_taken` rather than overwrite the existing row.
+      .onConflictDoNothing({ target: userProfile.userId })
+      .returning({ userId: userProfile.userId })
+    if (inserted.length === 0) throw new EmailTakenError()
     if (groupIds.length > 0) {
       await tx
         .insert(groupMember)
@@ -676,16 +682,28 @@ export async function createUserAccount(
  * account surfaces as 409 `email_taken`. Order: verify the target profile exists
  * (404 otherwise), then GoTrue, then mirror `user_profile.email` + audit
  * `user.update` with `{ emailChanged: true }` (no PII, parity groups.service).
+ *
+ * Editing an ADMIN target's login email is itself an admin-target action (wave-1b
+ * review): the `users.manage` gate alone would let a non-admin delegate repoint an
+ * admin's login email to an address they control, then seize the account through
+ * the PUBLIC forgot-password flow — a full privilege takeover. So when the target
+ * is an effective admin (DB role OR the env anti-lockout filet) the ACTOR must be
+ * an admin too (parity with the `requireAdmin` gate on role/demo/delete). Checked
+ * BEFORE any GoTrue write, so no auth.users mutation happens on a refused edit.
  */
 export async function updateUserEmailAccount(
   db: DB,
   actorUserId: string,
+  actorIsAdmin: boolean,
   client: AdminAuthClient,
   targetUserId: string,
   email: string,
 ): Promise<AdminUserSummary> {
   const target = await getProfile(db, targetUserId)
   if (!target) throw new NotFoundError('user not found')
+  if (!actorIsAdmin && isAdminProfile(target, targetUserId, resolveAuthConfig(process.env))) {
+    throw new ForbiddenError('editing an admin account requires admin')
+  }
   try {
     await client.updateUserEmail(targetUserId, email)
   } catch (e) {
