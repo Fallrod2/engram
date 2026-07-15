@@ -319,8 +319,11 @@ function RowActions({
   const canSetDemo = isAdmin && !user.isDemo && user.role !== 'admin'
   const canUnsetDemo = isAdmin && user.isDemo
   const canDelete = isAdmin && !isSelf && !user.isDemo
-  // Editing the email is a `users.manage` capability (parity with the server, A11).
-  const canEdit = canManageUsers
+  // Editing the email is a `users.manage` capability (parity with the server, A11)
+  // — EXCEPT editing an admin account's email, which is admin-only (wave-1b review:
+  // a delegate must not repoint an admin's login email and seize it via
+  // forgot-password). Mirrors the server admin-target guard.
+  const canEdit = canManageUsers && (isAdmin || user.role !== 'admin')
 
   const hasAny =
     canEdit ||
