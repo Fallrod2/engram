@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { SignJWT } from 'jose'
 import { eq } from 'drizzle-orm'
 import { app } from '../app'
 import { db } from '../db/client'
+import { createTestDb } from '../db/test-db'
 import { adminAudit, userProfile } from '../db/schema'
 import {
   resetDb,
@@ -20,7 +21,7 @@ import {
   setStatus,
   stats,
 } from '../services/admin.service'
-import { resolveProfile } from '../services/profile.service'
+import { lockAdminGuard, resolveProfile } from '../services/profile.service'
 
 /**
  * IAM / admin coverage (spec §5.1). Two layers:
@@ -104,6 +105,36 @@ describe('admin.service — role guards', () => {
   it('refuses to promote the demo account', async () => {
     await seedUserProfile(db, { userId: 'demo', isDemo: true })
     expect(setRole(db, 'admin-a', 'demo', 'admin')).rejects.toThrow(/demo/)
+  })
+})
+
+describe('admin.service — last-admin guard is serialized by an advisory lock', () => {
+  // The concurrency invariant: two admins demoting each other at once must not
+  // both pass (→ zero admins). PGlite serializes transactions on one connection,
+  // so it cannot exhibit the race — the REAL proof is `db/admin-guard-race.pgtest`.
+  // Here we prove the two ingredients under PGlite: the lock IS requested, and
+  // the guard recounts the effective admin set (so it sees committed state).
+  it('lockAdminGuard issues a pg_advisory_xact_lock statement', async () => {
+    const t = await createTestDb()
+    try {
+      const spy = spyOn(t.client, 'query')
+      await lockAdminGuard(t.db)
+      const requested = spy.mock.calls.some((c) => String(c[0]).includes('pg_advisory_xact_lock'))
+      spy.mockRestore()
+      expect(requested).toBe(true)
+    } finally {
+      await t.cleanup()
+    }
+  })
+
+  it('recounts admins after the lock: demoting the now-sole admin is refused', async () => {
+    enforcedNoEnvAdmin()
+    await seedUserProfile(db, { userId: 'admin-a', role: 'admin' })
+    await seedUserProfile(db, { userId: 'admin-b', role: 'admin' })
+    // First demote succeeds (two admins → one remains).
+    await setRole(db, 'admin-a', 'admin-b', 'user')
+    // The recount now sees a single admin → the second demote is blocked.
+    await expect(setRole(db, 'admin-b', 'admin-a', 'user')).rejects.toThrow(/last active admin/)
   })
 })
 

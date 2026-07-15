@@ -76,8 +76,11 @@ export function AdminAuditTab() {
 
 function AuditRow({ entry, t }: { entry: AdminAuditEntry; t: TFunction }) {
   const [open, setOpen] = useState(false)
-  const actor = entry.actorEmail ?? shortId(entry.actorUserId)
-  const target = entry.targetEmail ?? (entry.targetUserId ? shortId(entry.targetUserId) : null)
+  // The audit journal outlives the accounts it references (GDPR delete keeps the
+  // row); once a profile is gone its email no longer resolves, so fall back to a
+  // localized "deleted account" label rather than a raw id.
+  const actor = entry.actorEmail ?? t('admin.audit.unknownUser')
+  const target = entry.targetEmail ?? (entry.targetUserId ? t('admin.audit.unknownUser') : null)
   const hasDetails = Object.keys(entry.details).length > 0
 
   return (
@@ -93,7 +96,7 @@ function AuditRow({ entry, t }: { entry: AdminAuditEntry; t: TFunction }) {
       {hasDetails && (
         <Collapsible open={open} onOpenChange={setOpen}>
           <CollapsibleTrigger className="mt-1 text-2xs text-text-faint hover:text-text-muted">
-            {open ? '−' : '+'} details
+            {t('admin.audit.detailsToggle', { sign: open ? '−' : '+' })}
           </CollapsibleTrigger>
           <CollapsibleContent>
             <pre className="mt-1 overflow-x-auto rounded-sm bg-surface-2 p-2 font-mono text-2xs text-text-muted">
@@ -104,8 +107,4 @@ function AuditRow({ entry, t }: { entry: AdminAuditEntry; t: TFunction }) {
       )}
     </li>
   )
-}
-
-function shortId(id: string): string {
-  return id.length > 14 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
 }

@@ -147,6 +147,7 @@ export const dictFr = {
     audit: {
       empty: 'Aucune action enregistrée.',
       subtitle: 'Chaque écriture admin est tracée ici.',
+      detailsToggle: '{sign} détails',
       unknownUser: 'compte supprimé',
       actions: {
         rolePromote: 'a promu admin',

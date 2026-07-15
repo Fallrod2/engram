@@ -14,6 +14,14 @@ export const AUTH_WEB_URL = `http://localhost:${AUTH_PORTS.web}`
 /** Shared HS256 secret: signs the test tokens AND verifies them on the server. */
 export const AUTH_TEST_SECRET = 'engram-e2e-auth-secret-at-least-32-bytes-long!!'
 
+/**
+ * `sub` the auth-ON harness treats as the instance admin (wired as
+ * `ENGRAM_ADMIN_USER_ID` in `playwright.auth.config.ts`). A token minted with
+ * this subject is admin via the permanent env filet; every other sub is a plain
+ * user. Kept here so the config and the admin spec agree on one value.
+ */
+export const AUTH_ADMIN_SUB = 'e2e-admin-user'
+
 /** The storageKey configured in apps/web/src/lib/supabase.ts. */
 export const AUTH_STORAGE_KEY = 'engram-auth'
 
@@ -45,13 +53,27 @@ export interface SeedSession {
   user: { id: string; aud: string; role: string; email: string }
 }
 
-/** A supabase-js-compatible persisted session wrapping the given access token. */
-export function seedSession(accessToken: string): SeedSession {
+/**
+ * A supabase-js-compatible persisted session wrapping the given access token.
+ * `user` is parametrizable (amendment A14): the multi-user admin scenarios mint
+ * tokens with distinct `sub`s, and `session.user.id`/`email` MUST match the JWT
+ * subject or supabase-js (client) and the server (JWT-scoped) would disagree.
+ * Defaults preserve the original single-user fixture for the existing specs.
+ */
+export function seedSession(
+  accessToken: string,
+  user: { id?: string; email?: string } = {},
+): SeedSession {
   return {
     access_token: accessToken,
     refresh_token: 'e2e-refresh',
     expires_at: Math.floor(Date.now() / 1000) + 86_400, // far future → no refresh
     token_type: 'bearer',
-    user: { id: 'e2e-user', aud: 'authenticated', role: 'authenticated', email: 'test@local' },
+    user: {
+      id: user.id ?? 'e2e-user',
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: user.email ?? 'test@local',
+    },
   }
 }

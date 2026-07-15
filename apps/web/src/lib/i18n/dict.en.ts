@@ -141,6 +141,7 @@ export const dictEn: Dict = {
     audit: {
       empty: 'No action recorded yet.',
       subtitle: 'Every admin write is traced here.',
+      detailsToggle: '{sign} details',
       unknownUser: 'deleted account',
       actions: {
         rolePromote: 'promoted to admin',

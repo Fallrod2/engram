@@ -147,6 +147,34 @@ export async function wouldBeLastActiveAdmin(
   return set.size === 0
 }
 
+/**
+ * Constant key serializing the admin-invariant write paths (demote / suspend /
+ * delete of an admin) under one transaction-scoped advisory lock — the same
+ * mechanism `http/demo.ts` uses to serialize the demo reset. Any distinct
+ * constant works; every guarded write must share THIS one so they serialize.
+ */
+export const ADMIN_GUARD_LOCK_KEY = 728461
+
+/**
+ * Take the shared advisory lock BEFORE recounting the effective active-admin set,
+ * so the "last admin" guard sees committed state (amendment: the last-admin
+ * invariant, unlike the demo singleton, has no DB constraint backing it).
+ *
+ * Without it, two admins demoting each other concurrently each read a 2-admin set
+ * before the other commits, both pass, and the set empties → total lockout. The
+ * lock (`pg_advisory_xact_lock`, released at commit/rollback) forces the second
+ * writer to block until the first commits, then recount the fresh state. PGlite
+ * accepts the call (it already runs in demo.ts) but serializes transactions
+ * anyway; the REAL concurrency proof lives in `db/admin-guard-race.pgtest.ts`.
+ *
+ * Accepts `DB | Tx` so a unit test can drive it against the top-level handle (and
+ * observe the emitted statement); production callers always pass a real `Tx`, so
+ * the lock is transaction-scoped and released on commit/rollback.
+ */
+export async function lockAdminGuard(tx: DB | Tx): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${ADMIN_GUARD_LOCK_KEY})`)
+}
+
 /** Read a single profile row (admin detail / mutation echo), or undefined. */
 export async function getProfile(db: DB | Tx, userId: string): Promise<RequestProfile | undefined> {
   const [row] = await db

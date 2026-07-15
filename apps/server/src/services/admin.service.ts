@@ -34,6 +34,7 @@ import {
   effectiveActiveAdminIds,
   getEmailsByIds,
   getProfile,
+  lockAdminGuard,
   wouldBeLastActiveAdmin,
 } from './profile.service'
 
@@ -351,6 +352,9 @@ export async function setRole(
 ): Promise<AdminUserSummary> {
   const cfg = resolveAuthConfig(process.env)
   await db.transaction(async (tx) => {
+    // Serialize with the other admin-invariant writes so the last-admin recount
+    // below sees committed state, not a stale snapshot (concurrent demote race).
+    await lockAdminGuard(tx)
     const target = await requireTarget(tx, targetUserId)
     if (role === 'user') {
       if (targetUserId === actorUserId) throw new ForbiddenError('cannot demote yourself')
@@ -388,6 +392,9 @@ export async function setStatus(
 ): Promise<AdminUserSummary> {
   const cfg = resolveAuthConfig(process.env)
   await db.transaction(async (tx) => {
+    // Serialize with the other admin-invariant writes so the last-admin recount
+    // below sees committed state, not a stale snapshot (concurrent suspend race).
+    await lockAdminGuard(tx)
     const target = await requireTarget(tx, targetUserId)
     if (status === 'suspended') {
       if (targetUserId === actorUserId) throw new ForbiddenError('cannot suspend yourself')
@@ -463,6 +470,9 @@ export async function deleteUser(
 
   let deletedCounts!: AdminDeleteCounts
   await db.transaction(async (tx) => {
+    // Serialize with the other admin-invariant writes so the last-admin recount
+    // below sees committed state, not a stale snapshot (concurrent delete race).
+    await lockAdminGuard(tx)
     const target = await requireTarget(tx, targetUserId)
     if (target.role === 'admin') {
       // Never delete an effective active admin if it is the last one.
@@ -567,8 +577,13 @@ export async function stats(db: DB): Promise<AdminStatsResponse> {
   const [totalsRow] = await db
     .select({
       users: count(),
+      // Use the typed `gte` helper, not a raw `${sevenDaysAgo}` interpolation:
+      // a bare Date param has no SQL type, so postgres-js (prepared statements,
+      // the default on a direct connection) throws serializing it — while PGlite
+      // tolerates it. `gte` binds the Date through the column's timestamp mapper
+      // (same as `generation.createdAt` below), so it is safe on both drivers.
       active7d:
-        sql<number>`coalesce(sum(case when ${userProfile.lastSeenAt} >= ${sevenDaysAgo} then 1 else 0 end), 0)`.mapWith(
+        sql<number>`coalesce(sum(case when ${gte(userProfile.lastSeenAt, sevenDaysAgo)} then 1 else 0 end), 0)`.mapWith(
           Number,
         ),
       suspended:
