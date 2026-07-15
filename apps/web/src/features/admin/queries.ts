@@ -3,11 +3,15 @@ import { toast } from 'sonner'
 import {
   adminAuditResponseSchema,
   adminDeleteUserResponseSchema,
+  adminGroupSchema,
+  adminGroupMembersResponseSchema,
+  adminGroupsResponseSchema,
   adminStatsResponseSchema,
   adminUserDetailSchema,
   adminUsersResponseSchema,
   adminUserSummarySchema,
   meResponseSchema,
+  type AdminPermission,
   type AdminUsersQuery,
   type UserRole,
   type UserStatus,
@@ -118,4 +122,78 @@ export function useDeleteUser() {
       void qc.invalidateQueries({ queryKey: qk.admin.all })
     },
   })
+}
+
+// --- Groups (delegated administration, rbac-groups §5) ---------------------
+
+export function adminGroupsOptions() {
+  return queryOptions({
+    queryKey: qk.admin.groups,
+    queryFn: ({ signal }) => api.get('/admin/groups', adminGroupsResponseSchema, signal),
+  })
+}
+
+export function adminGroupMembersOptions(groupId: string) {
+  return queryOptions({
+    queryKey: qk.admin.groupMembers(groupId),
+    queryFn: ({ signal }) =>
+      api.get(`/admin/groups/${groupId}/members`, adminGroupMembersResponseSchema, signal),
+  })
+}
+
+/**
+ * Shared group-write scaffold: invalidate the whole admin surface (group list,
+ * the user list's chips) + `/api/me` (a membership change may alter the caller's
+ * OWN effective permissions) and surface a guard rejection (403) as a toast.
+ */
+function useGroupMutation<Vars>(mutationFn: (vars: Vars) => Promise<unknown>) {
+  const qc = useQueryClient()
+  const t = useT()
+  return useMutation({
+    mutationFn,
+    onError: (err: Error) => {
+      toast.error(t('admin.toasts.actionFailed'), { description: err.message })
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.admin.all })
+      void qc.invalidateQueries({ queryKey: qk.me })
+    },
+  })
+}
+
+export function useCreateGroup() {
+  return useGroupMutation<{ name: string; description?: string }>((body) =>
+    api.post('/admin/groups', body, adminGroupSchema),
+  )
+}
+
+export function useUpdateGroup() {
+  return useGroupMutation<{ id: string; name?: string; description?: string | null }>(
+    ({ id, ...body }) => api.patch(`/admin/groups/${id}`, body, adminGroupSchema),
+  )
+}
+
+export function useDeleteGroup() {
+  return useGroupMutation<{ id: string }>(({ id }) => api.delete(`/admin/groups/${id}`))
+}
+
+export function useSetGroupPermissions() {
+  return useGroupMutation<{ id: string; permissions: AdminPermission[] }>(({ id, permissions }) =>
+    api.putWith(`/admin/groups/${id}/permissions`, { permissions }, adminGroupSchema),
+  )
+}
+
+export function useAddMember() {
+  return useGroupMutation<{ groupId: string; userId: string }>(({ groupId, userId }) =>
+    api.post(`/admin/groups/${groupId}/members`, { userId }, adminGroupMembersResponseSchema),
+  )
+}
+
+export function useRemoveMember() {
+  return useGroupMutation<{ groupId: string; userId: string }>(({ groupId, userId }) =>
+    api.deleteWith(
+      `/admin/groups/${groupId}/members/${encodeURIComponent(userId)}`,
+      adminGroupMembersResponseSchema,
+    ),
+  )
 }

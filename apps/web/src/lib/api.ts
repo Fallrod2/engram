@@ -127,6 +127,9 @@ export const api = {
     request<T>(path, { method: 'PATCH', body, schema }),
   /** Write-only PUT (e.g. an API key): sends `body`, expects `204` (no schema). */
   put: (path: string, body: unknown) => request<void>(path, { method: 'PUT', body }),
+  /** PUT that returns (and validates) a body — e.g. replacing a group's permissions. */
+  putWith: <T>(path: string, body: unknown, schema: z.ZodType<T>) =>
+    request<T>(path, { method: 'PUT', body, schema }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
   /** DELETE that returns (and validates) a body — e.g. the admin GDPR delete result. */
   deleteWith: <T>(path: string, schema: z.ZodType<T>) =>

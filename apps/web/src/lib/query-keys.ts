@@ -13,6 +13,8 @@ export const qk = {
     userDetail: (userId: string) => ['admin', 'user', userId] as const,
     stats: ['admin', 'stats'] as const,
     audit: (page: number) => ['admin', 'audit', page] as const,
+    groups: ['admin', 'groups'] as const,
+    groupMembers: (groupId: string) => ['admin', 'groups', groupId, 'members'] as const,
   },
   subjects: {
     all: ['subjects'] as const,
