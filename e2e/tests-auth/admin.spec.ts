@@ -57,8 +57,10 @@ test.describe('IAM admin console (ON, HS256)', () => {
     await expect(page).toHaveURL(/\/admin/) // not bounced
     // The conditional sidebar entry is present for an admin.
     await expect(page.locator('a[href="/admin"]').first()).toBeVisible()
-    // The users table rendered and lists the seeded account.
-    await expect(page.getByText('e2e-listed@local')).toBeVisible()
+    // The users table rendered and lists the seeded account. Scope to the
+    // desktop table: the responsive console also renders a mobile card list in
+    // the DOM, so an unscoped getByText matches twice (strict-mode violation).
+    await expect(page.getByRole('table').getByText('e2e-listed@local')).toBeVisible()
   })
 
   test('a non-admin is bounced from /admin with no admin content and no sidebar entry', async ({
