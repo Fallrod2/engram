@@ -208,6 +208,11 @@ describe('admin.service — list + stats multi-user', () => {
     expect(res.users[0]!.userId).toBe('u1')
     expect(res.users[0]!.cards).toBe(2)
     expect(res.users[0]!.subjects).toBe(1)
+    // Aggregates are SCOPED PER USER: u2 owns nothing (regression guard for the
+    // correlated-subquery bug where every row showed the global card count).
+    expect(res.users[1]!.userId).toBe('u2')
+    expect(res.users[1]!.cards).toBe(0)
+    expect(res.users[1]!.subjects).toBe(0)
   })
 
   it('search matches on email (LIKE metacharacters escaped)', async () => {

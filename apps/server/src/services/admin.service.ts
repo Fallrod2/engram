@@ -45,53 +45,61 @@ import {
  * audit rows) any PII (amendment A13): emails are joined only at read time.
  */
 
-// --- Correlated per-user aggregates (secret-free) --------------------------
-// Scalar subqueries keyed on the profile row. At the app's scale (a handful of
-// users) this is well within budget and keeps sorting by an aggregate trivial.
+// --- Per-user usage aggregates (secret-free) -------------------------------
+// Grouped subqueries LEFT-JOINed onto `user_profile`. NOT correlated scalar
+// subqueries: drizzle does not qualify a bare `${table.column}` inside a `sql`
+// fragment, so `where ${card.userId} = ${userProfile.userId}` would collapse to
+// `where user_id = user_id` (always true → counts EVERY row). The grouped-join
+// form scopes correctly and each aggregate is 1:1 with the profile on user_id
+// (no row multiplication).
 
-const subjectsExpr =
-  sql<number>`(select count(*) from ${subject} where ${subject.userId} = ${userProfile.userId})`.mapWith(
-    Number,
-  )
-const decksExpr =
-  sql<number>`(select count(*) from ${deck} where ${deck.userId} = ${userProfile.userId})`.mapWith(
-    Number,
-  )
-const cardsExpr =
-  sql<number>`(select count(*) from ${card} where ${card.userId} = ${userProfile.userId})`.mapWith(
-    Number,
-  )
-const notesExpr =
-  sql<number>`(select count(*) from ${note} where ${note.userId} = ${userProfile.userId})`.mapWith(
-    Number,
-  )
-const reviewsExpr =
-  sql<number>`(select count(*) from ${reviewLog} where ${reviewLog.userId} = ${userProfile.userId})`.mapWith(
-    Number,
-  )
-const generationsExpr =
-  sql<number>`(select count(*) from ${generation} where ${generation.userId} = ${userProfile.userId})`.mapWith(
-    Number,
-  )
-const tokensExpr =
-  sql<number>`(select coalesce(sum(coalesce(${generation.promptTokens}, 0) + coalesce(${generation.completionTokens}, 0)), 0) from ${generation} where ${generation.userId} = ${userProfile.userId})`.mapWith(
-    Number,
-  )
-
-const SUMMARY_COLUMNS = {
-  userId: userProfile.userId,
-  email: userProfile.email,
-  role: userProfile.role,
-  status: userProfile.status,
-  isDemo: userProfile.isDemo,
-  createdAt: userProfile.createdAt,
-  lastSeenAt: userProfile.lastSeenAt,
-  subjects: subjectsExpr,
-  cards: cardsExpr,
-  notes: notesExpr,
-  generations: generationsExpr,
-  tokens: tokensExpr,
+function usageAggregates(db: DB) {
+  // Each count/sum gets a UNIQUE alias: drizzle renders a subquery field as its
+  // bare `.as()` name inside a `sql` fragment (no table qualification), so reusing
+  // `n` across joins would make `coalesce("n", 0)` ambiguous.
+  const subjects = db
+    .select({ uid: subject.userId, n: count().as('subjects_n') })
+    .from(subject)
+    .groupBy(subject.userId)
+    .as('subjects_agg')
+  const decks = db
+    .select({ uid: deck.userId, n: count().as('decks_n') })
+    .from(deck)
+    .groupBy(deck.userId)
+    .as('decks_agg')
+  const cards = db
+    .select({ uid: card.userId, n: count().as('cards_n') })
+    .from(card)
+    .groupBy(card.userId)
+    .as('cards_agg')
+  const notes = db
+    .select({ uid: note.userId, n: count().as('notes_n') })
+    .from(note)
+    .groupBy(note.userId)
+    .as('notes_agg')
+  const reviews = db
+    .select({ uid: reviewLog.userId, n: count().as('reviews_n') })
+    .from(reviewLog)
+    .groupBy(reviewLog.userId)
+    .as('reviews_agg')
+  const gens = db
+    .select({
+      uid: generation.userId,
+      n: count().as('gens_n'),
+      // Columns here live in the `generation` FROM, so bare names are unambiguous.
+      tokens:
+        sql<number>`coalesce(sum(coalesce(${generation.promptTokens}, 0) + coalesce(${generation.completionTokens}, 0)), 0)`.as(
+          'gens_tokens',
+        ),
+    })
+    .from(generation)
+    .groupBy(generation.userId)
+    .as('gens_agg')
+  return { subjects, decks, cards, notes, reviews, gens }
 }
+
+/** `coalesce(agg.col, 0)` → a Number-mapped expression (each alias is unique). */
+const num = (col: unknown) => sql<number>`coalesce(${col}, 0)`.mapWith(Number)
 
 function toSummary(row: {
   userId: string
@@ -131,24 +139,6 @@ function searchClause(query: string | undefined): SQL | undefined {
   return or(ilike(userProfile.email, pattern), ilike(userProfile.userId, pattern))
 }
 
-/** Map the closed sort enum to a concrete ORDER BY expression (never raw). */
-function orderClause(sort: AdminUsersQuery['sort'], dir: AdminUsersQuery['dir']): SQL {
-  const wrap = dir === 'asc' ? asc : desc
-  switch (sort) {
-    case 'createdAt':
-      return wrap(userProfile.createdAt)
-    case 'email':
-      return wrap(userProfile.email)
-    case 'cards':
-      return wrap(cardsExpr)
-    case 'tokens':
-      return wrap(tokensExpr)
-    case 'lastSeen':
-    default:
-      return wrap(userProfile.lastSeenAt)
-  }
-}
-
 export async function listUsers(db: DB, params: AdminUsersQuery): Promise<AdminUsersResponse> {
   const where = searchClause(params.query)
   const [{ total }] = (await db.select({ total: count() }).from(userProfile).where(where)) as [
@@ -158,12 +148,46 @@ export async function listUsers(db: DB, params: AdminUsersQuery): Promise<AdminU
   const pageSize = ADMIN_USERS_PAGE_SIZE
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(params.page, totalPages)
+
+  const agg = usageAggregates(db)
+  const cardsCol = num(agg.cards.n)
+  const tokensCol = num(agg.gens.tokens)
+  // Map the closed sort enum to a concrete ORDER BY expression (never raw, A11).
+  const wrap = params.dir === 'asc' ? asc : desc
+  const orderExpr =
+    params.sort === 'createdAt'
+      ? wrap(userProfile.createdAt)
+      : params.sort === 'email'
+        ? wrap(userProfile.email)
+        : params.sort === 'cards'
+          ? wrap(cardsCol)
+          : params.sort === 'tokens'
+            ? wrap(tokensCol)
+            : wrap(userProfile.lastSeenAt)
+
   const rows = await db
-    .select(SUMMARY_COLUMNS)
+    .select({
+      userId: userProfile.userId,
+      email: userProfile.email,
+      role: userProfile.role,
+      status: userProfile.status,
+      isDemo: userProfile.isDemo,
+      createdAt: userProfile.createdAt,
+      lastSeenAt: userProfile.lastSeenAt,
+      subjects: num(agg.subjects.n),
+      cards: cardsCol,
+      notes: num(agg.notes.n),
+      generations: num(agg.gens.n),
+      tokens: tokensCol,
+    })
     .from(userProfile)
+    .leftJoin(agg.subjects, eq(agg.subjects.uid, userProfile.userId))
+    .leftJoin(agg.cards, eq(agg.cards.uid, userProfile.userId))
+    .leftJoin(agg.notes, eq(agg.notes.uid, userProfile.userId))
+    .leftJoin(agg.gens, eq(agg.gens.uid, userProfile.userId))
     .where(where)
     // Secondary key keeps pagination deterministic when the primary ties.
-    .orderBy(orderClause(params.sort, params.dir), asc(userProfile.userId))
+    .orderBy(orderExpr, asc(userProfile.userId))
     .limit(pageSize)
     .offset((page - 1) * pageSize)
 
@@ -171,9 +195,31 @@ export async function listUsers(db: DB, params: AdminUsersQuery): Promise<AdminU
 }
 
 export async function userDetail(db: DB, userId: string): Promise<AdminUserDetail> {
+  const agg = usageAggregates(db)
   const [row] = await db
-    .select({ ...SUMMARY_COLUMNS, decks: decksExpr, reviews: reviewsExpr })
+    .select({
+      userId: userProfile.userId,
+      email: userProfile.email,
+      role: userProfile.role,
+      status: userProfile.status,
+      isDemo: userProfile.isDemo,
+      createdAt: userProfile.createdAt,
+      lastSeenAt: userProfile.lastSeenAt,
+      subjects: num(agg.subjects.n),
+      cards: num(agg.cards.n),
+      notes: num(agg.notes.n),
+      generations: num(agg.gens.n),
+      tokens: num(agg.gens.tokens),
+      decks: num(agg.decks.n),
+      reviews: num(agg.reviews.n),
+    })
     .from(userProfile)
+    .leftJoin(agg.subjects, eq(agg.subjects.uid, userProfile.userId))
+    .leftJoin(agg.decks, eq(agg.decks.uid, userProfile.userId))
+    .leftJoin(agg.cards, eq(agg.cards.uid, userProfile.userId))
+    .leftJoin(agg.notes, eq(agg.notes.uid, userProfile.userId))
+    .leftJoin(agg.reviews, eq(agg.reviews.uid, userProfile.userId))
+    .leftJoin(agg.gens, eq(agg.gens.uid, userProfile.userId))
     .where(eq(userProfile.userId, userId))
   if (!row) throw new NotFoundError('user not found')
 
@@ -485,9 +531,27 @@ async function countUserData(tx: Tx, userId: string): Promise<AdminDeleteCounts>
 }
 
 async function echoSummary(db: DB, userId: string): Promise<AdminUserSummary> {
+  const agg = usageAggregates(db)
   const [row] = await db
-    .select(SUMMARY_COLUMNS)
+    .select({
+      userId: userProfile.userId,
+      email: userProfile.email,
+      role: userProfile.role,
+      status: userProfile.status,
+      isDemo: userProfile.isDemo,
+      createdAt: userProfile.createdAt,
+      lastSeenAt: userProfile.lastSeenAt,
+      subjects: num(agg.subjects.n),
+      cards: num(agg.cards.n),
+      notes: num(agg.notes.n),
+      generations: num(agg.gens.n),
+      tokens: num(agg.gens.tokens),
+    })
     .from(userProfile)
+    .leftJoin(agg.subjects, eq(agg.subjects.uid, userProfile.userId))
+    .leftJoin(agg.cards, eq(agg.cards.uid, userProfile.userId))
+    .leftJoin(agg.notes, eq(agg.notes.uid, userProfile.userId))
+    .leftJoin(agg.gens, eq(agg.gens.uid, userProfile.userId))
     .where(eq(userProfile.userId, userId))
   if (!row) throw new NotFoundError('user not found')
   return toSummary(row)
