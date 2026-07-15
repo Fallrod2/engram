@@ -337,3 +337,14 @@ export const adminAddMemberSchema = z.object({
   userId: z.string().trim().min(1).max(255),
 })
 export type AdminAddMember = z.infer<typeof adminAddMemberSchema>
+
+/** Path params for a member sub-route: the group `id` + the member `userId`. */
+export const adminGroupMemberParamSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+})
+export type AdminGroupMemberParam = z.infer<typeof adminGroupMemberParamSchema>
+
+/** `DELETE /admin/groups/:id` acknowledgement. */
+export const adminGroupDeleteResponseSchema = z.object({ deleted: z.literal(true) })
+export type AdminGroupDeleteResponse = z.infer<typeof adminGroupDeleteResponseSchema>
