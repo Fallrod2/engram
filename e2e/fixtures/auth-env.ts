@@ -22,6 +22,15 @@ export const AUTH_TEST_SECRET = 'engram-e2e-auth-secret-at-least-32-bytes-long!!
  */
 export const AUTH_ADMIN_SUB = 'e2e-admin-user'
 
+/**
+ * A SECOND, non-admin subject used by the delegated-administration specs
+ * (rbac-groups §6.3). It is a plain `user` — it gains targeted admin permissions
+ * ONLY through group membership the admin grants at runtime, and loses them when
+ * removed. Kept here so the delegated specs share one canonical delegate identity;
+ * the other delegated scenarios mint further distinct subs inline for isolation.
+ */
+export const AUTH_DELEGATE_SUB = 'e2e-delegate-user'
+
 /** The storageKey configured in apps/web/src/lib/supabase.ts. */
 export const AUTH_STORAGE_KEY = 'engram-auth'
 
