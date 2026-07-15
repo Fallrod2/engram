@@ -29,10 +29,12 @@ export function Sidebar() {
   const subjectsQuery = useQuery(subjectsListOptions())
   const dueQuery = useQuery(dueCountsOptions())
   const dueLoading = dueQuery.isPending
-  // Conditional "Administration" entry (spec §4). Driven by the SAME shared
-  // /api/me cache as the /admin guard (amendment A12) and hidden while pending —
-  // so it never flashes in for a non-admin.
-  const isAdmin = useQuery(meQuery()).data?.isAdmin === true
+  // Conditional "Administration" entry (spec §4 + rbac-groups §5, amendment G1).
+  // Driven by the SAME shared /api/me cache as the /admin guard (amendment A12)
+  // and hidden while pending — so it never flashes in. Visible for an admin OR
+  // any delegate (a non-empty permission set), mirroring the route guard.
+  const me = useQuery(meQuery()).data
+  const isAdmin = me ? me.isAdmin || me.permissions.length > 0 : false
 
   // Real streak for the footer pill (was hard-coded `days={0}`, spec §5.3bis).
   // A stable `now` keeps the query from churning across renders.

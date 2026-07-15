@@ -232,6 +232,15 @@ function UserCell({ user, isSelf }: { user: AdminUserSummary; isSelf: boolean })
         <span className="truncate font-mono text-2xs text-text-faint">{shortId(user.userId)}</span>
       )}
       {!user.email && <span className="sr-only">{primary}</span>}
+      {user.groups.length > 0 && (
+        <span className="mt-1 flex flex-wrap gap-1">
+          {user.groups.map((g) => (
+            <Badge key={g.id} variant="outline">
+              {g.name}
+            </Badge>
+          ))}
+        </span>
+      )}
     </div>
   )
 }
@@ -271,15 +280,20 @@ function RowActions({
   const setRole = useSetRole()
   const setStatus = useSetStatus()
   const setDemo = useSetDemo()
+  const me = useQuery(meQuery()).data
 
-  // Mirror the SERVER guards so the UI never offers a forbidden action.
-  const canPromote = user.role === 'user' && !user.isDemo
-  const canDemote = user.role === 'admin' && !isSelf
-  const canSuspend = user.status === 'active' && !isSelf
-  const canReactivate = user.status === 'suspended'
-  const canSetDemo = !user.isDemo && user.role !== 'admin'
-  const canUnsetDemo = user.isDemo
-  const canDelete = !isSelf && !user.isDemo
+  // Mirror the SERVER guards AND the caller's permissions (rbac-groups, amendment
+  // G1) so the UI never offers an action the server would 403. role/demo/delete
+  // stay admin-only (requireAdmin); suspend/reactivate are delegable (users.manage).
+  const isAdmin = me?.isAdmin === true
+  const canManageUsers = isAdmin || (me?.permissions.includes('users.manage') ?? false)
+  const canPromote = isAdmin && user.role === 'user' && !user.isDemo
+  const canDemote = isAdmin && user.role === 'admin' && !isSelf
+  const canSuspend = canManageUsers && user.status === 'active' && !isSelf
+  const canReactivate = canManageUsers && user.status === 'suspended'
+  const canSetDemo = isAdmin && !user.isDemo && user.role !== 'admin'
+  const canUnsetDemo = isAdmin && user.isDemo
+  const canDelete = isAdmin && !isSelf && !user.isDemo
 
   const hasAny =
     canPromote ||

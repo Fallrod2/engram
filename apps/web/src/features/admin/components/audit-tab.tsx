@@ -18,6 +18,12 @@ const ACTION_KEY: Record<AdminAuditAction, TKey> = {
   'demo.set': 'admin.audit.actions.demoSet',
   'demo.unset': 'admin.audit.actions.demoUnset',
   'user.delete': 'admin.audit.actions.userDelete',
+  'group.create': 'admin.audit.actions.groupCreate',
+  'group.update': 'admin.audit.actions.groupUpdate',
+  'group.delete': 'admin.audit.actions.groupDelete',
+  'group.permissions': 'admin.audit.actions.groupPermissions',
+  'group.member.add': 'admin.audit.actions.groupMemberAdd',
+  'group.member.remove': 'admin.audit.actions.groupMemberRemove',
 }
 
 export function AdminAuditTab() {

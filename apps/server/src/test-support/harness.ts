@@ -9,12 +9,15 @@ import {
   exam,
   examSubject,
   generation,
+  groupMember,
+  groupPermission,
   note,
   reviewLog,
   subject,
+  userGroup,
   userProfile,
 } from '../db/schema'
-import type { UserRole, UserStatus } from '@engram/shared'
+import type { AdminPermission, UserRole, UserStatus } from '@engram/shared'
 import { fsrsCardToColumns } from '../db/mappers'
 import { localMidnight } from '../lib/day'
 import { DEFAULT_DEV_USER_ID } from '../auth/config'
@@ -48,11 +51,36 @@ export async function resetDb(db: DB): Promise<void> {
   // specs sharing the preloaded PGlite database.
   await db.delete(appSettings)
   await db.delete(aiCredential)
+  // RBAC group tables (rbac-groups §2): children BEFORE the parent (FK-safe).
+  await db.delete(groupPermission)
+  await db.delete(groupMember)
+  await db.delete(userGroup)
   // IAM tables (spec §5.1). NOTE: the profile middleware RECREATES a caller's
   // profile lazily during a route spec — seed AFTER resetDb, and never assert a
   // profile COUNT without accounting for that lazy creation (amendment A9).
   await db.delete(adminAudit)
   await db.delete(userProfile)
+}
+
+/** Seed a `user_group` row (rbac-groups §5 helper). Returns the created group. */
+export async function seedGroup(db: DB, o: { name?: string; description?: string | null } = {}) {
+  const [row] = await db
+    .insert(userGroup)
+    .values({ name: o.name ?? 'Group', description: o.description ?? null })
+    .returning()
+  return row!
+}
+
+/** Add a user to a group (composite PK). */
+export async function seedGroupMember(db: DB, groupId: string, userId: string) {
+  const [row] = await db.insert(groupMember).values({ groupId, userId }).returning()
+  return row!
+}
+
+/** Grant a permission to a group (composite PK). */
+export async function seedGroupPermission(db: DB, groupId: string, permission: AdminPermission) {
+  const [row] = await db.insert(groupPermission).values({ groupId, permission }).returning()
+  return row!
 }
 
 /**

@@ -22,6 +22,7 @@ import { backupRouter } from './routes/backup'
 import { aiRouter } from './routes/ai'
 import { meRouter } from './routes/me'
 import { adminRouter } from './routes/admin'
+import { groupsRouter } from './routes/groups'
 
 /**
  * The Hono application, exported without a server binding so it can be
@@ -80,6 +81,7 @@ app.route('/api/backup', backupRouter) // full-database JSON export + restore
 app.route('/api/ai', aiRouter) // multi-provider AI config (settings, keys, test, models)
 app.route('/api/me', meRouter) // authenticated identity probe (guard + nav + suspended screen)
 app.route('/api/admin', adminRouter) // IAM console: users, role/status/demo, delete, stats, audit
+app.route('/api/admin/groups', groupsRouter) // delegated-admin groups: CRUD, permissions, members
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
 

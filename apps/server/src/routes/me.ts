@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { meResponseSchema } from '@engram/shared'
+import { ADMIN_PERMISSIONS, meResponseSchema } from '@engram/shared'
 import { ok } from '../http/respond'
 import { requireUserId } from '../http/identity'
 import { resolveAuthConfig } from '../auth/config'
@@ -18,11 +18,15 @@ meRouter.get('/', (c) => {
   const userId = requireUserId(c)
   const profile = c.get('userProfile')
   const cfg = resolveAuthConfig(process.env)
+  const isAdmin = isAdminProfile(profile, userId, cfg)
   return ok(c, meResponseSchema, {
     userId,
     email: profile?.email ?? null,
-    isAdmin: isAdminProfile(profile, userId, cfg),
+    isAdmin,
     isDemo: isDemoProfile(profile, userId, cfg),
     status: profile?.status ?? 'active',
+    // ALL for an admin / env-admin (even a bypass env-admin whose DB role is
+    // 'user'), else the raw group union — reuse the SAME `isAdmin` (amendment C3).
+    permissions: isAdmin ? [...ADMIN_PERMISSIONS] : [...(profile?.permissions ?? [])],
   })
 })

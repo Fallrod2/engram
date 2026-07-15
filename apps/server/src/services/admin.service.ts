@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, gte, ilike, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, ilike, inArray, or, sql, type SQL } from 'drizzle-orm'
 import type {
   AdminAuditResponse,
   AdminDeleteCounts,
   AdminDeleteUserResponse,
   AdminStatsResponse,
   AdminUserDetail,
+  AdminUserGroupRef,
   AdminUserSummary,
   AdminUsersQuery,
   AdminUsersResponse,
@@ -21,9 +22,11 @@ import {
   deck,
   exam,
   generation,
+  groupMember,
   note,
   reviewLog,
   subject,
+  userGroup,
   userProfile,
 } from '../db/schema'
 import { localDayKey, localMidnight } from '../lib/day'
@@ -102,20 +105,23 @@ function usageAggregates(db: DB) {
 /** `coalesce(agg.col, 0)` → a Number-mapped expression (each alias is unique). */
 const num = (col: unknown) => sql<number>`coalesce(${col}, 0)`.mapWith(Number)
 
-function toSummary(row: {
-  userId: string
-  email: string | null
-  role: string
-  status: string
-  isDemo: boolean
-  createdAt: Date
-  lastSeenAt: Date
-  subjects: number
-  cards: number
-  notes: number
-  generations: number
-  tokens: number
-}): AdminUserSummary {
+function toSummary(
+  row: {
+    userId: string
+    email: string | null
+    role: string
+    status: string
+    isDemo: boolean
+    createdAt: Date
+    lastSeenAt: Date
+    subjects: number
+    cards: number
+    notes: number
+    generations: number
+    tokens: number
+  },
+  groups: AdminUserGroupRef[] = [],
+): AdminUserSummary {
   return {
     userId: row.userId,
     email: row.email,
@@ -129,7 +135,34 @@ function toSummary(row: {
     notes: row.notes,
     generations: row.generations,
     tokens: row.tokens,
+    groups,
   }
+}
+
+/**
+ * Resolve the group memberships of a set of users in ONE query (id + name), keyed
+ * by user id. Empty ids → empty map (no query). Used to decorate the user list /
+ * detail / write echoes with `groups` chips (rbac-groups §4).
+ */
+async function groupsByUserIds(
+  db: DB,
+  userIds: string[],
+): Promise<Map<string, AdminUserGroupRef[]>> {
+  const ids = [...new Set(userIds)].filter((id) => id.length > 0)
+  const map = new Map<string, AdminUserGroupRef[]>()
+  if (ids.length === 0) return map
+  const rows = await db
+    .select({ userId: groupMember.userId, id: userGroup.id, name: userGroup.name })
+    .from(groupMember)
+    .innerJoin(userGroup, eq(userGroup.id, groupMember.groupId))
+    .where(inArray(groupMember.userId, ids))
+    .orderBy(asc(userGroup.name))
+  for (const r of rows) {
+    const list = map.get(r.userId) ?? []
+    list.push({ id: r.id, name: r.name })
+    map.set(r.userId, list)
+  }
+  return map
 }
 
 /** Escape LIKE metacharacters so a literal `%`/`_` never widens the filter (A11). */
@@ -192,7 +225,17 @@ export async function listUsers(db: DB, params: AdminUsersQuery): Promise<AdminU
     .limit(pageSize)
     .offset((page - 1) * pageSize)
 
-  return { users: rows.map(toSummary), page, pageSize, total, totalPages }
+  const groups = await groupsByUserIds(
+    db,
+    rows.map((r) => r.userId),
+  )
+  return {
+    users: rows.map((r) => toSummary(r, groups.get(r.userId) ?? [])),
+    page,
+    pageSize,
+    total,
+    totalPages,
+  }
 }
 
 export async function userDetail(db: DB, userId: string): Promise<AdminUserDetail> {
@@ -258,8 +301,9 @@ export async function userDetail(db: DB, userId: string): Promise<AdminUserDetai
   ])
   const activity30d = build30dActivity(now, gens, revs)
 
+  const groups = (await groupsByUserIds(db, [userId])).get(userId) ?? []
   return {
-    ...toSummary(row),
+    ...toSummary(row, groups),
     decks: row.decks,
     reviews: row.reviews,
     byProvider,
@@ -487,6 +531,11 @@ export async function deleteUser(
     await wipeUserData(tx, targetUserId)
     await tx.delete(appSettings).where(eq(appSettings.userId, targetUserId))
     await tx.delete(aiCredential).where(eq(aiCredential.userId, targetUserId))
+    // Purge group memberships (amendment E1): `group_member.user_id` has no FK to
+    // `user_profile`, so a GDPR delete must remove them explicitly — otherwise a
+    // future user reusing the same `sub` would inherit phantom groups. NOT done in
+    // `wipeUserData` (that runs on every demo reset; a demo keeps its groups).
+    await tx.delete(groupMember).where(eq(groupMember.userId, targetUserId))
     await tx.delete(userProfile).where(eq(userProfile.userId, targetUserId))
     await writeAudit(tx, actorUserId, 'user.delete', targetUserId, { deletedCounts })
   })
@@ -564,7 +613,8 @@ async function echoSummary(db: DB, userId: string): Promise<AdminUserSummary> {
     .leftJoin(agg.gens, eq(agg.gens.uid, userProfile.userId))
     .where(eq(userProfile.userId, userId))
   if (!row) throw new NotFoundError('user not found')
-  return toSummary(row)
+  const groups = (await groupsByUserIds(db, [userId])).get(userId) ?? []
+  return toSummary(row, groups)
 }
 
 // --- Stats -----------------------------------------------------------------
