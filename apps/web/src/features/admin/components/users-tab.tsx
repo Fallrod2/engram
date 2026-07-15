@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
+  Pencil,
+  Plus,
   Search,
   ShieldCheck,
   ShieldMinus,
@@ -40,6 +42,8 @@ import { formatRelativeTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { adminUsersOptions, meQuery, useSetDemo, useSetRole, useSetStatus } from '../queries'
 import { DeleteUserDialog } from './delete-user-dialog'
+import { CreateUserDialog } from './create-user-dialog'
+import { EditUserDialog } from './edit-user-dialog'
 
 /** Compact integer formatter (tokens read in the thousands). */
 function fmt(n: number): string {
@@ -69,18 +73,33 @@ export function AdminUsersTab() {
   const data = usersQuery.data
 
   const [deleteTarget, setDeleteTarget] = useState<AdminUserSummary | null>(null)
+  const [editTarget, setEditTarget] = useState<AdminUserSummary | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+
+  // Mirror the server gate: creating/editing accounts needs `users.manage` (or
+  // admin). The server is the sole authority; this only hides an action that would
+  // otherwise 403 (or 503 when Supabase account management is not configured).
+  const canManageUsers = me?.isAdmin === true || (me?.permissions.includes('users.manage') ?? false)
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative max-w-sm">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-text-faint" />
-        <Input
-          value={rawQuery}
-          onChange={(e) => setRawQuery(e.target.value)}
-          placeholder={t('admin.users.searchPlaceholder')}
-          className="pl-8"
-          aria-label={t('admin.users.searchPlaceholder')}
-        />
+      <div className="flex items-center justify-between gap-2">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-text-faint" />
+          <Input
+            value={rawQuery}
+            onChange={(e) => setRawQuery(e.target.value)}
+            placeholder={t('admin.users.searchPlaceholder')}
+            className="pl-8"
+            aria-label={t('admin.users.searchPlaceholder')}
+          />
+        </div>
+        {canManageUsers && (
+          <Button size="sm" className="shrink-0" onClick={() => setCreateOpen(true)}>
+            <Plus className="size-4" />
+            <span className="sr-only sm:not-sr-only">{t('admin.users.createAccount')}</span>
+          </Button>
+        )}
       </div>
 
       {usersQuery.isPending ? (
@@ -136,6 +155,7 @@ export function AdminUsersTab() {
                         user={u}
                         isSelf={u.userId === me?.userId}
                         onDelete={() => setDeleteTarget(u)}
+                        onEdit={() => setEditTarget(u)}
                       />
                     </TableCell>
                   </TableRow>
@@ -157,6 +177,7 @@ export function AdminUsersTab() {
                     user={u}
                     isSelf={u.userId === me?.userId}
                     onDelete={() => setDeleteTarget(u)}
+                    onEdit={() => setEditTarget(u)}
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -214,6 +235,8 @@ export function AdminUsersTab() {
         user={deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
       />
+      <EditUserDialog user={editTarget} onOpenChange={(open) => !open && setEditTarget(null)} />
+      {createOpen && <CreateUserDialog onOpenChange={setCreateOpen} />}
     </div>
   )
 }
@@ -271,10 +294,12 @@ function RowActions({
   user,
   isSelf,
   onDelete,
+  onEdit,
 }: {
   user: AdminUserSummary
   isSelf: boolean
   onDelete: () => void
+  onEdit: () => void
 }) {
   const t = useT()
   const setRole = useSetRole()
@@ -294,8 +319,11 @@ function RowActions({
   const canSetDemo = isAdmin && !user.isDemo && user.role !== 'admin'
   const canUnsetDemo = isAdmin && user.isDemo
   const canDelete = isAdmin && !isSelf && !user.isDemo
+  // Editing the email is a `users.manage` capability (parity with the server, A11).
+  const canEdit = canManageUsers
 
   const hasAny =
+    canEdit ||
     canPromote ||
     canDemote ||
     canSuspend ||
@@ -320,6 +348,12 @@ function RowActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {canEdit && (
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="size-4" />
+            {t('admin.users.edit')}
+          </DropdownMenuItem>
+        )}
         {canPromote && (
           <DropdownMenuItem
             onClick={() =>

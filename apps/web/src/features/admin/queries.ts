@@ -11,14 +11,15 @@ import {
   adminUsersResponseSchema,
   adminUserSummarySchema,
   meResponseSchema,
+  type AdminCreateUser,
   type AdminPermission,
   type AdminUsersQuery,
   type UserRole,
   type UserStatus,
 } from '@engram/shared'
-import { api, qs } from '@/lib/api'
+import { api, qs, ApiError } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
-import { useT } from '@/lib/i18n'
+import { useT, type TFunction } from '@/lib/i18n'
 
 /**
  * IAM/admin data layer. `meQuery` (the identity probe) is the pivot: the `/admin`
@@ -122,6 +123,51 @@ export function useDeleteUser() {
       void qc.invalidateQueries({ queryKey: qk.admin.all })
     },
   })
+}
+
+// --- Account CRUD (spec §2, GoTrue Admin API) ------------------------------
+
+/**
+ * Map an account-CRUD failure to a specific, localized toast description: the
+ * dedicated codes (amendment A3/A12) — `email_taken` and `account_mgmt_unavailable`
+ * — get their own message; anything else falls back to the server's message.
+ */
+function accountErrorDescription(t: TFunction, err: Error): string {
+  if (err instanceof ApiError) {
+    if (err.code === 'email_taken') return t('admin.toasts.emailTaken')
+    if (err.code === 'account_mgmt_unavailable') return t('admin.toasts.mgmtUnavailable')
+  }
+  return err.message
+}
+
+/** Account write scaffold: invalidate the admin surface + surface CRUD-specific errors. */
+function useAccountMutation<Vars>(mutationFn: (vars: Vars) => Promise<unknown>) {
+  const qc = useQueryClient()
+  const t = useT()
+  return useMutation({
+    mutationFn,
+    onError: (err: Error) => {
+      toast.error(t('admin.toasts.actionFailed'), { description: accountErrorDescription(t, err) })
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.admin.all })
+      void qc.invalidateQueries({ queryKey: qk.me })
+    },
+  })
+}
+
+/** Create an account (invite by email or temporary password). Returns the new summary. */
+export function useCreateUser() {
+  return useAccountMutation<AdminCreateUser>((body) =>
+    api.post('/admin/users', body, adminUserSummarySchema),
+  )
+}
+
+/** Edit an account's login email. */
+export function useUpdateUserEmail() {
+  return useAccountMutation<{ userId: string; email: string }>(({ userId, email }) =>
+    api.patch(`/admin/users/${userId}`, { email }, adminUserSummarySchema),
+  )
 }
 
 // --- Groups (delegated administration, rbac-groups §5) ---------------------
