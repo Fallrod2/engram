@@ -156,6 +156,38 @@ export type AdminSetRole = z.infer<typeof adminSetRoleSchema>
 export type AdminSetStatus = z.infer<typeof adminSetStatusSchema>
 export type AdminSetDemo = z.infer<typeof adminSetDemoSchema>
 
+// --- Account CRUD (spec §2, GoTrue Admin API) ------------------------------
+
+/**
+ * Create a user account (spec §2, amendments A1/A2/A10). A DISCRIMINATED UNION on
+ * `mode` makes the password branch the ONLY shape that carries a `password`:
+ *  - `mode='invite'` → GoTrue emails a magic link; the user lands on /set-password
+ *    (existing flow). The server NEVER handles a password.
+ *  - `mode='password'` → the admin supplies a temporary password (min 8), sent to
+ *    GoTrue over TLS with `email_confirm:true`. It is NEVER logged/audited/echoed.
+ *
+ * `role` defaults to `'user'` (a body without `role` can NEVER create an admin —
+ * amendment A2). `groupIds` is validated to exist server-side BEFORE the GoTrue
+ * call (amendment A8) and gated by `groups.manage` at the route (amendment A1).
+ */
+const accountFields = {
+  email: z.string().trim().email().max(255),
+  role: userRoleSchema.default('user'),
+  groupIds: z.array(z.string().trim().min(1).max(255)).max(50).optional(),
+}
+
+export const adminCreateUserSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('invite'), ...accountFields }),
+  z.object({ mode: z.literal('password'), password: z.string().min(8).max(72), ...accountFields }),
+])
+export type AdminCreateUser = z.infer<typeof adminCreateUserSchema>
+
+/** Edit an existing account's email (spec §2, amendment A11). GoTrue is the unicity authority. */
+export const adminUpdateUserSchema = z.object({
+  email: z.string().trim().email().max(255),
+})
+export type AdminUpdateUser = z.infer<typeof adminUpdateUserSchema>
+
 /** Counts removed by a full GDPR delete, surfaced for the audit + the toast. */
 export const adminDeleteCountsSchema = z.object({
   subjects: z.number().int(),
@@ -231,6 +263,11 @@ export const adminAuditActionSchema = z.enum([
   'status.reactivate',
   'demo.set',
   'demo.unset',
+  // Account CRUD (spec §2, amendment A4) — MUST be present BEFORE the first
+  // `writeAudit(...,'user.create'/'user.update',...)` or the audit read 500s.
+  'user.create',
+  'user.update',
+  'user.invite.resend',
   'user.delete',
   'group.create',
   'group.update',

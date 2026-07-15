@@ -35,6 +35,19 @@ export interface AuthConfig {
   supabaseUrl: string | undefined
   /** Shared secret — HS256 fallback for a future local login (not shipped). */
   jwtSecret: string | undefined
+  /**
+   * GoTrue `service_role` key (account CRUD, spec §2 / amendment A5). Read ONLY
+   * here; the server-side admin client is the sole consumer. NEVER reflected in
+   * any response (/health, /me, admin.*) and NEVER logged. Absent → account
+   * creation/edit answers a clean 503 `account_mgmt_unavailable` (amendment A6).
+   */
+  serviceRoleKey: string | undefined
+  /**
+   * Trusted public site base URL for the invite `redirectTo` (amendment A9). MUST
+   * be a server-configured value, NEVER derived from the request `Origin`/`Referer`
+   * (phishing / token-theft backstop). Absent → a documented localhost dev fallback.
+   */
+  publicSiteUrl: string | undefined
   /** `sub` of the default identity posed when the gate is not enforced (§2). */
   devUserId: string
   /** `ENGRAM_ADMIN_USER_ID` — the only user allowed on admin routes (§3). */
@@ -57,6 +70,8 @@ export function resolveAuthConfig(env: Record<string, string | undefined>): Auth
     bypassActive,
     supabaseUrl,
     jwtSecret,
+    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY || undefined,
+    publicSiteUrl: env.ENGRAM_PUBLIC_SITE_URL || undefined,
     devUserId: env.ENGRAM_DEV_USER_ID || DEFAULT_DEV_USER_ID,
     adminUserId: env.ENGRAM_ADMIN_USER_ID || undefined,
     demoUserId: env.ENGRAM_DEMO_USER_ID || undefined,

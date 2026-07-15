@@ -501,8 +501,13 @@ export async function setDemo(
   return echoSummary(db, targetUserId)
 }
 
-/** UUID shape guard for the best-effort `auth.users` delete (amendment A6). */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/**
+ * UUID shape guard for the best-effort `auth.users` delete (amendment A6) AND for
+ * validating the `sub` GoTrue returns on create/invite before we upsert a profile
+ * (amendment A7 — a non-uuid sub would make the row un-deletable later). Exported
+ * as the SINGLE regex so account CRUD never re-implements a divergent one.
+ */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function deleteUser(
   db: DB,
