@@ -43,6 +43,12 @@ afterEach(async () => {
 
 describe('admin.service.stats — real Postgres (postgres-js prepared statements)', () => {
   it('runs without the raw-Date crash and counts the 7-day-active window', async () => {
+    // Start from an EMPTY profile table: migration 0008 backfills a permanent
+    // bootstrap admin (`20d58a6e-…`) and `beforeAll` re-runs migrate with no reset
+    // before this first test, so without this clear `totals.users` would be 3 and
+    // the fixture would carry that admin's (recent) last_seen_at into active7d.
+    // Clearing it makes `recent`/`stale` the ONLY users the counts describe.
+    await resetDb(db)
     // One user seen just now (active), one seen 30 days ago (inactive). The
     // active7d aggregate compares last_seen_at to a Date — the exact fragment
     // that threw before the `gte` fix.

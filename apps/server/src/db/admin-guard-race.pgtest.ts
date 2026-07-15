@@ -63,6 +63,13 @@ afterAll(() => {
 
 describe('last-admin guard — real concurrency serialization (postgres-js pool)', () => {
   it('two concurrent mutual demotes of the last two admins → exactly one wins', async () => {
+    // Start from an EMPTY profile table: migration 0008 backfills a permanent
+    // bootstrap admin (`20d58a6e-…`, Alex's Supabase uid) and `beforeAll` re-runs
+    // migrate with no reset before this first test, so without this clear there are
+    // THREE admins — the bootstrap one always keeps the set non-empty, both demotes
+    // pass, and the race is masked (a broken lock would look identical). Clearing it
+    // makes admin-a / admin-b the genuine last two admins the guard must protect.
+    await resetDb(db)
     await seedUserProfile(db, { userId: 'admin-a', role: 'admin' })
     await seedUserProfile(db, { userId: 'admin-b', role: 'admin' })
 
