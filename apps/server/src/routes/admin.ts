@@ -2,11 +2,13 @@ import { Hono } from 'hono'
 import {
   adminAuditQuerySchema,
   adminAuditResponseSchema,
+  adminCreateUserSchema,
   adminDeleteUserResponseSchema,
   adminSetDemoSchema,
   adminSetRoleSchema,
   adminSetStatusSchema,
   adminStatsResponseSchema,
+  adminUpdateUserSchema,
   adminUserDetailSchema,
   adminUsersQuerySchema,
   adminUsersResponseSchema,
@@ -17,7 +19,12 @@ import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
 import { requireAdmin, requirePermission } from '../http/identity'
+import { isAdminProfile } from '../services/profile.service'
+import { resolveAuthConfig } from '../auth/config'
+import { resolveAdminAuthClient, resolveInviteRedirect } from '../auth/admin-client'
+import { AccountMgmtUnavailableError } from '../http/errors'
 import {
+  createUserAccount,
   deleteUser,
   listAudit,
   listUsers,
@@ -25,6 +32,7 @@ import {
   setRole,
   setStatus,
   stats,
+  updateUserEmailAccount,
   userDetail,
 } from '../services/admin.service'
 
@@ -56,6 +64,61 @@ adminRouter.get('/users/:id', zValidator('param', idParamSchema), async (c) => {
   requirePermission(c, 'users.view')
   return ok(c, adminUserDetailSchema, await userDetail(db, c.req.valid('param').id))
 })
+
+/**
+ * Create an account (spec §2, amendments A1/A2/A6). The gate is decided AFTER the
+ * body is validated (the body chooses the gate — the escalation trap of A2):
+ *  - `role==='admin'` → `requireAdmin` (creating an admin = super-power, parity
+ *    with promote-to-admin). A `users.manage`-only delegate with `role='admin'`
+ *    gets 403, BEFORE any GoTrue call or write.
+ *  - else → `requirePermission('users.manage')`; AND if `groupIds` is non-empty,
+ *    ALSO `requirePermission('groups.manage')` (A1 — otherwise a `users.manage`
+ *    delegate could drop the new account into a powerful group, bypassing the
+ *    `groups.manage` gate that guards `POST /groups/:id/members`).
+ * Account management unavailable (no service_role) → clean 503 (A6), never a crash.
+ */
+adminRouter.post('/users', zValidator('json', adminCreateUserSchema), async (c) => {
+  const body = c.req.valid('json')
+  const actor = body.role === 'admin' ? requireAdmin(c) : requirePermission(c, 'users.manage')
+  if (body.role !== 'admin' && body.groupIds && body.groupIds.length > 0) {
+    requirePermission(c, 'groups.manage')
+  }
+  const cfg = resolveAuthConfig(process.env)
+  const client = resolveAdminAuthClient(cfg)
+  if (!client) throw new AccountMgmtUnavailableError()
+  const summary = await createUserAccount(db, actor, client, body, resolveInviteRedirect(cfg))
+  return ok(c, adminUserSummarySchema, summary, 201)
+})
+
+/**
+ * Edit an account's email (spec §2, amendment A11) — `requirePermission('users.manage')`
+ * for a plain user (not an escalation). But editing an ADMIN target's email IS an
+ * admin-target action (wave-1b review): a `users.manage`-only delegate must not be
+ * able to repoint an admin's login email and seize the account via forgot-password,
+ * so the service demands the actor be an admin when the target is one. We resolve
+ * the actor's admin status here (same predicate as `requireAdmin`) and pass it in;
+ * the target's admin status is checked inside the service, before any GoTrue write.
+ * GoTrue is the unicity authority (a clash → 409 `email_taken`). No config → 503.
+ */
+adminRouter.patch(
+  '/users/:id',
+  zValidator('param', idParamSchema),
+  zValidator('json', adminUpdateUserSchema),
+  async (c) => {
+    const actor = requirePermission(c, 'users.manage')
+    const cfg = resolveAuthConfig(process.env)
+    const actorIsAdmin = isAdminProfile(c.get('userProfile'), actor, cfg)
+    const client = resolveAdminAuthClient(cfg)
+    if (!client) throw new AccountMgmtUnavailableError()
+    const { id } = c.req.valid('param')
+    const { email } = c.req.valid('json')
+    return ok(
+      c,
+      adminUserSummarySchema,
+      await updateUserEmailAccount(db, actor, actorIsAdmin, client, id, email),
+    )
+  },
+)
 
 adminRouter.patch(
   '/users/:id/role',

@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, or, sql, type SQL } from 'drizzle-orm'
 import type {
   AdminAuditResponse,
+  AdminCreateUser,
   AdminDeleteCounts,
   AdminDeleteUserResponse,
   AdminStatsResponse,
@@ -31,12 +32,20 @@ import {
 } from '../db/schema'
 import { localDayKey, localMidnight } from '../lib/day'
 import { resolveAuthConfig } from '../auth/config'
-import { ForbiddenError, NotFoundError } from '../http/errors'
+import { AdminAuthError, type AdminAuthClient } from '../auth/admin-client'
+import {
+  EmailTakenError,
+  ForbiddenError,
+  InvalidEmailError,
+  NotFoundError,
+  UpstreamError,
+} from '../http/errors'
 import { wipeUserData } from './demo.service'
 import {
   effectiveActiveAdminIds,
   getEmailsByIds,
   getProfile,
+  isAdminProfile,
   lockAdminGuard,
   wouldBeLastActiveAdmin,
 } from './profile.service'
@@ -501,8 +510,13 @@ export async function setDemo(
   return echoSummary(db, targetUserId)
 }
 
-/** UUID shape guard for the best-effort `auth.users` delete (amendment A6). */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/**
+ * UUID shape guard for the best-effort `auth.users` delete (amendment A6) AND for
+ * validating the `sub` GoTrue returns on create/invite before we upsert a profile
+ * (amendment A7 — a non-uuid sub would make the row un-deletable later). Exported
+ * as the SINGLE regex so account CRUD never re-implements a divergent one.
+ */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function deleteUser(
   db: DB,
@@ -560,6 +574,149 @@ async function tryDeleteAuthUser(db: DB, userId: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+// --- Account CRUD (spec §2, GoTrue Admin API) ------------------------------
+
+/**
+ * Translate a classified GoTrue failure into the public `ApiError` (secret-free —
+ * amendment A5.3): `email_taken` → 409, `invalid_email` → 400, else 502. Any other
+ * throwable bubbles unchanged (never swallow a bug into a 502).
+ */
+function mapAuthError(e: unknown): never {
+  if (e instanceof AdminAuthError) {
+    if (e.kind === 'email_taken') throw new EmailTakenError()
+    if (e.kind === 'invalid_email') throw new InvalidEmailError()
+    throw new UpstreamError('the auth provider refused the request')
+  }
+  throw e
+}
+
+/**
+ * Create an account (spec §2, amendments A7/A8/A10). The route has ALREADY run the
+ * gate (A2: role decides `requireAdmin` vs `requirePermission('users.manage')`;
+ * A1: `groupIds` also requires `groups.manage`) and resolved the injected `client`
+ * + trusted `redirectTo`. Ordering minimizes an orphaned `auth.users` row:
+ *   1. validate every `groupId` exists (BEFORE any GoTrue call),
+ *   2. GoTrue create/invite → the authoritative `sub`,
+ *   3. validate the `sub` is a uuid (A7) — else 502, no profile written,
+ *   4. ONE transaction: upsert profile + insert memberships + audit `user.create`.
+ * The password (password mode) is passed to GoTrue over TLS and NEVER audited,
+ * logged, or echoed. A residual orphan (tx fails post-GoTrue) → 500; documented.
+ */
+export async function createUserAccount(
+  db: DB,
+  actorUserId: string,
+  client: AdminAuthClient,
+  input: AdminCreateUser,
+  redirectTo: string,
+): Promise<AdminUserSummary> {
+  const groupIds = input.groupIds ? [...new Set(input.groupIds)] : []
+  if (groupIds.length > 0) {
+    const rows = await db
+      .select({ id: userGroup.id })
+      .from(userGroup)
+      .where(inArray(userGroup.id, groupIds))
+    const found = new Set(rows.map((r) => r.id))
+    if (groupIds.some((id) => !found.has(id))) throw new NotFoundError('group not found')
+  }
+
+  let sub = ''
+  try {
+    sub =
+      input.mode === 'invite'
+        ? (await client.inviteUser(input.email, redirectTo)).id
+        : (
+            await client.createUser({
+              email: input.email,
+              password: input.password,
+              emailConfirm: true,
+            })
+          ).id
+  } catch (e) {
+    mapAuthError(e)
+  }
+  if (!UUID_RE.test(sub)) throw new UpstreamError('unexpected identity from the auth provider')
+  const newSub = sub
+
+  await db.transaction(async (tx) => {
+    const now = new Date()
+    const inserted = await tx
+      .insert(userProfile)
+      .values({
+        userId: newSub,
+        email: input.email,
+        role: input.role,
+        createdAt: now,
+        updatedAt: now,
+        lastSeenAt: now,
+      })
+      // A CREATE endpoint must never MUTATE an existing account (hardening, wave-1b
+      // review): a role/email upsert here would bypass `setRole`'s last-admin +
+      // audit invariants and mis-label the change as `user.create`. Insert-or-abort.
+      // GoTrue is the unicity authority, so a confirmed dup already 409s upstream;
+      // if it ever returned an already-known sub (e.g. re-inviting an unconfirmed
+      // user), we surface `email_taken` rather than overwrite the existing row.
+      .onConflictDoNothing({ target: userProfile.userId })
+      .returning({ userId: userProfile.userId })
+    if (inserted.length === 0) throw new EmailTakenError()
+    if (groupIds.length > 0) {
+      await tx
+        .insert(groupMember)
+        .values(groupIds.map((groupId) => ({ groupId, userId: newSub })))
+        .onConflictDoNothing()
+    }
+    // Audit carries mode + role + group ids only — NEVER the password (A10).
+    await writeAudit(tx, actorUserId, 'user.create', newSub, {
+      mode: input.mode,
+      role: input.role,
+      ...(groupIds.length > 0 ? { groupIds } : {}),
+    })
+  })
+  return echoSummary(db, newSub)
+}
+
+/**
+ * Change an existing account's login email (spec §2, amendment A11). GoTrue is the
+ * unicity authority (`user_profile.email` is NOT unique) — a clash on another
+ * account surfaces as 409 `email_taken`. Order: verify the target profile exists
+ * (404 otherwise), then GoTrue, then mirror `user_profile.email` + audit
+ * `user.update` with `{ emailChanged: true }` (no PII, parity groups.service).
+ *
+ * Editing an ADMIN target's login email is itself an admin-target action (wave-1b
+ * review): the `users.manage` gate alone would let a non-admin delegate repoint an
+ * admin's login email to an address they control, then seize the account through
+ * the PUBLIC forgot-password flow — a full privilege takeover. So when the target
+ * is an effective admin (DB role OR the env anti-lockout filet) the ACTOR must be
+ * an admin too (parity with the `requireAdmin` gate on role/demo/delete). Checked
+ * BEFORE any GoTrue write, so no auth.users mutation happens on a refused edit.
+ */
+export async function updateUserEmailAccount(
+  db: DB,
+  actorUserId: string,
+  actorIsAdmin: boolean,
+  client: AdminAuthClient,
+  targetUserId: string,
+  email: string,
+): Promise<AdminUserSummary> {
+  const target = await getProfile(db, targetUserId)
+  if (!target) throw new NotFoundError('user not found')
+  if (!actorIsAdmin && isAdminProfile(target, targetUserId, resolveAuthConfig(process.env))) {
+    throw new ForbiddenError('editing an admin account requires admin')
+  }
+  try {
+    await client.updateUserEmail(targetUserId, email)
+  } catch (e) {
+    mapAuthError(e)
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(userProfile)
+      .set({ email, updatedAt: new Date() })
+      .where(eq(userProfile.userId, targetUserId))
+    await writeAudit(tx, actorUserId, 'user.update', targetUserId, { emailChanged: true })
+  })
+  return echoSummary(db, targetUserId)
 }
 
 async function countUserData(tx: Tx, userId: string): Promise<AdminDeleteCounts> {

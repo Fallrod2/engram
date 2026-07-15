@@ -72,6 +72,40 @@ export class ConflictError extends ApiError {
   }
 }
 
+/**
+ * 409 — account CRUD: the email is already registered (spec §2, amendment A3/A8).
+ * GoTrue is the sole unicity authority (`user_profile.email` is NOT unique); this
+ * distinct code lets the web show a dedicated toast ("Cet email est déjà pris").
+ */
+export class EmailTakenError extends ApiError {
+  constructor(message = 'this email is already registered') {
+    super(409, 'email_taken', message)
+  }
+}
+
+/**
+ * 503 — account creation/edit is unavailable because SUPABASE_URL + the
+ * service_role key are not configured (dev bypass, tests, prod without the key —
+ * amendment A6). A clean, non-crashing degrade with a dedicated code the web maps
+ * to "Configure Supabase pour créer des comptes".
+ */
+export class AccountMgmtUnavailableError extends ApiError {
+  constructor() {
+    super(
+      503,
+      'account_mgmt_unavailable',
+      'La création de comptes nécessite la configuration Supabase — indisponible dans cet environnement.',
+    )
+  }
+}
+
+/** 400 — account CRUD: GoTrue rejected the email as malformed (amendment A3). */
+export class InvalidEmailError extends ApiError {
+  constructor(message = 'invalid email address') {
+    super(400, 'invalid_email', message)
+  }
+}
+
 /** 413 — an uploaded file exceeds the size limit. */
 export class PayloadTooLargeError extends ApiError {
   constructor(message: string) {
