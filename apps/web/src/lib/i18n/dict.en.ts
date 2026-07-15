@@ -151,6 +151,12 @@ export const dictEn: Dict = {
         demoSet: 'set as demo',
         demoUnset: 'unset demo on',
         userDelete: 'deleted',
+        groupCreate: 'created group',
+        groupUpdate: 'updated group',
+        groupDelete: 'deleted group',
+        groupPermissions: 'set permissions on group',
+        groupMemberAdd: 'added a member to group',
+        groupMemberRemove: 'removed a member from group',
       },
     },
     delete: {

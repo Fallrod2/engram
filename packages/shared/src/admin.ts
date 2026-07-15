@@ -15,6 +15,32 @@ import { aiProviderIdSchema } from './domain'
 export const userRoleSchema = z.enum(['admin', 'user'])
 export type UserRole = z.infer<typeof userRoleSchema>
 
+/**
+ * The delegated-administration permission set (rbac-groups §1.1, amendment A4.1).
+ * `role='admin'` (and the env admin filet) hold ALL of these IMPLICITLY — they are
+ * never stored on an admin. A `role='user'` gains a TARGETED subset via their
+ * groups (`group_permission`) → delegated admin (a moderator = user + a group).
+ *
+ * `users.delete` is DELIBERATELY absent (amendment A4.1): a GDPR delete is
+ * irreversible and stays a super-admin power (`DELETE /admin/users/:id` is
+ * `requireAdmin`). Likewise `set-role`/`set-demo` have no permission — creating an
+ * admin or the demo account stays `requireAdmin` (amendments A1/A5).
+ *
+ * ⚠️ This constant is the SINGLE source of truth AND the exact mirror of the
+ * `group_permission` CHECK (migration 0009). Adding a permission REQUIRES: (1) a
+ * new entry here, (2) a NEW migration widening that CHECK. The PGlite test
+ * `group-permission CHECK mirrors ADMIN_PERMISSIONS` guards this drift.
+ */
+export const ADMIN_PERMISSIONS = [
+  'users.view',
+  'users.manage',
+  'groups.manage',
+  'audit.view',
+  'stats.view',
+] as const
+export const adminPermissionSchema = z.enum(ADMIN_PERMISSIONS)
+export type AdminPermission = z.infer<typeof adminPermissionSchema>
+
 /** Account status (spec §1.1). `suspended` → 403 `suspended` on every /api/*. */
 export const userStatusSchema = z.enum(['active', 'suspended'])
 export type UserStatus = z.infer<typeof userStatusSchema>
@@ -32,6 +58,14 @@ export const meResponseSchema = z.object({
   isAdmin: z.boolean(),
   isDemo: z.boolean(),
   status: userStatusSchema,
+  /**
+   * The caller's EFFECTIVE permissions (rbac-groups §3, amendment C3). ALL of
+   * `ADMIN_PERMISSIONS` for an admin / env-admin (even a bypass env-admin whose DB
+   * role is 'user'), else the union of their groups' permissions. The web guards
+   * `/admin` on `isAdmin || permissions.length > 0` and mirrors each tab/action —
+   * the SERVER stays the sole authority.
+   */
+  permissions: z.array(z.string()),
 })
 export type MeResponse = z.infer<typeof meResponseSchema>
 
@@ -52,6 +86,13 @@ export const adminUsersQuerySchema = z.object({
 })
 export type AdminUsersQuery = z.infer<typeof adminUsersQuerySchema>
 
+/** A compact reference to a group the user belongs to (rbac-groups §4). */
+export const adminUserGroupRefSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+export type AdminUserGroupRef = z.infer<typeof adminUserGroupRefSchema>
+
 /** One row of the admin user table: profile + compact cross-user usage counts. */
 export const adminUserSummarySchema = z.object({
   userId: z.string(),
@@ -66,6 +107,8 @@ export const adminUserSummarySchema = z.object({
   notes: z.number().int(),
   generations: z.number().int(),
   tokens: z.number().int(),
+  /** Groups this user belongs to (rbac-groups §4, additive) — chips + quick manage. */
+  groups: z.array(adminUserGroupRefSchema),
 })
 export type AdminUserSummary = z.infer<typeof adminUserSummarySchema>
 
@@ -175,7 +218,12 @@ export type AdminStatsResponse = z.infer<typeof adminStatsResponseSchema>
 
 export const ADMIN_AUDIT_PAGE_SIZE = 50
 
-/** Every audited write action (spec §1.2). */
+/**
+ * Every audited write action (spec §1.2 + rbac-groups §4). The `group.*` actions
+ * MUST be in this enum BEFORE any group write is journaled (amendment B1): the
+ * audit read validates each row against this schema (`ok(...)` → `parse`), so an
+ * unknown action would throw a ZodError → 500 on `GET /admin/audit`.
+ */
 export const adminAuditActionSchema = z.enum([
   'role.promote',
   'role.demote',
@@ -184,6 +232,12 @@ export const adminAuditActionSchema = z.enum([
   'demo.set',
   'demo.unset',
   'user.delete',
+  'group.create',
+  'group.update',
+  'group.delete',
+  'group.permissions',
+  'group.member.add',
+  'group.member.remove',
 ])
 export type AdminAuditAction = z.infer<typeof adminAuditActionSchema>
 
@@ -219,3 +273,67 @@ export type AdminAuditResponse = z.infer<typeof adminAuditResponseSchema>
 
 /** The known provider ids (for the web to label the stacked chart legend). */
 export const adminKnownProviders = aiProviderIdSchema.options
+
+// --- Groups (delegated administration, rbac-groups §4) ---------------------
+
+/** One group row: identity + member count + granted permissions. */
+export const adminGroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  memberCount: z.number().int(),
+  permissions: z.array(adminPermissionSchema),
+  createdAt: z.string().datetime(),
+})
+export type AdminGroup = z.infer<typeof adminGroupSchema>
+
+export const adminGroupsResponseSchema = z.object({
+  groups: z.array(adminGroupSchema),
+})
+export type AdminGroupsResponse = z.infer<typeof adminGroupsResponseSchema>
+
+/** One member of a group (id + resolved email for display). */
+export const adminGroupMemberSchema = z.object({
+  userId: z.string(),
+  email: z.string().nullable(),
+})
+export type AdminGroupMember = z.infer<typeof adminGroupMemberSchema>
+
+export const adminGroupMembersResponseSchema = z.object({
+  members: z.array(adminGroupMemberSchema),
+})
+export type AdminGroupMembersResponse = z.infer<typeof adminGroupMembersResponseSchema>
+
+/** Create body. `name` non-empty (mirrors the DB CHECK), unique case-insensitively. */
+export const adminCreateGroupSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  description: z.string().trim().max(500).optional(),
+})
+export type AdminCreateGroup = z.infer<typeof adminCreateGroupSchema>
+
+/** Patch body: rename and/or reset the description (null clears it). */
+export const adminUpdateGroupSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    description: z.string().trim().max(500).nullable().optional(),
+  })
+  .refine((v) => v.name !== undefined || v.description !== undefined, {
+    message: 'at least one field is required',
+  })
+export type AdminUpdateGroup = z.infer<typeof adminUpdateGroupSchema>
+
+/**
+ * Replace a group's permission set (rbac-groups §4, `requireAdmin` — amendment
+ * A2). Primary validation is HERE (⊂ ADMIN_PERMISSIONS); the DB CHECK is only a
+ * backstop (amendment D2.3). Deduped server-side before the write.
+ */
+export const adminSetGroupPermissionsSchema = z.object({
+  permissions: z.array(adminPermissionSchema),
+})
+export type AdminSetGroupPermissions = z.infer<typeof adminSetGroupPermissionsSchema>
+
+/** Add a member by user id (the `sub`; a free-text string, never a physical FK). */
+export const adminAddMemberSchema = z.object({
+  userId: z.string().trim().min(1).max(255),
+})
+export type AdminAddMember = z.infer<typeof adminAddMemberSchema>

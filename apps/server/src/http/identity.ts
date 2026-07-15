@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { AdminPermission } from '@engram/shared'
 import { resolveAuthConfig } from '../auth/config'
 import { isAdminProfile, isDemoProfile } from '../services/profile.service'
 import { UnauthorizedError, ForbiddenError } from './errors'
@@ -35,6 +36,26 @@ export function requireAdmin(c: Context): string {
     throw new ForbiddenError('admin only')
   }
   return userId
+}
+
+/**
+ * Require the caller to hold a specific delegated permission (rbac-groups §3,
+ * amendment C2). SYNC — reads the profile already posed by the middleware. The
+ * "admin ⇒ ALL" override lives HERE (not in `resolveProfile`), using the EXACT
+ * same predicate as `requireAdmin` (`isAdminProfile`), so:
+ *  - an admin / env-admin passes for ANY permission (super-user), even under the
+ *    dev bypass where their DB `role` may be 'user' or their profile absent
+ *    (anti-lockout parity with `requireAdmin`);
+ *  - a `role='user'` passes only if one of their groups grants `perm`.
+ * The last-admin guard is untouched — groups only ADD permissions to non-admins.
+ */
+export function requirePermission(c: Context, perm: AdminPermission): string {
+  const userId = requireUserId(c)
+  const cfg = resolveAuthConfig(process.env)
+  const profile = c.get('userProfile')
+  if (isAdminProfile(profile, userId, cfg)) return userId
+  if (profile?.permissions.has(perm)) return userId
+  throw new ForbiddenError('forbidden')
 }
 
 /**

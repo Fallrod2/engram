@@ -19,25 +19,59 @@ export interface RequestProfile {
   role: UserRole
   status: UserStatus
   isDemo: boolean
+  /**
+   * The RAW union of permissions granted by this user's groups (rbac-groups §3,
+   * amendment C2) — EMPTY for an admin (an admin never stores permissions; the
+   * "admin ⇒ ALL" override lives in `requirePermission`, keeping this a pure
+   * data projection and the guard SYNC). Read-only so no caller mutates it.
+   */
+  permissions: ReadonlySet<string>
 }
 
 /** How stale `last_seen_at` may be before the throttled touch writes (5 min). */
 const TOUCH_THROTTLE_MS = 5 * 60_000
 
-function normalize(row: {
-  userId: string
-  email: string | null
-  role: string
-  status: string
-  isDemo: boolean
-}): RequestProfile {
+function normalize(
+  row: {
+    userId: string
+    email: string | null
+    role: string
+    status: string
+    isDemo: boolean
+  },
+  permissions: readonly string[] = [],
+): RequestProfile {
   return {
     userId: row.userId,
     email: row.email,
     role: row.role === 'admin' ? 'admin' : 'user',
     status: row.status === 'suspended' ? 'suspended' : 'active',
     isDemo: row.isDemo,
+    permissions: new Set(permissions),
   }
+}
+
+/**
+ * Scalar subquery yielding the DISTINCT permissions granted by a user's groups,
+ * as a text[] (empty `{}` when they have none). FOLDED into the profile SELECT so
+ * resolution stays at 1/2 queries — no extra round-trip per authenticated request
+ * (amendment C1). Written as RAW aliased SQL on purpose: a drizzle `${table.col}`
+ * ref renders UNqualified inside a `sql` fragment, so a two-table join would
+ * collapse `gp.group_id = gm.group_id` to an always-true `group_id = group_id`
+ * (the trap admin.service documents). The only bound value is `${userId}` (safe).
+ */
+function permissionsSubquery(userId: string) {
+  return sql<string[]>`coalesce((
+    select array_agg(distinct gp.permission)
+    from group_member gm
+    join group_permission gp on gp.group_id = gm.group_id
+    where gm.user_id = ${userId}
+  ), '{}')`
+}
+
+/** Normalize the driver's array shape (postgres-js/PGlite both return string[]). */
+function toPermArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String) : []
 }
 
 /**
@@ -61,15 +95,22 @@ export async function resolveProfile(
       status: userProfile.status,
       isDemo: userProfile.isDemo,
       lastSeenAt: userProfile.lastSeenAt,
+      // Union of the user's group permissions, folded in (amendment C1) — 1 query.
+      permissions: permissionsSubquery(userId),
     })
     .from(userProfile)
     .where(eq(userProfile.userId, userId))
+
+  // Groups do not change during a throttled touch, so the set computed on THIS
+  // read is reused on the upsert path (whose `returning()` omits it) — a brand
+  // new user (no `existing`) has no groups → empty (amendment C1).
+  const perms = toPermArray(existing?.permissions)
 
   const emailChanged = emailClaim !== null && existing?.email !== emailClaim
   const stale =
     !existing || emailChanged || Date.now() - existing.lastSeenAt.getTime() > TOUCH_THROTTLE_MS
 
-  if (!stale) return normalize(existing)
+  if (!stale) return normalize(existing, perms)
 
   const now = new Date()
   const [row] = await db
@@ -91,7 +132,7 @@ export async function resolveProfile(
       status: userProfile.status,
       isDemo: userProfile.isDemo,
     })
-  return normalize(row!)
+  return normalize(row!, perms)
 }
 
 /**

@@ -157,6 +157,12 @@ export const dictFr = {
         demoSet: 'a défini comme démo',
         demoUnset: 'a retiré la démo de',
         userDelete: 'a supprimé',
+        groupCreate: 'a créé le groupe',
+        groupUpdate: 'a modifié le groupe',
+        groupDelete: 'a supprimé le groupe',
+        groupPermissions: 'a défini les permissions du groupe',
+        groupMemberAdd: 'a ajouté un membre au groupe',
+        groupMemberRemove: 'a retiré un membre du groupe',
       },
     },
     delete: {
