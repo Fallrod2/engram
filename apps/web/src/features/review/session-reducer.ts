@@ -34,6 +34,8 @@ export interface SessionState {
   paused: boolean
   /** Exit-confirm dialog open (spec §3.6). Orthogonal to `phase`. */
   confirmingExit: boolean
+  /** Card-edit dialog open (E). Orthogonal to `phase`; freezes the card clock. */
+  editing: boolean
   /** Terminal flag — the hook navigates to the origin when this flips true. */
   exited: boolean
   /** A transient review POST failed; the card stays revealed for a retry. */
@@ -59,6 +61,9 @@ export type Action =
   | { type: 'CONFIRM_EXIT' }
   | { type: 'CANCEL_EXIT' }
   | { type: 'REVIEW_AGAIN'; sessionNow: string }
+  | { type: 'OPEN_EDIT' }
+  | { type: 'CLOSE_EDIT' }
+  | { type: 'CARD_EDITED'; cardId: string; front: string; back: string }
 
 /** A fresh session state at `LOADING` for the given frozen `now`. */
 export function initialState(sessionNow: string): SessionState {
@@ -71,6 +76,7 @@ export function initialState(sessionNow: string): SessionState {
     sessionNow,
     paused: false,
     confirmingExit: false,
+    editing: false,
     exited: false,
     submitError: false,
     pendingGrade: null,
@@ -193,6 +199,29 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       // Fresh lot, same scope (scope is a hook concern, not held here).
       if (state.phase !== 'SUMMARY') return state
       return initialState(action.sessionNow)
+
+    case 'OPEN_EDIT':
+      // Only where a card is actually on screen and no review is in flight —
+      // same window as SKIP_CARD (ASKING / REVEALED), never from SUBMITTING.
+      if (state.phase !== 'ASKING' && state.phase !== 'REVEALED') return state
+      return { ...state, editing: true }
+
+    case 'CLOSE_EDIT':
+      if (!state.editing) return state
+      return { ...state, editing: false }
+
+    case 'CARD_EDITED': {
+      // Patch the array the session actually RENDERS. The queue is frozen
+      // (`staleTime: Infinity`), so no refetch will ever bring the new text in:
+      // this write is what refreshes the screen. Only `front`/`back` move — the
+      // spread carries `fsrs` over BY REFERENCE, so an edit can never be
+      // mistaken for a scheduling event.
+      if (!state.cards.some((c) => c.id === action.cardId)) return state
+      const cards = state.cards.map((c) =>
+        c.id === action.cardId ? { ...c, front: action.front, back: action.back } : c,
+      )
+      return { ...state, cards }
+    }
 
     default:
       return state

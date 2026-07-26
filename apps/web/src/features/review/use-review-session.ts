@@ -3,9 +3,10 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useReducedMotion } from 'motion/react'
 import { toast } from 'sonner'
-import type { Card, ReviewPreview } from '@engram/shared'
-import { ApiError, postReview, type ReviewScope } from '@/lib/api'
+import type { Card, ReviewPreview, ReviewQueueResponse } from '@engram/shared'
+import { ApiError, postReview, updateCard, type ReviewScope } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { isEditableTarget, isModalSurfaceOpen } from '@/lib/use-hotkeys'
 import {
   initialState,
   sessionReducer,
@@ -34,6 +35,8 @@ export interface SessionApi {
   remaining: RemainingByState
   paused: boolean
   confirmingExit: boolean
+  /** Card-edit dialog open (E) — the card clock is frozen while it is. */
+  editing: boolean
   flashGrade: Grade | null
   summary: SessionSummary | undefined
   canReviewAgain: boolean
@@ -42,6 +45,12 @@ export interface SessionApi {
   rate: (grade: Grade) => void
   /** Drop the current card without rating it (client-side, session-scoped). */
   skip: () => void
+  /** Open the card-edit dialog on the current card (E). */
+  openEdit: () => void
+  /** Close the card-edit dialog without saving. */
+  closeEdit: () => void
+  /** Persist an edit of the current card's content (never its FSRS state). */
+  submitEdit: (values: { front: string; back: string }) => void
   requestExit: () => void
   confirmExit: () => void
   cancelExit: () => void
@@ -143,16 +152,23 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     timerRef.current = createCardTimer(state.paused)
   }, [state.phase, state.index])
 
+  // Two independent reasons to freeze the card clock, one effect so a pause
+  // always wins over a resume: the tab being hidden, and the edit dialog being
+  // open — time spent fixing a typo is not recall time. Closing the dialog on a
+  // hidden tab therefore does NOT restart the clock.
   useEffect(() => {
     const t = timerRef.current
     if (!t) return
-    if (state.paused) t.pause()
+    if (state.paused || state.editing) t.pause()
     else t.resume()
-  }, [state.paused])
+  }, [state.paused, state.editing])
 
   // --- Idle (mechanism A): silent stop, no overlay, auto-resume ------------
+  // Disarmed while editing: the dialog owns the keyboard, so its keystrokes are
+  // not presence signals for the *card* — and a `resume()` from here would
+  // undo the freeze the edit dialog just installed.
   useEffect(() => {
-    if (!isFlowPhase(state.phase) || state.paused) return
+    if (!isFlowPhase(state.phase) || state.paused || state.editing) return
     let idlePaused = false
     let timeout = window.setTimeout(onIdle, IDLE_MS)
     function onIdle() {
@@ -174,7 +190,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
       window.clearTimeout(timeout)
       for (const e of events) window.removeEventListener(e, onActivity)
     }
-  }, [state.phase, state.index, state.paused, bumpCurrentPreview])
+  }, [state.phase, state.index, state.paused, state.editing, bumpCurrentPreview])
 
   // --- Visibility (mechanism B): explicit pause + overlay ------------------
   useEffect(() => {
@@ -247,6 +263,85 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     // card left to time).
     dispatch({ type: 'SKIP_CARD' })
   }, [])
+
+  // --- Card edit (E) -------------------------------------------------------
+  /**
+   * Second half of the double write: the frozen queue in the cache. Its entry
+   * is never refetched (`staleTime: Infinity`, `gcTime: 0`), so without this a
+   * REVIEW_AGAIN — a new `sessionNow`, hence a new key seeded from the server —
+   * or a remount would resurrect the stale text. Only `front`/`back` of the one
+   * card move; `now`, `total` and every other card are carried over untouched.
+   */
+  const patchQueueCache = useCallback(
+    (cardId: string, front: string, back: string) => {
+      const key = qk.review.queue({ ...scope, now: stateRef.current.sessionNow })
+      queryClient.setQueryData<ReviewQueueResponse>(key, (old) =>
+        old
+          ? {
+              ...old,
+              cards: old.cards.map((c) => (c.id === cardId ? { ...c, front, back } : c)),
+            }
+          : old,
+      )
+    },
+    [queryClient, scope],
+  )
+
+  const editMut = useMutation({
+    mutationFn: (vars: {
+      cardId: string
+      deckId: string
+      front: string
+      back: string
+      prevFront: string
+      prevBack: string
+    }) => updateCard(vars.cardId, { front: vars.front, back: vars.back }),
+    // The pre-edit text travels as the mutation's context — the only copy left
+    // once the optimistic write has overwritten both the reducer and the cache.
+    onMutate: (vars) => ({ front: vars.prevFront, back: vars.prevBack }),
+    onError: (_err, vars, ctx) => {
+      if (ctx) {
+        dispatch({ type: 'CARD_EDITED', cardId: vars.cardId, front: ctx.front, back: ctx.back })
+        patchQueueCache(vars.cardId, ctx.front, ctx.back)
+      }
+      toast.error(t('toasts.cardUpdateError'))
+    },
+    onSettled: (_data, _err, vars) => {
+      // The deck's card list holds the same rows; `cards.all` covers every other
+      // reader (detail, counts) without enumerating them.
+      void queryClient.invalidateQueries({ queryKey: qk.cards.listByDeck(vars.deckId) })
+      void queryClient.invalidateQueries({ queryKey: qk.cards.all })
+    },
+  })
+  const editMutateRef = useRef(editMut.mutate)
+  editMutateRef.current = editMut.mutate
+
+  const openEdit = useCallback(() => dispatch({ type: 'OPEN_EDIT' }), [])
+  const closeEdit = useCallback(() => dispatch({ type: 'CLOSE_EDIT' }), [])
+
+  const submitEdit = useCallback(
+    (values: { front: string; back: string }) => {
+      const s = stateRef.current
+      const card = s.cards[s.index]
+      if (!card) return
+      const front = values.front.trim()
+      const back = values.back.trim()
+      if (front === card.front && back === card.back) return
+      // Optimistic, in the order that matters: the rendered array first (that is
+      // what the user sees), then the frozen queue behind it.
+      dispatch({ type: 'CARD_EDITED', cardId: card.id, front, back })
+      patchQueueCache(card.id, front, back)
+      editMutateRef.current({
+        cardId: card.id,
+        deckId: card.deckId,
+        front,
+        back,
+        prevFront: card.front,
+        prevBack: card.back,
+      })
+    },
+    [patchQueueCache],
+  )
 
   const retryRef = useRef<() => void>(() => {})
   retryRef.current = () => {
@@ -324,6 +419,11 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   // --- Global keyboard router (spec §3.8, §11.4) ---------------------------
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Precedence 0: a text field or an open Radix modal surface owns the
+      // keyboard. Without this, typing "3" in the edit dialog's textarea would
+      // rate the card behind it. Returning early also leaves Escape untouched,
+      // so Radix keeps closing its own dialog.
+      if (isEditableTarget(e.target) || isModalSurfaceOpen()) return
       if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return
       const s = stateRef.current
 
@@ -354,6 +454,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           } else if (e.key.toLowerCase() === 's') {
             e.preventDefault()
             skip()
+          } else if (e.key.toLowerCase() === 'e') {
+            e.preventDefault()
+            openEdit()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
@@ -366,6 +469,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           } else if (e.key.toLowerCase() === 's') {
             e.preventDefault()
             skip()
+          } else if (e.key.toLowerCase() === 'e') {
+            e.preventDefault()
+            openEdit()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
@@ -398,7 +504,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [reveal, rate, skip, requestExit, confirmExit, cancelExit, resume, reviewAgain])
+  }, [reveal, rate, skip, openEdit, requestExit, confirmExit, cancelExit, resume, reviewAgain])
 
   // Clear the pending flash timeout on unmount.
   useEffect(() => {
@@ -448,6 +554,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     remaining,
     paused: state.paused,
     confirmingExit: state.confirmingExit,
+    editing: state.editing,
     flashGrade,
     summary,
     canReviewAgain,
@@ -455,6 +562,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     reveal,
     rate,
     skip,
+    openEdit,
+    closeEdit,
+    submitEdit,
     requestExit,
     confirmExit,
     cancelExit,

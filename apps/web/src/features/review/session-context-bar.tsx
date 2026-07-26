@@ -1,4 +1,4 @@
-import { SkipForward } from 'lucide-react'
+import { Pencil, SkipForward } from 'lucide-react'
 import { FSRS_STATE_LABEL_KEYS, glyphClass } from '@/components/fsrs-state-glyph'
 import { Kbd } from '@/components/ui/kbd'
 import { useT } from '@/lib/i18n'
@@ -13,9 +13,11 @@ import { REMAINING_KEY_BY_STATE, REMAINING_STATES, type RemainingByState } from 
  */
 export function SessionContextBar({
   remaining,
+  onEdit,
   onSkip,
 }: {
   remaining: RemainingByState
+  onEdit: () => void
   onSkip: () => void
 }) {
   const t = useT()
@@ -26,6 +28,18 @@ export function SessionContextBar({
       {/* Left slot: the per-card actions. A flex row, so the steps that follow
           can drop their own buttons next to this one. */}
       <div className="flex items-center gap-3">
+        {/* Editing sits between "Annuler" (step 10, leftmost) and "Passer": a
+            correction is about the card you are on, a skip leaves it. */}
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={t('session.editAria')}
+          className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted"
+        >
+          <Pencil aria-hidden className="size-3" />
+          <span className="hidden sm:inline">{t('session.edit')}</span>
+          {!coarse && <Kbd>E</Kbd>}
+        </button>
         <button
           type="button"
           onClick={onSkip}

@@ -5,14 +5,15 @@ import { SessionContextBar } from './session-context-bar'
 
 afterEach(cleanup)
 
-const NO_SKIP = () => {}
+const NOOP = () => {}
 
 describe('<SessionContextBar> remaining counters', () => {
   it('reads as "state count" pairs in FSRS order', () => {
     render(
       <SessionContextBar
         remaining={{ new: 3, learning: 1, review: 12, relearning: 0 }}
-        onSkip={NO_SKIP}
+        onEdit={NOOP}
+        onSkip={NOOP}
       />,
     )
     const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
@@ -23,7 +24,8 @@ describe('<SessionContextBar> remaining counters', () => {
     render(
       <SessionContextBar
         remaining={{ new: 0, learning: 2, review: 0, relearning: 0 }}
-        onSkip={NO_SKIP}
+        onEdit={NOOP}
+        onSkip={NOOP}
       />,
     )
     const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
@@ -38,7 +40,7 @@ describe('<SessionContextBar> skip action', () => {
   const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
 
   it('exposes the skip button under its full aria-label (label may be hidden)', () => {
-    render(<SessionContextBar remaining={remaining} onSkip={NO_SKIP} />)
+    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={NOOP} />)
     const button = screen.getByRole('button', {
       name: 'Passer cette carte sans la noter (S)',
     })
@@ -47,8 +49,31 @@ describe('<SessionContextBar> skip action', () => {
 
   it('calls onSkip on click', () => {
     const onSkip = vi.fn()
-    render(<SessionContextBar remaining={remaining} onSkip={onSkip} />)
+    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={onSkip} />)
     fireEvent.click(screen.getByRole('button', { name: 'Passer cette carte sans la noter (S)' }))
     expect(onSkip).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('<SessionContextBar> edit action', () => {
+  const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
+
+  it('exposes the edit button under its full aria-label (label may be hidden)', () => {
+    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={NOOP} />)
+    const button = screen.getByRole('button', { name: 'Éditer cette carte (E)' })
+    expect(button.getAttribute('type')).toBe('button')
+  })
+
+  it('calls onEdit on click', () => {
+    const onEdit = vi.fn()
+    render(<SessionContextBar remaining={remaining} onEdit={onEdit} onSkip={NOOP} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Éditer cette carte (E)' }))
+    expect(onEdit).toHaveBeenCalledTimes(1)
+  })
+
+  it('sits before "Passer" in the left slot (Annuler · Éditer · Passer)', () => {
+    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={NOOP} />)
+    const labels = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))
+    expect(labels).toEqual(['Éditer cette carte (E)', 'Passer cette carte sans la noter (S)'])
   })
 })

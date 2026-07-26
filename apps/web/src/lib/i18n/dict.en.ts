@@ -497,6 +497,8 @@ export const dictEn: Dict = {
     remainingAria: 'Remaining cards by state',
     skip: 'Skip',
     skipAria: 'Skip this card without rating it (S)',
+    edit: 'Edit',
+    editAria: 'Edit this card (E)',
     paused: 'Session paused — press any key or click to resume',
     exitTitle: 'Leave the session?',
     exitDesc: 'Your progress is already saved.',

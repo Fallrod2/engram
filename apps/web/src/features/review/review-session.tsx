@@ -10,6 +10,7 @@ import { useT, type TFunction } from '@/lib/i18n'
 import { useCoarsePointer } from '@/lib/use-media-query'
 import { useShell } from '@/components/shell/shell-context'
 import type { ReviewScope } from '@/lib/api'
+import { CardEditDialog } from '@/features/cards/card-edit-dialog'
 import { useReviewSession } from './use-review-session'
 import { SessionHeader } from './session-header'
 import { ProgressBar } from './progress-bar'
@@ -70,6 +71,17 @@ export function ReviewSession({ scope }: { scope: ReviewScope }) {
       className="fixed inset-0 z-50 flex flex-col bg-bg text-text outline-none"
     >
       <PhaseView api={api} />
+      {/* Reuses the deck screen's card editor rather than growing a second one.
+          Radix portals it to `document.body`, OUTSIDE `#app-shell`, so the
+          `inert` the session puts on the shell never reaches it. */}
+      <CardEditDialog
+        open={api.editing}
+        onOpenChange={(open) => {
+          if (!open) api.closeEdit()
+        }}
+        card={api.current ?? null}
+        onSubmit={api.submitEdit}
+      />
       {api.confirmingExit && <ExitConfirm onResume={api.cancelExit} onQuit={api.confirmExit} />}
       {api.paused && <IdleOverlay onResume={api.resume} />}
     </div>
@@ -178,7 +190,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
           {/* Natural height, never compressed. */}
           <div className="flex shrink-0 flex-col gap-2">
-            <SessionContextBar remaining={api.remaining} onSkip={api.skip} />
+            <SessionContextBar remaining={api.remaining} onEdit={api.openEdit} onSkip={api.skip} />
             <RatingBar
               revealed={api.revealed}
               preview={api.preview}

@@ -1,16 +1,19 @@
 import { z } from 'zod'
 import {
   apiErrorSchema,
+  cardSchema,
   healthResponseSchema,
   reviewPreviewSchema,
   reviewQueueResponseSchema,
   reviewResultSchema,
   type ApiErrorCode,
+  type Card,
   type HealthResponse,
   type ReviewCard,
   type ReviewPreview,
   type ReviewQueueResponse,
   type ReviewResult,
+  type UpdateCard,
 } from '@engram/shared'
 
 /**
@@ -186,4 +189,14 @@ export function fetchCardPreview(
  */
 export function postReview(cardId: string, body: ReviewCard): Promise<ReviewResult> {
   return api.post(`/cards/${cardId}/review`, body, reviewResultSchema)
+}
+
+/**
+ * Edit a card's content (`PATCH /api/cards/:id`, shared `updateCardSchema`).
+ * Writes `front`/`back` only — the FSRS columns are the scheduler's, written
+ * exclusively by `postReview`, so an edit and a grade never race on the same
+ * columns even back to back.
+ */
+export function updateCard(cardId: string, patch: UpdateCard): Promise<Card> {
+  return api.patch(`/cards/${cardId}`, patch, cardSchema)
 }

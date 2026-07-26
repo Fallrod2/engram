@@ -16,7 +16,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
  * `components/shell/shell-context.tsx` — `lib/` must not depend on `shell/`.
  * Keep the two selectors in sync if either changes (same modal criterion).
  */
-function isModalSurfaceOpen(): boolean {
+export function isModalSurfaceOpen(): boolean {
   if (typeof document === 'undefined') return false
   return (
     document.querySelector(

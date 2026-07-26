@@ -503,6 +503,8 @@ export const dictFr = {
     remainingAria: 'Cartes restantes par état',
     skip: 'Passer',
     skipAria: 'Passer cette carte sans la noter (S)',
+    edit: 'Éditer',
+    editAria: 'Éditer cette carte (E)',
     paused: 'Session en pause — appuie sur une touche ou clique pour reprendre',
     exitTitle: 'Quitter la session ?',
     exitDesc: 'Ta progression est déjà enregistrée.',

@@ -9,9 +9,41 @@ import type { Card, ReviewPreview, ReviewQueueResponse } from '@engram/shared'
 const postReview = vi.fn()
 const fetchReviewQueue = vi.fn()
 const fetchCardPreview = vi.fn()
+const updateCard = vi.fn()
+
+const toastError = vi.fn()
+// Records every call the hook makes on the per-card clock, so a freeze can be
+// asserted without a fake `performance.now()`.
+const timerCalls: string[] = []
 
 vi.mock('motion/react', () => ({ useReducedMotion: () => false }))
-vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }))
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), { error: (...args: unknown[]) => toastError(...args) }),
+}))
+vi.mock('./session-timer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./session-timer')>()
+  return {
+    ...actual,
+    createCardTimer: (machinePaused: boolean) => {
+      const inner = actual.createCardTimer(machinePaused)
+      return {
+        pause: () => {
+          timerCalls.push('pause')
+          inner.pause()
+        },
+        pauseIdle: () => {
+          timerCalls.push('pauseIdle')
+          inner.pauseIdle()
+        },
+        resume: () => {
+          timerCalls.push('resume')
+          inner.resume()
+        },
+        read: () => inner.read(),
+      }
+    },
+  }
+})
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
   useRouter: () => ({ history: { back: vi.fn(), canGoBack: () => false } }),
@@ -27,6 +59,9 @@ vi.mock('@/lib/api', () => ({
   postReview: (...args: unknown[]) => postReview(...args),
   fetchReviewQueue: (...args: unknown[]) => fetchReviewQueue(...args),
   fetchCardPreview: (...args: unknown[]) => fetchCardPreview(...args),
+  // Must be exported by the mock: the hook imports it at module evaluation, so
+  // an omission here would leave `updateCard` undefined, not merely unstubbed.
+  updateCard: (...args: unknown[]) => updateCard(...args),
 }))
 
 import { useReviewSession } from './use-review-session'
@@ -76,10 +111,32 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
 
+/** Same wrapper, but hands the `QueryClient` back so the cache can be read. */
+function renderSession() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  const rendered = renderHook(() => useReviewSession({}), {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    ),
+  })
+  return { ...rendered, client }
+}
+
+/** The frozen queue entry, found by key prefix (its `now` is generated at mount). */
+function queueCache(client: QueryClient): ReviewQueueResponse | undefined {
+  const entries = client.getQueriesData<ReviewQueueResponse>({ queryKey: ['review', 'queue'] })
+  return entries[0]?.[1]
+}
+
 beforeEach(() => {
   postReview.mockReset()
   fetchReviewQueue.mockReset()
   fetchCardPreview.mockReset()
+  updateCard.mockReset()
+  toastError.mockReset()
+  timerCalls.length = 0
   const queue: ReviewQueueResponse = {
     now: '2026-07-12T10:00:00.000Z',
     total: 2,
@@ -135,5 +192,128 @@ describe('useReviewSession — double-submit guard (§16.1 item 2bis, finding #9
     await waitFor(() => expect(postReview).toHaveBeenCalled())
     expect(postReview).toHaveBeenCalledTimes(1)
     expect(postReview).toHaveBeenCalledWith('c1', { grade: 1, durationMs: expect.any(Number) })
+  })
+})
+
+describe('useReviewSession — editing the current card (E)', () => {
+  it('E opens the editor and freezes the card clock; closing restarts it', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.editing).toBe(false)
+
+    timerCalls.length = 0
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }))
+    })
+    expect(result.current.editing).toBe(true)
+    // Time spent fixing a typo is not recall time.
+    expect(timerCalls.at(-1)).toBe('pause')
+    // The phase is untouched — the card underneath is still the same one.
+    expect(result.current.phase).toBe('ASKING')
+
+    act(() => result.current.closeEdit())
+    expect(result.current.editing).toBe(false)
+    expect(timerCalls.at(-1)).toBe('resume')
+  })
+
+  it('openEdit() sets editing and pauses, from REVEALED too', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    act(() => result.current.reveal())
+    await waitFor(() => expect(result.current.phase).toBe('REVEALED'))
+
+    timerCalls.length = 0
+    act(() => result.current.openEdit())
+    expect(result.current.editing).toBe(true)
+    expect(result.current.phase).toBe('REVEALED')
+    expect(timerCalls.at(-1)).toBe('pause')
+  })
+
+  it('writes the rendered card AND the frozen queue cache, PATCHes, never touches fsrs', async () => {
+    updateCard.mockResolvedValue(makeCard('c1'))
+    const { result, client } = renderSession()
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    const fsrsBefore = result.current.current?.fsrs
+
+    act(() => result.current.submitEdit({ front: 'recto corrigé', back: 'verso corrigé' }))
+
+    // 1. The array the session renders.
+    expect(result.current.current?.front).toBe('recto corrigé')
+    expect(result.current.current?.back).toBe('verso corrigé')
+    expect(result.current.current?.fsrs).toBe(fsrsBefore)
+
+    // 2. The frozen queue entry — patched in place, rest of the response intact.
+    const cached = queueCache(client)
+    expect(cached?.cards[0]?.front).toBe('recto corrigé')
+    expect(cached?.cards[0]?.fsrs).toEqual(fsrsBefore)
+    expect(cached?.cards[1]?.front).toBe('front c2')
+    expect(cached?.total).toBe(2)
+    expect(cached?.now).toBe('2026-07-12T10:00:00.000Z')
+
+    await waitFor(() => expect(updateCard).toHaveBeenCalledTimes(1))
+    expect(updateCard).toHaveBeenCalledWith('c1', { front: 'recto corrigé', back: 'verso corrigé' })
+  })
+
+  it('does not block rating: the review POST still fires right after an edit', async () => {
+    updateCard.mockReturnValue(new Promise(() => {})) // PATCH left in flight
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.submitEdit({ front: 'f', back: 'b' }))
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+
+    await waitFor(() => expect(postReview).toHaveBeenCalledTimes(1))
+    expect(postReview).toHaveBeenCalledWith('c1', { grade: 3, durationMs: expect.any(Number) })
+  })
+
+  it('rolls back both writes and toasts when the PATCH fails', async () => {
+    updateCard.mockRejectedValue(new Error('nope'))
+    const { result, client } = renderSession()
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.submitEdit({ front: 'raté', back: 'raté aussi' }))
+    expect(result.current.current?.front).toBe('raté')
+
+    await waitFor(() => expect(result.current.current?.front).toBe('front c1'))
+    expect(result.current.current?.back).toBe('back c1')
+    expect(queueCache(client)?.cards[0]?.front).toBe('front c1')
+    expect(queueCache(client)?.cards[0]?.back).toBe('back c1')
+    expect(toastError).toHaveBeenCalledWith('Modification de la carte échouée')
+  })
+
+  it('a keystroke inside the editor never reaches the rating router', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    act(() => result.current.reveal())
+    await waitFor(() => expect(result.current.phase).toBe('REVEALED'))
+
+    // The dialog's textarea: typing "3" in it must edit text, not grade a card.
+    const textarea = document.createElement('textarea')
+    document.body.appendChild(textarea)
+    textarea.focus()
+    act(() => {
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true }))
+    })
+    expect(postReview).not.toHaveBeenCalled()
+    expect(result.current.phase).toBe('REVEALED')
+    textarea.remove()
+  })
+
+  it('an open Radix dialog swallows the session shortcuts', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    // Stand-in for the mounted `CardEditDialog` content (Radix stamps exactly
+    // this pair on an open Dialog).
+    const surface = document.createElement('div')
+    surface.setAttribute('role', 'dialog')
+    surface.setAttribute('data-state', 'open')
+    document.body.appendChild(surface)
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }))
+    })
+    expect(result.current.phase).toBe('ASKING') // no reveal behind the dialog
+    surface.remove()
   })
 })

@@ -194,6 +194,108 @@ describe('sessionReducer — user skip (SKIP_CARD)', () => {
   })
 })
 
+describe('sessionReducer — card edit (OPEN_EDIT / CLOSE_EDIT)', () => {
+  it('OPEN_EDIT from ASKING and from REVEALED opens without moving the phase', () => {
+    const fromAsking = sessionReducer(asking(2), { type: 'OPEN_EDIT' })
+    expect(fromAsking.editing).toBe(true)
+    expect(fromAsking.phase).toBe('ASKING')
+    expect(fromAsking.index).toBe(0)
+
+    const revealed = sessionReducer(asking(2), { type: 'REVEAL' })
+    const fromRevealed = sessionReducer(revealed, { type: 'OPEN_EDIT' })
+    expect(fromRevealed.editing).toBe(true)
+    expect(fromRevealed.phase).toBe('REVEALED')
+  })
+
+  it('OPEN_EDIT is ignored from SUBMITTING, SUMMARY, LOADING and EMPTY', () => {
+    const submitting = sessionReducer(sessionReducer(asking(2), { type: 'REVEAL' }), {
+      type: 'RATE',
+      grade: 3,
+      durationMs: 400,
+    })
+    expect(sessionReducer(submitting, { type: 'OPEN_EDIT' })).toBe(submitting)
+
+    const summary: SessionState = { ...asking(2, 2), phase: 'SUMMARY' }
+    expect(sessionReducer(summary, { type: 'OPEN_EDIT' })).toBe(summary)
+
+    const loading = initialState(NOW)
+    expect(sessionReducer(loading, { type: 'OPEN_EDIT' })).toBe(loading)
+
+    const empty: SessionState = { ...initialState(NOW), phase: 'EMPTY' }
+    expect(sessionReducer(empty, { type: 'OPEN_EDIT' })).toBe(empty)
+  })
+
+  it('CLOSE_EDIT closes; it is a no-op when nothing is open', () => {
+    const open = sessionReducer(asking(2), { type: 'OPEN_EDIT' })
+    const closed = sessionReducer(open, { type: 'CLOSE_EDIT' })
+    expect(closed.editing).toBe(false)
+    expect(closed.phase).toBe('ASKING')
+    const base = asking(2)
+    expect(sessionReducer(base, { type: 'CLOSE_EDIT' })).toBe(base)
+  })
+})
+
+describe('sessionReducer — CARD_EDITED', () => {
+  it('patches front/back of the targeted card only', () => {
+    const base = asking(3, 1)
+    const edited = sessionReducer(base, {
+      type: 'CARD_EDITED',
+      cardId: 'c1',
+      front: 'nouveau recto',
+      back: 'nouveau verso',
+    })
+    expect(edited.cards[1]?.front).toBe('nouveau recto')
+    expect(edited.cards[1]?.back).toBe('nouveau verso')
+    // Neighbours untouched, down to object identity.
+    expect(edited.cards[0]).toBe(base.cards[0])
+    expect(edited.cards[2]).toBe(base.cards[2])
+    // No phase/index/result side effect.
+    expect(edited.phase).toBe('ASKING')
+    expect(edited.index).toBe(1)
+    expect(edited.results).toEqual([])
+  })
+
+  it('never touches the FSRS state of the edited card', () => {
+    const base = asking(2, 0)
+    const before = base.cards[0]?.fsrs
+    const edited = sessionReducer(base, {
+      type: 'CARD_EDITED',
+      cardId: 'c0',
+      front: 'f',
+      back: 'b',
+    })
+    // Deep equality: not a single scheduling field moved…
+    expect(edited.cards[0]?.fsrs).toEqual(before)
+    // …and referential identity: the object was carried over, not rebuilt.
+    expect(edited.cards[0]?.fsrs).toBe(before)
+    expect(edited.cards[0]?.id).toBe('c0')
+    expect(edited.cards[0]?.deckId).toBe('deck-1')
+  })
+
+  it('is a no-op for a cardId absent from the lot', () => {
+    const base = asking(2)
+    const edited = sessionReducer(base, {
+      type: 'CARD_EDITED',
+      cardId: 'ghost',
+      front: 'f',
+      back: 'b',
+    })
+    expect(edited).toBe(base)
+  })
+
+  it('applies while the dialog is open and leaves `editing` alone', () => {
+    const open = sessionReducer(asking(2), { type: 'OPEN_EDIT' })
+    const edited = sessionReducer(open, {
+      type: 'CARD_EDITED',
+      cardId: 'c0',
+      front: 'f',
+      back: 'b',
+    })
+    expect(edited.editing).toBe(true)
+    expect(edited.cards[0]?.front).toBe('f')
+  })
+})
+
 describe('sessionReducer — exit (§16.1 item 5)', () => {
   it('REQUEST_EXIT with 0 reviews → exits directly', () => {
     const s = sessionReducer(asking(2), { type: 'REQUEST_EXIT' })
