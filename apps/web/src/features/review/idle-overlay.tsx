@@ -1,3 +1,5 @@
+import { useT } from '@/lib/i18n'
+
 /**
  * Pause overlay — mechanism B only (tab hidden, spec §8.3.B). Shown on return
  * to a hidden tab until a presence signal. Any key OR click/pointerdown resumes
@@ -6,15 +8,14 @@
  * z-index. The counter stays frozen behind it.
  */
 export function IdleOverlay({ onResume }: { onResume: () => void }) {
+  const t = useT()
   return (
     <div
       className="absolute inset-0 z-20 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
       onPointerDown={onResume}
       role="status"
     >
-      <p className="font-mono text-sm text-text-muted">
-        Session en pause — appuie sur une touche ou clique pour reprendre
-      </p>
+      <p className="font-mono text-sm text-text-muted">{t('session.paused')}</p>
     </div>
   )
 }

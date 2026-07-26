@@ -1,4 +1,5 @@
 import { motion } from 'motion/react'
+import { useT } from '@/lib/i18n'
 
 /**
  * Session progress — a 2px accent fill on the top edge (spec §4.2), advancing
@@ -14,6 +15,7 @@ export function ProgressBar({
   total: number
   reduce: boolean
 }) {
+  const t = useT()
   const pct = total === 0 ? 0 : Math.min(100, (done / total) * 100)
   return (
     <div
@@ -22,7 +24,7 @@ export function ProgressBar({
       aria-valuemin={0}
       aria-valuemax={total}
       aria-valuenow={done}
-      aria-label="Progression de la session"
+      aria-label={t('session.progressAria')}
     >
       <motion.div
         className="h-full bg-accent"

@@ -500,6 +500,12 @@ export const dictFr = {
     revealed: 'Réponse révélée',
     saveError: 'Échec d’enregistrement — appuie de nouveau pour réessayer.',
     footerHint: 'Espace révéler · 1-4 noter · Échap quitter',
+    progressAria: 'Progression de la session',
+    paused: 'Session en pause — appuie sur une touche ou clique pour reprendre',
+    exitTitle: 'Quitter la session ?',
+    exitDesc: 'Ta progression est déjà enregistrée.',
+    exitResume: 'Reprendre',
+    exitQuit: 'Quitter',
     ratings: {
       again: 'Encore',
       hard: 'Difficile',
@@ -516,6 +522,21 @@ export const dictFr = {
       avgPerCard: 'Moy./carte',
       success: 'Réussite',
       reviewAgain: 'Réviser encore',
+    },
+  },
+
+  fsrs: {
+    states: {
+      new: 'Nouvelle',
+      learning: 'Apprentissage',
+      review: 'Révision',
+      relearning: 'Réapprentissage',
+    },
+    tooltip: {
+      state: 'état',
+      stability: 'stab.',
+      difficulty: 'diff.',
+      due: 'dû',
     },
   },
 

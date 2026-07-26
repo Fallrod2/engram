@@ -494,6 +494,12 @@ export const dictEn: Dict = {
     revealed: 'Answer revealed',
     saveError: 'Save failed — press again to retry.',
     footerHint: 'Space reveal · 1-4 rate · Esc exit',
+    progressAria: 'Session progress',
+    paused: 'Session paused — press any key or click to resume',
+    exitTitle: 'Leave the session?',
+    exitDesc: 'Your progress is already saved.',
+    exitResume: 'Resume',
+    exitQuit: 'Leave',
     ratings: {
       again: 'Again',
       hard: 'Hard',
@@ -510,6 +516,21 @@ export const dictEn: Dict = {
       avgPerCard: 'Avg/card',
       success: 'Success',
       reviewAgain: 'Review again',
+    },
+  },
+
+  fsrs: {
+    states: {
+      new: 'New',
+      learning: 'Learning',
+      review: 'Review',
+      relearning: 'Relearning',
+    },
+    tooltip: {
+      state: 'state',
+      stability: 'stab.',
+      difficulty: 'diff.',
+      due: 'due',
     },
   },
 

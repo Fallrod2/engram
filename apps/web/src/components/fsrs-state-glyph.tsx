@@ -2,6 +2,7 @@ import type { FsrsCardState, FsrsState } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatDateTime } from '@/lib/format'
+import { type TKey, useT } from '@/lib/i18n'
 
 /**
  * FSRS state as a monochrome 8px glyph + luminance (design §6.2). One language,
@@ -12,14 +13,15 @@ import { formatDateTime } from '@/lib/format'
  *   Relearning(3) → warning square
  * ("Suspended" from the design isn't in the v1 `State` enum → not rendered.)
  */
-const LABELS: Record<FsrsState, string> = {
-  0: 'Nouvelle',
-  1: 'Apprentissage',
-  2: 'Révision',
-  3: 'Réapprentissage',
+const LABEL_KEYS: Record<FsrsState, TKey> = {
+  0: 'fsrs.states.new',
+  1: 'fsrs.states.learning',
+  2: 'fsrs.states.review',
+  3: 'fsrs.states.relearning',
 }
 
-function glyphClass(state: FsrsState): string {
+/** Shared with the review session, which reuses the same glyph vocabulary. */
+export function glyphClass(state: FsrsState): string {
   switch (state) {
     case 0:
       return 'border border-border-strong'
@@ -33,6 +35,8 @@ function glyphClass(state: FsrsState): string {
 }
 
 export function FsrsStateGlyph({ fsrs, className }: { fsrs: FsrsCardState; className?: string }) {
+  const t = useT()
+  const label = t(LABEL_KEYS[fsrs.state])
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -43,18 +47,18 @@ export function FsrsStateGlyph({ fsrs, className }: { fsrs: FsrsCardState; class
             className,
           )}
           role="img"
-          aria-label={LABELS[fsrs.state]}
+          aria-label={label}
         />
       </TooltipTrigger>
       <TooltipContent side="right" className="font-mono text-2xs tabular-nums">
         <span className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-          <span className="text-text-faint">état</span>
-          <span className="text-right text-text">{LABELS[fsrs.state]}</span>
-          <span className="text-text-faint">stab.</span>
+          <span className="text-text-faint">{t('fsrs.tooltip.state')}</span>
+          <span className="text-right text-text">{label}</span>
+          <span className="text-text-faint">{t('fsrs.tooltip.stability')}</span>
           <span className="text-right text-text">{fsrs.stability.toFixed(2)}</span>
-          <span className="text-text-faint">diff.</span>
+          <span className="text-text-faint">{t('fsrs.tooltip.difficulty')}</span>
           <span className="text-right text-text">{fsrs.difficulty.toFixed(2)}</span>
-          <span className="text-text-faint">dû</span>
+          <span className="text-text-faint">{t('fsrs.tooltip.due')}</span>
           <span className="text-right text-text">{formatDateTime(fsrs.due)}</span>
         </span>
       </TooltipContent>
