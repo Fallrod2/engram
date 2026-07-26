@@ -140,58 +140,69 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
         onExit={api.requestExit}
       />
 
-      <div className="flex flex-1 items-center justify-center overflow-hidden px-4">
-        <div className="flex w-full max-w-[680px] justify-center">
-          {current && (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={current.id}
-                className="w-full"
-                initial={api.reduce ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={api.reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
-                transition={{ duration: 0.13, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <ReviewCard
-                  front={current.front}
-                  back={current.back}
-                  revealed={api.revealed}
-                  reduce={api.reduce}
-                  onReveal={api.reveal}
-                />
-              </motion.div>
-            </AnimatePresence>
-          )}
+      {/* Elastic region. `min-h-0` is what ALLOWS shrinking below the intrinsic
+          size — without it flexbox refuses and the rating bar is pushed out of
+          the viewport. No `overflow-hidden`: the overflow scrolls INSIDE the
+          card, so nothing is ever silently truncated (no `vh` anywhere). */}
+      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-4 sm:px-4 sm:pb-5">
+        {/* Card + ratings are ONE centred block: on a tall screen the bar no
+            longer anchors to the bottom edge, it stays 12px under the card. */}
+        <div className="flex max-h-full w-full max-w-[680px] flex-col gap-3">
+          {/* No `flex-1` here — that would re-inflate the zone and push the
+              ratings back down. The default `flex-shrink: 1` lets it give way
+              under pressure and hands the overflow to the card's scroller. */}
+          <div className="flex min-h-0 flex-col">
+            {current && (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={current.id}
+                  className="flex min-h-0 flex-col"
+                  initial={api.reduce ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={api.reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
+                  transition={{ duration: 0.13, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <ReviewCard
+                    front={current.front}
+                    back={current.back}
+                    revealed={api.revealed}
+                    reduce={api.reduce}
+                    onReveal={api.reveal}
+                  />
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+
+          {/* Natural height, never compressed. */}
+          <div className="flex shrink-0 flex-col gap-2">
+            <RatingBar
+              revealed={api.revealed}
+              preview={api.preview}
+              disabled={api.submitting}
+              flashGrade={api.flashGrade}
+              reduce={api.reduce}
+              onReveal={api.reveal}
+              onRate={api.rate}
+            />
+            {api.submitError && (
+              <p className="text-center text-xs text-danger">{t('session.saveError')}</p>
+            )}
+            {/* Keyboard cheat-sheet — pointless (and a false promise) without a
+                keyboard, so it is hidden on touch devices (fix-session §3). */}
+            {!coarse && (
+              <p className="text-center text-2xs uppercase tracking-[0.08em] text-text-faint">
+                {t('session.footerHint')}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Screen-reader announcement of the reveal (spec §15). */}
+      {/* Screen-reader announcement of the reveal (spec §15). `sr-only` is
+          absolutely positioned, so it costs the flex column nothing. */}
       <div aria-live="polite" className="sr-only">
         {api.revealed ? t('session.revealed') : ''}
-      </div>
-
-      <div className="flex flex-col items-center gap-3 px-4 pb-6">
-        <div className="w-full max-w-[680px]">
-          <RatingBar
-            revealed={api.revealed}
-            preview={api.preview}
-            disabled={api.submitting}
-            flashGrade={api.flashGrade}
-            reduce={api.reduce}
-            onReveal={api.reveal}
-            onRate={api.rate}
-          />
-          {api.submitError && (
-            <p className="mt-2 text-center text-xs text-danger">{t('session.saveError')}</p>
-          )}
-        </div>
-        {/* Keyboard cheat-sheet — pointless (and a false promise) without a
-            keyboard, so it is hidden on touch devices (fix-session §3). */}
-        {!coarse && (
-          <p className="text-2xs uppercase tracking-[0.08em] text-text-faint">
-            {t('session.footerHint')}
-          </p>
-        )}
       </div>
     </>
   )
@@ -236,12 +247,17 @@ function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
     <>
       <div className="h-0.5 w-full bg-surface-2" />
       <CloseButton onExit={onExit} t={t} />
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4">
-        <Skeleton className="h-[280px] w-full max-w-[680px] rounded-lg" />
-        <div className="grid w-full max-w-[680px] grid-cols-2 gap-2 sm:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 rounded-md" />
-          ))}
+      {/* Mirrors PlayView's geometry exactly (same elastic region, same 680px
+          column, same 12px gap) so LOADING → ASKING swaps content in place
+          instead of jumping. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-4 sm:px-4 sm:pb-5">
+        <div className="flex max-h-full w-full max-w-[680px] flex-col gap-3">
+          <Skeleton className="h-[280px] min-h-0 w-full rounded-lg" />
+          <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-md" />
+            ))}
+          </div>
         </div>
       </div>
     </>
