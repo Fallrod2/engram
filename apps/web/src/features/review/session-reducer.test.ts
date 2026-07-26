@@ -139,6 +139,61 @@ describe('sessionReducer — rating outcomes (§16.1 items 3, 4, 4bis)', () => {
   })
 })
 
+describe('sessionReducer — user skip (SKIP_CARD)', () => {
+  it('from ASKING → next card, no result recorded, total untouched', () => {
+    const base = asking(3, 0)
+    const skipped = sessionReducer(base, { type: 'SKIP_CARD' })
+    expect(skipped.phase).toBe('ASKING')
+    expect(skipped.index).toBe(1)
+    expect(skipped.results).toEqual([])
+    expect(skipped.total).toBe(base.total)
+  })
+
+  it('from REVEALED → next card, no result recorded', () => {
+    const revealed = sessionReducer(asking(3, 0), { type: 'REVEAL' })
+    const skipped = sessionReducer(revealed, { type: 'SKIP_CARD' })
+    expect(skipped.phase).toBe('ASKING')
+    expect(skipped.index).toBe(1)
+    expect(skipped.results).toEqual([])
+  })
+
+  it('leaves already-graded results strictly unchanged', () => {
+    const results = [
+      { cardId: 'c0', grade: 3 as const, durationMs: 100 },
+      { cardId: 'c1', grade: 1 as const, durationMs: 250 },
+    ]
+    const withResults: SessionState = { ...asking(4, 2), results, total: 4 }
+    const skipped = sessionReducer(withResults, { type: 'SKIP_CARD' })
+    expect(skipped.results).toEqual(results)
+    expect(skipped.total).toBe(4)
+    expect(reviewedCount(skipped)).toBe(2)
+  })
+
+  it('on the last card → SUMMARY', () => {
+    const skipped = sessionReducer(asking(2, 1), { type: 'SKIP_CARD' })
+    expect(skipped.phase).toBe('SUMMARY')
+    expect(skipped.index).toBe(2)
+    expect(skipped.results).toEqual([])
+  })
+
+  it('is ignored from SUBMITTING — a review is already in flight', () => {
+    const submitting = sessionReducer(sessionReducer(asking(3, 0), { type: 'REVEAL' }), {
+      type: 'RATE',
+      grade: 3,
+      durationMs: 400,
+    })
+    expect(submitting.phase).toBe('SUBMITTING')
+    expect(sessionReducer(submitting, { type: 'SKIP_CARD' })).toBe(submitting)
+  })
+
+  it('is ignored from SUMMARY and LOADING', () => {
+    const summary: SessionState = { ...asking(2, 2), phase: 'SUMMARY' }
+    expect(sessionReducer(summary, { type: 'SKIP_CARD' })).toBe(summary)
+    const loading = initialState(NOW)
+    expect(sessionReducer(loading, { type: 'SKIP_CARD' })).toBe(loading)
+  })
+})
+
 describe('sessionReducer — exit (§16.1 item 5)', () => {
   it('REQUEST_EXIT with 0 reviews → exits directly', () => {
     const s = sessionReducer(asking(2), { type: 'REQUEST_EXIT' })

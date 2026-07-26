@@ -52,6 +52,7 @@ export type Action =
   | { type: 'RATE_OK' }
   | { type: 'RATE_FAIL' }
   | { type: 'RATE_SKIP' }
+  | { type: 'SKIP_CARD' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'REQUEST_EXIT' }
@@ -147,6 +148,21 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       // 404 — the card vanished (finding #8). Advance WITHOUT recording a
       // result: a deleted card is never counted in the summary.
       if (state.phase !== 'SUBMITTING') return state
+      return advance(state, state.results)
+
+    case 'SKIP_CARD':
+      // The user drops the current card (S / the "Passer" button). Client-side
+      // only, session-scoped: nothing is written anywhere — no review is POSTed,
+      // so the card keeps its past `due`, still counts in the due counts and
+      // comes back in the next session. Deliberately NOT a server-side bury
+      // (`due = now + 1d`): that would make a second writer of the FSRS columns
+      // outside the scheduler, the very invariant the API protects.
+      // It shares `advance(state, state.results)` with RATE_SKIP, which already
+      // means exactly "move on WITHOUT recording a result": `total` is untouched
+      // and the summary only ever counts graded cards.
+      // Accepted from ASKING and REVEALED only — never from SUBMITTING, where a
+      // review is already in flight for this card and its ack must land first.
+      if (state.phase !== 'ASKING' && state.phase !== 'REVEALED') return state
       return advance(state, state.results)
 
     case 'RATE_FAIL':

@@ -40,6 +40,8 @@ export interface SessionApi {
   reduce: boolean
   reveal: () => void
   rate: (grade: Grade) => void
+  /** Drop the current card without rating it (client-side, session-scoped). */
+  skip: () => void
   requestExit: () => void
   confirmExit: () => void
   cancelExit: () => void
@@ -234,6 +236,18 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     mutateRef.current({ cardId: card.id, grade, durationMs })
   }, [])
 
+  const skip = useCallback(() => {
+    const s = stateRef.current
+    if (s.phase !== 'ASKING' && s.phase !== 'REVEALED') return
+    // No POST, no `inFlightRef`, nothing read off the timer: a skipped card
+    // produces no `RatingResult`, so its duration is never needed. The next
+    // card gets a fresh `createCardTimer` from the same effect that serves a
+    // rating — it is keyed on `[state.phase, state.index]`, and SKIP_CARD
+    // always lands on ASKING at `index + 1` (or on SUMMARY, where there is no
+    // card left to time).
+    dispatch({ type: 'SKIP_CARD' })
+  }, [])
+
   const retryRef = useRef<() => void>(() => {})
   retryRef.current = () => {
     const last = lastRateRef.current
@@ -337,6 +351,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault()
             reveal()
+          } else if (e.key.toLowerCase() === 's') {
+            e.preventDefault()
+            skip()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
@@ -346,6 +363,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           if (e.key >= '1' && e.key <= '4') {
             e.preventDefault()
             rate(Number(e.key) as Grade)
+          } else if (e.key.toLowerCase() === 's') {
+            e.preventDefault()
+            skip()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
@@ -378,7 +398,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [reveal, rate, requestExit, confirmExit, cancelExit, resume, reviewAgain])
+  }, [reveal, rate, skip, requestExit, confirmExit, cancelExit, resume, reviewAgain])
 
   // Clear the pending flash timeout on unmount.
   useEffect(() => {
@@ -434,6 +454,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     reduce,
     reveal,
     rate,
+    skip,
     requestExit,
     confirmExit,
     cancelExit,

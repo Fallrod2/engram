@@ -178,7 +178,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
           {/* Natural height, never compressed. */}
           <div className="flex shrink-0 flex-col gap-2">
-            <SessionContextBar remaining={api.remaining} />
+            <SessionContextBar remaining={api.remaining} onSkip={api.skip} />
             <RatingBar
               revealed={api.revealed}
               preview={api.preview}

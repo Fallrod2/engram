@@ -495,6 +495,8 @@ export const dictEn: Dict = {
     footerHint: 'Space reveal · 1-4 rate · Esc exit',
     progressAria: 'Session progress',
     remainingAria: 'Remaining cards by state',
+    skip: 'Skip',
+    skipAria: 'Skip this card without rating it (S)',
     paused: 'Session paused — press any key or click to resume',
     exitTitle: 'Leave the session?',
     exitDesc: 'Your progress is already saved.',

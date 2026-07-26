@@ -501,6 +501,8 @@ export const dictFr = {
     footerHint: 'Espace révéler · 1-4 noter · Échap quitter',
     progressAria: 'Progression de la session',
     remainingAria: 'Cartes restantes par état',
+    skip: 'Passer',
+    skipAria: 'Passer cette carte sans la noter (S)',
     paused: 'Session en pause — appuie sur une touche ou clique pour reprendre',
     exitTitle: 'Quitter la session ?',
     exitDesc: 'Ta progression est déjà enregistrée.',
