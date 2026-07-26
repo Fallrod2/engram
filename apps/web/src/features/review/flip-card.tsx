@@ -45,10 +45,10 @@ function Verso({ front, back }: { front: string; back: string }) {
   return (
     <div className="flex w-full flex-col gap-4">
       <div aria-label={t('session.questionRecall')}>
-        <Markdown source={front} centered className="text-sm text-text-muted" />
+        <Markdown source={front} align="center" className="text-sm text-text-muted" />
       </div>
       <hr className="border-border" />
-      <Markdown source={back} centered />
+      <Markdown source={back} align="center" />
     </div>
   )
 }
@@ -90,7 +90,7 @@ export function FlipCard({
       >
         <motion.div animate={{ opacity: revealed ? 0 : 1 }} transition={{ duration: 0.12 }}>
           <Face className="min-h-[240px]">
-            <Markdown source={front} centered />
+            <Markdown source={front} align="center" />
           </Face>
         </motion.div>
         <motion.div
@@ -123,7 +123,7 @@ export function FlipCard({
         transition={{ duration: 0.22, ease: FLIP_EASE }}
       >
         <Face className="min-h-[240px]">
-          <Markdown source={front} centered />
+          <Markdown source={front} align="center" />
         </Face>
         <Face className="absolute inset-0 min-h-[240px] [transform:rotateY(180deg)]">
           <Verso front={front} back={back} />

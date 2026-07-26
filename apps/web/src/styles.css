@@ -86,6 +86,16 @@
   --text-2xl: 2.5rem; /* 40 */
   --text-3xl: 3.5rem; /* 56 */
 
+  /* — Échelle « lecture de carte » — la seule zone lue en continu de l'app.
+     Le chrome est ancré sur 14px (densité Linear) ; le contenu de carte a son
+     propre registre, ancré sur 17px. 17 et non 16 : 16 (--text-md) sert déjà
+     dans le chrome, la carte doit lire comme un AUTRE registre. À 17px/1.6
+     dans 616px utiles (680 − 2×32), la mesure tombe à ~60 caractères. — */
+  --text-card-sm: 0.9375rem; /* 15 — code en bloc, tables, h4 */
+  --text-card: 1.0625rem; /* 17 — corps de carte */
+  --text-card-md: 1.1875rem; /* 19 — h2 */
+  --text-card-lg: 1.375rem; /* 22 — h1 */
+
   /* — Espacement — base 4px, dense — */
   --spacing: 0.25rem;
 

@@ -1,5 +1,16 @@
 import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { extendTailwindMerge } from 'tailwind-merge'
+
+/**
+ * tailwind-merge recognises a font size by its t-shirt shape (`xs`, `2xl`, …),
+ * so the card reading scale (`text-card`, `text-card-sm`…) would otherwise be
+ * filed under *text color* and cancel out `text-text` / `text-text-muted`.
+ * Registering the four tokens puts them back in the `font-size` group: they now
+ * conflict with other sizes (correct) and never with a color (correct).
+ */
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { 'font-size': [{ text: ['card', 'card-sm', 'card-md', 'card-lg'] }] } },
+})
 
 /** Merge conditional class names, resolving Tailwind conflicts last-wins. */
 export function cn(...inputs: ClassValue[]): string {
