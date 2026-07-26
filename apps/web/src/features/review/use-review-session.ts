@@ -17,6 +17,7 @@ import { useT } from '@/lib/i18n'
 import { createCardTimer, IDLE_MS, type CardTimer } from './session-timer'
 import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
+import { remainingByState, type RemainingByState } from './queue-stats'
 
 export interface SessionApi {
   phase: Phase
@@ -29,6 +30,8 @@ export interface SessionApi {
   preview: ReviewPreview | undefined
   progress: { done: number; total: number }
   counts: Record<Grade, number>
+  /** FSRS breakdown of the cards still ahead (current card included). */
+  remaining: RemainingByState
   paused: boolean
   confirmingExit: boolean
   flashGrade: Grade | null
@@ -402,6 +405,11 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     return c
   }, [state.results])
 
+  const remaining = useMemo(
+    () => remainingByState(state.cards, state.index),
+    [state.cards, state.index],
+  )
+
   const summary = useMemo(
     () => (state.phase === 'SUMMARY' ? computeSummary(state.results) : undefined),
     [state.phase, state.results],
@@ -417,6 +425,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     preview: previewQuery.data,
     progress: { done: state.index, total: state.cards.length },
     counts,
+    remaining,
     paused: state.paused,
     confirmingExit: state.confirmingExit,
     flashGrade,

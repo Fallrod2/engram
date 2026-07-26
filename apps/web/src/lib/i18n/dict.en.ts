@@ -494,6 +494,7 @@ export const dictEn: Dict = {
     saveError: 'Save failed — press again to retry.',
     footerHint: 'Space reveal · 1-4 rate · Esc exit',
     progressAria: 'Session progress',
+    remainingAria: 'Remaining cards by state',
     paused: 'Session paused — press any key or click to resume',
     exitTitle: 'Leave the session?',
     exitDesc: 'Your progress is already saved.',

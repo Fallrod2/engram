@@ -15,6 +15,7 @@ import { SessionHeader } from './session-header'
 import { ProgressBar } from './progress-bar'
 import { ReviewCard } from './review-card'
 import { RatingBar } from './rating-bar'
+import { SessionContextBar } from './session-context-bar'
 import { SessionSummary } from './session-summary'
 import { ExitConfirm } from './exit-confirm'
 import { IdleOverlay } from './idle-overlay'
@@ -137,6 +138,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
         scope={api.scope}
         current={Math.min(api.progress.done + 1, api.progress.total)}
         total={api.progress.total}
+        fsrs={current?.fsrs}
         onExit={api.requestExit}
       />
 
@@ -176,6 +178,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
           {/* Natural height, never compressed. */}
           <div className="flex shrink-0 flex-col gap-2">
+            <SessionContextBar remaining={api.remaining} />
             <RatingBar
               revealed={api.revealed}
               preview={api.preview}

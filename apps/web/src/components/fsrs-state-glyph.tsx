@@ -13,7 +13,7 @@ import { type TKey, useT } from '@/lib/i18n'
  *   Relearning(3) → warning square
  * ("Suspended" from the design isn't in the v1 `State` enum → not rendered.)
  */
-const LABEL_KEYS: Record<FsrsState, TKey> = {
+export const FSRS_STATE_LABEL_KEYS: Record<FsrsState, TKey> = {
   0: 'fsrs.states.new',
   1: 'fsrs.states.learning',
   2: 'fsrs.states.review',
@@ -36,7 +36,7 @@ export function glyphClass(state: FsrsState): string {
 
 export function FsrsStateGlyph({ fsrs, className }: { fsrs: FsrsCardState; className?: string }) {
   const t = useT()
-  const label = t(LABEL_KEYS[fsrs.state])
+  const label = t(FSRS_STATE_LABEL_KEYS[fsrs.state])
   return (
     <Tooltip>
       <TooltipTrigger asChild>
