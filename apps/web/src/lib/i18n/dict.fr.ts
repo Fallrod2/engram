@@ -496,7 +496,6 @@ export const dictFr = {
     revealHint: 'pour révéler',
     revealButton: 'Révéler la réponse',
     revealAria: 'Révéler la réponse',
-    questionRecall: 'Rappel de la question',
     revealed: 'Réponse révélée',
     saveError: 'Échec d’enregistrement — appuie de nouveau pour réessayer.',
     footerHint: 'Espace révéler · 1-4 noter · Échap quitter',

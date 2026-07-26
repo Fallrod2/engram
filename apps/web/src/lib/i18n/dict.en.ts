@@ -490,7 +490,6 @@ export const dictEn: Dict = {
     revealHint: 'to reveal',
     revealButton: 'Reveal answer',
     revealAria: 'Reveal answer',
-    questionRecall: 'Question recall',
     revealed: 'Answer revealed',
     saveError: 'Save failed — press again to retry.',
     footerHint: 'Space reveal · 1-4 rate · Esc exit',

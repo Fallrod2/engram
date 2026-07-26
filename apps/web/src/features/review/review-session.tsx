@@ -13,7 +13,7 @@ import type { ReviewScope } from '@/lib/api'
 import { useReviewSession } from './use-review-session'
 import { SessionHeader } from './session-header'
 import { ProgressBar } from './progress-bar'
-import { FlipCard } from './flip-card'
+import { ReviewCard } from './review-card'
 import { RatingBar } from './rating-bar'
 import { SessionSummary } from './session-summary'
 import { ExitConfirm } from './exit-confirm'
@@ -152,7 +152,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
                 exit={api.reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
                 transition={{ duration: 0.13, ease: [0.16, 1, 0.3, 1] }}
               >
-                <FlipCard
+                <ReviewCard
                   front={current.front}
                   back={current.back}
                   revealed={api.revealed}
