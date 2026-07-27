@@ -259,7 +259,11 @@ export function Sidebar() {
           collapsed && 'items-center px-2',
         )}
       >
-        <div className={cn('flex items-center gap-1', collapsed && 'flex-col')}>
+        {/* Expanded, "Administration" and "Settings" are nav-shaped full-width
+            rows: they STACK on the nav group's own `gap-0.5`, like the links
+            above them. Side by side they overflowed the 240px bar. Collapsed,
+            the centred icon column is unchanged. */}
+        <div className={cn('flex flex-col', collapsed ? 'items-center gap-1' : 'gap-0.5')}>
           {isAdmin &&
             (collapsed ? (
               <Tooltip>
@@ -305,15 +309,24 @@ export function Sidebar() {
               {t('sidebar.settings')}
             </Link>
           )}
-          <div className={cn('ml-auto flex items-center gap-1', collapsed && 'ml-0 flex-col')}>
+          {collapsed && (
             <StreakPill
               current={streak?.current ?? 0}
               includesToday={streak?.includesToday ?? false}
-              collapsed={collapsed}
+              collapsed
             />
-            {!collapsed && <ThemeToggle />}
-          </div>
+          )}
         </div>
+        {/* Streak + theme get their own row once expanded, still trailing-aligned. */}
+        {!collapsed && (
+          <div className="flex items-center justify-end gap-1">
+            <StreakPill
+              current={streak?.current ?? 0}
+              includesToday={streak?.includesToday ?? false}
+            />
+            <ThemeToggle />
+          </div>
+        )}
         <ApiStatus collapsed={collapsed} />
       </div>
     </aside>

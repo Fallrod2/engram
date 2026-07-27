@@ -165,3 +165,46 @@ describe('<Sidebar> collapse toggle placement', () => {
     expect(screen.queryByLabelText('Déployer la barre latérale')).toBeNull()
   })
 })
+
+describe('<Sidebar> footer layout', () => {
+  it('stacks Administration and Settings when expanded', () => {
+    const { container } = renderSidebar()
+    const admin = screen.getByText('Administration').closest('a')
+    const settings = screen.getByText('Réglages').closest('a')
+    expect(admin).not.toBeNull()
+    expect(settings).not.toBeNull()
+
+    // Same container (they are siblings), and that container stacks.
+    const group = admin?.parentElement
+    expect(settings?.parentElement).toBe(group)
+    expect(group?.className).toContain('flex-col')
+    expect(group?.className).not.toContain('items-center')
+    expect(footer(container).contains(group as Node)).toBe(true)
+  })
+
+  it('puts the streak and the theme toggle on their own footer row', () => {
+    const { container } = renderSidebar()
+    const linkGroup = screen.getByText('Administration').closest('a')?.parentElement
+    const themeRow = screen.getByTestId('theme-toggle').parentElement
+    expect(themeRow).not.toBe(linkGroup)
+    expect(themeRow?.contains(screen.getByTestId('streak-pill'))).toBe(true)
+    // Both are direct children of the footer, so its own gap separates them.
+    expect(themeRow?.parentElement).toBe(footer(container))
+    expect(linkGroup?.parentElement).toBe(footer(container))
+  })
+
+  it('keeps the collapsed footer a single centred icon column', () => {
+    collapsed = true
+    const { container } = renderSidebar()
+    const admin = screen.getByLabelText('Administration')
+    const settings = screen.getByLabelText('Réglages')
+    const group = admin.parentElement
+    expect(settings.parentElement).toBe(group)
+    expect(group?.className).toContain('flex-col')
+    expect(group?.className).toContain('items-center')
+    // The streak stays in that same column; the theme toggle is hidden.
+    expect(group?.contains(screen.getByTestId('streak-pill'))).toBe(true)
+    expect(screen.queryByTestId('theme-toggle')).toBeNull()
+    expect(footer(container).contains(admin)).toBe(true)
+  })
+})
