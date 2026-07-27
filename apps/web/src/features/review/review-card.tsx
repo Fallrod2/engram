@@ -69,8 +69,11 @@ export function ReviewCard({
       role={interactive ? 'button' : undefined}
       aria-label={interactive ? t('session.revealAria') : undefined}
       onClick={interactive ? onReveal : undefined}
+      // No `min-h-0` here: what lets this flex item shrink below its intrinsic
+      // size is `overflow-hidden` (automatic minimum size is 0 once `overflow`
+      // is not `visible`); the `min-h-*` below is the deliberate floor.
       className={cn(
-        'flex min-h-0 w-full flex-col overflow-hidden rounded-lg',
+        'flex w-full flex-col overflow-hidden rounded-lg',
         'min-h-[180px] border border-border bg-surface-2 sm:min-h-[220px]',
         interactive && 'cursor-pointer',
       )}
