@@ -511,6 +511,8 @@ export const dictFr = {
     footerHint: 'Espace révéler · 1-4 noter · Échap quitter',
     progressAria: 'Progression de la session',
     remainingAria: 'Cartes restantes par état',
+    difficultyAria: 'Difficulté de cette carte : {value} sur 10',
+    difficultyUnknown: 'Difficulté de cette carte : pas encore évaluée',
     skip: 'Passer',
     skipAria: 'Passer cette carte sans la noter (S)',
     edit: 'Éditer',

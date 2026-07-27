@@ -505,6 +505,8 @@ export const dictEn: Dict = {
     footerHint: 'Space reveal · 1-4 rate · Esc exit',
     progressAria: 'Session progress',
     remainingAria: 'Remaining cards by state',
+    difficultyAria: 'Difficulty of this card: {value} out of 10',
+    difficultyUnknown: 'Difficulty of this card: not yet assessed',
     skip: 'Skip',
     skipAria: 'Skip this card without rating it (S)',
     edit: 'Edit',

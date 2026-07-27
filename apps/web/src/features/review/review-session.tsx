@@ -198,6 +198,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
           <div className="flex shrink-0 flex-col gap-2">
             <SessionContextBar
               remaining={api.remaining}
+              difficulty={current?.fsrs.difficulty ?? null}
               canUndo={api.canUndo}
               undoing={api.undoing}
               onEdit={api.openEdit}
