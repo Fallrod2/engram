@@ -16,7 +16,7 @@ import {
   streaksResponseSchema,
   studyTimeResponseSchema,
 } from '@engram/shared'
-import { api, qs } from '@/lib/api'
+import { api, fetchHardestCards, qs } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
 import {
   previousSeriesRange,
@@ -100,6 +100,23 @@ export function retentionOptions(w: AnalyticsWindow, now: Date) {
     staleTime: STALE,
     refetchOnWindowFocus: true,
     placeholderData: keepPreviousData,
+  })
+}
+
+/** How many hard cards the panel lists PER SUBJECT (bounded 1..20 server-side). */
+export const HARDEST_CARDS_PER_SUBJECT = 5
+
+/**
+ * The hardest cards of each subject. NOT window-scoped, and deliberately so:
+ * FSRS `difficulty` is the card's current state, not an aggregate over a period
+ * — so no `placeholderData` dance either, the window filter never touches it.
+ */
+export function hardestCardsOptions(limit = HARDEST_CARDS_PER_SUBJECT) {
+  return queryOptions({
+    queryKey: qk.analytics.hardestCards(limit),
+    queryFn: ({ signal }) => fetchHardestCards(limit, signal),
+    staleTime: STALE,
+    refetchOnWindowFocus: true,
   })
 }
 

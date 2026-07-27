@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   apiErrorSchema,
   cardSchema,
+  hardestCardsResponseSchema,
   healthResponseSchema,
   reviewPreviewSchema,
   reviewQueueResponseSchema,
@@ -9,6 +10,7 @@ import {
   undoReviewResponseSchema,
   type ApiErrorCode,
   type Card,
+  type HardestCardsResponse,
   type HealthResponse,
   type ReviewCard,
   type ReviewPreview,
@@ -157,6 +159,20 @@ export function qs(params: Record<string, string | number | boolean | undefined>
 /** Fetch + validate `GET /api/health` (kept from Phase 0). */
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return api.get('/health', healthResponseSchema, signal)
+}
+
+/**
+ * The `limit` hardest cards OF EACH SUBJECT (`GET /api/analytics/hardest-cards`).
+ * Ranked on the FSRS `difficulty` the scheduler already maintains; the server
+ * drops never-reviewed cards (`difficulty = 0` = unknown, not easy) and anything
+ * under the `minReps` it echoes back. Not window-scoped: difficulty is a current
+ * state, not an aggregate over a period.
+ */
+export function fetchHardestCards(
+  limit: number,
+  signal?: AbortSignal,
+): Promise<HardestCardsResponse> {
+  return api.get(`/analytics/hardest-cards${qs({ limit })}`, hardestCardsResponseSchema, signal)
 }
 
 /** Review-session scope filters (at most one is set in practice). */

@@ -49,6 +49,27 @@ export function ChartCardSkeleton({ height = 264 }: { height?: number }) {
   )
 }
 
+/** The hardest-cards panel is a LIST, so its placeholder is rows, not a plot. */
+export function HardestCardsSkeleton() {
+  return (
+    <div className="rounded-md bg-surface-2 p-4">
+      <Skeleton className="h-5 w-40 bg-surface-3" />
+      <div className="mt-4 flex flex-col gap-4">
+        {Array.from({ length: 2 }).map((_, g) => (
+          <div key={g}>
+            <Skeleton className="h-3.5 w-28 bg-surface-3" />
+            <div className="mt-2 flex flex-col gap-2">
+              {Array.from({ length: 3 }).map((__, r) => (
+                <Skeleton key={r} className="h-4 w-full bg-surface-3" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function AnalyticsSkeleton() {
   return (
     <div className="flex flex-col gap-6">
