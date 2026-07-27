@@ -15,6 +15,13 @@ export default defineConfig({
     // Node by default (DB/domain/pure-logic tests). Component tests opt into
     // jsdom per file via a `// @vitest-environment jsdom` docblock.
     environment: 'node',
-    include: ['apps/**/*.test.ts', 'apps/**/*.test.tsx', 'packages/**/*.test.ts'],
+    // Only `*.test.ts` — the Playwright suites are `*.spec.ts` (as are the
+    // server's bun:test DB specs), so neither is ever picked up here.
+    include: [
+      'apps/**/*.test.ts',
+      'apps/**/*.test.tsx',
+      'packages/**/*.test.ts',
+      'e2e/**/*.test.ts',
+    ],
   },
 })
