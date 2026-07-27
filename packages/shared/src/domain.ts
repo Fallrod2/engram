@@ -921,6 +921,41 @@ export const deckSuccessResponseSchema = z.object({
   decks: z.array(deckSuccessSchema),
 })
 
+// --- hardest-cards (top-N per subject) ---
+export const hardestCardsQuerySchema = z.object({
+  // Number of cards returned PER SUBJECT (not a global cap): the panel is a
+  // per-subject ranking, so the bound is applied inside each partition.
+  limit: z.coerce.number().int().min(1).max(20).default(5),
+})
+/**
+ * One card of the "hardest cards" ranking.
+ *
+ * `difficulty` is NOT a score of ours: it is the FSRS value ts-fsrs maintains on
+ * `card.difficulty`, on a 1 (easy) to 10 (hard) scale, rewritten at every review.
+ *
+ * THE TRAP: the column defaults to `0` and ts-fsrs only writes a real value on
+ * the FIRST review, so a never-reviewed card carries `difficulty = 0` — outside
+ * the scale. Such a card is UNKNOWN, not easy, and is EXCLUDED from the ranking
+ * (as is any card below `minReps`), so `difficulty` here is always > 0.
+ *
+ * `front` is a TRUNCATED excerpt of the card's Markdown recto (see the service's
+ * `FRONT_EXCERPT_CHARS`), never the whole document: this feeds a dense list.
+ */
+export const hardestCardSchema = z.object({
+  cardId: z.string(),
+  deckId: z.string(),
+  subjectId: z.string(),
+  front: z.string(), // Markdown excerpt, truncated server-side
+  difficulty: z.number(), // FSRS 1..10, never 0 (see above)
+  lapses: z.number().int().nonnegative(),
+  reps: z.number().int().nonnegative(),
+})
+export const hardestCardsResponseSchema = z.object({
+  minReps: z.number().int().positive(),
+  limit: z.number().int().positive(),
+  cards: z.array(hardestCardSchema),
+})
+
 export type HeatmapQuery = z.infer<typeof heatmapQuerySchema>
 export type HeatmapDay = z.infer<typeof heatmapDaySchema>
 export type HeatmapResponse = z.infer<typeof heatmapResponseSchema>
@@ -938,6 +973,9 @@ export type RetentionResponse = z.infer<typeof retentionResponseSchema>
 export type DeckSuccessQuery = z.infer<typeof deckSuccessQuerySchema>
 export type DeckSuccess = z.infer<typeof deckSuccessSchema>
 export type DeckSuccessResponse = z.infer<typeof deckSuccessResponseSchema>
+export type HardestCardsQuery = z.infer<typeof hardestCardsQuerySchema>
+export type HardestCard = z.infer<typeof hardestCardSchema>
+export type HardestCardsResponse = z.infer<typeof hardestCardsResponseSchema>
 
 export type ListExamsQuery = z.infer<typeof listExamsQuerySchema>
 export type StudyPlanQuery = z.infer<typeof studyPlanQuerySchema>

@@ -1,6 +1,7 @@
-import { and, count, desc, eq, gte, lt, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, lt, lte, sql, type SQL } from 'drizzle-orm'
 import type {
   DeckSuccessResponse,
+  HardestCardsResponse,
   HeatmapResponse,
   RetentionResponse,
   ReviewVolumeResponse,
@@ -25,6 +26,20 @@ const RECALL_RATING_MIN = 2
 const RATING_MIN_COUNTED = 1
 /** State.Review — retention only counts mature (scheduled) cards. */
 const REVIEW_STATE = 2
+/**
+ * Minimum `card.reps` for a card to enter the "hardest cards" ranking. A card
+ * answered once has a difficulty FSRS has not had time to calibrate; ranking it
+ * would present noise as a fact. Returned to the client as `minReps` so the UI
+ * can say WHY a subject is missing (mirrors `retention`'s `minSample`).
+ */
+export const MIN_REPS = 3
+/**
+ * Length of the `front` excerpt returned by `hardestCards`. It is a dense list,
+ * not a reader: the whole Markdown recto would bloat the payload for nothing.
+ * Truncation is a hard character cut (no Markdown-aware cleanup — the UI
+ * flattens the excerpt at render time).
+ */
+const FRONT_EXCERPT_CHARS = 160
 
 type Granularity = 'day' | 'week'
 
@@ -174,6 +189,10 @@ export interface GranularSeriesParams extends SeriesParams {
 export interface RateParams {
   from?: string
   to?: string
+}
+export interface HardestCardsParams {
+  /** Cards kept PER SUBJECT (bounded 1..20 by `hardestCardsQuerySchema`). */
+  limit: number
 }
 
 /**
@@ -496,4 +515,82 @@ export async function deckSuccess(
   }))
 
   return { from: win.from, to: win.to, minSample: MIN_RATE_SAMPLE, decks }
+}
+
+/**
+ * The `limit` hardest cards OF EACH SUBJECT, ranked by the FSRS `difficulty`
+ * already persisted on the card.
+ *
+ * NO TIME WINDOW — deliberately, unlike its neighbours: `difficulty` is a
+ * CURRENT STATE maintained by ts-fsrs, not an aggregate over a period. Filtering
+ * it by `from`/`to` would mean nothing (there is no date to filter on but the
+ * card's own last review, which is not what "hardest right now" asks).
+ *
+ * WHAT IS EXCLUDED, AND WHY. `difficulty` defaults to `0` and ts-fsrs only
+ * writes a real value on the first review, so a never-reviewed card sits at `0`,
+ * outside the 1-10 scale: it is UNKNOWN, not easy, and has no place in a ranking
+ * of hard cards (`difficulty > 0`). Cards below `MIN_REPS` are dropped for the
+ * same reason at the other end: too few answers for FSRS to have calibrated
+ * anything. Archived subjects are excluded (present-tense view) and everything
+ * is scoped by `subject.userId`, exactly like `deckSuccess`.
+ *
+ * TOP-N PER SUBJECT via `row_number() over (partition by subject order by ...)`
+ * in a subquery, filtered to `<= limit` outside — one query, no fan-out. The
+ * ordering is fully deterministic (`difficulty DESC, lapses DESC, id ASC`): with
+ * ties broken only by difficulty, two equally hard cards would swap places
+ * between calls and the `limit` cut would be a coin flip.
+ */
+export async function hardestCards(
+  db: DB,
+  userId: string,
+  params: HardestCardsParams,
+): Promise<HardestCardsResponse> {
+  const ranked = db
+    .select({
+      cardId: card.id,
+      deckId: card.deckId,
+      // Aliased: drizzle renders a subquery field by its BARE name, so keeping
+      // `subject.id` as `"id"` next to `card.id` makes the outer select
+      // ambiguous ("column reference id is ambiguous").
+      subjectId: sql<string>`${subject.id}`.as('subject_id'),
+      // Hard character cut — see FRONT_EXCERPT_CHARS.
+      front: sql<string>`left(${card.front}, ${FRONT_EXCERPT_CHARS})`.as('front_excerpt'),
+      difficulty: card.difficulty,
+      lapses: card.lapses,
+      reps: card.reps,
+      rank: sql<number>`row_number() over (
+        partition by ${subject.id}
+        order by ${card.difficulty} desc, ${card.lapses} desc, ${card.id} asc
+      )`.as('subject_rank'),
+    })
+    .from(card)
+    .innerJoin(deck, eq(deck.id, card.deckId))
+    .innerJoin(subject, eq(subject.id, deck.subjectId))
+    .where(
+      and(
+        eq(subject.userId, userId),
+        eq(subject.archived, false),
+        gt(card.difficulty, 0), // never reviewed → unknown, not easy
+        gte(card.reps, MIN_REPS),
+      ),
+    )
+    .as('ranked')
+
+  const rows = await db
+    .select({
+      cardId: ranked.cardId,
+      deckId: ranked.deckId,
+      subjectId: ranked.subjectId,
+      front: ranked.front,
+      difficulty: ranked.difficulty,
+      lapses: ranked.lapses,
+      reps: ranked.reps,
+    })
+    .from(ranked)
+    .where(lte(ranked.rank, params.limit))
+    // Same total order as the partitions: the globally hardest card leads, so a
+    // client grouping by subject in encounter order gets a meaningful order too.
+    .orderBy(desc(ranked.difficulty), desc(ranked.lapses), asc(ranked.cardId))
+
+  return { minReps: MIN_REPS, limit: params.limit, cards: rows }
 }

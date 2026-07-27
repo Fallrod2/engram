@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import {
   deckSuccessQuerySchema,
   deckSuccessResponseSchema,
+  hardestCardsQuerySchema,
+  hardestCardsResponseSchema,
   heatmapQuerySchema,
   heatmapResponseSchema,
   retentionQuerySchema,
@@ -19,6 +21,7 @@ import { ok } from '../http/respond'
 import { requireUserId } from '../http/identity'
 import {
   deckSuccess,
+  hardestCards,
   heatmap,
   retention,
   reviewVolume,
@@ -99,5 +102,14 @@ analyticsRouter.get('/deck-success', zValidator('query', deckSuccessQuerySchema)
       ...(q.from !== undefined ? { from: q.from } : {}),
       ...(q.to !== undefined ? { to: q.to } : {}),
     }),
+  )
+})
+
+analyticsRouter.get('/hardest-cards', zValidator('query', hardestCardsQuerySchema), async (c) => {
+  const q = c.req.valid('query')
+  return ok(
+    c,
+    hardestCardsResponseSchema,
+    await hardestCards(db, requireUserId(c), { limit: q.limit }),
   )
 })

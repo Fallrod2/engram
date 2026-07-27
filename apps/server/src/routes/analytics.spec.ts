@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
 import {
   deckSuccessResponseSchema,
+  hardestCardsResponseSchema,
   heatmapResponseSchema,
   retentionResponseSchema,
   reviewVolumeResponseSchema,
@@ -90,6 +91,37 @@ describe('analytics routes — contract validity', () => {
     const res = await app.request('/api/analytics/deck-success')
     expect(res.status).toBe(200)
     expect(deckSuccessResponseSchema.safeParse(await res.json()).success).toBe(true)
+  })
+
+  it('GET /api/analytics/hardest-cards → 200, default limit, never-reviewed absent', async () => {
+    const s = await seedSubject(db)
+    const d = await seedDeck(db, s.id)
+    await seedCard(db, d.id, { difficulty: 8.1, reps: 5 })
+    await seedCard(db, d.id) // pristine: difficulty 0 → excluded
+    const res = await app.request('/api/analytics/hardest-cards')
+    expect(res.status).toBe(200)
+    const body = hardestCardsResponseSchema.parse(await res.json())
+    expect(body.limit).toBe(5) // schema default
+    expect(body.minReps).toBeGreaterThan(0)
+    expect(body.cards.length).toBe(1)
+    expect(body.cards[0]?.difficulty).toBeCloseTo(8.1, 10)
+  })
+
+  it('GET /api/analytics/hardest-cards?limit=1 → echoes the limit', async () => {
+    const s = await seedSubject(db)
+    const d = await seedDeck(db, s.id)
+    for (const diff of [3, 9]) await seedCard(db, d.id, { difficulty: diff, reps: 4 })
+    const res = await app.request('/api/analytics/hardest-cards?limit=1')
+    expect(res.status).toBe(200)
+    const body = hardestCardsResponseSchema.parse(await res.json())
+    expect(body.limit).toBe(1)
+    expect(body.cards.length).toBe(1)
+    expect(body.cards[0]?.difficulty).toBeCloseTo(9, 10)
+  })
+
+  it('GET /api/analytics/hardest-cards?limit=0 → 400', async () => {
+    expect((await app.request('/api/analytics/hardest-cards?limit=0')).status).toBe(400)
+    expect((await app.request('/api/analytics/hardest-cards?limit=21')).status).toBe(400)
   })
 })
 

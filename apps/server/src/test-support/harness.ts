@@ -160,10 +160,24 @@ export async function seedDeck(
   return row!
 }
 
+/**
+ * Seed a card. Defaults to a pristine `createEmptyCard()` — so `difficulty`,
+ * `reps` and `lapses` are all 0, i.e. the NEVER-REVIEWED state. Override them to
+ * pose a card FSRS has already graded (the difficulty ranking reads exactly
+ * these three columns).
+ */
 export async function seedCard(
   db: DB,
   deckId: string,
-  o: { front?: string; back?: string; due?: Date; userId?: string } = {},
+  o: {
+    front?: string
+    back?: string
+    due?: Date
+    userId?: string
+    difficulty?: number
+    reps?: number
+    lapses?: number
+  } = {},
 ) {
   const cols = fsrsCardToColumns(createEmptyCard(new Date()))
   const [row] = await db
@@ -175,6 +189,9 @@ export async function seedCard(
       back: o.back ?? '# A',
       ...cols,
       ...(o.due !== undefined ? { due: o.due } : {}),
+      ...(o.difficulty !== undefined ? { difficulty: o.difficulty } : {}),
+      ...(o.reps !== undefined ? { reps: o.reps } : {}),
+      ...(o.lapses !== undefined ? { lapses: o.lapses } : {}),
     })
     .returning()
   return row!

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { eq } from 'drizzle-orm'
+import { hardestCardsResponseSchema } from '@engram/shared'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
 import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
@@ -8,7 +9,9 @@ import { seedCard, seedDeck, seedReviewLog, seedSubject } from '../test-support/
 import { localDayKey } from '../lib/day'
 import { ValidationError } from '../http/errors'
 import {
+  MIN_REPS,
   deckSuccess,
+  hardestCards,
   heatmap,
   retention,
   reviewVolume,
@@ -465,6 +468,135 @@ describe('deck-success', () => {
     for (let i = 0; i < 10; i++) await seedReviewLog(db, cardId, { rating: 3 })
     await seedReviewLog(db, cardId, { rating: 0 }) // Manual
     expect(findDeck(await deckSuccess(db, U, {}), deckId)?.reviewed).toBe(10)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('hardest-cards', () => {
+  /** Seed a REVIEWED card: FSRS has written a difficulty and at least MIN_REPS. */
+  const reviewed = (
+    db: DB,
+    deckId: string,
+    o: { difficulty: number; reps?: number; lapses?: number; front?: string },
+  ) =>
+    seedCard(db, deckId, {
+      difficulty: o.difficulty,
+      reps: o.reps ?? MIN_REPS,
+      lapses: o.lapses ?? 0,
+      ...(o.front !== undefined ? { front: o.front } : {}),
+    })
+
+  it('ranks_the_hardest_card_of_a_subject_first', async () => {
+    const { deckId, subjectId } = await chain(db)
+    const easy = await reviewed(db, deckId, { difficulty: 2.5 })
+    const hard = await reviewed(db, deckId, { difficulty: 8.4 })
+    const mid = await reviewed(db, deckId, { difficulty: 5 })
+    const r = await hardestCards(db, U, { limit: 5 })
+    expect(r.cards.map((c) => c.cardId)).toEqual([hard.id, mid.id, easy.id])
+    expect(r.cards.every((c) => c.subjectId === subjectId)).toBe(true)
+    expect(r.cards[0]?.difficulty).toBeCloseTo(8.4, 10)
+  })
+
+  it('never_reviewed_card_absent_even_alone_in_its_subject', async () => {
+    // difficulty defaults to 0 and ts-fsrs only writes it on the first review:
+    // this card is UNKNOWN, not easy — it must not appear at all.
+    const { deckId, subjectId } = await chain(db)
+    await seedCard(db, deckId) // pristine: difficulty 0, reps 0
+    const r = await hardestCards(db, U, { limit: 5 })
+    expect(r.cards).toEqual([])
+    expect(r.cards.some((c) => c.subjectId === subjectId)).toBe(false)
+  })
+
+  it('difficulty_zero_with_enough_reps_still_absent', async () => {
+    // reps alone is not enough: a 0 difficulty is off-scale whatever the reps.
+    const { deckId } = await chain(db)
+    await reviewed(db, deckId, { difficulty: 0, reps: 20 })
+    expect((await hardestCards(db, U, { limit: 5 })).cards).toEqual([])
+  })
+
+  it('card_below_min_reps_absent', async () => {
+    const { deckId } = await chain(db)
+    const shy = await reviewed(db, deckId, { difficulty: 9.9, reps: MIN_REPS - 1 })
+    const kept = await reviewed(db, deckId, { difficulty: 4, reps: MIN_REPS })
+    const r = await hardestCards(db, U, { limit: 5 })
+    expect(r.cards.map((c) => c.cardId)).toEqual([kept.id])
+    expect(r.cards.some((c) => c.cardId === shy.id)).toBe(false)
+    expect(r.minReps).toBe(MIN_REPS)
+  })
+
+  it('limit_applies_per_subject_not_globally', async () => {
+    const a = await chain(db)
+    const b = await chain(db)
+    for (const d of [7, 6, 5, 4]) await reviewed(db, a.deckId, { difficulty: d })
+    for (const d of [9, 8, 3, 2]) await reviewed(db, b.deckId, { difficulty: d })
+    const r = await hardestCards(db, U, { limit: 2 })
+    expect(r.cards.length).toBe(4) // 2 subjects × 2, NOT a global top-2
+    expect(r.cards.filter((c) => c.subjectId === a.subjectId).length).toBe(2)
+    expect(r.cards.filter((c) => c.subjectId === b.subjectId).length).toBe(2)
+    const byA = r.cards.filter((c) => c.subjectId === a.subjectId).map((c) => c.difficulty)
+    expect(byA).toEqual([7, 6])
+    expect(r.limit).toBe(2)
+  })
+
+  it('other_user_cards_absent', async () => {
+    const mine = await chain(db)
+    await reviewed(db, mine.deckId, { difficulty: 4 })
+    const theirs = await seedSubject(db, { userId: 'user-other' })
+    const theirDeck = await seedDeck(db, theirs.id, { userId: 'user-other' })
+    await seedCard(db, theirDeck.id, {
+      userId: 'user-other',
+      difficulty: 10,
+      reps: MIN_REPS,
+    })
+    const r = await hardestCards(db, U, { limit: 5 })
+    expect(r.cards.length).toBe(1)
+    expect(r.cards[0]?.subjectId).toBe(mine.subjectId)
+  })
+
+  it('archived_subject_cards_excluded', async () => {
+    const arch = await chain(db, { archived: true })
+    await reviewed(db, arch.deckId, { difficulty: 9 })
+    expect((await hardestCards(db, U, { limit: 5 })).cards).toEqual([])
+  })
+
+  it('order_is_deterministic_on_difficulty_ties', async () => {
+    const { deckId } = await chain(db)
+    // Same difficulty: `lapses DESC` then `id ASC` must decide, identically at
+    // every call — otherwise the `limit` cut would be a coin flip.
+    await reviewed(db, deckId, { difficulty: 6, lapses: 1 })
+    await reviewed(db, deckId, { difficulty: 6, lapses: 4 })
+    await reviewed(db, deckId, { difficulty: 6, lapses: 1 })
+    const first = await hardestCards(db, U, { limit: 5 })
+    const second = await hardestCards(db, U, { limit: 5 })
+    expect(first.cards.map((c) => c.cardId)).toEqual(second.cards.map((c) => c.cardId))
+    expect(first.cards[0]?.lapses).toBe(4) // lapses breaks the difficulty tie
+    const tied = first.cards.slice(1).map((c) => c.cardId)
+    expect(tied).toEqual([...tied].sort()) // then id ASC
+  })
+
+  it('front_is_a_bounded_excerpt', async () => {
+    const { deckId } = await chain(db)
+    await reviewed(db, deckId, { difficulty: 5, front: '#'.repeat(400) })
+    const r = await hardestCards(db, U, { limit: 5 })
+    expect(r.cards[0]?.front.length).toBe(160)
+  })
+
+  it('response_matches_the_shared_contract', async () => {
+    const { deckId } = await chain(db)
+    await reviewed(db, deckId, { difficulty: 7.25, reps: 9, lapses: 2 })
+    const r = await hardestCards(db, U, { limit: 5 })
+    expect(hardestCardsResponseSchema.safeParse(r).success).toBe(true)
+  })
+
+  it('emits_one_sql_query', async () => {
+    const { deckId } = await chain(db)
+    for (const d of [3, 6, 9]) await reviewed(db, deckId, { difficulty: d })
+    const spy = spyOn(t.client, 'query')
+    const before = spy.mock.calls.length
+    await hardestCards(db, U, { limit: 5 })
+    const after = spy.mock.calls.length
+    spy.mockRestore()
+    expect(after - before).toBe(1)
   })
 })
 
