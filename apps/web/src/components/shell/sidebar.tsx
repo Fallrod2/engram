@@ -379,8 +379,12 @@ function NavLink({
         <Icon className="size-4 shrink-0" />
         {/* The rail leaves 48px of usable width and 32px rows: a three-character
             badge overflowed onto the row above. Two characters and a tighter
-            offset keep it on its own icon; the exact count stays in the tooltip
-            and in the expanded `DueCount`. */}
+            offset keep it on its own icon. `9+` is purely a display truncation:
+            the exact count is only readable once the sidebar is expanded, where
+            `DueCount` prints it in full. Collapsed, nothing carries it for a
+            screen reader either — the badge is `aria-hidden` and the tooltip
+            only repeats the label. That gap predates this cap and is not made
+            worse by it; closing it would change the rows' accessible names. */}
         {collapsed && count != null && (
           <DueBadge value={count} max={9} className="absolute -right-1 -top-1" />
         )}
