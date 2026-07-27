@@ -130,6 +130,29 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* Collapse toggle, collapsed state. The control stays at the TOP in both
+          states: expanded it sits in the brand row above, collapsed it becomes
+          the first row of the rail. Moving it to the footer made users hunt for
+          it where they had just clicked. Geometry mirrors the collapsed search
+          button below so the rail column reads as one regular stack. */}
+      {collapsed && canToggleCollapse && (
+        <div className="px-2 pb-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={toggleCollapse}
+                aria-label={t('sidebar.expandAria')}
+                className="flex size-8 w-full items-center justify-center rounded-sm text-text-faint transition-colors duration-fast hover:bg-surface-2 hover:text-text"
+              >
+                <PanelLeftOpen className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('sidebar.expand')}</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+
       {/* Search / ⌘K */}
       <div className={cn('px-3 pb-2', collapsed && 'px-2')}>
         {collapsed ? (
@@ -288,21 +311,6 @@ export function Sidebar() {
               includesToday={streak?.includesToday ?? false}
               collapsed={collapsed}
             />
-            {canToggleCollapse && collapsed && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={toggleCollapse}
-                    aria-label={t('sidebar.expandAria')}
-                    className="flex size-8 items-center justify-center rounded-sm text-text-faint transition-colors duration-fast hover:bg-surface-2 hover:text-text"
-                  >
-                    <PanelLeftOpen className="size-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">{t('sidebar.expand')}</TooltipContent>
-              </Tooltip>
-            )}
             {!collapsed && <ThemeToggle />}
           </div>
         </div>
