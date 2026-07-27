@@ -292,12 +292,27 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
     case 'REVIEW_AGAIN':
       // Fresh lot, same scope (scope is a hook concern, not held here).
       if (state.phase !== 'SUMMARY') return state
+      // Refused while an undo is in flight, third face of the same invariant as
+      // RATE and SKIP_CARD: a restart throws the whole state away, `lastReview`
+      // included, so the pending ack lands on a session that no longer holds the
+      // target it was fired for — UNDO_OK degrades to a silent no-op while the
+      // server really did unwind the review, and the mutation's `onSuccess`
+      // reseeds the card clock of the card the NEW lot has just started.
+      if (state.undoing) return state
       return initialState(action.sessionNow)
 
     case 'OPEN_EDIT':
       // Only where a card is actually on screen and no review is in flight —
       // same window as SKIP_CARD (ASKING / REVEALED), never from SUBMITTING.
       if (state.phase !== 'ASKING' && state.phase !== 'REVEALED') return state
+      // Refused while an undo is in flight: UNDO_OK moves `index` back to
+      // `lastReview.index` and deliberately does NOT touch `editing`, so an
+      // already-open dialog would follow the cursor — it renders `cards[index]`
+      // and re-seeds its fields on every card identity change. The undo would
+      // overwrite the text being typed with the rewound card's content, and a
+      // save would then write onto THAT card (`submitEdit` re-reads
+      // `cards[index]` at submit time), not the one being corrected.
+      if (state.undoing) return state
       return { ...state, editing: true }
 
     case 'CLOSE_EDIT':

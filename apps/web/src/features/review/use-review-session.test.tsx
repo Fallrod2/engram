@@ -587,6 +587,30 @@ describe('useReviewSession — undoing the last rating (U)', () => {
       expect(result.current.submitting).toBe(false)
     })
 
+    it('opening the editor on B while A is being undone is refused (T-011)', async () => {
+      const { result, ack } = await undoInFlight()
+
+      // The dialog renders `cards[index]` and re-seeds its fields whenever that
+      // card changes. Opened here, the pending UNDO_OK would swap B for A under
+      // the user's typing — and `submitEdit` re-reads `cards[index]`, so the
+      // save would land on A, not on the card being corrected.
+      act(() => result.current.openEdit())
+      expect(result.current.editing).toBe(false)
+
+      await act(async () => {
+        ack({ card: makeCard('c1'), undoneLogId: 'log-1' })
+      })
+
+      // The undo rewinds onto A, and nothing opened behind it in the meantime.
+      await waitFor(() => expect(result.current.current?.id).toBe('c1'))
+      expect(result.current.phase).toBe('REVEALED')
+      expect(result.current.editing).toBe(false)
+
+      // The guard is a window, not a wall: E works again once the undo settled.
+      act(() => result.current.openEdit())
+      expect(result.current.editing).toBe(true)
+    })
+
     it('skipping B while A is being undone leaves the cursor put (scenario 2)', async () => {
       const { result, ack } = await undoInFlight()
 

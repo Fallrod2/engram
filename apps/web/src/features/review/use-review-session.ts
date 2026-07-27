@@ -417,7 +417,15 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   const editMutateRef = useRef(editMut.mutate)
   editMutateRef.current = editMut.mutate
 
-  const openEdit = useCallback(() => dispatch({ type: 'OPEN_EDIT' }), [])
+  const openEdit = useCallback(() => {
+    // Same synchronous exclusion as in `rate()` and `skip()`, for the same
+    // reason: `stateRef` only refreshes on render, so a U and an E landing in
+    // one tick would both read `undoing: false` and open a dialog the pending
+    // UNDO_OK is about to move the card out from under (it rewinds `index`,
+    // and the editor re-seeds its fields on every card change).
+    if (undoInFlightRef.current) return
+    dispatch({ type: 'OPEN_EDIT' })
+  }, [])
   const closeEdit = useCallback(() => dispatch({ type: 'CLOSE_EDIT' }), [])
 
   const submitEdit = useCallback(
@@ -470,6 +478,11 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   }, [queue])
 
   const reviewAgain = useCallback(() => {
+    // Before anything else, so a refused restart leaves no trace: the two lines
+    // below are the new lot's bookkeeping, and clearing them for a REVIEW_AGAIN
+    // the reducer is going to drop would disarm the end-of-session batch and
+    // the per-card preview `now`s of the session that is still running.
+    if (undoInFlightRef.current) return
     invalidatedRef.current = false
     setPreviewNowByCard({})
     dispatch({ type: 'REVIEW_AGAIN', sessionNow: new Date().toISOString() })

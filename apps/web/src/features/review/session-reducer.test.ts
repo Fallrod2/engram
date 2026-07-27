@@ -548,6 +548,42 @@ describe('sessionReducer — undo the last rating (U, step 10)', () => {
     expect(sessionReducer({ ...asking1, undoing: false }, { type: 'SKIP_CARD' }).index).toBe(2)
   })
 
+  it('neither the editor nor a restart opens while an undo is in flight (T-011)', () => {
+    /** Same fixture as T-008: c0 graded, its undo POSTed and not yet acked. */
+    function inFlight(phase: 'ASKING' | 'REVEALED'): SessionState {
+      return {
+        ...asking(3, 1),
+        phase,
+        results: [{ cardId: 'c0', grade: 3, durationMs: 100 }],
+        lastReview: { cardId: 'c0', logId: 'log-0', grade: 3, index: 0 },
+        undoing: true,
+      }
+    }
+
+    // OPEN_EDIT: the pending UNDO_OK rewinds `index` WITHOUT closing the dialog,
+    // which follows `cards[index]` and re-seeds its fields on the rewound card —
+    // the typing in progress is lost and a save lands on the wrong card.
+    const asking1 = inFlight('ASKING')
+    expect(sessionReducer(asking1, { type: 'OPEN_EDIT' })).toBe(asking1)
+    const revealed = inFlight('REVEALED')
+    expect(sessionReducer(revealed, { type: 'OPEN_EDIT' })).toBe(revealed)
+
+    // REVIEW_AGAIN: a restart drops `lastReview`, so the ack the server is about
+    // to send would have nothing left to consume.
+    const summary: SessionState = { ...inFlight('ASKING'), phase: 'SUMMARY', index: 3 }
+    expect(sessionReducer(summary, { type: 'REVIEW_AGAIN', sessionNow: NOW })).toBe(summary)
+
+    // Control: the SAME states with the flag down still act — the guard reads
+    // `undoing`, not the mere presence of an undo target.
+    expect(sessionReducer({ ...revealed, undoing: false }, { type: 'OPEN_EDIT' }).editing).toBe(
+      true,
+    )
+    expect(
+      sessionReducer({ ...summary, undoing: false }, { type: 'REVIEW_AGAIN', sessionNow: NOW })
+        .phase,
+    ).toBe('LOADING')
+  })
+
   it('REVIEW_AGAIN clears the target — the previous lot is gone', () => {
     const graded = rate(asking(1, 0), 3, 100, 'log-0')
     expect(graded.phase).toBe('SUMMARY')
