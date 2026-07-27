@@ -89,6 +89,93 @@ describe('sessionReducer — reveal & rate guards (§16.1 items 2, 2bis)', () =>
   })
 })
 
+describe('sessionReducer — answering a QCM (SELECT_CHOICE)', () => {
+  /** A graded card behind us, its undo POSTed and not yet acked. */
+  function undoInFlight(phase: 'ASKING' | 'REVEALED'): SessionState {
+    return {
+      ...asking(3, 1),
+      phase,
+      results: [{ cardId: 'c0', grade: 3, durationMs: 100 }],
+      lastReview: { cardId: 'c0', logId: 'log-0', grade: 3, index: 0 },
+      undoing: true,
+    }
+  }
+
+  it('a fresh session has nothing selected', () => {
+    expect(initialState(NOW).selectedChoice).toBeNull()
+    expect(asking(3, 0).selectedChoice).toBeNull()
+  })
+
+  it('from ASKING → REVEALED, with the picked index recorded', () => {
+    const chosen = sessionReducer(asking(3, 0), { type: 'SELECT_CHOICE', index: 2 })
+    // Picking IS revealing: one keystroke, both effects.
+    expect(chosen.phase).toBe('REVEALED')
+    expect(chosen.selectedChoice).toBe(2)
+    // …and nothing else moved: no grade, no cursor.
+    expect(chosen.index).toBe(0)
+    expect(chosen.results).toEqual([])
+    expect(chosen.pendingGrade).toBeNull()
+  })
+
+  it('is ignored outside ASKING — a question is answered once', () => {
+    const revealed = sessionReducer(asking(3, 0), { type: 'REVEAL' })
+    expect(sessionReducer(revealed, { type: 'SELECT_CHOICE', index: 1 })).toBe(revealed)
+
+    const submitting = sessionReducer(revealed, { type: 'RATE', grade: 3, durationMs: 100 })
+    expect(submitting.phase).toBe('SUBMITTING')
+    expect(sessionReducer(submitting, { type: 'SELECT_CHOICE', index: 1 })).toBe(submitting)
+
+    const summary: SessionState = { ...asking(2, 2), phase: 'SUMMARY' }
+    expect(sessionReducer(summary, { type: 'SELECT_CHOICE', index: 0 })).toBe(summary)
+
+    const loading = initialState(NOW)
+    expect(sessionReducer(loading, { type: 'SELECT_CHOICE', index: 0 })).toBe(loading)
+  })
+
+  it('is accepted while an undo is in flight — it reveals, it does not advance', () => {
+    // Deliberate asymmetry with RATE / SKIP_CARD / OPEN_EDIT / REVIEW_AGAIN,
+    // pinned here so it is not "fixed" into a guard: what `undoing` protects is
+    // the session cursor and its content target, and a selection touches
+    // neither — no more than REVEAL, which is not guarded either.
+    const inFlight = undoInFlight('ASKING')
+    const chosen = sessionReducer(inFlight, { type: 'SELECT_CHOICE', index: 1 })
+    expect(chosen.phase).toBe('REVEALED')
+    expect(chosen.selectedChoice).toBe(1)
+    expect(chosen.index).toBe(1)
+    expect(chosen.results).toEqual(inFlight.results)
+    expect(chosen.lastReview).toBe(inFlight.lastReview)
+    expect(chosen.undoing).toBe(true)
+  })
+
+  it('REVEAL leaves nothing selected — seeing the answer is not answering', () => {
+    const revealed = sessionReducer(asking(3, 0), { type: 'REVEAL' })
+    expect(revealed.phase).toBe('REVEALED')
+    expect(revealed.selectedChoice).toBeNull()
+  })
+
+  it('advancing clears the selection — RATE_OK', () => {
+    const chosen = sessionReducer(asking(3, 0), { type: 'SELECT_CHOICE', index: 1 })
+    const submitting = sessionReducer(chosen, { type: 'RATE', grade: 3, durationMs: 100 })
+    const ok = sessionReducer(submitting, { type: 'RATE_OK', logId: 'log-0' })
+    expect(ok.index).toBe(1)
+    expect(ok.selectedChoice).toBeNull()
+  })
+
+  it('advancing clears the selection — SKIP_CARD', () => {
+    const chosen = sessionReducer(asking(3, 0), { type: 'SELECT_CHOICE', index: 2 })
+    const skipped = sessionReducer(chosen, { type: 'SKIP_CARD' })
+    expect(skipped.index).toBe(1)
+    expect(skipped.selectedChoice).toBeNull()
+  })
+
+  it('UNDO_OK clears the selection — it lands on ANOTHER card', () => {
+    const inFlight: SessionState = { ...undoInFlight('REVEALED'), selectedChoice: 0 }
+    const undone = sessionReducer(inFlight, { type: 'UNDO_OK' })
+    expect(undone.index).toBe(0) // rewound onto c0…
+    expect(undone.selectedChoice).toBeNull() // …so c1's answer is dropped
+  })
+})
+
 describe('sessionReducer — rating outcomes (§16.1 items 3, 4, 4bis)', () => {
   function submit(state: SessionState, grade: 1 | 2 | 3 | 4, durationMs: number): SessionState {
     return sessionReducer(sessionReducer(state, { type: 'REVEAL' }), {
@@ -294,6 +381,43 @@ describe('sessionReducer — CARD_EDITED', () => {
       back: 'b',
     })
     expect(edited).toBe(base)
+  })
+
+  it('clears the QCM selection when the edited card is the one on screen', () => {
+    const answered: SessionState = {
+      ...asking(3, 1),
+      phase: 'REVEALED',
+      selectedChoice: 0,
+    }
+    const edited = sessionReducer(answered, {
+      type: 'CARD_EDITED',
+      cardId: 'c1',
+      front: 'nouvelle question\n\n- A) un\n- B) deux\n- C) trois',
+      back: 'C) trois',
+    })
+    expect(edited.selectedChoice).toBeNull()
+    expect(edited.cards[1]?.front).toBe('nouvelle question\n\n- A) un\n- B) deux\n- C) trois')
+    expect(edited.cards[1]?.back).toBe('C) trois')
+    // Scheduling untouched, and the edit moves neither the cursor nor the phase.
+    expect(edited.cards[1]?.fsrs).toBe(answered.cards[1]?.fsrs)
+    expect(edited.phase).toBe('REVEALED')
+    expect(edited.index).toBe(1)
+  })
+
+  it('keeps the QCM selection when another card of the lot is edited', () => {
+    const answered: SessionState = {
+      ...asking(3, 1),
+      phase: 'REVEALED',
+      selectedChoice: 2,
+    }
+    const edited = sessionReducer(answered, {
+      type: 'CARD_EDITED',
+      cardId: 'c2',
+      front: 'f',
+      back: 'b',
+    })
+    expect(edited.selectedChoice).toBe(2)
+    expect(edited.cards[1]).toBe(answered.cards[1])
   })
 
   it('applies while the dialog is open and leaves `editing` alone', () => {

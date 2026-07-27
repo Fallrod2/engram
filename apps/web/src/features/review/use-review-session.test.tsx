@@ -97,6 +97,21 @@ function makeCard(id: string): Card {
   }
 }
 
+const QCM_QUESTION = 'Quelle est la capitale du Pérou ?'
+const QCM_TEXTS = ['Cusco', 'Lima', 'Arequipa', 'Trujillo'] as const
+
+/** A card whose Markdown follows the QCM shape `parseQcm` recognises. */
+function makeQcmCard(id: string, optionCount = 3): Card {
+  const options = QCM_TEXTS.slice(0, optionCount)
+    .map((text, i) => `- ${String.fromCharCode(65 + i)}) ${text}`)
+    .join('\n')
+  return {
+    ...makeCard(id),
+    front: `${QCM_QUESTION}\n\n${options}`,
+    back: 'B) Lima — siège du gouvernement depuis 1535.',
+  }
+}
+
 const grade = {
   due: '2026-07-13T00:00:00.000Z',
   stability: 2,
@@ -628,6 +643,90 @@ describe('useReviewSession — undoing the last rating (U)', () => {
       expect(result.current.progress.done).toBe(0)
       expect(result.current.counts).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0 })
     })
+  })
+})
+
+describe('useReviewSession — answering a QCM from the keyboard (A-D)', () => {
+  /** Replace the frozen queue of the current test with `cards`. */
+  function loadQueue(cards: Card[]) {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: cards.length,
+      cards,
+    })
+  }
+
+  it('B reveals the card and records the second option, without grading it', async () => {
+    loadQueue([makeQcmCard('c1'), makeCard('c2')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.selectedChoice).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'b' })
+
+    expect(result.current.phase).toBe('REVEALED')
+    expect(result.current.selectedChoice).toBe(1)
+    // Selecting is answering, never rating: the 1-4 bar still owns the grade.
+    expect(postReview).not.toHaveBeenCalled()
+    expect(result.current.progress.done).toBe(0)
+    expect(result.current.current?.id).toBe('c1')
+  })
+
+  it('a letter key does nothing on a card that is not a QCM', async () => {
+    // The default queue of `beforeEach` is made of plain front/back cards.
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.qcm).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'b' })
+
+    expect(result.current.phase).toBe('ASKING')
+    expect(result.current.selectedChoice).toBeNull()
+  })
+
+  it('D does nothing on a three-option QCM', async () => {
+    loadQueue([makeQcmCard('c1', 3)])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'd' })
+
+    expect(result.current.phase).toBe('ASKING')
+    expect(result.current.selectedChoice).toBeNull()
+
+    // Control: C exists on that card, and does select.
+    fireEvent.keyDown(window, { key: 'c' })
+    expect(result.current.phase).toBe('REVEALED')
+    expect(result.current.selectedChoice).toBe(2)
+  })
+
+  it('exposes the parsed QCM only while a QCM card is on screen', async () => {
+    loadQueue([makeQcmCard('c1'), makeCard('c2')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    expect(result.current.qcm?.question).toBe(QCM_QUESTION)
+    expect(result.current.qcm?.answerIndex).toBe(1)
+    expect(result.current.qcm?.options.map((o) => o.text)).toEqual(['Cusco', 'Lima', 'Arequipa'])
+
+    act(() => result.current.skip())
+    await waitFor(() => expect(result.current.current?.id).toBe('c2'))
+    expect(result.current.qcm).toBeNull()
+  })
+
+  it('re-parses a card edited in session — memoised on the card, not on its id', async () => {
+    updateCard.mockResolvedValue(makeCard('c1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.qcm).toBeNull()
+
+    // Same card id, new text: CARD_EDITED swaps the object the session renders.
+    const edited = makeQcmCard('c1')
+    act(() => result.current.submitEdit({ front: edited.front, back: edited.back }))
+
+    await waitFor(() => expect(result.current.qcm).not.toBeNull())
+    fireEvent.keyDown(window, { key: 'c' })
+    expect(result.current.selectedChoice).toBe(2)
   })
 })
 
