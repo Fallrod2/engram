@@ -59,6 +59,14 @@ export function DueCount({
 /**
  * Collapsed-sidebar variant: the due count becomes a micro badge over an icon
  * (spec §5). Hidden at zero (the calm `·` has no badge form).
+ *
+ * Neutral like `DueCount`, never accent: in this rail the accent already means
+ * "the row you are on" (active nav = accent-subtle + indigo edge), so painting
+ * a passive counter with it collides with that meaning. `surface-3` is the
+ * highest neutral surface available and is already the sidebar's raised tone
+ * (the `DueCount` load-bar track, the collapsed toggle's hover); with `text` on
+ * top the 9px digits sit at 13.2:1 dark / 14.0:1 light — above the 5.8:1 / 6.7:1
+ * the accent fill gave, so the smaller type reads better than before.
  */
 export function DueBadge({
   value,
@@ -78,8 +86,8 @@ export function DueBadge({
   return (
     <span
       className={cn(
-        'flex min-w-3.5 items-center justify-center rounded-full bg-accent-fill px-1',
-        'font-mono text-[9px] leading-none text-accent-fg tabular-nums',
+        'flex min-w-3.5 items-center justify-center rounded-full bg-surface-3 px-1',
+        'font-mono text-[9px] leading-none text-text tabular-nums',
         className,
       )}
       aria-hidden
