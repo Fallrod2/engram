@@ -529,6 +529,7 @@ export const dictFr = {
     },
     ratingAriaNext: '{label} — prochaine révision dans {interval}',
     ratingAriaRate: '{label} — noter cette carte',
+    gradeSuggested: 'suggéré',
     summary: {
       done: 'Session terminée',
       cardsViewed_one: 'carte vue',

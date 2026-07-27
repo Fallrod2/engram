@@ -766,6 +766,109 @@ describe('useReviewSession — answering a QCM from the keyboard (A-D)', () => {
   })
 })
 
+describe('useReviewSession — the grade suggested by the QCM result', () => {
+  /** Replace the frozen queue of the current test with `cards`. */
+  function loadQueue(cards: Card[]) {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: cards.length,
+      cards,
+    })
+  }
+
+  it('a wrong pick suggests Encore (1)', async () => {
+    loadQueue([makeQcmCard('c1')]) // answer is B, index 1
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.suggestedGrade).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'a' })
+
+    expect(result.current.suggestedGrade).toBe(1)
+  })
+
+  it('a right pick suggests Bien (3)', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'b' })
+
+    expect(result.current.suggestedGrade).toBe(3)
+  })
+
+  it('stays null on a plain card, revealed or not', async () => {
+    // The default queue of `beforeEach` is made of plain front/back cards.
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.suggestedGrade).toBeNull()
+
+    fireEvent.keyDown(window, { key: ' ' })
+
+    expect(result.current.phase).toBe('REVEALED')
+    expect(result.current.suggestedGrade).toBeNull()
+  })
+
+  it('stays null on a QCM revealed with Space — no answer, no evidence', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: ' ' })
+
+    expect(result.current.phase).toBe('REVEALED')
+    expect(result.current.selectedChoice).toBeNull()
+    expect(result.current.suggestedGrade).toBeNull()
+  })
+
+  it('Enter in REVEALED grades once, with the suggested grade', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'a' }) // wrong → suggests 1
+    expect(result.current.suggestedGrade).toBe(1)
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    // mutate() runs the mutationFn in a microtask; wait for it to land.
+    await waitFor(() => expect(postReview).toHaveBeenCalled())
+    expect(postReview).toHaveBeenCalledTimes(1)
+    expect(postReview).toHaveBeenCalledWith('c1', { grade: 1, durationMs: expect.any(Number) })
+  })
+
+  it('the 1-4 keys still override the suggestion', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'b' }) // right → suggests 3
+    fireEvent.keyDown(window, { key: '4' })
+
+    await waitFor(() => expect(postReview).toHaveBeenCalled())
+    expect(postReview).toHaveBeenCalledTimes(1)
+    expect(postReview).toHaveBeenCalledWith('c1', { grade: 4, durationMs: expect.any(Number) })
+  })
+
+  it('Enter does nothing in REVEALED when there is no suggestion', async () => {
+    // Plain card: Space reveals it, and Enter must stay inert from there.
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(result.current.phase).toBe('REVEALED')
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true })
+    fireEvent(window, event)
+
+    // Flush the microtask a mutation would have used, so "no POST" is not just
+    // "not yet".
+    await act(async () => {})
+    expect(postReview).not.toHaveBeenCalled()
+    expect(result.current.phase).toBe('REVEALED')
+    // Nothing was done, so nothing was swallowed either.
+    expect(event.defaultPrevented).toBe(false)
+  })
+})
+
 describe('useReviewSession — modifiers are not session shortcuts', () => {
   /** Hide the tab the way the browser does, so the machine pauses (mechanism B). */
   function hideTab() {

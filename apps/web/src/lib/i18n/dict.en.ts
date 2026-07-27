@@ -523,6 +523,7 @@ export const dictEn: Dict = {
     },
     ratingAriaNext: '{label} — next review in {interval}',
     ratingAriaRate: '{label} — rate this card',
+    gradeSuggested: 'suggested',
     summary: {
       done: 'Session complete',
       cardsViewed_one: 'card seen',
