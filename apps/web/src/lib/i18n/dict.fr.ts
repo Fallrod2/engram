@@ -502,6 +502,7 @@ export const dictFr = {
     revealHint: 'pour révéler',
     revealButton: 'Révéler la réponse',
     revealAria: 'Révéler la réponse',
+    next: 'Suivant',
     revealed: 'Réponse révélée',
     qcmOptionsAria: 'Réponses possibles',
     qcmCorrect: 'Bonne réponse',
@@ -532,7 +533,6 @@ export const dictFr = {
     },
     ratingAriaNext: '{label} — prochaine révision dans {interval}',
     ratingAriaRate: '{label} — noter cette carte',
-    gradeSuggested: 'suggéré',
     summary: {
       done: 'Session terminée',
       cardsViewed_one: 'carte vue',

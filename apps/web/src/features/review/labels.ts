@@ -23,6 +23,14 @@ export const RATINGS: readonly [RatingMeta, RatingMeta, RatingMeta, RatingMeta] 
   { grade: 4, label: 'session.ratings.easy', a11y: 'session.ratings.easy', token: 'info' },
 ]
 
+/** Rating metadata by grade — the tuple above is the single source of its order. */
+export const RATING_BY_GRADE: Record<Grade, RatingMeta> = {
+  1: RATINGS[0],
+  2: RATINGS[1],
+  3: RATINGS[2],
+  4: RATINGS[3],
+}
+
 /** Preview response field (again/hard/good/easy) for a grade. */
 export const PREVIEW_KEY: Record<Grade, 'again' | 'hard' | 'good' | 'easy'> = {
   1: 'again',
