@@ -50,6 +50,12 @@ export interface SessionState {
   confirmingExit: boolean
   /** Card-edit dialog open (E). Orthogonal to `phase`; freezes the card clock. */
   editing: boolean
+  /**
+   * Index, into the CURRENT card's QCM options, of the one the user picked —
+   * `null` when the card is not a multiple-choice question, or when nothing has
+   * been picked on it yet (revealing with Space answers nothing).
+   */
+  selectedChoice: number | null
   /** Terminal flag — the hook navigates to the origin when this flips true. */
   exited: boolean
   /** A transient review POST failed; the card stays revealed for a retry. */
@@ -68,6 +74,7 @@ export type Action =
   | { type: 'QUEUE_FAILED' }
   | { type: 'RETRY' }
   | { type: 'REVEAL' }
+  | { type: 'SELECT_CHOICE'; index: number }
   | { type: 'RATE'; grade: Grade; durationMs: number }
   | { type: 'RATE_OK'; logId: string }
   | { type: 'RATE_FAIL' }
@@ -98,6 +105,7 @@ export function initialState(sessionNow: string): SessionState {
     paused: false,
     confirmingExit: false,
     editing: false,
+    selectedChoice: null,
     exited: false,
     submitError: false,
     pendingGrade: null,
@@ -130,6 +138,9 @@ function advance(state: SessionState, results: RatingResult[]): SessionState {
     pendingDurationMs: 0,
     submitError: false,
     lastReview: null,
+    // Another card comes up: an answer picked on the previous one would
+    // otherwise light up an option of the new question.
+    selectedChoice: null,
     phase: index >= state.cards.length ? 'SUMMARY' : 'ASKING',
   }
 }
@@ -154,7 +165,24 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
     case 'REVEAL':
       // Space/Enter only reveals from ASKING; a no-op in every other phase.
       if (state.phase !== 'ASKING') return state
+      // Space answers nothing: `selectedChoice` stays null, so the UI marks no
+      // option as wrong when the user only wanted to see the answer.
       return { ...state, phase: 'REVEALED' }
+
+    case 'SELECT_CHOICE':
+      // Picking an option IS answering the question, and one answers only once:
+      // accepted from ASKING, a no-op from every other phase (in particular
+      // REVEALED, where the correct answer is already on screen).
+      if (state.phase !== 'ASKING') return state
+      // NOT guarded on `state.undoing`, deliberately — do not "fix" this
+      // asymmetry with RATE / SKIP_CARD / OPEN_EDIT / REVIEW_AGAIN. What those
+      // guards protect is the invariant "while an undo is in flight, nothing
+      // moves the session cursor nor its content target". A selection moves
+      // neither: it reveals the current card in place, exactly like REVEAL —
+      // which is not guarded either. And UNDO_OK clears `selectedChoice`, so a
+      // pick made in that window cannot survive onto the rewound card.
+      // The selection is the revelation: one keystroke, both effects.
+      return { ...state, selectedChoice: action.index, phase: 'REVEALED' }
 
     case 'RATE':
       // Invariant (finding #9): RATE is accepted ONLY from REVEALED. Once in
@@ -256,6 +284,10 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
         submitError: false,
         pendingGrade: null,
         pendingDurationMs: 0,
+        // This transition MOVES `index`: a selection kept here would belong to
+        // the card the session was on, not to the one it rewinds to, and the UI
+        // would mark an option of a different question as the user's answer.
+        selectedChoice: null,
       }
     }
 

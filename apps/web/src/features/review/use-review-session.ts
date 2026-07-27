@@ -19,11 +19,23 @@ import { createCardTimer, IDLE_MS, type CardTimer } from './session-timer'
 import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
 import { remainingByState, type RemainingByState } from './queue-stats'
+import { parseQcm, type ParsedQcm } from './qcm'
+
+/**
+ * Keys A-D, mapped onto option indices 0-3 (spec: a QCM has 2 to 4 options).
+ * Stops at D because E, S and U are already session shortcuts — the same
+ * constraint that caps `MAX_OPTIONS` in `qcm.ts`.
+ */
+const OPTION_KEYS: readonly string[] = ['a', 'b', 'c', 'd']
 
 export interface SessionApi {
   phase: Phase
   scope: ReviewScope
   current: Card | undefined
+  /** The current card read as a multiple-choice question, or null if it is not one. */
+  qcm: ParsedQcm | null
+  /** Index into `qcm.options` of the option the user picked, or null. */
+  selectedChoice: number | null
   /** True while the verso is shown (REVEALED or SUBMITTING). */
   revealed: boolean
   submitting: boolean
@@ -46,6 +58,8 @@ export interface SessionApi {
   canReviewAgain: boolean
   reduce: boolean
   reveal: () => void
+  /** Answer the current QCM by picking an option — reveals it, never grades it. */
+  selectChoice: (index: number) => void
   rate: (grade: Grade) => void
   /** Drop the current card without rating it (client-side, session-scoped). */
   skip: () => void
@@ -249,6 +263,26 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   // --- Commands ------------------------------------------------------------
   const reveal = useCallback(() => {
     if (stateRef.current.phase === 'ASKING') dispatch({ type: 'REVEAL' })
+  }, [])
+
+  // The current card read as a QCM, or null when it is not one (the nominal
+  // case — the caller then falls back to the plain Markdown rendering).
+  // Memoised on the card OBJECT and not on its id, on purpose: an edit made
+  // during the session (CARD_EDITED) replaces that object with new front/back,
+  // and the parse has to follow the text now on screen.
+  const qcm = useMemo(() => (current ? parseQcm(current.front, current.back) : null), [current])
+  // Read by the keyboard router, which is subscribed once and never re-created.
+  const qcmRef = useRef(qcm)
+  qcmRef.current = qcm
+
+  const selectChoice = useCallback((index: number) => {
+    const parsed = qcmRef.current
+    if (!parsed) return
+    // Out of range is REFUSED, never clamped: clamping would answer an option
+    // the user did not point at, and the whole QCM layer is built on never
+    // asserting something about the answer that the card does not say.
+    if (index < 0 || index >= parsed.options.length) return
+    dispatch({ type: 'SELECT_CHOICE', index })
   }, [])
 
   const rate = useCallback((grade: Grade) => {
@@ -576,6 +610,20 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
+          } else {
+            // A-D pick an option of the current QCM. LAST test of the branch so
+            // it can never mask a shortcut above it — and none of A/B/C/D is
+            // taken in ASKING anyway (E edits, S skips, U undoes, Space/Enter
+            // reveal, Escape quits), which is exactly why `qcm.ts` caps a
+            // question at four options.
+            const choice = OPTION_KEYS.indexOf(e.key.toLowerCase())
+            // Nothing is swallowed unless it really does something: a D on a
+            // 3-option QCM, or any letter on a card that is not a QCM, stays an
+            // ordinary keystroke the rest of the page may still use.
+            if (choice !== -1 && choice < (qcmRef.current?.options.length ?? 0)) {
+              e.preventDefault()
+              selectChoice(choice)
+            }
           }
           break
         case 'REVEALED':
@@ -630,6 +678,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     return () => window.removeEventListener('keydown', onKey)
   }, [
     reveal,
+    selectChoice,
     rate,
     skip,
     undo,
@@ -688,6 +737,8 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     phase: state.phase,
     scope,
     current,
+    qcm,
+    selectedChoice: state.selectedChoice,
     revealed: state.phase === 'REVEALED' || state.phase === 'SUBMITTING',
     submitting: state.phase === 'SUBMITTING',
     submitError: state.submitError,
@@ -705,6 +756,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     canReviewAgain,
     reduce,
     reveal,
+    selectChoice,
     rate,
     skip,
     undo,
