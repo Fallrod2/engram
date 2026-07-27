@@ -568,6 +568,25 @@ describe('useReviewSession — undoing the last rating (U)', () => {
       expect(result.current.undoing).toBe(false)
     })
 
+    it('exposes the refusal: `undoing` is true while `submitting` stays false (T-009)', async () => {
+      const { result } = await undoInFlight()
+
+      // `submitting` is `phase === 'SUBMITTING'`, which an undo never sets — so it
+      // cannot be what greys the rating bar out. Only `undoing` marks this window,
+      // and RatingBar has to be disabled on it or the four buttons stay clickable
+      // while the reducer silently drops every RATE.
+      expect(result.current.undoing).toBe(true)
+      expect(result.current.submitting).toBe(false)
+
+      // Still true after a refused rating: the click changes no phase, so nothing
+      // else in the render ever signals that the bar is inoperative.
+      act(() => result.current.reveal())
+      act(() => result.current.rate(3))
+      await act(async () => {})
+      expect(result.current.undoing).toBe(true)
+      expect(result.current.submitting).toBe(false)
+    })
+
     it('skipping B while A is being undone leaves the cursor put (scenario 2)', async () => {
       const { result, ack } = await undoInFlight()
 

@@ -204,7 +204,9 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
             <RatingBar
               revealed={api.revealed}
               preview={api.preview}
-              disabled={api.submitting}
+              // Also while an undo is in flight: the reducer refuses RATE until it
+              // lands (T-008), so the affordance must say so instead of eating the click.
+              disabled={api.submitting || api.undoing}
               flashGrade={api.flashGrade}
               reduce={api.reduce}
               onReveal={api.reveal}
