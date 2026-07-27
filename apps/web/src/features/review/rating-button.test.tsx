@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { ReviewPreview } from '@engram/shared'
 import { RATINGS } from './labels'
 import { RatingButton } from './rating-button'
 import { RatingBar } from './rating-bar'
@@ -66,77 +67,109 @@ describe('<RatingButton> (§16.2 item 12)', () => {
   })
 })
 
-describe('<RatingButton> — the grade suggested by a QCM result', () => {
-  it('appends the mention to the accessible name and rings the button', () => {
-    render(
-      <RatingButton
-        meta={GOOD}
-        interval="10 min"
-        disabled={false}
-        flash={false}
-        suggested
-        onRate={() => {}}
-      />,
-    )
-    // The name still STARTS with the rating label — `reviewAllGood` (e2e) finds
-    // this button with `/^Bien/`, so the mention may only ever be a suffix.
-    const btn = screen.getByRole('button', {
-      name: 'Bien — prochaine révision dans 10 min, suggéré',
-    })
-    expect(btn.className).toContain('ring-success')
-  })
-
-  it('renders exactly as before when it is not the suggested grade', () => {
-    const { container } = render(
-      <RatingButton
-        meta={GOOD}
-        interval="10 min"
-        disabled={false}
-        flash={false}
-        onRate={() => {}}
-      />,
-    )
-    const plain = container.innerHTML
-    cleanup()
-    const explicit = render(
-      <RatingButton
-        meta={GOOD}
-        interval="10 min"
-        disabled={false}
-        flash={false}
-        suggested={false}
-        onRate={() => {}}
-      />,
-    )
-    expect(explicit.container.innerHTML).toBe(plain)
-    expect(plain).not.toContain('suggéré')
-    expect(plain).not.toContain('ring-success')
-  })
-})
-
-describe('<RatingBar> — wiring the suggestion', () => {
+describe('<RatingBar> — a QCM the user answered', () => {
   const BAR = {
     revealed: true,
-    preview: undefined,
     disabled: false,
     flashGrade: null,
     reduce: true,
     onReveal: () => {},
-    onRate: () => {},
   } as const
 
-  it('marks only the suggested grade', () => {
-    render(<RatingBar {...BAR} suggestedGrade={3} />)
-    expect(screen.getByRole('button', { name: 'Bien — noter cette carte, suggéré' })).toBeTruthy()
-    for (const name of ['Encore', 'Difficile', 'Facile']) {
-      const btn = screen.getByRole('button', { name: `${name} — noter cette carte` })
-      expect(btn.className).not.toContain('ring-')
+  /** Preview shaped like the API response, so the projections are real. */
+  const PREVIEW: ReviewPreview = {
+    now: '2026-07-01T10:00:00.000Z',
+    // scheduledDays 0 → the interval is derived from `due − now`: 10 min.
+    again: {
+      due: '2026-07-01T10:10:00.000Z',
+      stability: 1,
+      difficulty: 7,
+      scheduledDays: 0,
+      state: 3,
+    },
+    hard: {
+      due: '2026-07-03T10:00:00.000Z',
+      stability: 2,
+      difficulty: 6,
+      scheduledDays: 2,
+      state: 2,
+    },
+    good: {
+      due: '2026-07-06T10:00:00.000Z',
+      stability: 5,
+      difficulty: 5,
+      scheduledDays: 5,
+      state: 2,
+    },
+    easy: {
+      due: '2026-07-13T10:00:00.000Z',
+      stability: 12,
+      difficulty: 4,
+      scheduledDays: 12,
+      state: 2,
+    },
+  }
+
+  it('replaces the four ratings with a single Next button', () => {
+    render(<RatingBar {...BAR} preview={PREVIEW} suggestedGrade={3} onRate={() => {}} />)
+    const buttons = screen.getAllByRole('button')
+    expect(buttons).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /^Suivant/ })).toBe(buttons[0])
+    for (const name of ['Encore', 'Difficile', 'Bien', 'Facile']) {
+      expect(screen.queryByRole('button', { name: new RegExp(`^${name} —`) })).toBeNull()
     }
   })
 
-  it('marks nothing at all without a suggestion', () => {
-    const { container } = render(<RatingBar {...BAR} />)
-    expect(container.innerHTML).not.toContain('suggéré')
-    expect(container.innerHTML).not.toContain('ring-')
+  it('spells out the grade it will record and its projected interval', () => {
+    render(<RatingBar {...BAR} preview={PREVIEW} suggestedGrade={1} onRate={() => {}} />)
+    expect(screen.getByText('Encore')).toBeTruthy()
+    const interval = screen.getByText('10 min')
+    expect(interval.className).toContain('text-danger')
+  })
+
+  it('degrades to the `·` placeholder while the preview is pending', () => {
+    render(<RatingBar {...BAR} preview={undefined} suggestedGrade={3} onRate={() => {}} />)
+    expect(screen.getByText('Bien')).toBeTruthy()
+    expect(screen.getByText('·')).toBeTruthy()
+  })
+
+  it('rates with the suggested grade, exactly once, on click', () => {
+    const onRate = vi.fn()
+    render(<RatingBar {...BAR} preview={PREVIEW} suggestedGrade={1} onRate={onRate} />)
+    fireEvent.click(screen.getByRole('button', { name: /^Suivant/ }))
+    expect(onRate).toHaveBeenCalledTimes(1)
+    expect(onRate).toHaveBeenCalledWith(1)
+  })
+
+  it('is inert while a submission is in flight', () => {
+    const onRate = vi.fn()
+    render(<RatingBar {...BAR} disabled preview={PREVIEW} suggestedGrade={3} onRate={onRate} />)
+    const btn = screen.getByRole('button', { name: /^Suivant/ })
+    expect(btn).toHaveProperty('disabled', true)
+    fireEvent.click(btn)
+    expect(onRate).not.toHaveBeenCalled()
+  })
+
+  it('keeps the four buttons and shows no Next without a suggestion', () => {
+    render(<RatingBar {...BAR} preview={PREVIEW} onRate={() => {}} />)
+    expect(screen.getAllByRole('button')).toHaveLength(4)
+    for (const name of ['Encore', 'Difficile', 'Bien', 'Facile']) {
+      expect(screen.getByRole('button', { name: new RegExp(`^${name} —`) })).toBeTruthy()
+    }
+    expect(screen.queryByRole('button', { name: /^Suivant/ })).toBeNull()
+  })
+
+  it('shows the reveal hint once, and nothing else, before the reveal', () => {
+    render(
+      <RatingBar
+        {...BAR}
+        revealed={false}
+        preview={PREVIEW}
+        suggestedGrade={3}
+        onRate={() => {}}
+      />,
+    )
+    expect(screen.getAllByText('pour révéler')).toHaveLength(1)
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })

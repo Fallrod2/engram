@@ -496,6 +496,7 @@ export const dictEn: Dict = {
     revealHint: 'to reveal',
     revealButton: 'Reveal answer',
     revealAria: 'Reveal answer',
+    next: 'Next',
     revealed: 'Answer revealed',
     qcmOptionsAria: 'Answer choices',
     qcmCorrect: 'Correct answer',
@@ -526,7 +527,6 @@ export const dictEn: Dict = {
     },
     ratingAriaNext: '{label} — next review in {interval}',
     ratingAriaRate: '{label} — rate this card',
-    gradeSuggested: 'suggested',
     summary: {
       done: 'Session complete',
       cardsViewed_one: 'card seen',
