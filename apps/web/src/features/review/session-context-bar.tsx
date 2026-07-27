@@ -1,4 +1,4 @@
-import { Pencil, SkipForward } from 'lucide-react'
+import { Pencil, SkipForward, Undo2 } from 'lucide-react'
 import { FSRS_STATE_LABEL_KEYS, glyphClass } from '@/components/fsrs-state-glyph'
 import { Kbd } from '@/components/ui/kbd'
 import { useT } from '@/lib/i18n'
@@ -13,12 +13,19 @@ import { REMAINING_KEY_BY_STATE, REMAINING_STATES, type RemainingByState } from 
  */
 export function SessionContextBar({
   remaining,
+  canUndo,
+  undoing,
   onEdit,
   onSkip,
+  onUndo,
 }: {
   remaining: RemainingByState
+  /** There is a rating left to take back — the button exists only then. */
+  canUndo: boolean
+  undoing: boolean
   onEdit: () => void
   onSkip: () => void
+  onUndo: () => void
 }) {
   const t = useT()
   // No keyboard on touch → drop the `S` chip (fix-session §3).
@@ -28,8 +35,25 @@ export function SessionContextBar({
       {/* Left slot: the per-card actions. A flex row, so the steps that follow
           can drop their own buttons next to this one. */}
       <div className="flex items-center gap-3">
-        {/* Editing sits between "Annuler" (step 10, leftmost) and "Passer": a
-            correction is about the card you are on, a skip leaves it. */}
+        {/* Leftmost, and only when there is something to take back: undo looks
+            BACKWARD (the card you just left), while the two others act on the
+            card in front of you. Nothing to undo → no button at all, rather than
+            a permanently dead control. */}
+        {canUndo && (
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={undoing}
+            aria-label={t('session.undoAria')}
+            className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted disabled:pointer-events-none disabled:opacity-50"
+          >
+            <Undo2 aria-hidden className="size-3" />
+            <span className="hidden sm:inline">{t('session.undo')}</span>
+            {!coarse && <Kbd>U</Kbd>}
+          </button>
+        )}
+        {/* Editing sits between "Annuler" and "Passer": a correction is about
+            the card you are on, a skip leaves it. */}
         <button
           type="button"
           onClick={onEdit}

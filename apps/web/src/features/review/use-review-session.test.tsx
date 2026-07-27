@@ -7,6 +7,7 @@ import type { Card, ReviewPreview, ReviewQueueResponse } from '@engram/shared'
 
 // --- Module mocks (keep the hook's effects inert but observable) ------------
 const postReview = vi.fn()
+const postUndoReview = vi.fn()
 const fetchReviewQueue = vi.fn()
 const fetchCardPreview = vi.fn()
 const updateCard = vi.fn()
@@ -57,6 +58,8 @@ vi.mock('@/lib/api', () => ({
     }
   },
   postReview: (...args: unknown[]) => postReview(...args),
+  // Same rule as `updateCard` below: the hook imports it at module evaluation.
+  postUndoReview: (...args: unknown[]) => postUndoReview(...args),
   fetchReviewQueue: (...args: unknown[]) => fetchReviewQueue(...args),
   fetchCardPreview: (...args: unknown[]) => fetchCardPreview(...args),
   // Must be exported by the mock: the hook imports it at module evaluation, so
@@ -130,8 +133,32 @@ function queueCache(client: QueryClient): ReviewQueueResponse | undefined {
   return entries[0]?.[1]
 }
 
+/** A `ReviewResult`-shaped ack whose `log.id` is the undo handle. */
+function reviewResult(cardId: string, logId: string) {
+  return {
+    card: makeCard(cardId),
+    log: {
+      id: logId,
+      cardId,
+      rating: 3,
+      state: 1,
+      due: '2026-07-13T00:00:00.000Z',
+      stability: 2,
+      difficulty: 5,
+      elapsedDays: 0,
+      lastElapsedDays: 0,
+      scheduledDays: 1,
+      learningSteps: 0,
+      review: '2026-07-12T10:00:00.000Z',
+      durationMs: 1000,
+      createdAt: '2026-07-12T10:00:00.000Z',
+    },
+  }
+}
+
 beforeEach(() => {
   postReview.mockReset()
+  postUndoReview.mockReset()
   fetchReviewQueue.mockReset()
   fetchCardPreview.mockReset()
   updateCard.mockReset()
@@ -148,6 +175,7 @@ beforeEach(() => {
   // and any same-tick second submit has to be blocked by the synchronous guard,
   // not by a state that has already advanced.
   postReview.mockReturnValue(new Promise(() => {}))
+  postUndoReview.mockReturnValue(new Promise(() => {}))
 })
 
 afterEach(cleanup)
@@ -315,5 +343,131 @@ describe('useReviewSession — editing the current card (E)', () => {
     })
     expect(result.current.phase).toBe('ASKING') // no reveal behind the dialog
     surface.remove()
+  })
+})
+
+describe('useReviewSession — undoing the last rating (U)', () => {
+  it('nothing is undoable before the first rating is acknowledged', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.canUndo).toBe(false)
+
+    // Rating started but never acked (postReview hangs) → still nothing: the
+    // `logId` the server needs does not exist yet.
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.phase).toBe('SUBMITTING'))
+    expect(result.current.canUndo).toBe(false)
+  })
+
+  it('canUndo flips true once the review POST resolves', async () => {
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+    // The session has moved on to the second card…
+    expect(result.current.phase).toBe('ASKING')
+    expect(result.current.current?.id).toBe('c2')
+    expect(result.current.undoing).toBe(false)
+  })
+
+  it('undo() POSTs exactly once, with the logId of the review it unwinds', async () => {
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+
+    // Two synchronous calls: the in-flight ref must collapse them into one POST.
+    act(() => {
+      result.current.undo()
+      result.current.undo()
+    })
+
+    await waitFor(() => expect(postUndoReview).toHaveBeenCalled())
+    expect(postUndoReview).toHaveBeenCalledTimes(1)
+    expect(postUndoReview).toHaveBeenCalledWith('c1', { logId: 'log-1' })
+    // While the POST is in flight the affordance is closed.
+    expect(result.current.undoing).toBe(true)
+    expect(result.current.canUndo).toBe(false)
+  })
+
+  it('U on the keyboard unwinds from SUMMARY, where the session had ended', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 1,
+      cards: [makeCard('c1')],
+    })
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(4))
+    await waitFor(() => expect(result.current.phase).toBe('SUMMARY'))
+    expect(result.current.canUndo).toBe(true)
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'u' }))
+    })
+    await waitFor(() => expect(postUndoReview).toHaveBeenCalledTimes(1))
+    expect(postUndoReview).toHaveBeenCalledWith('c1', { logId: 'log-1' })
+  })
+
+  it('a resolved undo rewinds to the rated card, revealed, and purges its previews', async () => {
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    postUndoReview.mockResolvedValue({ card: makeCard('c1'), undoneLogId: 'log-1' })
+    const { result, client } = renderSession()
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    /** The `now` of every preview entry cached for c1. */
+    const previewNows = () =>
+      client.getQueriesData({ queryKey: ['review', 'preview', 'c1'] }).map(([key]) => key[3])
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+    await waitFor(() => expect(previewNows().length).toBeGreaterThan(0))
+    // The intervals computed against the PRE-undo FSRS state.
+    const staleNows = previewNows()
+
+    act(() => result.current.undo())
+
+    await waitFor(() => expect(result.current.phase).toBe('REVEALED'))
+    expect(result.current.current?.id).toBe('c1')
+    expect(result.current.progress.done).toBe(0)
+    expect(result.current.counts).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0 })
+    expect(result.current.canUndo).toBe(false)
+    expect(result.current.undoing).toBe(false)
+    // Every pre-undo entry is gone (they describe a card that no longer exists)…
+    const fresh = previewNows()
+    for (const stale of staleNows) expect(fresh).not.toContain(stale)
+    // …and the card is previewed again under a `now` minted by the undo itself.
+    expect(fresh.length).toBeGreaterThan(0)
+  })
+
+  it('a refused undo (409) is final: the target is dropped and an error is toasted', async () => {
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    postUndoReview.mockRejectedValue(new Error('409'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+
+    act(() => result.current.undo())
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Annulation impossible'))
+    expect(result.current.canUndo).toBe(false)
+    expect(result.current.undoing).toBe(false)
+    // Nothing was rewound — the rating stands and the session stayed put.
+    expect(result.current.current?.id).toBe('c2')
+    expect(result.current.counts[3]).toBe(1)
   })
 })

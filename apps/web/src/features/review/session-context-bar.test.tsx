@@ -12,8 +12,11 @@ describe('<SessionContextBar> remaining counters', () => {
     render(
       <SessionContextBar
         remaining={{ new: 3, learning: 1, review: 12, relearning: 0 }}
+        canUndo={false}
+        undoing={false}
         onEdit={NOOP}
         onSkip={NOOP}
+        onUndo={NOOP}
       />,
     )
     const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
@@ -24,8 +27,11 @@ describe('<SessionContextBar> remaining counters', () => {
     render(
       <SessionContextBar
         remaining={{ new: 0, learning: 2, review: 0, relearning: 0 }}
+        canUndo={false}
+        undoing={false}
         onEdit={NOOP}
         onSkip={NOOP}
+        onUndo={NOOP}
       />,
     )
     const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
@@ -40,7 +46,16 @@ describe('<SessionContextBar> skip action', () => {
   const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
 
   it('exposes the skip button under its full aria-label (label may be hidden)', () => {
-    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={NOOP} />)
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
     const button = screen.getByRole('button', {
       name: 'Passer cette carte sans la noter (S)',
     })
@@ -49,7 +64,16 @@ describe('<SessionContextBar> skip action', () => {
 
   it('calls onSkip on click', () => {
     const onSkip = vi.fn()
-    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={onSkip} />)
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={onSkip}
+        onUndo={NOOP}
+      />,
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Passer cette carte sans la noter (S)' }))
     expect(onSkip).toHaveBeenCalledTimes(1)
   })
@@ -59,21 +83,122 @@ describe('<SessionContextBar> edit action', () => {
   const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
 
   it('exposes the edit button under its full aria-label (label may be hidden)', () => {
-    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={NOOP} />)
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
     const button = screen.getByRole('button', { name: 'Éditer cette carte (E)' })
     expect(button.getAttribute('type')).toBe('button')
   })
 
   it('calls onEdit on click', () => {
     const onEdit = vi.fn()
-    render(<SessionContextBar remaining={remaining} onEdit={onEdit} onSkip={NOOP} />)
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo={false}
+        undoing={false}
+        onEdit={onEdit}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Éditer cette carte (E)' }))
     expect(onEdit).toHaveBeenCalledTimes(1)
   })
 
   it('sits before "Passer" in the left slot (Annuler · Éditer · Passer)', () => {
-    render(<SessionContextBar remaining={remaining} onEdit={NOOP} onSkip={NOOP} />)
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
     const labels = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))
     expect(labels).toEqual(['Éditer cette carte (E)', 'Passer cette carte sans la noter (S)'])
+  })
+})
+
+describe('<SessionContextBar> undo action', () => {
+  const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
+
+  it('renders nothing when there is no rating to take back', () => {
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Annuler la dernière note (U)' })).toBeNull()
+  })
+
+  it('appears under its full aria-label once a rating is undoable, first in the row', () => {
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
+    const button = screen.getByRole('button', { name: 'Annuler la dernière note (U)' })
+    expect(button.getAttribute('type')).toBe('button')
+    expect((button as HTMLButtonElement).disabled).toBe(false)
+    const labels = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))
+    expect(labels).toEqual([
+      'Annuler la dernière note (U)',
+      'Éditer cette carte (E)',
+      'Passer cette carte sans la noter (S)',
+    ])
+  })
+
+  it('calls onUndo on click', () => {
+    const onUndo = vi.fn()
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={onUndo}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler la dernière note (U)' }))
+    expect(onUndo).toHaveBeenCalledTimes(1)
+  })
+
+  it('is disabled — and unclickable — while the undo is in flight', () => {
+    const onUndo = vi.fn()
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo
+        undoing
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={onUndo}
+      />,
+    )
+    const button = screen.getByRole('button', { name: 'Annuler la dernière note (U)' })
+    expect((button as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(button)
+    expect(onUndo).not.toHaveBeenCalled()
   })
 })

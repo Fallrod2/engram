@@ -100,7 +100,7 @@ describe('sessionReducer — rating outcomes (§16.1 items 3, 4, 4bis)', () => {
 
   it('RATE_OK before the last card → ASKING(i+1), result accumulated', () => {
     const submitting = submit(asking(3, 0), 3, 4200)
-    const ok = sessionReducer(submitting, { type: 'RATE_OK' })
+    const ok = sessionReducer(submitting, { type: 'RATE_OK', logId: 'log-1' })
     expect(ok.phase).toBe('ASKING')
     expect(ok.index).toBe(1)
     expect(ok.results).toEqual([{ cardId: 'c0', grade: 3, durationMs: 4200 }])
@@ -108,7 +108,7 @@ describe('sessionReducer — rating outcomes (§16.1 items 3, 4, 4bis)', () => {
 
   it('RATE_OK on the last card → SUMMARY', () => {
     const submitting = submit(asking(2, 1), 4, 1000)
-    const ok = sessionReducer(submitting, { type: 'RATE_OK' })
+    const ok = sessionReducer(submitting, { type: 'RATE_OK', logId: 'log-1' })
     expect(ok.phase).toBe('SUMMARY')
     expect(ok.index).toBe(2)
     expect(ok.results).toEqual([{ cardId: 'c1', grade: 4, durationMs: 1000 }])
@@ -191,6 +191,19 @@ describe('sessionReducer — user skip (SKIP_CARD)', () => {
     expect(sessionReducer(summary, { type: 'SKIP_CARD' })).toBe(summary)
     const loading = initialState(NOW)
     expect(sessionReducer(loading, { type: 'SKIP_CARD' })).toBe(loading)
+  })
+
+  it('drops the undo target — U must not reach back OVER a skip', () => {
+    const withTarget: SessionState = {
+      ...asking(4, 1),
+      results: [{ cardId: 'c0', grade: 3, durationMs: 100 }],
+      lastReview: { cardId: 'c0', logId: 'log-0', grade: 3, index: 0 },
+    }
+    const skipped = sessionReducer(withTarget, { type: 'SKIP_CARD' })
+    expect(skipped.index).toBe(2)
+    expect(skipped.results).toEqual(withTarget.results) // nothing recorded…
+    expect(skipped.lastReview).toBeNull() // …and nothing left to undo
+    expect(sessionReducer(skipped, { type: 'UNDO' }).undoing).toBe(false)
   })
 })
 
@@ -393,5 +406,122 @@ describe('sessionReducer — review again (§16.1 item 6ter)', () => {
   it('REVIEW_AGAIN is a no-op outside SUMMARY', () => {
     const base = asking(2)
     expect(sessionReducer(base, { type: 'REVIEW_AGAIN', sessionNow: NOW }).phase).toBe('ASKING')
+  })
+})
+
+describe('sessionReducer — undo the last rating (U, step 10)', () => {
+  /** REVEAL + RATE + RATE_OK: one full graded card, undo target armed. */
+  function rate(
+    state: SessionState,
+    grade: 1 | 2 | 3 | 4,
+    durationMs: number,
+    logId: string,
+  ): SessionState {
+    const submitting = sessionReducer(sessionReducer(state, { type: 'REVEAL' }), {
+      type: 'RATE',
+      grade,
+      durationMs,
+    })
+    return sessionReducer(submitting, { type: 'RATE_OK', logId })
+  }
+
+  it('a fresh session has nothing to undo', () => {
+    expect(initialState(NOW).lastReview).toBeNull()
+    expect(initialState(NOW).undoing).toBe(false)
+  })
+
+  it('RATE_OK arms the target with the index of the card JUST RATED, not the next', () => {
+    const ok = rate(asking(3, 1), 2, 700, 'log-42')
+    // The cursor moved on…
+    expect(ok.index).toBe(2)
+    // …but the target still points at the card that was graded.
+    expect(ok.lastReview).toEqual({ cardId: 'c1', logId: 'log-42', grade: 2, index: 1 })
+  })
+
+  it('RATE_OK on the LAST card arms the target too (undo from SUMMARY)', () => {
+    const ok = rate(asking(2, 1), 4, 900, 'log-last')
+    expect(ok.phase).toBe('SUMMARY')
+    expect(ok.lastReview).toEqual({ cardId: 'c1', logId: 'log-last', grade: 4, index: 1 })
+  })
+
+  it('UNDO is ignored when there is no target', () => {
+    const base = asking(3, 0)
+    expect(sessionReducer(base, { type: 'UNDO' })).toBe(base)
+    const summary: SessionState = { ...asking(2, 2), phase: 'SUMMARY' }
+    expect(sessionReducer(summary, { type: 'UNDO' })).toBe(summary)
+  })
+
+  it('UNDO is refused while SUBMITTING — a review is already in flight', () => {
+    const graded = rate(asking(3, 0), 3, 400, 'log-0')
+    const submitting = sessionReducer(sessionReducer(graded, { type: 'REVEAL' }), {
+      type: 'RATE',
+      grade: 1,
+      durationMs: 50,
+    })
+    expect(submitting.phase).toBe('SUBMITTING')
+    expect(submitting.lastReview).not.toBeNull() // a target DOES exist…
+    expect(sessionReducer(submitting, { type: 'UNDO' })).toBe(submitting) // …still refused
+  })
+
+  it('UNDO is ignored while an undo is already in flight', () => {
+    const graded = rate(asking(3, 0), 3, 400, 'log-0')
+    const undoing = sessionReducer(graded, { type: 'UNDO' })
+    expect(undoing.undoing).toBe(true)
+    expect(sessionReducer(undoing, { type: 'UNDO' })).toBe(undoing)
+  })
+
+  it('UNDO_OK rewinds index + results and lands on REVEALED (from ASKING)', () => {
+    const graded = rate(asking(3, 0), 3, 4200, 'log-0')
+    expect(graded.phase).toBe('ASKING')
+    expect(graded.results).toHaveLength(1)
+    const undone = sessionReducer(sessionReducer(graded, { type: 'UNDO' }), { type: 'UNDO_OK' })
+    // Back on the rated card, answer already shown: re-rate, don't re-guess.
+    expect(undone.phase).toBe('REVEALED')
+    expect(undone.index).toBe(0)
+    expect(undone.results).toEqual([])
+    expect(undone.lastReview).toBeNull()
+    expect(undone.undoing).toBe(false)
+    expect(undone.submitError).toBe(false)
+    expect(undone.pendingGrade).toBeNull()
+  })
+
+  it('UNDO_OK from SUMMARY resurrects the session on the last card', () => {
+    const first = rate(asking(2, 0), 3, 100, 'log-0')
+    const graded = rate(first, 1, 200, 'log-1')
+    expect(graded.phase).toBe('SUMMARY')
+    expect(graded.results).toHaveLength(2)
+    const undone = sessionReducer(sessionReducer(graded, { type: 'UNDO' }), { type: 'UNDO_OK' })
+    expect(undone.phase).toBe('REVEALED')
+    expect(undone.index).toBe(1)
+    // Only the LAST result is dropped — the first card stays graded.
+    expect(undone.results).toEqual([{ cardId: 'c0', grade: 3, durationMs: 100 }])
+    expect(undone.lastReview).toBeNull()
+  })
+
+  it('UNDO_OK is a no-op without a target', () => {
+    const base = asking(3, 1)
+    expect(sessionReducer(base, { type: 'UNDO_OK' })).toBe(base)
+  })
+
+  it('UNDO_FAIL clears both the flag and the target — a 409 is definitive', () => {
+    const graded = rate(asking(3, 0), 3, 400, 'log-0')
+    const undoing = sessionReducer(graded, { type: 'UNDO' })
+    const failed = sessionReducer(undoing, { type: 'UNDO_FAIL' })
+    expect(failed.undoing).toBe(false)
+    expect(failed.lastReview).toBeNull()
+    // Nothing was rewound: the rating stands.
+    expect(failed.phase).toBe('ASKING')
+    expect(failed.index).toBe(1)
+    expect(failed.results).toHaveLength(1)
+    // And it is never offered again.
+    expect(sessionReducer(failed, { type: 'UNDO' })).toBe(failed)
+  })
+
+  it('REVIEW_AGAIN clears the target — the previous lot is gone', () => {
+    const graded = rate(asking(1, 0), 3, 100, 'log-0')
+    expect(graded.phase).toBe('SUMMARY')
+    const restarted = sessionReducer(graded, { type: 'REVIEW_AGAIN', sessionNow: NOW })
+    expect(restarted.lastReview).toBeNull()
+    expect(restarted.undoing).toBe(false)
   })
 })

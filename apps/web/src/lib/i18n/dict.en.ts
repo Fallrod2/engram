@@ -41,6 +41,8 @@ export const dictEn: Dict = {
     examUpdateError: 'Could not update exam',
     examDeleteError: 'Could not delete exam',
     reviewSaveError: 'Could not save review',
+    reviewUndone: 'Last rating undone',
+    reviewUndoError: 'Could not undo',
     cardGone: 'Card not found — skipped',
   },
 
@@ -499,6 +501,8 @@ export const dictEn: Dict = {
     skipAria: 'Skip this card without rating it (S)',
     edit: 'Edit',
     editAria: 'Edit this card (E)',
+    undo: 'Undo',
+    undoAria: 'Undo the last rating (U)',
     paused: 'Session paused — press any key or click to resume',
     exitTitle: 'Leave the session?',
     exitDesc: 'Your progress is already saved.',

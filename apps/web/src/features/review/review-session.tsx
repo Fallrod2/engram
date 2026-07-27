@@ -127,8 +127,11 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
           <SessionSummary
             summary={api.summary}
             canReviewAgain={api.canReviewAgain}
+            canUndo={api.canUndo}
+            undoing={api.undoing}
             onExit={api.confirmExit}
             onReviewAgain={api.reviewAgain}
+            onUndo={api.undo}
           />
         )}
       </div>
@@ -190,7 +193,14 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
           {/* Natural height, never compressed. */}
           <div className="flex shrink-0 flex-col gap-2">
-            <SessionContextBar remaining={api.remaining} onEdit={api.openEdit} onSkip={api.skip} />
+            <SessionContextBar
+              remaining={api.remaining}
+              canUndo={api.canUndo}
+              undoing={api.undoing}
+              onEdit={api.openEdit}
+              onSkip={api.skip}
+              onUndo={api.undo}
+            />
             <RatingBar
               revealed={api.revealed}
               preview={api.preview}

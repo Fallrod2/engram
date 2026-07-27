@@ -94,5 +94,12 @@ export const qk = {
      * otherwise collide and the second be silently dropped.
      */
     preview: (cardId: string, now: string) => ['review', 'preview', cardId, now] as const,
+    /**
+     * Strict PREFIX of `preview(cardId, now)` — every cached preview of a card,
+     * all `now` confounded. It is a PURGE handle, never a key to fetch with: an
+     * undo unwinds the card's FSRS state, so every interval already computed for
+     * it describes a card that no longer exists and must leave the cache.
+     */
+    previewsFor: (cardId: string) => ['review', 'preview', cardId] as const,
   },
 } as const

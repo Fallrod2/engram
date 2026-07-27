@@ -1,4 +1,4 @@
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
@@ -30,13 +30,20 @@ const SEG_TEXT: Record<(typeof RATINGS)[number]['token'], string> = {
 export function SessionSummary({
   summary,
   canReviewAgain,
+  canUndo,
+  undoing,
   onExit,
   onReviewAgain,
+  onUndo,
 }: {
   summary: Summary
   canReviewAgain: boolean
+  /** The rating that ended the session is still undoable — offer it here too. */
+  canUndo: boolean
+  undoing: boolean
   onExit: () => void
   onReviewAgain: () => void
+  onUndo: () => void
 }) {
   const t = useT()
   const plural = usePlural()
@@ -98,13 +105,30 @@ export function SessionSummary({
             </Kbd>
           )}
         </Button>
-        {canReviewAgain && (
-          <Button variant="ghost" onClick={onReviewAgain} className="text-text-muted">
-            <RotateCcw className="size-4" />
-            {t('session.summary.reviewAgain')}
-            {!coarse && <Kbd className="ml-1">R</Kbd>}
-          </Button>
-        )}
+        {/* Secondary row: both are ghosts and both are conditional, so they sit
+            side by side and the row simply disappears when neither applies. */}
+        <div className="flex items-center gap-1">
+          {canReviewAgain && (
+            <Button variant="ghost" onClick={onReviewAgain} className="text-text-muted">
+              <RotateCcw className="size-4" />
+              {t('session.summary.reviewAgain')}
+              {!coarse && <Kbd className="ml-1">R</Kbd>}
+            </Button>
+          )}
+          {canUndo && (
+            <Button
+              variant="ghost"
+              onClick={onUndo}
+              disabled={undoing}
+              aria-label={t('session.undoAria')}
+              className="text-text-muted"
+            >
+              <Undo2 className="size-4" />
+              {t('session.undo')}
+              {!coarse && <Kbd className="ml-1">U</Kbd>}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )

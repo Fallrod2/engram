@@ -6,6 +6,7 @@ import {
   reviewPreviewSchema,
   reviewQueueResponseSchema,
   reviewResultSchema,
+  undoReviewResponseSchema,
   type ApiErrorCode,
   type Card,
   type HealthResponse,
@@ -13,6 +14,8 @@ import {
   type ReviewPreview,
   type ReviewQueueResponse,
   type ReviewResult,
+  type UndoReview,
+  type UndoReviewResponse,
   type UpdateCard,
 } from '@engram/shared'
 
@@ -189,6 +192,18 @@ export function fetchCardPreview(
  */
 export function postReview(cardId: string, body: ReviewCard): Promise<ReviewResult> {
   return api.post(`/cards/${cardId}/review`, body, reviewResultSchema)
+}
+
+/**
+ * Unwind the last review of a card (`POST /api/cards/:id/review/undo`). `logId`
+ * is the id `postReview` returned for the very review being undone: the server
+ * only accepts it while that log is STILL the card's last one, which makes the
+ * call naturally idempotent — a replay 409s instead of unwinding a second
+ * review. Every refusal (stale log, double undo, outside the server's window)
+ * comes back as a 409, so the client treats any error as DEFINITIVE: no retry.
+ */
+export function postUndoReview(cardId: string, body: UndoReview): Promise<UndoReviewResponse> {
+  return api.post(`/cards/${cardId}/review/undo`, body, undoReviewResponseSchema)
 }
 
 /**

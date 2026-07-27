@@ -47,6 +47,8 @@ export const dictFr = {
     examUpdateError: "Modification de l'examen échouée",
     examDeleteError: "Suppression de l'examen échouée",
     reviewSaveError: "Échec d'enregistrement",
+    reviewUndone: 'Dernière note annulée',
+    reviewUndoError: 'Annulation impossible',
     cardGone: 'Carte introuvable — passée',
   },
 
@@ -505,6 +507,8 @@ export const dictFr = {
     skipAria: 'Passer cette carte sans la noter (S)',
     edit: 'Éditer',
     editAria: 'Éditer cette carte (E)',
+    undo: 'Annuler',
+    undoAria: 'Annuler la dernière note (U)',
     paused: 'Session en pause — appuie sur une touche ou clique pour reprendre',
     exitTitle: 'Quitter la session ?',
     exitDesc: 'Ta progression est déjà enregistrée.',
