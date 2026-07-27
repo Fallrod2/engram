@@ -45,16 +45,31 @@ const OPTION_LINE = /^[ \t]{0,3}(?:[-*+][ \t]+)?([A-Za-z])[).][ \t]+(.+)$/
 
 /**
  * Punctuated answer marker, at the head of the back's first non-blank line: an
- * optional opening paren, the letter, then `)`, `.` or `:` IMMEDIATELY after it
- * — this is what the generation prompt emits (`B)`, `B.`, `B :`). The colon may
- * be preceded by a single space, as French typography requires.
+ * optional opening paren, the letter, then `)` or `:` IMMEDIATELY after it
+ * (`B)`, `(B)`, `B:`, `B :`). The colon may be preceded by a single space, as
+ * French typography requires.
  *
- * Whitespace is deliberately NOT a separator of its own: a back such as
- * "A priori, on croirait Cusco, mais la capitale est Lima." would otherwise be
- * read as "the answer is A", and the UI would assert a wrong answer. That is
- * the false positive this module exists to avoid.
+ * `)` and `:` are safe because neither ends a French abbreviation nor an
+ * initial: no ordinary prose opens on "<single letter>)" or "<single letter>:"
+ * without meaning "here is the answer".
+ *
+ * `.` is NOT a separator here, and must not be added back. A single letter
+ * followed by a dot is everywhere in French notes, and always as prose:
+ *   - "c.-à-d. HyperText Transfer Protocol, …"  → would be read as answer C
+ *   - "A. Aho et J. Ullman distinguent …"       → would be read as answer A
+ * Restricting the letter to one of the front's options is no protection: `A`
+ * and `C` are precisely option letters. Whitespace is not a separator either,
+ * for the same reason ("A priori, on croirait Cusco, mais …").
+ *
+ * The cost is a legitimate back written "B. Lima — …", which now falls back to
+ * the plain Markdown rendering. That is the trade this module is built on: a
+ * false negative costs a nicer UI, a false positive lies about the answer.
+ *
+ * Note that `OPTION_LINE` still accepts `.` on the FRONT: an option line is
+ * structurally constrained (2+ lines, letters consecutive from A, block at the
+ * very end of the front), which already rules out prose.
  */
-const BACK_PUNCTUATED_ANSWER = /^\(?([A-Za-z])(?:\)|\.|[ \t]?:)/
+const BACK_PUNCTUATED_ANSWER = /^\(?([A-Za-z])(?:\)|[ \t]?:)/
 
 /**
  * Bare answer letter, matched against the back's first non-blank line once
@@ -133,7 +148,7 @@ function parseBackAnswer(back: string): BackAnswer | null {
  *
  * Back — the first non-blank line must carry the answer letter, in one of two
  * forms and no other (see `BACK_PUNCTUATED_ANSWER`, `BACK_BARE_ANSWER`):
- *  - the letter punctuated by `)`, `.` or `:`, optionally parenthesised;
+ *  - the letter punctuated by `)` or `:`, optionally parenthesised (never `.`);
  *  - the letter alone on that line, optionally parenthesised;
  *  - that letter must be one of the options, otherwise `null`;
  *  - `explanation` is whatever follows the marker, trimmed, kept as authored —

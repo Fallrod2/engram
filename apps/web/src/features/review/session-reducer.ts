@@ -361,7 +361,15 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       const cards = state.cards.map((c) =>
         c.id === action.cardId ? { ...c, front: action.front, back: action.back } : c,
       )
-      return { ...state, cards }
+      // Editing the card ON SCREEN rewrites the very question that was answered:
+      // `selectedChoice` is a raw index, bound to no option identity, so a pick
+      // kept across the edit would mark "your answer" on an option the user
+      // never saw — an edit is allowed from REVEALED, and may turn the card into
+      // an entirely different question. Editing ANOTHER card of the lot leaves
+      // the displayed one alone, so the selection still belongs to it.
+      const selectedChoice =
+        action.cardId === state.cards[state.index]?.id ? null : state.selectedChoice
+      return { ...state, cards, selectedChoice }
     }
 
     default:

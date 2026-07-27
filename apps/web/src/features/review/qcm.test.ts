@@ -46,9 +46,11 @@ const PARSED: readonly ParseCase[] = [
     },
   ],
   [
-    'a `.` separator instead of `)`',
+    // The `.` separator stays legitimate on the FRONT, where the options block
+    // is structurally constrained — it is only banned on the back.
+    'a `.` separator instead of `)` on the option lines',
     `${CAPITAL}\n\n- A. Cusco\n- B. Lima\n- C. Arequipa`,
-    'B. Siège du gouvernement.',
+    'B) Siège du gouvernement.',
     {
       question: CAPITAL,
       options: options('Cusco', 'Lima', 'Arequipa'),
@@ -224,6 +226,31 @@ const REJECTED: readonly RejectCase[] = [
     'Oui, c’est Lima.',
   ],
   [
+    // `.` is not an answer separator on the back: the French "c'est-à-dire"
+    // abbreviation would otherwise assert answer C on a card whose answer is A.
+    'a back opening on the abbreviation "c.-à-d."',
+    'Que signifie HTTP ?\n\n- A) HyperText Transfer Protocol\n- B) High Transfer Text Protocol\n- C) HyperText Transport Program',
+    'c.-à-d. HyperText Transfer Protocol, le protocole de transfert du web.',
+  ],
+  [
+    // Author initials, just as common in a justification.
+    'a back opening on an author initial ("A. Aho …")',
+    'Quelles classes ?\n\n- A) Rationnel\n- B) Algébrique\n- C) Contextuel',
+    'A. Aho et J. Ullman distinguent ces trois catégories.',
+  ],
+  [
+    'another author initial ("N. Wirth …")',
+    `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
+    'N. Wirth a conçu Pascal.',
+  ],
+  [
+    // The assumed cost of banning `.`: a legitimate back written this way now
+    // falls back to the plain Markdown rendering rather than risk lying.
+    'a back using a `.` after the answer letter',
+    `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
+    'B. Lima — siège du gouvernement depuis 1535.',
+  ],
+  [
     'five options — E would collide with the session edit shortcut',
     `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa\n- D) Trujillo\n- E) Iquitos`,
     'B) Siège du gouvernement.',
@@ -264,13 +291,20 @@ describe('parseQcm — details', () => {
     expect(parsed?.explanation).toBe('Lima — siège du gouvernement depuis 1535.')
   })
 
-  it('accepts a `:` after the answer letter', () => {
-    const parsed = parseQcm(
+  it('accepts a `:` after the answer letter, with or without the French space', () => {
+    const spaced = parseQcm(
       `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
       'B : siège du gouvernement.',
     )
-    expect(parsed?.answerIndex).toBe(1)
-    expect(parsed?.explanation).toBe('siège du gouvernement.')
+    expect(spaced?.answerIndex).toBe(1)
+    expect(spaced?.explanation).toBe('siège du gouvernement.')
+
+    const tight = parseQcm(
+      `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
+      'B: Lima, siège du gouvernement.',
+    )
+    expect(tight?.answerIndex).toBe(1)
+    expect(tight?.explanation).toBe('Lima, siège du gouvernement.')
   })
 
   it('tolerates CRLF line endings', () => {

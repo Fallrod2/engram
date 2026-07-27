@@ -383,6 +383,43 @@ describe('sessionReducer — CARD_EDITED', () => {
     expect(edited).toBe(base)
   })
 
+  it('clears the QCM selection when the edited card is the one on screen', () => {
+    const answered: SessionState = {
+      ...asking(3, 1),
+      phase: 'REVEALED',
+      selectedChoice: 0,
+    }
+    const edited = sessionReducer(answered, {
+      type: 'CARD_EDITED',
+      cardId: 'c1',
+      front: 'nouvelle question\n\n- A) un\n- B) deux\n- C) trois',
+      back: 'C) trois',
+    })
+    expect(edited.selectedChoice).toBeNull()
+    expect(edited.cards[1]?.front).toBe('nouvelle question\n\n- A) un\n- B) deux\n- C) trois')
+    expect(edited.cards[1]?.back).toBe('C) trois')
+    // Scheduling untouched, and the edit moves neither the cursor nor the phase.
+    expect(edited.cards[1]?.fsrs).toBe(answered.cards[1]?.fsrs)
+    expect(edited.phase).toBe('REVEALED')
+    expect(edited.index).toBe(1)
+  })
+
+  it('keeps the QCM selection when another card of the lot is edited', () => {
+    const answered: SessionState = {
+      ...asking(3, 1),
+      phase: 'REVEALED',
+      selectedChoice: 2,
+    }
+    const edited = sessionReducer(answered, {
+      type: 'CARD_EDITED',
+      cardId: 'c2',
+      front: 'f',
+      back: 'b',
+    })
+    expect(edited.selectedChoice).toBe(2)
+    expect(edited.cards[1]).toBe(answered.cards[1])
+  })
+
   it('applies while the dialog is open and leaves `editing` alone', () => {
     const open = sessionReducer(asking(2), { type: 'OPEN_EDIT' })
     const edited = sessionReducer(open, {
