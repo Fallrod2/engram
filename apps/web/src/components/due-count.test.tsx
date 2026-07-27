@@ -73,6 +73,14 @@ describe('<DueBadge> collapsed-sidebar variant (spec §5)', () => {
     expect(screen.getByText('9')).toBeTruthy()
   })
 
+  it('stays neutral — the accent is reserved for the active nav row', () => {
+    const { container } = render(<DueBadge value={7} max={9} />)
+    const badge = container.firstChild as HTMLElement
+    expect(badge.className).not.toMatch(/accent/)
+    expect(badge.className).toContain('bg-surface-3')
+    expect(badge.className).toContain('text-text')
+  })
+
   it('stays aria-hidden — the count is announced by the row, not the badge', () => {
     const { container } = render(<DueBadge value={42} max={9} />)
     expect((container.firstChild as HTMLElement).getAttribute('aria-hidden')).toBe('true')

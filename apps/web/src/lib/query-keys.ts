@@ -79,6 +79,9 @@ export const qk = {
     retention: (w: string) => ['analytics', 'retention', w] as const,
     // Deltas vs the previous equivalent period (tiles). Null for `all`.
     deltas: (w: string) => ['analytics', 'deltas', w] as const,
+    // Hardest cards per subject. NOT window-scoped (FSRS difficulty is a current
+    // state, not a period aggregate) — only the per-subject `limit` keys it.
+    hardestCards: (limit: number) => ['analytics', 'hardest-cards', limit] as const,
   },
   review: {
     /**

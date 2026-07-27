@@ -14,6 +14,7 @@ import { localDayKey } from '@/lib/calendar'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import {
   deltasOptions,
+  hardestCardsOptions,
   heatmapOptions,
   retentionOptions,
   reviewVolumeOptions,
@@ -32,9 +33,11 @@ import { ChartTableView } from '@/features/analytics/components/chart-table-view
 import { ReviewVolumeChart } from '@/features/analytics/components/review-volume-chart'
 import { StudyTimeChart } from '@/features/analytics/components/study-time-chart'
 import { RetentionBySubjectChart } from '@/features/analytics/components/retention-by-subject-chart'
+import { HardestCardsPanel } from '@/features/analytics/components/hardest-cards-panel'
 import {
   AnalyticsSkeleton,
   ChartCardSkeleton,
+  HardestCardsSkeleton,
   HeatmapSkeleton,
   StatTilesSkeleton,
 } from '@/features/analytics/components/analytics-skeletons'
@@ -107,6 +110,7 @@ function AnalyticsPage() {
   const studyTimeQuery = useQuery(studyTimeOptions(window, now))
   const retentionQuery = useQuery(retentionOptions(window, now))
   const deltasQuery = useQuery(deltasOptions(window, now))
+  const hardestQuery = useQuery(hardestCardsOptions())
 
   const label = windowLabel(window)
 
@@ -235,6 +239,18 @@ function AnalyticsPage() {
           />
         ) : (
           <ChartCardSkeleton height={180} />
+        )}
+
+        {hardestQuery.data || hardestQuery.isError ? (
+          <HardestCardsPanel
+            data={hardestQuery.data}
+            subjects={subjectsQuery.data ?? []}
+            isFetching={hardestQuery.isFetching}
+            error={hardestQuery.isError}
+            onRetry={() => void hardestQuery.refetch()}
+          />
+        ) : (
+          <HardestCardsSkeleton />
         )}
       </div>
     </div>
