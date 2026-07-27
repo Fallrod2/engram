@@ -19,6 +19,7 @@ import { createCardTimer, IDLE_MS, type CardTimer } from './session-timer'
 import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
 import { remainingByState, type RemainingByState } from './queue-stats'
+import { orderQueue } from './queue-order'
 import { parseQcm, type ParsedQcm } from './qcm'
 
 /**
@@ -134,7 +135,19 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   useEffect(() => {
     if (state.phase !== 'LOADING' || queue.isFetching) return
     if (queue.isSuccess) {
-      dispatch({ type: 'QUEUE_LOADED', cards: queue.data.cards, total: queue.data.total })
+      // The draw happens HERE and only here, on the way into the reducer: the
+      // reducer stays pure and deterministic (it is tested exhaustively), and
+      // the order is fixed once for the whole lot. It cannot be re-rolled on a
+      // re-render — QUEUE_LOADED is only accepted from LOADING, and this effect
+      // returns early in every other phase. A REVIEW_AGAIN does go back through
+      // LOADING and therefore reshuffles, which is what we want: it is a new lot.
+      // `total` is the SERVER count (it can exceed `cards.length`) and is passed
+      // through untouched.
+      dispatch({
+        type: 'QUEUE_LOADED',
+        cards: orderQueue(queue.data.cards, Math.random),
+        total: queue.data.total,
+      })
     } else if (queue.isError) {
       dispatch({ type: 'QUEUE_FAILED' })
     }

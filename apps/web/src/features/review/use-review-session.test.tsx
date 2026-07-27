@@ -177,6 +177,11 @@ function reviewResult(cardId: string, logId: string) {
 }
 
 beforeEach(() => {
+  // The hook draws the queue order with `orderQueue(cards, Math.random)`. Pinned
+  // at 0, the weighted draw always takes the head of the remaining pool, so the
+  // lot reaches the reducer in the server's order — which is what every test
+  // below is written against. The draw itself is covered in `queue-order.test.ts`.
+  vi.spyOn(Math, 'random').mockReturnValue(0)
   postReview.mockReset()
   postUndoReview.mockReset()
   fetchReviewQueue.mockReset()
@@ -199,7 +204,38 @@ beforeEach(() => {
   postUndoReview.mockReturnValue(new Promise(() => {}))
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
+
+describe('useReviewSession — the queue is drawn, not served in server order', () => {
+  it('applies orderQueue to the loaded lot', async () => {
+    // Both cards carry `difficulty: 5`, so they share a weight: a draw at 0.9 of
+    // the cumulative weight lands past the first entry and starts the session on
+    // c2 — proof the lot went through `orderQueue` on its way to the reducer.
+    vi.spyOn(Math, 'random').mockReturnValue(0.9)
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.current?.id).toBe('c2')
+  })
+
+  it('does not re-draw on re-render: the order is fixed for the whole lot', async () => {
+    const draws = [0.9, 0]
+    let i = 0
+    vi.spyOn(Math, 'random').mockImplementation(() => draws[i++ % draws.length] ?? 0)
+    const { result, rerender } = renderHook(() => useReviewSession({}), { wrapper })
+
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    const first = result.current.current?.id
+    // QUEUE_LOADED is only accepted from LOADING and the effect returns early in
+    // every other phase, so no amount of re-rendering can reshuffle the lot —
+    // even though the generator would hand back a different sequence.
+    for (let n = 0; n < 5; n++) rerender()
+    expect(result.current.current?.id).toBe(first)
+  })
+})
 
 describe('useReviewSession — double-submit guard (§16.1 item 2bis, finding #9, wired-up)', () => {
   it('fires exactly one POST when two rating keydowns land in the same tick', async () => {
