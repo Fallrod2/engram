@@ -377,8 +377,12 @@ function NavLink({
       />
       <span className="relative flex items-center justify-center">
         <Icon className="size-4 shrink-0" />
+        {/* The rail leaves 48px of usable width and 32px rows: a three-character
+            badge overflowed onto the row above. Two characters and a tighter
+            offset keep it on its own icon; the exact count stays in the tooltip
+            and in the expanded `DueCount`. */}
         {collapsed && count != null && (
-          <DueBadge value={count} className="absolute -right-2 -top-2" />
+          <DueBadge value={count} max={9} className="absolute -right-1 -top-1" />
         )}
       </span>
       {!collapsed && (
@@ -443,7 +447,7 @@ function SubjectNavRow({
       />
       <span className="relative flex items-center justify-center">
         <SubjectDot color={subject.color} />
-        {collapsed && <DueBadge value={due} className="absolute -right-2 -top-2" />}
+        {collapsed && <DueBadge value={due} max={9} className="absolute -right-1 -top-1" />}
       </span>
       {!collapsed && (
         <>

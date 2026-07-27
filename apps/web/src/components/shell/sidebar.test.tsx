@@ -166,6 +166,29 @@ describe('<Sidebar> collapse toggle placement', () => {
   })
 })
 
+describe('<Sidebar> collapsed due badges', () => {
+  it('caps at 9+ and hugs its icon so it cannot spill onto the row above', () => {
+    collapsed = true
+    renderSidebar()
+    // Both the /review total (128) and the subject count (42) collapse to `9+`.
+    expect(screen.getAllByText('9+')).toHaveLength(2)
+    expect(screen.queryByText('99+')).toBeNull()
+    expect(screen.queryByText('128')).toBeNull()
+
+    for (const badge of screen.getAllByText('9+')) {
+      expect(badge.className).toContain('-top-1')
+      expect(badge.className).not.toContain('-top-2')
+    }
+  })
+
+  it('shows the exact counts once expanded', () => {
+    renderSidebar()
+    expect(screen.getByText('128')).toBeTruthy()
+    expect(screen.getByText('42')).toBeTruthy()
+    expect(screen.queryByText('9+')).toBeNull()
+  })
+})
+
 describe('<Sidebar> footer layout', () => {
   it('stacks Administration and Settings when expanded', () => {
     const { container } = renderSidebar()
