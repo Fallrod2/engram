@@ -15,13 +15,15 @@ import { RatingButton } from './rating-button'
  * the only way to reveal at the finger). REVEALED/SUBMITTING: the 4 rating
  * buttons with their projected intervals, faded in short (§7.2). The interval is
  * a bonus — a pending preview renders a `·` placeholder and the rating stays
- * fully functional (§3.4).
+ * fully functional (§3.4). On a QCM the result argues for a grade: that button
+ * is highlighted (`suggestedGrade`), but every rating stays one click away.
  */
 export function RatingBar({
   revealed,
   preview,
   disabled,
   flashGrade,
+  suggestedGrade = null,
   reduce,
   onReveal,
   onRate,
@@ -30,6 +32,8 @@ export function RatingBar({
   preview: ReviewPreview | undefined
   disabled: boolean
   flashGrade: Grade | null
+  /** Grade deduced from the QCM result, highlighted on the bar; null = none. */
+  suggestedGrade?: Grade | null
   reduce: boolean
   onReveal: () => void
   onRate: (grade: Grade) => void
@@ -80,6 +84,7 @@ export function RatingBar({
             interval={interval}
             disabled={disabled}
             flash={flashGrade === meta.grade}
+            suggested={suggestedGrade === meta.grade}
             onRate={() => onRate(meta.grade)}
           />
         )

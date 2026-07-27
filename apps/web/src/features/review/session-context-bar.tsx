@@ -1,18 +1,79 @@
 import { Pencil, SkipForward, Undo2 } from 'lucide-react'
 import { FSRS_STATE_LABEL_KEYS, glyphClass } from '@/components/fsrs-state-glyph'
 import { Kbd } from '@/components/ui/kbd'
-import { useT } from '@/lib/i18n'
+import { useT, type TFunction } from '@/lib/i18n'
 import { useCoarsePointer } from '@/lib/use-media-query'
 import { cn } from '@/lib/utils'
 import { REMAINING_KEY_BY_STATE, REMAINING_STATES, type RemainingByState } from './queue-stats'
 
+/** Segments of the difficulty gauge — one per two points of the 1-10 scale. */
+const DIFFICULTY_SEGMENTS = 5
+const MIN_DIFFICULTY = 1
+const MAX_DIFFICULTY = 10
+
+/**
+ * How many segments a difficulty lights up: `ceil(d / 2)` on the clamped scale,
+ * so 1-2 → one segment and 9-10 → five, each segment worth two points.
+ *
+ * Returns `0` for a card that has never been reviewed. Same trap as the one
+ * `weightFor` documents in `queue-order.ts`: the `difficulty` column defaults to
+ * `0` and ts-fsrs only writes a real value on the first review, so `0` is not
+ * "the easiest card", it is "no measurement yet" — an empty gauge, and its own
+ * accessible label. Non-finite values are read the same way rather than
+ * rendered as `NaN`.
+ */
+function filledSegments(difficulty: number): number {
+  if (difficulty === 0 || !Number.isFinite(difficulty)) return 0
+  const clamped = Math.min(MAX_DIFFICULTY, Math.max(MIN_DIFFICULTY, difficulty))
+  return Math.ceil((clamped * DIFFICULTY_SEGMENTS) / MAX_DIFFICULTY)
+}
+
+/**
+ * The difficulty of the card on screen, as five segments. Discreet on purpose:
+ * it explains why some cards keep coming back (the queue draw is weighted by
+ * `card.fsrs.difficulty`, see `queue-order.ts`) without competing with the
+ * counters next to it — hence no colour of its own, and never `danger`: a hard
+ * card is work to do, not a failure.
+ *
+ * Hidden under 640px like the neighbouring button labels — the bar already
+ * holds three buttons and four counters and must stay readable at 320px.
+ */
+function DifficultyGauge({ difficulty, t }: { difficulty: number; t: TFunction }) {
+  const filled = filledSegments(difficulty)
+  // The tooltip in `fsrs-state-glyph` prints the raw FSRS float; here one
+  // decimal is enough, and `Math.round` (not `toFixed`) keeps a whole value
+  // whole ("10", not "10.0").
+  const label =
+    filled === 0
+      ? t('session.difficultyUnknown')
+      : t('session.difficultyAria', { value: Math.round(difficulty * 10) / 10 })
+  return (
+    // `role="img"` and not a bare labelled div: same reason as the `role="group"`
+    // on the counters — an `aria-label` alone is not mapped on a generic element.
+    <div role="img" aria-label={label} className="hidden items-center gap-0.5 sm:flex">
+      {Array.from({ length: DIFFICULTY_SEGMENTS }).map((_, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className={cn(
+            'inline-block h-2 w-1 shrink-0 rounded-xs',
+            i < filled ? 'bg-text-muted' : 'bg-border-strong',
+          )}
+        />
+      ))}
+    </div>
+  )
+}
+
 /**
  * The strip between the card and the ratings: 24px of session instrumentation
  * that never touches the reading surface. It holds what is still ahead — the
- * four FSRS counters, right-aligned — and the per-card actions on the left.
+ * four FSRS counters, right-aligned — the per-card actions on the left, and the
+ * current card's difficulty in between.
  */
 export function SessionContextBar({
   remaining,
+  difficulty,
   canUndo,
   undoing,
   onEdit,
@@ -20,6 +81,8 @@ export function SessionContextBar({
   onUndo,
 }: {
   remaining: RemainingByState
+  /** FSRS difficulty of the card on screen; `null` when there is no card. */
+  difficulty: number | null
   /** There is a rating left to take back — the button exists only then. */
   canUndo: boolean
   undoing: boolean
@@ -82,6 +145,7 @@ export function SessionContextBar({
           {!coarse && <Kbd>S</Kbd>}
         </button>
       </div>
+      {difficulty !== null && <DifficultyGauge difficulty={difficulty} t={t} />}
       <div
         role="group"
         aria-label={t('session.remainingAria')}

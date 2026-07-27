@@ -12,6 +12,7 @@ describe('<SessionContextBar> remaining counters', () => {
     render(
       <SessionContextBar
         remaining={{ new: 3, learning: 1, review: 12, relearning: 0 }}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={NOOP}
@@ -27,6 +28,7 @@ describe('<SessionContextBar> remaining counters', () => {
     render(
       <SessionContextBar
         remaining={{ new: 0, learning: 2, review: 0, relearning: 0 }}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={NOOP}
@@ -49,6 +51,7 @@ describe('<SessionContextBar> skip action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={NOOP}
@@ -67,6 +70,7 @@ describe('<SessionContextBar> skip action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={NOOP}
@@ -86,6 +90,7 @@ describe('<SessionContextBar> edit action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={NOOP}
@@ -102,6 +107,7 @@ describe('<SessionContextBar> edit action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={onEdit}
@@ -117,6 +123,7 @@ describe('<SessionContextBar> edit action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={NOOP}
@@ -136,6 +143,7 @@ describe('<SessionContextBar> undo action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo={false}
         undoing={false}
         onEdit={NOOP}
@@ -150,6 +158,7 @@ describe('<SessionContextBar> undo action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo
         undoing={false}
         onEdit={NOOP}
@@ -173,6 +182,7 @@ describe('<SessionContextBar> undo action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo
         undoing={false}
         onEdit={NOOP}
@@ -189,6 +199,7 @@ describe('<SessionContextBar> undo action', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo
         undoing
         onEdit={NOOP}
@@ -214,6 +225,7 @@ describe('<SessionContextBar> affordance while an undo is in flight', () => {
     render(
       <SessionContextBar
         remaining={remaining}
+        difficulty={null}
         canUndo={false}
         undoing
         onEdit={onEdit}
@@ -233,4 +245,69 @@ describe('<SessionContextBar> affordance while an undo is in flight', () => {
   // The `undoing: false` control already exists above: "calls onEdit on click" and
   // "calls onSkip on click" both fail if the buttons were disabled unconditionally,
   // since a disabled button fires no click handler.
+})
+
+describe('<SessionContextBar> difficulty gauge', () => {
+  const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
+
+  function renderWith(difficulty: number | null) {
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        difficulty={difficulty}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
+  }
+
+  /** Segments lit up, read off the fill token rather than off a count of nodes. */
+  function filledCount(): number {
+    const gauge = screen.getByRole('img')
+    return gauge.querySelectorAll('.bg-text-muted').length
+  }
+
+  it('fills every segment at the top of the scale', () => {
+    renderWith(10)
+    expect(filledCount()).toBe(5)
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
+      'Difficulté de cette carte : 10 sur 10',
+    )
+  })
+
+  it('fills a single segment at the bottom of the scale', () => {
+    renderWith(1)
+    expect(filledCount()).toBe(1)
+  })
+
+  it('rounds the spoken value to one decimal', () => {
+    renderWith(5.4)
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
+      'Difficulté de cette carte : 5.4 sur 10',
+    )
+    cleanup()
+    // The value ts-fsrs actually writes: two decimals, spoken with one.
+    renderWith(5.37)
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
+      'Difficulté de cette carte : 5.4 sur 10',
+    )
+  })
+
+  // The trap `weightFor` documents: `difficulty` is 0 until the first review, so
+  // a new card is UNKNOWN, not easy — an empty gauge, never a difficulty of 1.
+  it('leaves the gauge empty and says so on a never-reviewed card', () => {
+    renderWith(0)
+    expect(filledCount()).toBe(0)
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
+      'Difficulté de cette carte : pas encore évaluée',
+    )
+  })
+
+  it('renders nothing at all when there is no current card', () => {
+    renderWith(null)
+    expect(screen.queryByRole('img')).toBeNull()
+  })
 })

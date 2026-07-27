@@ -198,6 +198,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
           <div className="flex shrink-0 flex-col gap-2">
             <SessionContextBar
               remaining={api.remaining}
+              difficulty={current?.fsrs.difficulty ?? null}
               canUndo={api.canUndo}
               undoing={api.undoing}
               onEdit={api.openEdit}
@@ -211,6 +212,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
               // lands (T-008), so the affordance must say so instead of eating the click.
               disabled={api.submitting || api.undoing}
               flashGrade={api.flashGrade}
+              suggestedGrade={api.suggestedGrade}
               reduce={api.reduce}
               onReveal={api.reveal}
               onRate={api.rate}

@@ -177,6 +177,11 @@ function reviewResult(cardId: string, logId: string) {
 }
 
 beforeEach(() => {
+  // The hook draws the queue order with `orderQueue(cards, Math.random)`. Pinned
+  // at 0, the weighted draw always takes the head of the remaining pool, so the
+  // lot reaches the reducer in the server's order — which is what every test
+  // below is written against. The draw itself is covered in `queue-order.test.ts`.
+  vi.spyOn(Math, 'random').mockReturnValue(0)
   postReview.mockReset()
   postUndoReview.mockReset()
   fetchReviewQueue.mockReset()
@@ -199,7 +204,38 @@ beforeEach(() => {
   postUndoReview.mockReturnValue(new Promise(() => {}))
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
+
+describe('useReviewSession — the queue is drawn, not served in server order', () => {
+  it('applies orderQueue to the loaded lot', async () => {
+    // Both cards carry `difficulty: 5`, so they share a weight: a draw at 0.9 of
+    // the cumulative weight lands past the first entry and starts the session on
+    // c2 — proof the lot went through `orderQueue` on its way to the reducer.
+    vi.spyOn(Math, 'random').mockReturnValue(0.9)
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.current?.id).toBe('c2')
+  })
+
+  it('does not re-draw on re-render: the order is fixed for the whole lot', async () => {
+    const draws = [0.9, 0]
+    let i = 0
+    vi.spyOn(Math, 'random').mockImplementation(() => draws[i++ % draws.length] ?? 0)
+    const { result, rerender } = renderHook(() => useReviewSession({}), { wrapper })
+
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    const first = result.current.current?.id
+    // QUEUE_LOADED is only accepted from LOADING and the effect returns early in
+    // every other phase, so no amount of re-rendering can reshuffle the lot —
+    // even though the generator would hand back a different sequence.
+    for (let n = 0; n < 5; n++) rerender()
+    expect(result.current.current?.id).toBe(first)
+  })
+})
 
 describe('useReviewSession — double-submit guard (§16.1 item 2bis, finding #9, wired-up)', () => {
   it('fires exactly one POST when two rating keydowns land in the same tick', async () => {
@@ -727,6 +763,109 @@ describe('useReviewSession — answering a QCM from the keyboard (A-D)', () => {
     await waitFor(() => expect(result.current.qcm).not.toBeNull())
     fireEvent.keyDown(window, { key: 'c' })
     expect(result.current.selectedChoice).toBe(2)
+  })
+})
+
+describe('useReviewSession — the grade suggested by the QCM result', () => {
+  /** Replace the frozen queue of the current test with `cards`. */
+  function loadQueue(cards: Card[]) {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: cards.length,
+      cards,
+    })
+  }
+
+  it('a wrong pick suggests Encore (1)', async () => {
+    loadQueue([makeQcmCard('c1')]) // answer is B, index 1
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.suggestedGrade).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'a' })
+
+    expect(result.current.suggestedGrade).toBe(1)
+  })
+
+  it('a right pick suggests Bien (3)', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'b' })
+
+    expect(result.current.suggestedGrade).toBe(3)
+  })
+
+  it('stays null on a plain card, revealed or not', async () => {
+    // The default queue of `beforeEach` is made of plain front/back cards.
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.suggestedGrade).toBeNull()
+
+    fireEvent.keyDown(window, { key: ' ' })
+
+    expect(result.current.phase).toBe('REVEALED')
+    expect(result.current.suggestedGrade).toBeNull()
+  })
+
+  it('stays null on a QCM revealed with Space — no answer, no evidence', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: ' ' })
+
+    expect(result.current.phase).toBe('REVEALED')
+    expect(result.current.selectedChoice).toBeNull()
+    expect(result.current.suggestedGrade).toBeNull()
+  })
+
+  it('Enter in REVEALED grades once, with the suggested grade', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'a' }) // wrong → suggests 1
+    expect(result.current.suggestedGrade).toBe(1)
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    // mutate() runs the mutationFn in a microtask; wait for it to land.
+    await waitFor(() => expect(postReview).toHaveBeenCalled())
+    expect(postReview).toHaveBeenCalledTimes(1)
+    expect(postReview).toHaveBeenCalledWith('c1', { grade: 1, durationMs: expect.any(Number) })
+  })
+
+  it('the 1-4 keys still override the suggestion', async () => {
+    loadQueue([makeQcmCard('c1')])
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'b' }) // right → suggests 3
+    fireEvent.keyDown(window, { key: '4' })
+
+    await waitFor(() => expect(postReview).toHaveBeenCalled())
+    expect(postReview).toHaveBeenCalledTimes(1)
+    expect(postReview).toHaveBeenCalledWith('c1', { grade: 4, durationMs: expect.any(Number) })
+  })
+
+  it('Enter does nothing in REVEALED when there is no suggestion', async () => {
+    // Plain card: Space reveals it, and Enter must stay inert from there.
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(result.current.phase).toBe('REVEALED')
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true })
+    fireEvent(window, event)
+
+    // Flush the microtask a mutation would have used, so "no POST" is not just
+    // "not yet".
+    await act(async () => {})
+    expect(postReview).not.toHaveBeenCalled()
+    expect(result.current.phase).toBe('REVEALED')
+    // Nothing was done, so nothing was swallowed either.
+    expect(event.defaultPrevented).toBe(false)
   })
 })
 

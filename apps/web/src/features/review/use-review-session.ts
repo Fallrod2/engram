@@ -19,6 +19,7 @@ import { createCardTimer, IDLE_MS, type CardTimer } from './session-timer'
 import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
 import { remainingByState, type RemainingByState } from './queue-stats'
+import { orderQueue } from './queue-order'
 import { parseQcm, type ParsedQcm } from './qcm'
 
 /**
@@ -36,6 +37,11 @@ export interface SessionApi {
   qcm: ParsedQcm | null
   /** Index into `qcm.options` of the option the user picked, or null. */
   selectedChoice: number | null
+  /**
+   * The grade the QCM result argues for, pre-selected on the bar and validated
+   * by Enter. Null whenever the session holds no objective evidence.
+   */
+  suggestedGrade: Grade | null
   /** True while the verso is shown (REVEALED or SUBMITTING). */
   revealed: boolean
   submitting: boolean
@@ -134,7 +140,19 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   useEffect(() => {
     if (state.phase !== 'LOADING' || queue.isFetching) return
     if (queue.isSuccess) {
-      dispatch({ type: 'QUEUE_LOADED', cards: queue.data.cards, total: queue.data.total })
+      // The draw happens HERE and only here, on the way into the reducer: the
+      // reducer stays pure and deterministic (it is tested exhaustively), and
+      // the order is fixed once for the whole lot. It cannot be re-rolled on a
+      // re-render — QUEUE_LOADED is only accepted from LOADING, and this effect
+      // returns early in every other phase. A REVIEW_AGAIN does go back through
+      // LOADING and therefore reshuffles, which is what we want: it is a new lot.
+      // `total` is the SERVER count (it can exceed `cards.length`) and is passed
+      // through untouched.
+      dispatch({
+        type: 'QUEUE_LOADED',
+        cards: orderQueue(queue.data.cards, Math.random),
+        total: queue.data.total,
+      })
     } else if (queue.isError) {
       dispatch({ type: 'QUEUE_FAILED' })
     }
@@ -274,6 +292,24 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   // Read by the keyboard router, which is subscribed once and never re-created.
   const qcmRef = useRef(qcm)
   qcmRef.current = qcm
+
+  /**
+   * The grade the QCM result argues for: a wrong pick is a lapse (1, Again), a
+   * right one an ordinary success (3, Good). Null in every other case — a plain
+   * card, or a QCM revealed with Space without answering it: no answer means no
+   * evidence, and without evidence the bar must behave exactly as it always has.
+   *
+   * DERIVED, never stored: it is a pure reading of the card's parse and of the
+   * option picked, so the reducer has nothing to say about it.
+   */
+  const suggestedGrade = useMemo<Grade | null>(() => {
+    if (!qcm || state.selectedChoice === null) return null
+    return state.selectedChoice === qcm.answerIndex ? 3 : 1
+  }, [qcm, state.selectedChoice])
+  // Same reason as `qcmRef`: the keyboard router subscribes once and must not
+  // re-subscribe on every pick.
+  const suggestedGradeRef = useRef(suggestedGrade)
+  suggestedGradeRef.current = suggestedGrade
 
   const selectChoice = useCallback((index: number) => {
     const parsed = qcmRef.current
@@ -630,6 +666,16 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           if (e.key >= '1' && e.key <= '4') {
             e.preventDefault()
             rate(Number(e.key) as Grade)
+          } else if (e.key === 'Enter') {
+            // Enter validates the suggestion, and only that. It is free in this
+            // phase (it reveals in ASKING, and REVEALED never claimed it), so on
+            // a card with no suggestion it stays an ordinary keystroke — hence no
+            // `preventDefault()` outside the branch that actually acts.
+            const suggested = suggestedGradeRef.current
+            if (suggested !== null) {
+              e.preventDefault()
+              rate(suggested)
+            }
           } else if (e.key.toLowerCase() === 's') {
             e.preventDefault()
             skip()
@@ -739,6 +785,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     current,
     qcm,
     selectedChoice: state.selectedChoice,
+    suggestedGrade,
     revealed: state.phase === 'REVEALED' || state.phase === 'SUBMITTING',
     submitting: state.phase === 'SUBMITTING',
     submitError: state.submitError,
