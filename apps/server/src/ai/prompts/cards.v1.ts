@@ -23,8 +23,19 @@ export const SYSTEM_PROMPT = `Tu es un générateur de flashcards de révision p
 
 Tu renvoies les cartes UNIQUEMENT via l'outil "emit_cards". Aucun texte hors de l'appel d'outil.`
 
-/** Kind-specific instruction for 'quiz' (multiple choice), added to the user message. */
-export const QUIZ_INSTRUCTIONS = `Format QUIZ (QCM) : pour chaque carte, le RECTO contient la question suivie de 3 à 4 options en liste Markdown ("- A) …"). Le VERSO contient la lettre de la bonne réponse suivie d'une justification courte (1 phrase). Une seule bonne réponse par question. Les distracteurs doivent être plausibles et tirés du même domaine que la note.`
+/**
+ * Kind-specific instruction for 'quiz' (multiple choice), added to the user message.
+ *
+ * The front/back shape spelled out below is a CONTRACT with the render-time QCM
+ * parser, `apps/web/src/features/review/qcm.ts`: loosening it here makes the
+ * generated cards unrecognisable as QCM, and they fall back to the plain
+ * Markdown rendering. Two points are load-bearing on that side — the `)` after
+ * the answer letter (`.` is refused, it collides with French abbreviations and
+ * initials) and the 4-option ceiling (a 5th option `E` would collide with the
+ * review session's edit shortcut). See `BACK_PUNCTUATED_ANSWER` and
+ * `MAX_OPTIONS` there before touching this string.
+ */
+export const QUIZ_INSTRUCTIONS = `Format QUIZ (QCM) : pour chaque carte, le RECTO contient la question suivie de 3 à 4 options — JAMAIS plus de 4 — en liste Markdown, chaque option préfixée par sa lettre puis une parenthèse fermante : "- A) …", "- B) …", "- C) …", "- D) …". Le VERSO commence OBLIGATOIREMENT par la lettre de la bonne réponse suivie d'une parenthèse fermante, puis une justification courte (1 phrase) ; exemple exact : "B) Lima concentre l'essentiel de l'administration péruvienne." N'écris jamais la lettre suivie d'un point ("B."), cette forme n'est pas reconnue. Une seule bonne réponse par question. Les distracteurs doivent être plausibles et tirés du même domaine que la note.`
 
 /** Kind-specific instruction for 'cards' (classic front/back). */
 export const CARDS_INSTRUCTIONS = `Format CARTES (recto/verso) : question au recto, réponse concise au verso. Pas d'options à choix multiple.`
