@@ -395,6 +395,8 @@ export const dictEn: Dict = {
       examNav: 'Move through exams',
       reveal: 'Reveal the answer',
       rate: 'Rate the card',
+      undoReview: 'Undo the last rating',
+      skipCard: 'Skip the card',
       exitSession: 'Exit session',
       confirmExit: 'Confirm exit',
       restartSession: 'Restart a session',
