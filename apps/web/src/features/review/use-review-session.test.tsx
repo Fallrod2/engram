@@ -508,6 +508,84 @@ describe('useReviewSession — undoing the last rating (U)', () => {
     expect(result.current.current?.id).toBe('c2')
     expect(result.current.counts[3]).toBe(1)
   })
+
+  describe('an undo in flight freezes the session (T-008)', () => {
+    interface UndoAck {
+      card: Card
+      undoneLogId: string
+    }
+
+    /** Arms the undo of c1 and leaves its POST hanging; returns the resolver. */
+    async function undoInFlight() {
+      postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+      let ack: (value: UndoAck) => void = () => {}
+      postUndoReview.mockReturnValue(
+        new Promise<UndoAck>((resolve) => {
+          ack = resolve
+        }),
+      )
+      const { result } = renderHook(() => useReviewSession({}), { wrapper })
+      await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+      // Card A (c1) graded and acked → `lastReview` armed, cursor on B (c2).
+      act(() => result.current.reveal())
+      act(() => result.current.rate(3))
+      await waitFor(() => expect(result.current.canUndo).toBe(true))
+      expect(result.current.current?.id).toBe('c2')
+
+      act(() => result.current.undo())
+      await waitFor(() => expect(postUndoReview).toHaveBeenCalledTimes(1))
+      expect(result.current.undoing).toBe(true)
+      return { result, ack }
+    }
+
+    it('rating B while A is being undone POSTs nothing and rewinds onto A', async () => {
+      const { result, ack } = await undoInFlight()
+
+      // The user reveals B and grades it before the undo of A has landed. Without
+      // the guard this fires a second POST whose RATE_OK re-arms `lastReview` on
+      // B — the pending UNDO_OK would then rewind onto B and drop B's result.
+      act(() => result.current.reveal())
+      expect(result.current.phase).toBe('REVEALED')
+      act(() => result.current.rate(3))
+      await act(async () => {}) // flush: a POST would land in a microtask
+
+      expect(postReview).toHaveBeenCalledTimes(1) // A's, and only A's
+      expect(postReview).toHaveBeenCalledWith('c1', { grade: 3, durationMs: expect.any(Number) })
+      expect(result.current.progress.done).toBe(1) // cursor did not move
+      expect(result.current.current?.id).toBe('c2')
+
+      await act(async () => {
+        ack({ card: makeCard('c1'), undoneLogId: 'log-1' })
+      })
+
+      // The undo lands on the card it was fired for, and takes its result with it.
+      await waitFor(() => expect(result.current.current?.id).toBe('c1'))
+      expect(result.current.phase).toBe('REVEALED')
+      expect(result.current.progress.done).toBe(0)
+      expect(result.current.counts).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0 })
+      expect(result.current.canUndo).toBe(false)
+      expect(result.current.undoing).toBe(false)
+    })
+
+    it('skipping B while A is being undone leaves the cursor put (scenario 2)', async () => {
+      const { result, ack } = await undoInFlight()
+
+      // SKIP_CARD calls `advance`, which CLEARS `lastReview`: unguarded, the undo
+      // of A would ack into a no-op and the summary would keep counting A.
+      act(() => result.current.skip())
+      expect(result.current.progress.done).toBe(1)
+      expect(result.current.current?.id).toBe('c2')
+
+      await act(async () => {
+        ack({ card: makeCard('c1'), undoneLogId: 'log-1' })
+      })
+
+      await waitFor(() => expect(result.current.current?.id).toBe('c1'))
+      expect(result.current.progress.done).toBe(0)
+      expect(result.current.counts).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0 })
+    })
+  })
 })
 
 describe('useReviewSession — modifiers are not session shortcuts', () => {

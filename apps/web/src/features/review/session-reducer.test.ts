@@ -517,6 +517,37 @@ describe('sessionReducer — undo the last rating (U, step 10)', () => {
     expect(sessionReducer(failed, { type: 'UNDO' })).toBe(failed)
   })
 
+  it('nothing consumes the cursor while an undo is in flight (T-008)', () => {
+    /** A graded card behind us, its undo POSTed and not yet acked. */
+    function inFlight(phase: 'ASKING' | 'REVEALED'): SessionState {
+      return {
+        ...asking(3, 1),
+        phase,
+        results: [{ cardId: 'c0', grade: 3, durationMs: 100 }],
+        lastReview: { cardId: 'c0', logId: 'log-0', grade: 3, index: 0 },
+        undoing: true,
+      }
+    }
+
+    // RATE would re-arm `lastReview` on c1 and desynchronise the pending UNDO_OK.
+    const revealed = inFlight('REVEALED')
+    expect(sessionReducer(revealed, { type: 'RATE', grade: 3, durationMs: 400 })).toBe(revealed)
+
+    // SKIP_CARD would clear `lastReview` and make the pending UNDO_OK a no-op.
+    const asking1 = inFlight('ASKING')
+    expect(sessionReducer(asking1, { type: 'SKIP_CARD' })).toBe(asking1)
+    expect(sessionReducer(revealed, { type: 'SKIP_CARD' })).toBe(revealed)
+
+    // Control: the SAME states with the flag down still move — the guard reads
+    // `undoing`, not the mere presence of an undo target.
+    const settled: SessionState = { ...revealed, undoing: false }
+    expect(sessionReducer(settled, { type: 'RATE', grade: 3, durationMs: 400 }).phase).toBe(
+      'SUBMITTING',
+    )
+    expect(sessionReducer(settled, { type: 'SKIP_CARD' }).index).toBe(2)
+    expect(sessionReducer({ ...asking1, undoing: false }, { type: 'SKIP_CARD' }).index).toBe(2)
+  })
+
   it('REVIEW_AGAIN clears the target — the previous lot is gone', () => {
     const graded = rate(asking(1, 0), 3, 100, 'log-0')
     expect(graded.phase).toBe('SUMMARY')

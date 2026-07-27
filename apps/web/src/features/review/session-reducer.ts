@@ -162,6 +162,13 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       // per card, the guard that makes "await the ack" safe on a non-idempotent
       // endpoint.
       if (state.phase !== 'REVEALED') return state
+      // Refused while an undo is in flight, the mirror of the `inFlightRef` test
+      // `undo()` already makes: a pending UNDO_OK is going to rewind the cursor
+      // to `lastReview.index` and drop the LAST entry of `results`. Consuming the
+      // current card meanwhile re-arms `lastReview` on it (RATE_OK), so the undo
+      // would rewind onto the wrong card and unwind the wrong result — while the
+      // server has unwound the original one.
+      if (state.undoing) return state
       return {
         ...state,
         phase: 'SUBMITTING',
@@ -212,6 +219,12 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       // Skipping also DROPS the undo target (see `advance`): after an S, `U`
       // must not reach back over it to unwind the rating before the skip.
       if (state.phase !== 'ASKING' && state.phase !== 'REVEALED') return state
+      // Refused while an undo is in flight, same exclusion as RATE: both consume
+      // the cursor through `advance`, which CLEARS `lastReview`. A skip slipped in
+      // before the ack would turn the pending UNDO_OK into a silent no-op even
+      // though the server really did unwind the review — the result stays in
+      // `results` and the summary over-counts.
+      if (state.undoing) return state
       return advance(state, state.results)
 
     case 'UNDO':

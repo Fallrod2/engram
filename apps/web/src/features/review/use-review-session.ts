@@ -258,7 +258,10 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     // `phase: REVEALED`, so the phase check alone can't stop a double submit.
     // This synchronous ref does — it flips to true before the first call ever
     // returns and is only cleared when the mutation settles (see onSettled).
-    if (inFlightRef.current) return
+    // `undoInFlightRef` is the same test in the other direction, symmetric to the
+    // one `undo()` already makes on `inFlightRef`: an undo about to rewind the
+    // cursor must not have this card consumed under it.
+    if (undoInFlightRef.current || inFlightRef.current) return
     const card = s.cards[s.index]
     if (!card) return
     inFlightRef.current = true
@@ -274,6 +277,10 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   const skip = useCallback(() => {
     const s = stateRef.current
     if (s.phase !== 'ASKING' && s.phase !== 'REVEALED') return
+    // Same mutual exclusion as in `rate()`: a skip also consumes the cursor, and
+    // `stateRef` only refreshes on render, so a U and an S in one tick would both
+    // read `undoing: false` and let the session move under the pending undo.
+    if (undoInFlightRef.current) return
     // No POST, no `inFlightRef`, nothing read off the timer: a skipped card
     // produces no `RatingResult`, so its duration is never needed. The next
     // card gets a fresh `createCardTimer` from the same effect that serves a
