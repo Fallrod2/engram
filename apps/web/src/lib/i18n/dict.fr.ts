@@ -504,6 +504,7 @@ export const dictFr = {
     revealed: 'Réponse révélée',
     qcmOptionsAria: 'Réponses possibles',
     qcmCorrect: 'Bonne réponse',
+    qcmCorrectPicked: 'Ta réponse, correcte',
     qcmWrong: 'Ta réponse, incorrecte',
     saveError: 'Échec d’enregistrement — appuie de nouveau pour réessayer.',
     footerHint: 'Espace révéler · 1-4 noter · Échap quitter',

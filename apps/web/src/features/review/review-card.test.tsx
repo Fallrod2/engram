@@ -39,6 +39,12 @@ function answerChain(container: HTMLElement): HTMLElement[] {
   return chain
 }
 
+/** Utility classes of an element — jsdom loads no stylesheet, so the class list
+ *  is the only faithful source of what the browser would paint. */
+function classesOf(el: Element): string[] {
+  return el.className.split(/\s+/)
+}
+
 /** Structure without inline styles — motion writes the animation onto `style`,
  *  which is precisely the part allowed to differ between motion modes. */
 function structure(el: Element): string {
@@ -257,8 +263,13 @@ describe('<ReviewCard>', () => {
 
       const wrong = screen.getByRole('button', { name: /Ta réponse, incorrecte/ })
       expect(wrong.textContent).toContain('Cusco')
+      expect(classesOf(wrong)).toContain('border-danger')
+      // The right answer stays green even though the user missed it, and it is
+      // NOT dressed as their own pick.
       const right = screen.getByRole('button', { name: /Bonne réponse/ })
       expect(right.textContent).toContain('Lima')
+      expect(classesOf(right)).toContain('border-success')
+      expect(screen.queryByRole('button', { name: /Ta réponse, correcte/ })).toBeNull()
 
       for (const option of screen.getAllByRole('button')) {
         expect((option as HTMLButtonElement).disabled).toBe(true)
@@ -267,10 +278,30 @@ describe('<ReviewCard>', () => {
       expect(onSelect).not.toHaveBeenCalled()
     })
 
+    // The whole point of answering: "I was right" must not render exactly like
+    // "here is the answer" (which is what a Space reveal shows).
+    it('tells the user their own pick was the right one', () => {
+      renderQcm({ revealed: true, selectedChoice: 1 })
+
+      const picked = screen.getByRole('button', { name: /Ta réponse, correcte/ })
+      expect(picked.textContent).toContain('Lima')
+      // The bare "here is the answer" label must NOT be the one used.
+      expect(screen.queryByRole('button', { name: /Bonne réponse/ })).toBeNull()
+      // Green, reinforced — readable at a glance next to the Space-reveal case.
+      const classes = classesOf(picked)
+      expect(classes).toContain('border-success')
+      expect(classes).toContain('bg-success-subtle')
+      expect(classes).toContain('ring-success')
+    })
+
     it('marks only the right answer when revealed without an answer', () => {
       renderQcm({ revealed: true, selectedChoice: null })
       expect(screen.queryByRole('button', { name: /Ta réponse, incorrecte/ })).toBeNull()
-      expect(screen.getByRole('button', { name: /Bonne réponse/ }).textContent).toContain('Lima')
+      expect(screen.queryByRole('button', { name: /Ta réponse, correcte/ })).toBeNull()
+      const right = screen.getByRole('button', { name: /Bonne réponse/ })
+      expect(right.textContent).toContain('Lima')
+      // Green, but without the reinforcement reserved for a right pick.
+      expect(classesOf(right)).not.toContain('ring-success')
     })
 
     it('renders the justification under the structural rule', () => {

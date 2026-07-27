@@ -498,6 +498,7 @@ export const dictEn: Dict = {
     revealed: 'Answer revealed',
     qcmOptionsAria: 'Answer choices',
     qcmCorrect: 'Correct answer',
+    qcmCorrectPicked: 'Your answer, correct',
     qcmWrong: 'Your answer, incorrect',
     saveError: 'Save failed — press again to retry.',
     footerHint: 'Space reveal · 1-4 rate · Esc exit',

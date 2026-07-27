@@ -170,11 +170,19 @@ export function ReviewCard({
  * on a plain `<div>` is dropped by a good part of the screen readers, and the
  * options would then be announced with no idea what they belong to.
  *
- * After the reveal the verdict is readable WITHOUT color — a `sr-only` label on
- * the correct option and on the user's wrong pick, the lucide glyphs being
- * decorative (`aria-hidden`). When the card was revealed with Space instead of
- * being answered, `selectedChoice` is null and only the correct option is
- * marked: nothing is ever painted red that the user did not choose.
+ * After the reveal there are three marked states, not two — "you got it right"
+ * is the answer the user clicked for, and it must not look like a bare "here is
+ * the answer":
+ *   1. the right answer the user actually picked — green, plus a ring;
+ *   2. the right answer they did not pick — plain green;
+ *   3. their wrong pick — red.
+ * Every other option steps back, unmarked.
+ *
+ * The verdict is readable WITHOUT color: each of the three states carries its
+ * own `sr-only` label, the lucide glyphs being decorative (`aria-hidden`) and
+ * the ring being a visual reinforcement only. When the card was revealed with
+ * Space instead of being answered, `selectedChoice` is null, so state 2 applies
+ * and nothing is ever painted red that the user did not choose.
  */
 function QcmOptions({
   options,
@@ -194,6 +202,8 @@ function QcmOptions({
     <div role="group" aria-label={t('session.qcmOptionsAria')} className="mt-5 flex flex-col gap-2">
       {options.map((option, index) => {
         const correct = revealed && index === answerIndex
+        // The right answer the user actually picked: same green, one notch louder.
+        const correctPicked = correct && index === selectedChoice
         const wrong = revealed && index === selectedChoice && index !== answerIndex
         return (
           <button
@@ -210,6 +220,7 @@ function QcmOptions({
               // steps back so the two marked options carry the reading.
               revealed && 'border-border text-text-muted',
               correct && 'border-success bg-success-subtle text-text',
+              correctPicked && 'ring-1 ring-success',
               wrong && 'border-danger bg-danger-subtle text-text',
             )}
           >
@@ -234,7 +245,11 @@ function QcmOptions({
             {wrong && <X aria-hidden className="mt-1.5 size-4 shrink-0 text-danger" />}
             {(correct || wrong) && (
               <span className="sr-only">
-                {correct ? t('session.qcmCorrect') : t('session.qcmWrong')}
+                {correctPicked
+                  ? t('session.qcmCorrectPicked')
+                  : correct
+                    ? t('session.qcmCorrect')
+                    : t('session.qcmWrong')}
               </span>
             )}
           </button>
