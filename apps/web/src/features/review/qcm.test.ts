@@ -133,6 +133,28 @@ const PARSED: readonly ParseCase[] = [
       explanation: 'Siège du gouvernement.',
     },
   ],
+  [
+    'a bare answer letter on its own line, justified underneath',
+    `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
+    'B\n\nSiège du gouvernement depuis 1535.',
+    {
+      question: CAPITAL,
+      options: options('Cusco', 'Lima', 'Arequipa'),
+      answerIndex: 1,
+      explanation: 'Siège du gouvernement depuis 1535.',
+    },
+  ],
+  [
+    'a parenthesised answer letter on its own line, justified underneath',
+    `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
+    '(B)\nSiège du gouvernement.',
+    {
+      question: CAPITAL,
+      options: options('Cusco', 'Lima', 'Arequipa'),
+      answerIndex: 1,
+      explanation: 'Siège du gouvernement.',
+    },
+  ],
 ]
 
 const REJECTED: readonly RejectCase[] = [
@@ -189,6 +211,28 @@ const REJECTED: readonly RejectCase[] = [
   ['a whitespace-only front', '   \n\t\n  ', 'B) Lima.'],
   ['an empty back', `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`, ''],
   ['a whitespace-only back', `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`, '  \n\t '],
+  [
+    // The false positive this module exists to avoid: a space is not a
+    // separator, so this back must NOT be read as "the answer is A".
+    'a back opening on a lone letter followed by prose ("A priori, …")',
+    `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
+    'A priori, on croirait Cusco, mais la capitale est Lima.',
+  ],
+  [
+    'a back whose first word merely starts with an option letter',
+    `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa`,
+    'Oui, c’est Lima.',
+  ],
+  [
+    'five options — E would collide with the session edit shortcut',
+    `${CAPITAL}\n\n- A) Cusco\n- B) Lima\n- C) Arequipa\n- D) Trujillo\n- E) Iquitos`,
+    'B) Siège du gouvernement.',
+  ],
+  [
+    'an option line with no text after its letter',
+    `${CAPITAL}\n\n- A)\n- B) Lima\n- C) Arequipa`,
+    'B) Siège du gouvernement.',
+  ],
 ]
 
 describe('parseQcm — recognised', () => {

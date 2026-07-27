@@ -44,11 +44,24 @@ export interface ParsedQcm {
 const OPTION_LINE = /^[ \t]{0,3}(?:[-*+][ \t]+)?([A-Za-z])[).][ \t]+(.+)$/
 
 /**
- * The answer marker at the head of the back: an optional opening paren, the
- * letter, then a closing paren / dot / colon / whitespace. Anything the marker
- * is made of is dropped from the explanation.
+ * Punctuated answer marker, at the head of the back's first non-blank line: an
+ * optional opening paren, the letter, then `)`, `.` or `:` IMMEDIATELY after it
+ * — this is what the generation prompt emits (`B)`, `B.`, `B :`). The colon may
+ * be preceded by a single space, as French typography requires.
+ *
+ * Whitespace is deliberately NOT a separator of its own: a back such as
+ * "A priori, on croirait Cusco, mais la capitale est Lima." would otherwise be
+ * read as "the answer is A", and the UI would assert a wrong answer. That is
+ * the false positive this module exists to avoid.
  */
-const BACK_ANSWER = /^\s*\(?([A-Za-z])(?=[).:\s]|$)[).:\s]*/
+const BACK_PUNCTUATED_ANSWER = /^\(?([A-Za-z])(?:\)|\.|[ \t]?:)/
+
+/**
+ * Bare answer letter, matched against the back's first non-blank line once
+ * trimmed: the whole line must be the letter, optionally parenthesised (`B`,
+ * `(B)`). Anything else on the line makes it prose, not a marker.
+ */
+const BACK_BARE_ANSWER = /^(?:([A-Za-z])|\(([A-Za-z])\))$/
 
 /** Any code fence anywhere in the front disqualifies the card (see `parseQcm`). */
 const CODE_FENCE = /```|~~~/
@@ -56,14 +69,57 @@ const CODE_FENCE = /```|~~~/
 /** Minimum number of options for the card to be a question and not a list. */
 const MIN_OPTIONS = 2
 
+/**
+ * Maximum number of options. A product constraint, not a parsing one: the
+ * review session maps the keys A to D onto the options, and the next letters
+ * are already taken by its own shortcuts — `E` edits the card, `S` skips it,
+ * `U` undoes the last review (see `lib/keymap.ts`). A 5-option QCM would make
+ * its option `E` collide with card editing. The generation prompt asks for 3 to
+ * 4 options anyway; beyond that, falling back to the Markdown rendering is the
+ * safe behaviour.
+ */
+const MAX_OPTIONS = 4
+
 const LETTER_A = 'A'.charCodeAt(0)
+
+interface BackAnswer {
+  /** The answer letter as authored, not yet uppercased. */
+  letter: string
+  /** Everything the back says beyond the marker, trimmed. */
+  explanation: string
+}
+
+/**
+ * Read the answer marker off the back, or return `null` when the back does not
+ * open with one of the two recognised forms.
+ */
+function parseBackAnswer(back: string): BackAnswer | null {
+  const lines = back.split('\n')
+  const firstIndex = lines.findIndex((line) => line.trim() !== '')
+  if (firstIndex === -1) return null
+
+  const firstLine = (lines[firstIndex] ?? '').trim()
+  const rest = lines.slice(firstIndex + 1)
+
+  const bare = BACK_BARE_ANSWER.exec(firstLine)
+  if (bare !== null) {
+    return { letter: bare[1] ?? bare[2] ?? '', explanation: rest.join('\n').trim() }
+  }
+
+  const punctuated = BACK_PUNCTUATED_ANSWER.exec(firstLine)
+  if (punctuated === null) return null
+  return {
+    letter: punctuated[1] ?? '',
+    explanation: [firstLine.slice(punctuated[0].length), ...rest].join('\n').trim(),
+  }
+}
 
 /**
  * Parse a QCM out of a card's `front`/`back`, or return `null` when the card is
  * not recognisably a QCM.
  *
  * Front — the options block must be the LAST block of the front:
- *  - at least 2 option lines;
+ *  - between 2 and 4 option lines (see `MAX_OPTIONS`);
  *  - their letters, uppercased, must be distinct, consecutive AND start at A
  *    (A, B, C…). `A, B, D` or `B, C` return `null`; this is what keeps an
  *    ordinary bullet list from being mistaken for a question;
@@ -75,10 +131,13 @@ const LETTER_A = 'A'.charCodeAt(0)
  *  - a front containing a code fence returns `null` outright, rather than
  *    risking parsing options out of a code block.
  *
- * Back — the first non-blank line must start with the answer letter:
+ * Back — the first non-blank line must carry the answer letter, in one of two
+ * forms and no other (see `BACK_PUNCTUATED_ANSWER`, `BACK_BARE_ANSWER`):
+ *  - the letter punctuated by `)`, `.` or `:`, optionally parenthesised;
+ *  - the letter alone on that line, optionally parenthesised;
  *  - that letter must be one of the options, otherwise `null`;
- *  - `explanation` is whatever follows the letter marker, trimmed, kept as
- *    authored — including when the model repeats the option text.
+ *  - `explanation` is whatever follows the marker, trimmed, kept as authored —
+ *    including when the model repeats the option text.
  */
 export function parseQcm(front: string, back: string): ParsedQcm | null {
   if (CODE_FENCE.test(front)) return null
@@ -105,7 +164,7 @@ export function parseQcm(front: string, back: string): ParsedQcm | null {
     options.push({ letter: letter.toUpperCase(), text: text.trim() })
   }
 
-  if (options.length < MIN_OPTIONS) return null
+  if (options.length < MIN_OPTIONS || options.length > MAX_OPTIONS) return null
   const consecutiveFromA = options.every(
     (option, index) => option.letter.charCodeAt(0) === LETTER_A + index,
   )
@@ -114,17 +173,11 @@ export function parseQcm(front: string, back: string): ParsedQcm | null {
   const question = lines.slice(0, start).join('\n').trim()
   if (question === '') return null
 
-  const normalisedBack = back.replace(/\r\n?/g, '\n')
-  const answer = BACK_ANSWER.exec(normalisedBack)
+  const answer = parseBackAnswer(back.replace(/\r\n?/g, '\n'))
   if (answer === null) return null
-  const answerLetter = (answer[1] ?? '').toUpperCase()
+  const answerLetter = answer.letter.toUpperCase()
   const answerIndex = options.findIndex((option) => option.letter === answerLetter)
   if (answerIndex === -1) return null
 
-  return {
-    question,
-    options,
-    answerIndex,
-    explanation: normalisedBack.slice(answer[0].length).trim(),
-  }
+  return { question, options, answerIndex, explanation: answer.explanation }
 }
