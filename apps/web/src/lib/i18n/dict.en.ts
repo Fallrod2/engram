@@ -491,6 +491,7 @@ export const dictEn: Dict = {
     exitAria: 'Exit session (Esc)',
     keySpace: 'Space',
     keyEnter: 'Enter',
+    keyEsc: 'Esc',
     revealHint: 'to reveal',
     revealButton: 'Reveal answer',
     revealAria: 'Reveal answer',

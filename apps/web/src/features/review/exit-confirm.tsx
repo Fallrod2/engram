@@ -33,7 +33,7 @@ export function ExitConfirm({ onResume, onQuit }: { onResume: () => void; onQuit
         <div className="mt-5 flex justify-end gap-2">
           <Button autoFocus variant="secondary" onClick={onResume}>
             {t('session.exitResume')}
-            {!coarse && <Kbd className="ml-1">Échap</Kbd>}
+            {!coarse && <Kbd className="ml-1">{t('session.keyEsc')}</Kbd>}
           </Button>
           <Button variant="destructive" onClick={onQuit}>
             {t('session.exitQuit')}

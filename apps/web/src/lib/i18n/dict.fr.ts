@@ -497,6 +497,7 @@ export const dictFr = {
     exitAria: 'Quitter la session (Échap)',
     keySpace: 'Espace',
     keyEnter: 'Entrée',
+    keyEsc: 'Échap',
     revealHint: 'pour révéler',
     revealButton: 'Révéler la réponse',
     revealAria: 'Révéler la réponse',
