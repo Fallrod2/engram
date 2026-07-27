@@ -9,6 +9,8 @@ import {
   reviewCardSchema,
   reviewPreviewSchema,
   reviewResultSchema,
+  undoReviewResponseSchema,
+  undoReviewSchema,
   updateCardSchema,
 } from '@engram/shared'
 import { db } from '../db/client'
@@ -23,7 +25,7 @@ import {
   previewCard,
   updateCard,
 } from '../services/cards.service'
-import { reviewCard, type ReviewInput } from '../services/review.service'
+import { reviewCard, undoReview, type ReviewInput } from '../services/review.service'
 
 export const cardsRouter = new Hono()
 
@@ -100,6 +102,25 @@ cardsRouter.post(
       c,
       reviewResultSchema,
       await reviewCard(db, requireUserId(c), c.req.valid('param').id, input),
+    )
+  },
+)
+
+/**
+ * A POST on the card, not a `DELETE /review-logs/:id`: undoing is a domain
+ * command that MUTATES the card, so the card is the identity resource. The
+ * client never addresses a review log directly — it only echoes back the id it
+ * was handed, as the freshness token that keeps the call idempotent.
+ */
+cardsRouter.post(
+  '/:id/review/undo',
+  zValidator('param', idParamSchema),
+  zValidator('json', undoReviewSchema),
+  async (c) => {
+    return ok(
+      c,
+      undoReviewResponseSchema,
+      await undoReview(db, requireUserId(c), c.req.valid('param').id, c.req.valid('json')),
     )
   },
 )

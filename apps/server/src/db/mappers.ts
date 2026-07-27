@@ -1,6 +1,6 @@
 import type { Card as FsrsCard, ReviewLog as FsrsReviewLog } from 'ts-fsrs'
 import type { InferSelectModel } from 'drizzle-orm'
-import type { card } from './schema'
+import type { card, reviewLog } from './schema'
 
 /**
  * Adapters at the DB ⇄ ts-fsrs boundary. Drizzle FSRS properties are camelCase;
@@ -9,6 +9,7 @@ import type { card } from './schema'
  */
 
 type CardRow = InferSelectModel<typeof card>
+type ReviewLogRow = InferSelectModel<typeof reviewLog>
 
 /** DB row → ts-fsrs `Card` (to feed `fsrs.next` / `fsrs.repeat`). */
 export function toFsrsCard(row: CardRow): FsrsCard {
@@ -39,6 +40,27 @@ export function fsrsCardToColumns(c: FsrsCard) {
     lapses: c.lapses,
     state: c.state,
     lastReview: c.last_review ?? null,
+  }
+}
+
+/**
+ * `review_log` row → ts-fsrs `ReviewLog` (to feed `fsrs.rollback`). Inverse of
+ * `fsrsLogToRow`; the extra `id`/`userId`/`durationMs`/`createdAt` columns are
+ * ours, not FSRS's, and are dropped. `ReviewLog` declares no optional field, so
+ * `exactOptionalPropertyTypes` has nothing to catch here.
+ */
+export function toFsrsLog(row: ReviewLogRow): FsrsReviewLog {
+  return {
+    rating: row.rating as FsrsReviewLog['rating'],
+    state: row.state as FsrsReviewLog['state'],
+    due: row.due,
+    stability: row.stability,
+    difficulty: row.difficulty,
+    elapsed_days: row.elapsedDays,
+    last_elapsed_days: row.lastElapsedDays,
+    scheduled_days: row.scheduledDays,
+    learning_steps: row.learningSteps,
+    review: row.review,
   }
 }
 

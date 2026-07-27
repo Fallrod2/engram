@@ -20,6 +20,19 @@ import { card } from './card'
  * `rating` check allows 0 (Rating.Manual): that is the physical enum bound,
  * kept future-proof. The 1..4 business guarantee is enforced at the API edge
  * by `reviewCardSchema`. `duration_ms` NULL means "not measured" (≠ 0).
+ *
+ * APPEND-ONLY — ONE EXCEPTION: `undoReview` (see `review.service.ts`) HARD
+ * DELETES the row it is compensating. It is never updated, never flagged.
+ * Rationale: (1) five analytics aggregations plus `admin.service.ts` and
+ * `backup.service.ts` scan this table; an `undone_at` flag would need a
+ * predicate in each, and a single omission silently inflates heatmap, streak,
+ * study time and retention — a delete is correct everywhere by construction.
+ * (2) These rows are the raw material of a future FSRS parameter optimisation,
+ * where a review annotated "ignore me" is poison: the row we want is the one
+ * that never existed. The invariant holds in spirit because the mutation is
+ * fenced: only the LAST log of the card, matched by id against the one the
+ * client was handed, graded 1..4, inside `UNDO_WINDOW_MS`, and only inside the
+ * same transaction that restores the card via `fsrs.rollback`.
  */
 export const reviewLog = pgTable(
   'review_log',

@@ -1,12 +1,12 @@
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import type { FSRS } from 'ts-fsrs'
-import type { ReviewResult } from '@engram/shared'
+import type { ReviewResult, UndoReview, UndoReviewResponse } from '@engram/shared'
 import type { DB } from '../db/client'
 import { card, reviewLog } from '../db/schema'
-import { toFsrsCard, fsrsCardToColumns, fsrsLogToRow } from '../db/mappers'
+import { toFsrsCard, toFsrsLog, fsrsCardToColumns, fsrsLogToRow } from '../db/mappers'
 import { cardToDto, reviewLogToDto } from '../db/dto'
 import { schedule, toGrade, scheduler } from './fsrs'
-import { NotFoundError, ValidationError } from '../http/errors'
+import { ConflictError, NotFoundError, ValidationError } from '../http/errors'
 
 const FUTURE_SKEW_MS = 60_000
 
@@ -63,5 +63,67 @@ export async function reviewCard(
     const [updatedCard] = await tx.select().from(card).where(eq(card.id, cardId))
     if (!updatedCard) throw new NotFoundError(`card ${cardId} not found`)
     return { card: cardToDto(updatedCard), log: reviewLogToDto(insertedLog!) }
+  })
+}
+
+/** A typo is fixed within the minute, not the next day. Bounds the undo to the
+ *  current sitting and freezes the analytics beyond it. */
+export const UNDO_WINDOW_MS = 10 * 60_000
+
+/**
+ * Undo the LAST review of a card: `fsrs.rollback` restores the pre-review FSRS
+ * state (never reimplemented by hand) and the compensated `review_log` row is
+ * hard-deleted — see the append-only exception documented on the table.
+ *
+ * `rollback` re-consumes the log symmetrically with `buildLog`, which recorded
+ * the state BEFORE the review. That is only sound for the CURRENT card paired
+ * with its OWN last log; any other pairing corrupts `reps`/`lapses`. Hence the
+ * guard is structural, not a comment: the log is re-read as the last one inside
+ * the transaction AND its id must match the one the client was handed. Every
+ * `throw` rolls the transaction back — no half-undone card, no orphan log.
+ */
+export async function undoReview(
+  db: DB,
+  userId: string,
+  cardId: string,
+  input: UndoReview,
+  sched: FSRS = scheduler,
+  now: Date = new Date(),
+): Promise<UndoReviewResponse> {
+  return db.transaction(async (tx) => {
+    // Scoped SELECT: a card owned by another user reads as 404 (never a 403).
+    const [row] = await tx
+      .select()
+      .from(card)
+      .where(and(eq(card.id, cardId), eq(card.userId, userId)))
+    if (!row) throw new NotFoundError(`card ${cardId} not found`)
+
+    const [log] = await tx
+      .select()
+      .from(reviewLog)
+      .where(and(eq(reviewLog.cardId, cardId), eq(reviewLog.userId, userId)))
+      .orderBy(desc(reviewLog.review), desc(reviewLog.createdAt))
+      .limit(1)
+    if (!log) throw new ConflictError(`card ${cardId} has no review to undo`)
+
+    // The structural guard. A stale id means another review landed in between,
+    // or this undo already ran — either way the pairing would be unsound.
+    if (log.id !== input.logId) {
+      throw new ConflictError(`review log ${input.logId} is no longer the last review of the card`)
+    }
+    // Rating.Manual (0) never comes from a session; rollback throws an unmapped
+    // FSRSValidationError on it, so reject it here as a plain conflict.
+    if (log.rating === 0) throw new ConflictError('a manual rating cannot be undone')
+    if (now.getTime() - log.review.getTime() > UNDO_WINDOW_MS) {
+      throw new ConflictError('the undo window for this review has expired')
+    }
+
+    const restored = sched.rollback(toFsrsCard(row), toFsrsLog(log))
+    await tx.update(card).set(fsrsCardToColumns(restored)).where(eq(card.id, cardId))
+    await tx.delete(reviewLog).where(eq(reviewLog.id, log.id))
+
+    const [updatedCard] = await tx.select().from(card).where(eq(card.id, cardId))
+    if (!updatedCard) throw new NotFoundError(`card ${cardId} not found`)
+    return { card: cardToDto(updatedCard), undoneLogId: log.id }
   })
 }

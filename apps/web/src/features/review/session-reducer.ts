@@ -20,6 +20,20 @@ export interface RatingResult {
   durationMs: number
 }
 
+/**
+ * The single rating `U` can still unwind. Captured on RATE_OK and dropped by any
+ * action that moves past a card without grading it, so undo only ever reverses
+ * the action IMMEDIATELY preceding it.
+ */
+export interface UndoTarget {
+  cardId: string
+  /** `review_log.id` of the graded review — the server's idempotency handle. */
+  logId: string
+  grade: Grade
+  /** Index of the RATED card (pre-`advance`) — where UNDO_OK rewinds to. */
+  index: number
+}
+
 export interface SessionState {
   phase: Phase
   cards: Card[]
@@ -34,6 +48,8 @@ export interface SessionState {
   paused: boolean
   /** Exit-confirm dialog open (spec §3.6). Orthogonal to `phase`. */
   confirmingExit: boolean
+  /** Card-edit dialog open (E). Orthogonal to `phase`; freezes the card clock. */
+  editing: boolean
   /** Terminal flag — the hook navigates to the origin when this flips true. */
   exited: boolean
   /** A transient review POST failed; the card stays revealed for a retry. */
@@ -41,6 +57,10 @@ export interface SessionState {
   /** Grade + duration captured on RATE, applied on RATE_OK. */
   pendingGrade: Grade | null
   pendingDurationMs: number
+  /** The one rating still undoable (`U`), or null when there is nothing to undo. */
+  lastReview: UndoTarget | null
+  /** An undo POST is in flight — the affordance is disabled until it settles. */
+  undoing: boolean
 }
 
 export type Action =
@@ -49,15 +69,22 @@ export type Action =
   | { type: 'RETRY' }
   | { type: 'REVEAL' }
   | { type: 'RATE'; grade: Grade; durationMs: number }
-  | { type: 'RATE_OK' }
+  | { type: 'RATE_OK'; logId: string }
   | { type: 'RATE_FAIL' }
   | { type: 'RATE_SKIP' }
+  | { type: 'SKIP_CARD' }
+  | { type: 'UNDO' }
+  | { type: 'UNDO_OK' }
+  | { type: 'UNDO_FAIL' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'REQUEST_EXIT' }
   | { type: 'CONFIRM_EXIT' }
   | { type: 'CANCEL_EXIT' }
   | { type: 'REVIEW_AGAIN'; sessionNow: string }
+  | { type: 'OPEN_EDIT' }
+  | { type: 'CLOSE_EDIT' }
+  | { type: 'CARD_EDITED'; cardId: string; front: string; back: string }
 
 /** A fresh session state at `LOADING` for the given frozen `now`. */
 export function initialState(sessionNow: string): SessionState {
@@ -70,10 +97,13 @@ export function initialState(sessionNow: string): SessionState {
     sessionNow,
     paused: false,
     confirmingExit: false,
+    editing: false,
     exited: false,
     submitError: false,
     pendingGrade: null,
     pendingDurationMs: 0,
+    lastReview: null,
+    undoing: false,
   }
 }
 
@@ -82,7 +112,14 @@ export function reviewedCount(state: SessionState): number {
   return state.results.length
 }
 
-/** Advance past the current card; SUMMARY once every card is consumed. */
+/**
+ * Advance past the current card; SUMMARY once every card is consumed.
+ *
+ * `lastReview` is CLEARED here: moving on is itself an action, and `U` may only
+ * reverse the one immediately before it — undoing a rating "through" a skip
+ * would silently rewind the session two cards back. RATE_OK, the only transition
+ * that produces an undo target, re-arms it right after this call.
+ */
 function advance(state: SessionState, results: RatingResult[]): SessionState {
   const index = state.index + 1
   return {
@@ -92,6 +129,7 @@ function advance(state: SessionState, results: RatingResult[]): SessionState {
     pendingGrade: null,
     pendingDurationMs: 0,
     submitError: false,
+    lastReview: null,
     phase: index >= state.cards.length ? 'SUMMARY' : 'ASKING',
   }
 }
@@ -124,6 +162,13 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       // per card, the guard that makes "await the ack" safe on a non-idempotent
       // endpoint.
       if (state.phase !== 'REVEALED') return state
+      // Refused while an undo is in flight, the mirror of the `inFlightRef` test
+      // `undo()` already makes: a pending UNDO_OK is going to rewind the cursor
+      // to `lastReview.index` and drop the LAST entry of `results`. Consuming the
+      // current card meanwhile re-arms `lastReview` on it (RATE_OK), so the undo
+      // would rewind onto the wrong card and unwind the wrong result — while the
+      // server has unwound the original one.
+      if (state.undoing) return state
       return {
         ...state,
         phase: 'SUBMITTING',
@@ -136,11 +181,21 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       if (state.phase !== 'SUBMITTING') return state
       const current = state.cards[state.index]
       if (!current || state.pendingGrade === null) return state
+      const grade = state.pendingGrade
       const results = [
         ...state.results,
-        { cardId: current.id, grade: state.pendingGrade, durationMs: state.pendingDurationMs },
+        { cardId: current.id, grade, durationMs: state.pendingDurationMs },
       ]
-      return advance(state, results)
+      // The undo target is captured BEFORE `advance` moves the cursor: `index`
+      // is the position of the card just rated, i.e. exactly where UNDO_OK has
+      // to put the session back. Re-armed after `advance`, which clears it.
+      const lastReview: UndoTarget = {
+        cardId: current.id,
+        logId: action.logId,
+        grade,
+        index: state.index,
+      }
+      return { ...advance(state, results), lastReview }
     }
 
     case 'RATE_SKIP':
@@ -148,6 +203,67 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       // result: a deleted card is never counted in the summary.
       if (state.phase !== 'SUBMITTING') return state
       return advance(state, state.results)
+
+    case 'SKIP_CARD':
+      // The user drops the current card (S / the "Passer" button). Client-side
+      // only, session-scoped: nothing is written anywhere — no review is POSTed,
+      // so the card keeps its past `due`, still counts in the due counts and
+      // comes back in the next session. Deliberately NOT a server-side bury
+      // (`due = now + 1d`): that would make a second writer of the FSRS columns
+      // outside the scheduler, the very invariant the API protects.
+      // It shares `advance(state, state.results)` with RATE_SKIP, which already
+      // means exactly "move on WITHOUT recording a result": `total` is untouched
+      // and the summary only ever counts graded cards.
+      // Accepted from ASKING and REVEALED only — never from SUBMITTING, where a
+      // review is already in flight for this card and its ack must land first.
+      // Skipping also DROPS the undo target (see `advance`): after an S, `U`
+      // must not reach back over it to unwind the rating before the skip.
+      if (state.phase !== 'ASKING' && state.phase !== 'REVEALED') return state
+      // Refused while an undo is in flight, same exclusion as RATE: both consume
+      // the cursor through `advance`, which CLEARS `lastReview`. A skip slipped in
+      // before the ack would turn the pending UNDO_OK into a silent no-op even
+      // though the server really did unwind the review — the result stays in
+      // `results` and the summary over-counts.
+      if (state.undoing) return state
+      return advance(state, state.results)
+
+    case 'UNDO':
+      // Accepted mid-session (ASKING / REVEALED) and from SUMMARY — a rating
+      // that ended the session is exactly the one most worth taking back.
+      // Refused from SUBMITTING: a review is already in flight, and undoing the
+      // PREVIOUS one while the next is being written would race two mutations of
+      // the same FSRS row. `undoing` makes a second U a no-op.
+      if (state.phase !== 'ASKING' && state.phase !== 'REVEALED' && state.phase !== 'SUMMARY') {
+        return state
+      }
+      if (!state.lastReview || state.undoing) return state
+      return { ...state, undoing: true }
+
+    case 'UNDO_OK': {
+      // The server unwound the log: rewind to the rated card and drop its result.
+      // We land on REVEALED, not ASKING — the user has already seen the answer,
+      // so asking them to "guess again" would be theatre; what they came back
+      // for is to RE-RATE (Anki's behaviour).
+      const target = state.lastReview
+      if (!target) return state
+      return {
+        ...state,
+        phase: 'REVEALED',
+        index: target.index,
+        results: state.results.slice(0, -1),
+        lastReview: null,
+        undoing: false,
+        submitError: false,
+        pendingGrade: null,
+        pendingDurationMs: 0,
+      }
+    }
+
+    case 'UNDO_FAIL':
+      // The server refused (409 — stale log, already undone, outside its
+      // window). That is DEFINITIVE, never transient: the target is dropped so
+      // the affordance disappears instead of inviting a retry that cannot work.
+      return { ...state, undoing: false, lastReview: null }
 
     case 'RATE_FAIL':
       // Transient failure — stay on the card, re-enable the buttons for a retry.
@@ -176,7 +292,45 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
     case 'REVIEW_AGAIN':
       // Fresh lot, same scope (scope is a hook concern, not held here).
       if (state.phase !== 'SUMMARY') return state
+      // Refused while an undo is in flight, third face of the same invariant as
+      // RATE and SKIP_CARD: a restart throws the whole state away, `lastReview`
+      // included, so the pending ack lands on a session that no longer holds the
+      // target it was fired for — UNDO_OK degrades to a silent no-op while the
+      // server really did unwind the review, and the mutation's `onSuccess`
+      // reseeds the card clock of the card the NEW lot has just started.
+      if (state.undoing) return state
       return initialState(action.sessionNow)
+
+    case 'OPEN_EDIT':
+      // Only where a card is actually on screen and no review is in flight —
+      // same window as SKIP_CARD (ASKING / REVEALED), never from SUBMITTING.
+      if (state.phase !== 'ASKING' && state.phase !== 'REVEALED') return state
+      // Refused while an undo is in flight: UNDO_OK moves `index` back to
+      // `lastReview.index` and deliberately does NOT touch `editing`, so an
+      // already-open dialog would follow the cursor — it renders `cards[index]`
+      // and re-seeds its fields on every card identity change. The undo would
+      // overwrite the text being typed with the rewound card's content, and a
+      // save would then write onto THAT card (`submitEdit` re-reads
+      // `cards[index]` at submit time), not the one being corrected.
+      if (state.undoing) return state
+      return { ...state, editing: true }
+
+    case 'CLOSE_EDIT':
+      if (!state.editing) return state
+      return { ...state, editing: false }
+
+    case 'CARD_EDITED': {
+      // Patch the array the session actually RENDERS. The queue is frozen
+      // (`staleTime: Infinity`), so no refetch will ever bring the new text in:
+      // this write is what refreshes the screen. Only `front`/`back` move — the
+      // spread carries `fsrs` over BY REFERENCE, so an edit can never be
+      // mistaken for a scheduling event.
+      if (!state.cards.some((c) => c.id === action.cardId)) return state
+      const cards = state.cards.map((c) =>
+        c.id === action.cardId ? { ...c, front: action.front, back: action.back } : c,
+      )
+      return { ...state, cards }
+    }
 
     default:
       return state

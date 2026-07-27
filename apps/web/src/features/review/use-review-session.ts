@@ -3,9 +3,10 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useReducedMotion } from 'motion/react'
 import { toast } from 'sonner'
-import type { Card, ReviewPreview } from '@engram/shared'
-import { ApiError, postReview, type ReviewScope } from '@/lib/api'
+import type { Card, ReviewPreview, ReviewQueueResponse } from '@engram/shared'
+import { ApiError, postReview, postUndoReview, updateCard, type ReviewScope } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { isEditableTarget, isModalSurfaceOpen } from '@/lib/use-hotkeys'
 import {
   initialState,
   sessionReducer,
@@ -17,6 +18,7 @@ import { useT } from '@/lib/i18n'
 import { createCardTimer, IDLE_MS, type CardTimer } from './session-timer'
 import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
+import { remainingByState, type RemainingByState } from './queue-stats'
 
 export interface SessionApi {
   phase: Phase
@@ -29,14 +31,32 @@ export interface SessionApi {
   preview: ReviewPreview | undefined
   progress: { done: number; total: number }
   counts: Record<Grade, number>
+  /** FSRS breakdown of the cards still ahead (current card included). */
+  remaining: RemainingByState
   paused: boolean
   confirmingExit: boolean
+  /** Card-edit dialog open (E) — the card clock is frozen while it is. */
+  editing: boolean
   flashGrade: Grade | null
+  /** True while the last rating can still be taken back (U). */
+  canUndo: boolean
+  /** An undo POST is in flight — the affordance stays visible but disabled. */
+  undoing: boolean
   summary: SessionSummary | undefined
   canReviewAgain: boolean
   reduce: boolean
   reveal: () => void
   rate: (grade: Grade) => void
+  /** Drop the current card without rating it (client-side, session-scoped). */
+  skip: () => void
+  /** Take back the last rating (U) — server-side unwind, then rewind the session. */
+  undo: () => void
+  /** Open the card-edit dialog on the current card (E). */
+  openEdit: () => void
+  /** Close the card-edit dialog without saving. */
+  closeEdit: () => void
+  /** Persist an edit of the current card's content (never its FSRS state). */
+  submitEdit: (values: { front: string; back: string }) => void
   requestExit: () => void
   confirmExit: () => void
   cancelExit: () => void
@@ -82,6 +102,8 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   // card. The reducer's SUBMITTING guard alone can't stop this: the network
   // call is not gated by post-dispatch state, so it would escape the safeguard.
   const inFlightRef = useRef(false)
+  /** Same synchronous guard, for the undo POST (see `undo()`). */
+  const undoInFlightRef = useRef(false)
   const invalidatedRef = useRef(false)
   const flashTimeoutRef = useRef<number | null>(null)
 
@@ -123,12 +145,21 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     }
   }, [state.phase, state.index, state.cards, state.sessionNow, previewNowByCard, queryClient])
 
+  /**
+   * Re-key one card's preview at the real `now`, which forces a refetch instead
+   * of serving intervals computed against a state that has moved (a long pause,
+   * or an undo that just rewound the card's FSRS row).
+   */
+  const bumpPreviewFor = useCallback((cardId: string) => {
+    setPreviewNowByCard((m) => ({ ...m, [cardId]: new Date().toISOString() }))
+  }, [])
+
   const bumpCurrentPreview = useCallback(() => {
     const s = stateRef.current
     const c = s.cards[s.index]
     if (!c) return
-    setPreviewNowByCard((m) => ({ ...m, [c.id]: new Date().toISOString() }))
-  }, [])
+    bumpPreviewFor(c.id)
+  }, [bumpPreviewFor])
 
   // --- Per-card active-time timer ------------------------------------------
   // A fresh timer per card, seeded from the machine's CURRENT pause (finding
@@ -138,16 +169,23 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     timerRef.current = createCardTimer(state.paused)
   }, [state.phase, state.index])
 
+  // Two independent reasons to freeze the card clock, one effect so a pause
+  // always wins over a resume: the tab being hidden, and the edit dialog being
+  // open — time spent fixing a typo is not recall time. Closing the dialog on a
+  // hidden tab therefore does NOT restart the clock.
   useEffect(() => {
     const t = timerRef.current
     if (!t) return
-    if (state.paused) t.pause()
+    if (state.paused || state.editing) t.pause()
     else t.resume()
-  }, [state.paused])
+  }, [state.paused, state.editing])
 
   // --- Idle (mechanism A): silent stop, no overlay, auto-resume ------------
+  // Disarmed while editing: the dialog owns the keyboard, so its keystrokes are
+  // not presence signals for the *card* — and a `resume()` from here would
+  // undo the freeze the edit dialog just installed.
   useEffect(() => {
-    if (!isFlowPhase(state.phase) || state.paused) return
+    if (!isFlowPhase(state.phase) || state.paused || state.editing) return
     let idlePaused = false
     let timeout = window.setTimeout(onIdle, IDLE_MS)
     function onIdle() {
@@ -169,7 +207,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
       window.clearTimeout(timeout)
       for (const e of events) window.removeEventListener(e, onActivity)
     }
-  }, [state.phase, state.index, state.paused, bumpCurrentPreview])
+  }, [state.phase, state.index, state.paused, state.editing, bumpCurrentPreview])
 
   // --- Visibility (mechanism B): explicit pause + overlay ------------------
   useEffect(() => {
@@ -185,7 +223,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   const reviewMut = useMutation({
     mutationFn: (vars: { cardId: string; grade: Grade; durationMs: number }) =>
       postReview(vars.cardId, { grade: vars.grade, durationMs: vars.durationMs }),
-    onSuccess: () => dispatch({ type: 'RATE_OK' }),
+    // `log.id` is the handle the undo needs — the server only unwinds a review
+    // while its log is still the card's last one.
+    onSuccess: (data) => dispatch({ type: 'RATE_OK', logId: data.log.id }),
     onError: (err) => {
       if (err instanceof ApiError && err.status === 404) {
         // The card vanished (deleted in parallel) — skip without counting.
@@ -218,7 +258,10 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     // `phase: REVEALED`, so the phase check alone can't stop a double submit.
     // This synchronous ref does — it flips to true before the first call ever
     // returns and is only cleared when the mutation settles (see onSettled).
-    if (inFlightRef.current) return
+    // `undoInFlightRef` is the same test in the other direction, symmetric to the
+    // one `undo()` already makes on `inFlightRef`: an undo about to rewind the
+    // cursor must not have this card consumed under it.
+    if (undoInFlightRef.current || inFlightRef.current) return
     const card = s.cards[s.index]
     if (!card) return
     inFlightRef.current = true
@@ -230,6 +273,184 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     dispatch({ type: 'RATE', grade, durationMs })
     mutateRef.current({ cardId: card.id, grade, durationMs })
   }, [])
+
+  const skip = useCallback(() => {
+    const s = stateRef.current
+    if (s.phase !== 'ASKING' && s.phase !== 'REVEALED') return
+    // Same mutual exclusion as in `rate()`: a skip also consumes the cursor, and
+    // `stateRef` only refreshes on render, so a U and an S in one tick would both
+    // read `undoing: false` and let the session move under the pending undo.
+    if (undoInFlightRef.current) return
+    // No POST, no `inFlightRef`, nothing read off the timer: a skipped card
+    // produces no `RatingResult`, so its duration is never needed. The next
+    // card gets a fresh `createCardTimer` from the same effect that serves a
+    // rating — it is keyed on `[state.phase, state.index]`, and SKIP_CARD
+    // always lands on ASKING at `index + 1` (or on SUMMARY, where there is no
+    // card left to time).
+    dispatch({ type: 'SKIP_CARD' })
+  }, [])
+
+  // --- Aggregate cache invalidations ---------------------------------------
+  /**
+   * Refresh every cache that holds a DERIVED view of the review data: the due
+   * counts, the subject/deck/card rows that carry them, the study plan (a card's
+   * `due` moved) and the analytics built on `review_log`. Declared here because
+   * both writers below need it — the end of a session (§13.3) and an undo, which
+   * rewinds a card's FSRS state and deletes its log row on the server.
+   */
+  const invalidateAggregates = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: qk.dueCounts.all })
+    void queryClient.invalidateQueries({ queryKey: qk.subjects.all })
+    void queryClient.invalidateQueries({ queryKey: qk.decks.all })
+    void queryClient.invalidateQueries({ queryKey: qk.cards.all })
+    // Graded cards shift their `due` → the study-plan load and "today" suggestion
+    // rebalance in real time (Phase 4 §1.4).
+    void queryClient.invalidateQueries({ queryKey: qk.planning.all })
+    // Each review is a row in `review_log` — the raw material of every analytic.
+    // A finished session refreshes tiles + heatmap + graphs (Phase 5 §1.6).
+    void queryClient.invalidateQueries({ queryKey: qk.analytics.all })
+  }, [queryClient])
+
+  // --- Undo the last rating (U) --------------------------------------------
+  const undoMut = useMutation({
+    mutationFn: (vars: { cardId: string; logId: string }) =>
+      postUndoReview(vars.cardId, { logId: vars.logId }),
+    onSuccess: (_data, vars) => {
+      dispatch({ type: 'UNDO_OK' })
+      // The cached intervals of that card were computed from an FSRS state the
+      // server has just thrown away — they describe a card that no longer
+      // exists, so they are removed rather than left to be served stale.
+      queryClient.removeQueries({ queryKey: qk.review.previewsFor(vars.cardId) })
+      // …and a NEW `now` for it, so the refetch is keyed on the real instant of
+      // the undo instead of resurrecting the entry we just dropped.
+      bumpPreviewFor(vars.cardId)
+      // The card is being re-presented: it deserves a clock of its own, seeded
+      // from the machine's current pause. The `[phase, index]` timer effect
+      // cannot do it — UNDO_OK lands on REVEALED, which that effect ignores.
+      timerRef.current = createCardTimer(stateRef.current.paused)
+      // An undo from SUMMARY resurrects the session, so the end-of-session
+      // invalidation batch must be re-armed to fire again when it really ends.
+      invalidatedRef.current = false
+      // Unconditional, and NOT the same thing as re-arming above: the server has
+      // already rewound the card and dropped its `review_log` row, so every
+      // aggregate is stale right now. Leaving it to the next `endSession()`
+      // would lose the refresh entirely when the resurrected session is left
+      // without a new rating (`results.length === 0` sends it home early).
+      invalidateAggregates()
+      toast(t('toasts.reviewUndone'))
+    },
+    onError: () => {
+      // Every refusal is a 409 and every 409 is final — no retry action here.
+      dispatch({ type: 'UNDO_FAIL' })
+      toast.error(t('toasts.reviewUndoError'))
+    },
+    onSettled: () => {
+      undoInFlightRef.current = false
+    },
+  })
+  const undoMutateRef = useRef(undoMut.mutate)
+  undoMutateRef.current = undoMut.mutate
+
+  const undo = useCallback(() => {
+    const s = stateRef.current
+    if (s.phase !== 'ASKING' && s.phase !== 'REVEALED' && s.phase !== 'SUMMARY') return
+    if (!s.lastReview || s.undoing) return
+    // Same reasoning as `inFlightRef` in `rate()`: `stateRef` only refreshes on
+    // render, so two U keydowns in one tick both read `undoing: false`. This
+    // synchronous ref is what keeps the POST count at one.
+    if (undoInFlightRef.current || inFlightRef.current) return
+    undoInFlightRef.current = true
+    const { cardId, logId } = s.lastReview
+    dispatch({ type: 'UNDO' })
+    undoMutateRef.current({ cardId, logId })
+  }, [])
+
+  // --- Card edit (E) -------------------------------------------------------
+  /**
+   * Second half of the double write: the frozen queue in the cache. Its entry
+   * is never refetched (`staleTime: Infinity`, `gcTime: 0`), so without this a
+   * REVIEW_AGAIN — a new `sessionNow`, hence a new key seeded from the server —
+   * or a remount would resurrect the stale text. Only `front`/`back` of the one
+   * card move; `now`, `total` and every other card are carried over untouched.
+   */
+  const patchQueueCache = useCallback(
+    (cardId: string, front: string, back: string) => {
+      const key = qk.review.queue({ ...scope, now: stateRef.current.sessionNow })
+      queryClient.setQueryData<ReviewQueueResponse>(key, (old) =>
+        old
+          ? {
+              ...old,
+              cards: old.cards.map((c) => (c.id === cardId ? { ...c, front, back } : c)),
+            }
+          : old,
+      )
+    },
+    [queryClient, scope],
+  )
+
+  const editMut = useMutation({
+    mutationFn: (vars: {
+      cardId: string
+      deckId: string
+      front: string
+      back: string
+      prevFront: string
+      prevBack: string
+    }) => updateCard(vars.cardId, { front: vars.front, back: vars.back }),
+    // The pre-edit text travels as the mutation's context — the only copy left
+    // once the optimistic write has overwritten both the reducer and the cache.
+    onMutate: (vars) => ({ front: vars.prevFront, back: vars.prevBack }),
+    onError: (_err, vars, ctx) => {
+      if (ctx) {
+        dispatch({ type: 'CARD_EDITED', cardId: vars.cardId, front: ctx.front, back: ctx.back })
+        patchQueueCache(vars.cardId, ctx.front, ctx.back)
+      }
+      toast.error(t('toasts.cardUpdateError'))
+    },
+    onSettled: (_data, _err, vars) => {
+      // The deck's card list holds the same rows; `cards.all` covers every other
+      // reader (detail, counts) without enumerating them.
+      void queryClient.invalidateQueries({ queryKey: qk.cards.listByDeck(vars.deckId) })
+      void queryClient.invalidateQueries({ queryKey: qk.cards.all })
+    },
+  })
+  const editMutateRef = useRef(editMut.mutate)
+  editMutateRef.current = editMut.mutate
+
+  const openEdit = useCallback(() => {
+    // Same synchronous exclusion as in `rate()` and `skip()`, for the same
+    // reason: `stateRef` only refreshes on render, so a U and an E landing in
+    // one tick would both read `undoing: false` and open a dialog the pending
+    // UNDO_OK is about to move the card out from under (it rewinds `index`,
+    // and the editor re-seeds its fields on every card change).
+    if (undoInFlightRef.current) return
+    dispatch({ type: 'OPEN_EDIT' })
+  }, [])
+  const closeEdit = useCallback(() => dispatch({ type: 'CLOSE_EDIT' }), [])
+
+  const submitEdit = useCallback(
+    (values: { front: string; back: string }) => {
+      const s = stateRef.current
+      const card = s.cards[s.index]
+      if (!card) return
+      const front = values.front.trim()
+      const back = values.back.trim()
+      if (front === card.front && back === card.back) return
+      // Optimistic, in the order that matters: the rendered array first (that is
+      // what the user sees), then the frozen queue behind it.
+      dispatch({ type: 'CARD_EDITED', cardId: card.id, front, back })
+      patchQueueCache(card.id, front, back)
+      editMutateRef.current({
+        cardId: card.id,
+        deckId: card.deckId,
+        front,
+        back,
+        prevFront: card.front,
+        prevBack: card.back,
+      })
+    },
+    [patchQueueCache],
+  )
 
   const retryRef = useRef<() => void>(() => {})
   retryRef.current = () => {
@@ -257,6 +478,11 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   }, [queue])
 
   const reviewAgain = useCallback(() => {
+    // Before anything else, so a refused restart leaves no trace: the two lines
+    // below are the new lot's bookkeeping, and clearing them for a REVIEW_AGAIN
+    // the reducer is going to drop would disarm the end-of-session batch and
+    // the per-card preview `now`s of the session that is still running.
+    if (undoInFlightRef.current) return
     invalidatedRef.current = false
     setPreviewNowByCard({})
     dispatch({ type: 'REVIEW_AGAIN', sessionNow: new Date().toISOString() })
@@ -267,17 +493,8 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     if (invalidatedRef.current) return
     if (stateRef.current.results.length === 0) return
     invalidatedRef.current = true
-    void queryClient.invalidateQueries({ queryKey: qk.dueCounts.all })
-    void queryClient.invalidateQueries({ queryKey: qk.subjects.all })
-    void queryClient.invalidateQueries({ queryKey: qk.decks.all })
-    void queryClient.invalidateQueries({ queryKey: qk.cards.all })
-    // Graded cards shift their `due` → the study-plan load and "today" suggestion
-    // rebalance in real time (Phase 4 §1.4).
-    void queryClient.invalidateQueries({ queryKey: qk.planning.all })
-    // Each review is a row in `review_log` — the raw material of every analytic.
-    // A finished session refreshes tiles + heatmap + graphs (Phase 5 §1.6).
-    void queryClient.invalidateQueries({ queryKey: qk.analytics.all })
-  }, [queryClient])
+    invalidateAggregates()
+  }, [invalidateAggregates])
 
   useEffect(() => {
     if (state.phase === 'SUMMARY') endSession()
@@ -307,6 +524,11 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   // --- Global keyboard router (spec §3.8, §11.4) ---------------------------
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Precedence 0: a text field or an open Radix modal surface owns the
+      // keyboard. Without this, typing "3" in the edit dialog's textarea would
+      // rate the card behind it. Returning early also leaves Escape untouched,
+      // so Radix keeps closing its own dialog.
+      if (isEditableTarget(e.target) || isModalSurfaceOpen()) return
       if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return
       const s = stateRef.current
 
@@ -317,6 +539,14 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
         resume()
         return
       }
+
+      // A session shortcut is a BARE key. Anything with a modifier belongs to the
+      // browser or the OS (Cmd+S, Cmd+R, Cmd+Q…) and must pass through untouched —
+      // intercepting it would both steal the command and fire an action nobody asked
+      // for. The `paused` branch above keeps its own copy of this test on purpose:
+      // there, ANY bare key resumes, so the filter has to run before that catch-all.
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+
       // Precedence 2: exit-confirm dialog.
       if (s.confirmingExit) {
         if (e.key === 'Escape' || e.key === 'Enter') {
@@ -334,6 +564,15 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault()
             reveal()
+          } else if (e.key.toLowerCase() === 's') {
+            e.preventDefault()
+            skip()
+          } else if (e.key.toLowerCase() === 'e') {
+            e.preventDefault()
+            openEdit()
+          } else if (e.key.toLowerCase() === 'u') {
+            e.preventDefault()
+            undo()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
@@ -343,6 +582,15 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           if (e.key >= '1' && e.key <= '4') {
             e.preventDefault()
             rate(Number(e.key) as Grade)
+          } else if (e.key.toLowerCase() === 's') {
+            e.preventDefault()
+            skip()
+          } else if (e.key.toLowerCase() === 'e') {
+            e.preventDefault()
+            openEdit()
+          } else if (e.key.toLowerCase() === 'u') {
+            e.preventDefault()
+            undo()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
@@ -361,6 +609,11 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           } else if (e.key.toLowerCase() === 'r') {
             e.preventDefault()
             reviewAgain()
+          } else if (e.key.toLowerCase() === 'u') {
+            // The rating that ENDED the session is the one most worth taking
+            // back: U resurrects it here, not only mid-flow.
+            e.preventDefault()
+            undo()
           }
           break
         case 'LOADING':
@@ -375,7 +628,18 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [reveal, rate, requestExit, confirmExit, cancelExit, resume, reviewAgain])
+  }, [
+    reveal,
+    rate,
+    skip,
+    undo,
+    openEdit,
+    requestExit,
+    confirmExit,
+    cancelExit,
+    resume,
+    reviewAgain,
+  ])
 
   // Clear the pending flash timeout on unmount.
   useEffect(() => {
@@ -402,10 +666,23 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     return c
   }, [state.results])
 
+  const remaining = useMemo(
+    () => remainingByState(state.cards, state.index),
+    [state.cards, state.index],
+  )
+
   const summary = useMemo(
     () => (state.phase === 'SUMMARY' ? computeSummary(state.results) : undefined),
     [state.phase, state.results],
   )
+
+  // Mirrors the reducer's UNDO guard exactly, so the affordance is only ever
+  // offered where the action would actually be accepted. Excluding SUBMITTING is
+  // how "nothing in flight" is expressed in reactive state.
+  const canUndo =
+    (state.phase === 'ASKING' || state.phase === 'REVEALED' || state.phase === 'SUMMARY') &&
+    state.lastReview !== null &&
+    !state.undoing
 
   return {
     phase: state.phase,
@@ -417,14 +694,23 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     preview: previewQuery.data,
     progress: { done: state.index, total: state.cards.length },
     counts,
+    remaining,
     paused: state.paused,
     confirmingExit: state.confirmingExit,
+    editing: state.editing,
     flashGrade,
+    canUndo,
+    undoing: state.undoing,
     summary,
     canReviewAgain,
     reduce,
     reveal,
     rate,
+    skip,
+    undo,
+    openEdit,
+    closeEdit,
+    submitEdit,
     requestExit,
     confirmExit,
     cancelExit,

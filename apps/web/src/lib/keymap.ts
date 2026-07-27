@@ -170,6 +170,9 @@ export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
   session: [
     { keys: 'Espace', label: 'shortcuts.keys.reveal', group: 'session' },
     { keys: '1 2 3 4', label: 'shortcuts.keys.rate', group: 'session' },
+    { keys: 'U', label: 'shortcuts.keys.undoReview', group: 'session' },
+    { keys: 'E', label: 'shortcuts.keys.editCard', group: 'session' },
+    { keys: 'S', label: 'shortcuts.keys.skipCard', group: 'session' },
     { keys: 'Échap', label: 'shortcuts.keys.exitSession', group: 'session' },
     { keys: 'Q', label: 'shortcuts.keys.confirmExit', group: 'session' },
     { keys: 'R', label: 'shortcuts.keys.restartSession', group: 'session' },

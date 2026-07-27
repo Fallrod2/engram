@@ -29,8 +29,11 @@ describe('computeSummary + <SessionSummary> (§16.2 item 14)', () => {
       <SessionSummary
         summary={computeSummary(RESULTS)}
         canReviewAgain={false}
+        canUndo={false}
+        undoing={false}
         onExit={() => {}}
         onReviewAgain={() => {}}
+        onUndo={() => {}}
       />,
     )
     expect(screen.getByText('4')).toBeTruthy() // hero viewed
@@ -45,8 +48,11 @@ describe('computeSummary + <SessionSummary> (§16.2 item 14)', () => {
       <SessionSummary
         summary={computeSummary(RESULTS)}
         canReviewAgain={false}
+        canUndo={false}
+        undoing={false}
         onExit={() => {}}
         onReviewAgain={() => {}}
+        onUndo={() => {}}
       />,
     )
     expect(screen.queryByText(/streak/i)).toBeNull()
@@ -59,8 +65,11 @@ describe('computeSummary + <SessionSummary> (§16.2 item 14)', () => {
       <SessionSummary
         summary={computeSummary(RESULTS)}
         canReviewAgain={false}
+        canUndo={false}
+        undoing={false}
         onExit={() => {}}
         onReviewAgain={onReviewAgain}
+        onUndo={() => {}}
       />,
     )
     expect(screen.queryByText('Réviser encore')).toBeNull()
@@ -68,8 +77,11 @@ describe('computeSummary + <SessionSummary> (§16.2 item 14)', () => {
       <SessionSummary
         summary={computeSummary(RESULTS)}
         canReviewAgain
+        canUndo={false}
+        undoing={false}
         onExit={() => {}}
         onReviewAgain={onReviewAgain}
+        onUndo={() => {}}
       />,
     )
     fireEvent.click(screen.getByText('Réviser encore'))

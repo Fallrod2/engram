@@ -507,6 +507,18 @@ export const reviewCardSchema = z.object({
   reviewedAt: iso.optional(),
 })
 
+/**
+ * Undoing the last review of a card. `logId` is the id returned by
+ * `POST /cards/:id/review`: the server only accepts the undo while that log is
+ * STILL the card's last one. This makes the call naturally idempotent — a
+ * double-click gets a 409 instead of unwinding a second review.
+ */
+export const undoReviewSchema = z.object({ logId: z.string().min(1) })
+export const undoReviewResponseSchema = z.object({
+  card: cardSchema,
+  undoneLogId: z.string(),
+})
+
 export const createNoteSchema = z.object({
   subjectId: z.string().optional(),
   title: z.string().min(1),
@@ -559,6 +571,8 @@ export type UpdateDeck = z.infer<typeof updateDeckSchema>
 export type CreateCard = z.infer<typeof createCardSchema>
 export type UpdateCard = z.infer<typeof updateCardSchema>
 export type ReviewCard = z.infer<typeof reviewCardSchema>
+export type UndoReview = z.infer<typeof undoReviewSchema>
+export type UndoReviewResponse = z.infer<typeof undoReviewResponseSchema>
 export type CreateNote = z.infer<typeof createNoteSchema>
 export type UpdateNote = z.infer<typeof updateNoteSchema>
 export type StartGeneration = z.infer<typeof startGenerationSchema>
