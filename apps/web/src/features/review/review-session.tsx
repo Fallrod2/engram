@@ -182,9 +182,12 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
                   <ReviewCard
                     front={current.front}
                     back={current.back}
+                    qcm={api.qcm}
+                    selectedChoice={api.selectedChoice}
                     revealed={api.revealed}
                     reduce={api.reduce}
                     onReveal={api.reveal}
+                    onSelect={api.selectChoice}
                   />
                 </motion.div>
               </AnimatePresence>
