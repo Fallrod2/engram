@@ -6,36 +6,117 @@ import postgres from 'postgres'
  * Throwaway Postgres database for one e2e run (Phase 7 §1.4, amended for the
  * Supabase/Postgres migration handoff §14).
  *
- * The local Supabase stack (127.0.0.1:54322) also serves the orchestrator's live
- * servers on the default `postgres` database, so we NEVER touch its content: we
- * only `CREATE DATABASE` / `DROP DATABASE` a uniquely-named database on the same
- * instance (creating/dropping named databases is allowed; mutating `postgres`
- * is not). `db:reset` is never used here.
+ * This module runs `CREATE DATABASE` / `DROP DATABASE`, so it must NEVER target
+ * the Supabase cloud project. The guard below therefore refuses any non-local
+ * host — but it accepts ANY local Postgres, on any port: the historical
+ * 127.0.0.1:54322 was just the local Supabase CLI stack, which no longer exists.
+ * We only ever create/drop a uniquely-named database; the instance's own
+ * databases are never mutated and `db:reset` is never used here.
  *
  * `createRunDb()` runs in the BODY of `playwright.config.ts` (top-level await),
  * BEFORE Playwright freezes each `webServer.env` — so the migrated database URL
  * can be injected into the server env. `dropRunDb()` runs in `globalTeardown`.
  */
 
+/** Historical local Supabase CLI port; still the default a `docker run` maps to. */
 const DEFAULT_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
-function baseUrl(): URL {
-  const raw =
-    process.env.DATABASE_URL && process.env.DATABASE_URL.length > 0
-      ? process.env.DATABASE_URL
-      : DEFAULT_URL
-  return new URL(raw)
+/** `new URL()` keeps IPv6 hosts bracketed (`[::1]`); accept the bare form too. */
+const LOCAL_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+
+const DOCKER_HINT =
+  'docker run --rm -d -p 54322:5432 -e POSTGRES_PASSWORD=postgres --name engram-e2e postgres:16'
+
+function parseUrl(raw: string): URL | null {
+  try {
+    return new URL(raw)
+  } catch {
+    return null
+  }
 }
 
-/** Hard guard: the e2e DB lives ONLY on the local Supabase instance. */
-function assertLocal(u: URL): void {
-  const isLocal = (u.hostname === '127.0.0.1' || u.hostname === 'localhost') && u.port === '54322'
-  if (!isLocal) {
-    throw new Error(
-      `e2e refuses a non-local DATABASE_URL (${u.hostname}:${u.port || '(default)'}). ` +
-        'The throwaway database is only ever created on the local Supabase stack (127.0.0.1:54322).',
-    )
+function isLocal(u: URL): boolean {
+  return LOCAL_HOSTNAMES.has(u.hostname)
+}
+
+/** Connection string with the password masked, safe to put in an error message. */
+function redact(raw: string): string {
+  const u = parseUrl(raw)
+  if (!u) return raw
+  if (u.password) u.password = '***'
+  return u.toString()
+}
+
+function rejectNonLocal(raw: string): never {
+  const u = parseUrl(raw)
+  const where = u
+    ? `${u.hostname}:${u.port || '(default port)'}`
+    : 'an unparsable connection string'
+  throw new Error(
+    `e2e refuses E2E_DATABASE_URL pointing at ${where}. ` +
+      'The e2e harness CREATEs and DROPs a throwaway database, so it only ever runs against a ' +
+      'local Postgres (127.0.0.1, localhost or ::1, any port) and never against the Supabase ' +
+      `cloud project. Set E2E_DATABASE_URL to a local instance, or start one with: ${DOCKER_HINT}`,
+  )
+}
+
+/**
+ * Resolve the base connection string for the throwaway database.
+ *
+ * 1. `E2E_DATABASE_URL` — the dedicated variable; a non-local value is a hard error.
+ * 2. `DATABASE_URL` — used ONLY when local. In normal dev it points at the cloud
+ *    project, and silently inheriting that would be both unsafe and confusing, so
+ *    a non-local (or unparsable) value is ignored without error.
+ * 3. The historical local default.
+ *
+ * Pure and env-injected so the guard is unit-testable without touching `process.env`.
+ */
+export function resolveE2eDatabaseUrl(env: Record<string, string | undefined>): string {
+  const explicit = env.E2E_DATABASE_URL
+  if (explicit) {
+    const u = parseUrl(explicit)
+    if (!u || !isLocal(u)) rejectNonLocal(explicit)
+    return explicit
   }
+
+  const inherited = env.DATABASE_URL
+  if (inherited) {
+    const u = parseUrl(inherited)
+    if (u && isLocal(u)) return inherited
+  }
+
+  return DEFAULT_URL
+}
+
+const CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+  'CONNECT_TIMEOUT',
+  'CONNECTION_CLOSED',
+])
+
+function isConnectionFailure(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' && CONNECTION_ERROR_CODES.has(code)
+}
+
+/**
+ * Turn a bare `ECONNREFUSED` (raised from the top-level await of
+ * `playwright.config.ts`, where it arrives without any context) into something
+ * actionable, keeping the original error as `cause`.
+ */
+function connectionError(url: string, cause: unknown): Error {
+  return new Error(
+    `e2e could not reach a Postgres at ${redact(url)}. ` +
+      'The e2e harness needs a local Postgres it can CREATE/DROP a throwaway database on; ' +
+      'it never uses the Supabase cloud project. Start a disposable one with: ' +
+      `${DOCKER_HINT} — or point E2E_DATABASE_URL at an existing local instance.`,
+    { cause },
+  )
 }
 
 export interface RunDb {
@@ -50,8 +131,7 @@ export interface RunDb {
  * pointing at the fresh database — highest fidelity, no schema drift.
  */
 export async function createRunDb(): Promise<RunDb> {
-  const base = baseUrl()
-  assertLocal(base)
+  const base = new URL(resolveE2eDatabaseUrl(process.env))
 
   // Digits + underscore only → a safe unquoted Postgres identifier.
   const dbName = `engram_e2e_${Date.now()}_${process.pid}`
@@ -64,6 +144,9 @@ export async function createRunDb(): Promise<RunDb> {
   const admin = postgres(adminUrl.toString(), { max: 1 })
   try {
     await admin.unsafe(`CREATE DATABASE ${dbName}`)
+  } catch (error) {
+    if (isConnectionFailure(error)) throw connectionError(adminUrl.toString(), error)
+    throw error
   } finally {
     await admin.end()
   }
