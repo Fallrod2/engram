@@ -130,6 +130,29 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* Collapse toggle, collapsed state. The control stays at the TOP in both
+          states: expanded it sits in the brand row above, collapsed it becomes
+          the first row of the rail. Moving it to the footer made users hunt for
+          it where they had just clicked. Geometry mirrors the collapsed search
+          button below so the rail column reads as one regular stack. */}
+      {collapsed && canToggleCollapse && (
+        <div className="px-2 pb-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={toggleCollapse}
+                aria-label={t('sidebar.expandAria')}
+                className="flex size-8 w-full items-center justify-center rounded-sm text-text-faint transition-colors duration-fast hover:bg-surface-2 hover:text-text"
+              >
+                <PanelLeftOpen className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('sidebar.expand')}</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+
       {/* Search / ⌘K */}
       <div className={cn('px-3 pb-2', collapsed && 'px-2')}>
         {collapsed ? (
@@ -236,7 +259,11 @@ export function Sidebar() {
           collapsed && 'items-center px-2',
         )}
       >
-        <div className={cn('flex items-center gap-1', collapsed && 'flex-col')}>
+        {/* Expanded, "Administration" and "Settings" are nav-shaped full-width
+            rows: they STACK on the nav group's own `gap-0.5`, like the links
+            above them. Side by side they overflowed the 240px bar. Collapsed,
+            the centred icon column is unchanged. */}
+        <div className={cn('flex flex-col', collapsed ? 'items-center gap-1' : 'gap-0.5')}>
           {isAdmin &&
             (collapsed ? (
               <Tooltip>
@@ -282,30 +309,24 @@ export function Sidebar() {
               {t('sidebar.settings')}
             </Link>
           )}
-          <div className={cn('ml-auto flex items-center gap-1', collapsed && 'ml-0 flex-col')}>
+          {collapsed && (
             <StreakPill
               current={streak?.current ?? 0}
               includesToday={streak?.includesToday ?? false}
-              collapsed={collapsed}
+              collapsed
             />
-            {canToggleCollapse && collapsed && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={toggleCollapse}
-                    aria-label={t('sidebar.expandAria')}
-                    className="flex size-8 items-center justify-center rounded-sm text-text-faint transition-colors duration-fast hover:bg-surface-2 hover:text-text"
-                  >
-                    <PanelLeftOpen className="size-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">{t('sidebar.expand')}</TooltipContent>
-              </Tooltip>
-            )}
-            {!collapsed && <ThemeToggle />}
-          </div>
+          )}
         </div>
+        {/* Streak + theme get their own row once expanded, still trailing-aligned. */}
+        {!collapsed && (
+          <div className="flex items-center justify-end gap-1">
+            <StreakPill
+              current={streak?.current ?? 0}
+              includesToday={streak?.includesToday ?? false}
+            />
+            <ThemeToggle />
+          </div>
+        )}
         <ApiStatus collapsed={collapsed} />
       </div>
     </aside>
@@ -356,8 +377,16 @@ function NavLink({
       />
       <span className="relative flex items-center justify-center">
         <Icon className="size-4 shrink-0" />
+        {/* The rail leaves 48px of usable width and 32px rows: a three-character
+            badge overflowed onto the row above. Two characters and a tighter
+            offset keep it on its own icon. `9+` is purely a display truncation:
+            the exact count is only readable once the sidebar is expanded, where
+            `DueCount` prints it in full. Collapsed, nothing carries it for a
+            screen reader either — the badge is `aria-hidden` and the tooltip
+            only repeats the label. That gap predates this cap and is not made
+            worse by it; closing it would change the rows' accessible names. */}
         {collapsed && count != null && (
-          <DueBadge value={count} className="absolute -right-2 -top-2" />
+          <DueBadge value={count} max={9} className="absolute -right-1 -top-1" />
         )}
       </span>
       {!collapsed && (
@@ -422,7 +451,7 @@ function SubjectNavRow({
       />
       <span className="relative flex items-center justify-center">
         <SubjectDot color={subject.color} />
-        {collapsed && <DueBadge value={due} className="absolute -right-2 -top-2" />}
+        {collapsed && <DueBadge value={due} max={9} className="absolute -right-1 -top-1" />}
       </span>
       {!collapsed && (
         <>

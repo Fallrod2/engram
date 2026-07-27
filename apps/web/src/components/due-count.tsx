@@ -60,7 +60,20 @@ export function DueCount({
  * Collapsed-sidebar variant: the due count becomes a micro badge over an icon
  * (spec §5). Hidden at zero (the calm `·` has no badge form).
  */
-export function DueBadge({ value, className }: { value: number; className?: string }) {
+export function DueBadge({
+  value,
+  max = 99,
+  className,
+}: {
+  value: number
+  /**
+   * Largest value shown as-is; above it the badge reads `{max}+`. Callers that
+   * anchor the badge to a narrow target (the 64px collapsed rail) pass a single
+   * digit so the label never exceeds two characters and stays inside the rail.
+   */
+  max?: number
+  className?: string
+}) {
   if (value <= 0) return null
   return (
     <span
@@ -71,7 +84,7 @@ export function DueBadge({ value, className }: { value: number; className?: stri
       )}
       aria-hidden
     >
-      {value > 99 ? '99+' : value}
+      {value > max ? `${max}+` : value}
     </span>
   )
 }

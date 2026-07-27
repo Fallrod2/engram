@@ -53,8 +53,28 @@ describe('<DueBadge> collapsed-sidebar variant (spec §5)', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('caps overflow at 99+', () => {
+  it('caps overflow at 99+ by default', () => {
     render(<DueBadge value={150} />)
     expect(screen.getByText('99+')).toBeTruthy()
+  })
+
+  it('honours a caller-supplied cap (the 64px rail asks for two characters)', () => {
+    render(<DueBadge value={42} max={9} />)
+    expect(screen.getByText('9+')).toBeTruthy()
+  })
+
+  it('shows the exact value while it stays under the cap', () => {
+    render(<DueBadge value={7} max={9} />)
+    expect(screen.getByText('7')).toBeTruthy()
+  })
+
+  it('shows the exact value at the cap itself', () => {
+    render(<DueBadge value={9} max={9} />)
+    expect(screen.getByText('9')).toBeTruthy()
+  })
+
+  it('stays aria-hidden — the count is announced by the row, not the badge', () => {
+    const { container } = render(<DueBadge value={42} max={9} />)
+    expect((container.firstChild as HTMLElement).getAttribute('aria-hidden')).toBe('true')
   })
 })
