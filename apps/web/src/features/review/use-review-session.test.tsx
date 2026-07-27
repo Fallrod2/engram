@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Card, ReviewPreview, ReviewQueueResponse } from '@engram/shared'
+import { qk } from '@/lib/query-keys'
 
 // --- Module mocks (keep the hook's effects inert but observable) ------------
 const postReview = vi.fn()
@@ -455,6 +456,38 @@ describe('useReviewSession — undoing the last rating (U)', () => {
     for (const stale of staleNows) expect(fresh).not.toContain(stale)
     // …and the card is previewed again under a `now` minted by the undo itself.
     expect(fresh.length).toBeGreaterThan(0)
+  })
+
+  it('a resolved undo refreshes the aggregate caches, even after the session had ended', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 1,
+      cards: [makeCard('c1')],
+    })
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    postUndoReview.mockResolvedValue({ card: makeCard('c1'), undoneLogId: 'log-1' })
+    const { result, client } = renderSession()
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(4))
+    // Entering SUMMARY already fired the end-of-session batch against a server
+    // state where the card WAS reviewed. The spy goes up only now, so what it
+    // records is the undo's own doing and nothing else.
+    await waitFor(() => expect(result.current.phase).toBe('SUMMARY'))
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+
+    act(() => result.current.undo())
+    await waitFor(() => expect(result.current.phase).toBe('REVEALED'))
+
+    const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey)
+    expect(keys).toContainEqual(qk.dueCounts.all)
+    expect(keys).toContainEqual(qk.analytics.all)
+    expect(keys).toContainEqual(qk.planning.all)
+    expect(keys).toContainEqual(qk.subjects.all)
+    expect(keys).toContainEqual(qk.decks.all)
+    expect(keys).toContainEqual(qk.cards.all)
+    invalidate.mockRestore()
   })
 
   it('a refused undo (409) is final: the target is dropped and an error is toasted', async () => {

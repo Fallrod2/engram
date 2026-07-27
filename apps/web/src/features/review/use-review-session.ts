@@ -283,6 +283,27 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     dispatch({ type: 'SKIP_CARD' })
   }, [])
 
+  // --- Aggregate cache invalidations ---------------------------------------
+  /**
+   * Refresh every cache that holds a DERIVED view of the review data: the due
+   * counts, the subject/deck/card rows that carry them, the study plan (a card's
+   * `due` moved) and the analytics built on `review_log`. Declared here because
+   * both writers below need it — the end of a session (§13.3) and an undo, which
+   * rewinds a card's FSRS state and deletes its log row on the server.
+   */
+  const invalidateAggregates = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: qk.dueCounts.all })
+    void queryClient.invalidateQueries({ queryKey: qk.subjects.all })
+    void queryClient.invalidateQueries({ queryKey: qk.decks.all })
+    void queryClient.invalidateQueries({ queryKey: qk.cards.all })
+    // Graded cards shift their `due` → the study-plan load and "today" suggestion
+    // rebalance in real time (Phase 4 §1.4).
+    void queryClient.invalidateQueries({ queryKey: qk.planning.all })
+    // Each review is a row in `review_log` — the raw material of every analytic.
+    // A finished session refreshes tiles + heatmap + graphs (Phase 5 §1.6).
+    void queryClient.invalidateQueries({ queryKey: qk.analytics.all })
+  }, [queryClient])
+
   // --- Undo the last rating (U) --------------------------------------------
   const undoMut = useMutation({
     mutationFn: (vars: { cardId: string; logId: string }) =>
@@ -303,6 +324,12 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
       // An undo from SUMMARY resurrects the session, so the end-of-session
       // invalidation batch must be re-armed to fire again when it really ends.
       invalidatedRef.current = false
+      // Unconditional, and NOT the same thing as re-arming above: the server has
+      // already rewound the card and dropped its `review_log` row, so every
+      // aggregate is stale right now. Leaving it to the next `endSession()`
+      // would lose the refresh entirely when the resurrected session is left
+      // without a new rating (`results.length === 0` sends it home early).
+      invalidateAggregates()
       toast(t('toasts.reviewUndone'))
     },
     onError: () => {
@@ -446,17 +473,8 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     if (invalidatedRef.current) return
     if (stateRef.current.results.length === 0) return
     invalidatedRef.current = true
-    void queryClient.invalidateQueries({ queryKey: qk.dueCounts.all })
-    void queryClient.invalidateQueries({ queryKey: qk.subjects.all })
-    void queryClient.invalidateQueries({ queryKey: qk.decks.all })
-    void queryClient.invalidateQueries({ queryKey: qk.cards.all })
-    // Graded cards shift their `due` → the study-plan load and "today" suggestion
-    // rebalance in real time (Phase 4 §1.4).
-    void queryClient.invalidateQueries({ queryKey: qk.planning.all })
-    // Each review is a row in `review_log` — the raw material of every analytic.
-    // A finished session refreshes tiles + heatmap + graphs (Phase 5 §1.6).
-    void queryClient.invalidateQueries({ queryKey: qk.analytics.all })
-  }, [queryClient])
+    invalidateAggregates()
+  }, [invalidateAggregates])
 
   useEffect(() => {
     if (state.phase === 'SUMMARY') endSession()
