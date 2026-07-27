@@ -170,6 +170,9 @@ export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
   session: [
     { keys: 'Espace', label: 'shortcuts.keys.reveal', group: 'session' },
     { keys: '1 2 3 4', label: 'shortcuts.keys.rate', group: 'session' },
+    // Only ever acts on a QCM the user actually answered — with no suggestion on
+    // screen the key stays inert, which the label ("the suggested grade") says.
+    { keys: 'Enter', label: 'shortcuts.keys.validateSuggested', group: 'session' },
     { keys: 'U', label: 'shortcuts.keys.undoReview', group: 'session' },
     { keys: 'E', label: 'shortcuts.keys.editCard', group: 'session' },
     { keys: 'S', label: 'shortcuts.keys.skipCard', group: 'session' },

@@ -401,6 +401,7 @@ export const dictFr = {
       examNav: 'Naviguer dans les examens',
       reveal: 'Révéler la réponse',
       rate: 'Noter la carte',
+      validateSuggested: 'Valider la note suggérée',
       undoReview: 'Annuler la dernière note',
       skipCard: 'Passer la carte',
       exitSession: 'Quitter la session',
