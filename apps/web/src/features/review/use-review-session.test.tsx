@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Card, ReviewPreview, ReviewQueueResponse } from '@engram/shared'
 
@@ -13,6 +13,10 @@ const fetchCardPreview = vi.fn()
 const updateCard = vi.fn()
 
 const toastError = vi.fn()
+// Stable across renders so "the session left the screen" is assertable: leaving
+// only shows up as a navigation — `exited` is internal and `confirmingExit` is
+// deliberately not cleared by CONFIRM_EXIT.
+const navigate = vi.fn()
 // Records every call the hook makes on the per-card clock, so a freeze can be
 // asserted without a fake `performance.now()`.
 const timerCalls: string[] = []
@@ -46,7 +50,7 @@ vi.mock('./session-timer', async (importOriginal) => {
   }
 })
 vi.mock('@tanstack/react-router', () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
   useRouter: () => ({ history: { back: vi.fn(), canGoBack: () => false } }),
 }))
 vi.mock('@/lib/api', () => ({
@@ -163,6 +167,7 @@ beforeEach(() => {
   fetchCardPreview.mockReset()
   updateCard.mockReset()
   toastError.mockReset()
+  navigate.mockReset()
   timerCalls.length = 0
   const queue: ReviewQueueResponse = {
     now: '2026-07-12T10:00:00.000Z',
@@ -469,5 +474,115 @@ describe('useReviewSession — undoing the last rating (U)', () => {
     // Nothing was rewound — the rating stands and the session stayed put.
     expect(result.current.current?.id).toBe('c2')
     expect(result.current.counts[3]).toBe(1)
+  })
+})
+
+describe('useReviewSession — modifiers are not session shortcuts', () => {
+  /** Hide the tab the way the browser does, so the machine pauses (mechanism B). */
+  function hideTab() {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'hidden')
+  })
+
+  it('Cmd+S in ASKING neither skips the card nor moves the cursor', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.current?.id).toBe('c1')
+
+    // "Save page": the browser's command, not ours.
+    fireEvent.keyDown(window, { key: 's', metaKey: true })
+
+    expect(result.current.phase).toBe('ASKING')
+    expect(result.current.progress.done).toBe(0)
+    expect(result.current.current?.id).toBe('c1')
+  })
+
+  it('bare S in ASKING does skip — the control that makes the Cmd+S case meaningful', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 's' })
+
+    expect(result.current.phase).toBe('ASKING')
+    expect(result.current.progress.done).toBe(1)
+    expect(result.current.current?.id).toBe('c2')
+  })
+
+  it('Ctrl+R in SUMMARY reloads the page instead of restarting a session', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 1,
+      cards: [makeCard('c1')],
+    })
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(4))
+    await waitFor(() => expect(result.current.phase).toBe('SUMMARY'))
+
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true })
+
+    // REVIEW_AGAIN would have reset the machine to LOADING; the summary stands.
+    expect(result.current.phase).toBe('SUMMARY')
+    expect(result.current.summary?.viewed).toBe(1)
+  })
+
+  it('Cmd+Q in the exit-confirm dialog does not confirm the exit', async () => {
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    // One graded card is what makes a requested exit open the confirm dialog.
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.current?.id).toBe('c2'))
+    act(() => result.current.requestExit())
+    expect(result.current.confirmingExit).toBe(true)
+
+    fireEvent.keyDown(window, { key: 'q', metaKey: true })
+    expect(navigate).not.toHaveBeenCalled()
+
+    // Control: bare Q is the confirm, and confirming leaves the session.
+    fireEvent.keyDown(window, { key: 'q' })
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/' }))
+  })
+
+  it('the pause overlay still resumes on any bare key', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    hideTab()
+    expect(result.current.paused).toBe(true)
+
+    // "S" here means resume, nothing else — the pause branch runs before the
+    // modifier filter and consumes every bare key.
+    fireEvent.keyDown(window, { key: 's' })
+
+    expect(result.current.paused).toBe(false)
+    expect(result.current.phase).toBe('ASKING')
+    expect(result.current.progress.done).toBe(0)
+  })
+
+  // Pins the pause branch's OWN copy of the modifier test — the one the new
+  // guard deliberately does not replace, since it has to run before a catch-all
+  // that would otherwise resume on Cmd+R.
+  it('a modified key while paused leaves the overlay up', async () => {
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    hideTab()
+    expect(result.current.paused).toBe(true)
+
+    fireEvent.keyDown(window, { key: 'r', metaKey: true })
+
+    expect(result.current.paused).toBe(true)
   })
 })

@@ -501,6 +501,14 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
         resume()
         return
       }
+
+      // A session shortcut is a BARE key. Anything with a modifier belongs to the
+      // browser or the OS (Cmd+S, Cmd+R, Cmd+Q…) and must pass through untouched —
+      // intercepting it would both steal the command and fire an action nobody asked
+      // for. The `paused` branch above keeps its own copy of this test on purpose:
+      // there, ANY bare key resumes, so the filter has to run before that catch-all.
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+
       // Precedence 2: exit-confirm dialog.
       if (s.confirmingExit) {
         if (e.key === 'Escape' || e.key === 'Enter') {
