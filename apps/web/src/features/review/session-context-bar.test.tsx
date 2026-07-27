@@ -202,3 +202,35 @@ describe('<SessionContextBar> undo action', () => {
     expect(onUndo).not.toHaveBeenCalled()
   })
 })
+
+describe('<SessionContextBar> affordance while an undo is in flight', () => {
+  const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
+
+  // The realistic combination: the hook computes `canUndo = lastReview !== null && !undoing`,
+  // so an in-flight undo means the "Annuler" button is not rendered at all.
+  it('disables "Éditer" and "Passer" — and swallows no click', () => {
+    const onEdit = vi.fn()
+    const onSkip = vi.fn()
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        canUndo={false}
+        undoing
+        onEdit={onEdit}
+        onSkip={onSkip}
+        onUndo={NOOP}
+      />,
+    )
+    const edit = screen.getByRole('button', { name: 'Éditer cette carte (E)' })
+    const skip = screen.getByRole('button', { name: 'Passer cette carte sans la noter (S)' })
+    expect((edit as HTMLButtonElement).disabled).toBe(true)
+    expect((skip as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(edit)
+    fireEvent.click(skip)
+    expect(onEdit).not.toHaveBeenCalled()
+    expect(onSkip).not.toHaveBeenCalled()
+  })
+  // The `undoing: false` control already exists above: "calls onEdit on click" and
+  // "calls onSkip on click" both fail if the buttons were disabled unconditionally,
+  // since a disabled button fires no click handler.
+})

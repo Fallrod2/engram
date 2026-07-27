@@ -52,13 +52,16 @@ export function SessionContextBar({
             {!coarse && <Kbd>U</Kbd>}
           </button>
         )}
+        {/* While an undo is in flight the reducer refuses OPEN_EDIT and
+            SKIP_CARD, so the bar says so instead of swallowing the click. */}
         {/* Editing sits between "Annuler" and "Passer": a correction is about
             the card you are on, a skip leaves it. */}
         <button
           type="button"
           onClick={onEdit}
+          disabled={undoing}
           aria-label={t('session.editAria')}
-          className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted"
+          className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted disabled:pointer-events-none disabled:opacity-50"
         >
           <Pencil aria-hidden className="size-3" />
           <span className="hidden sm:inline">{t('session.edit')}</span>
@@ -67,11 +70,12 @@ export function SessionContextBar({
         <button
           type="button"
           onClick={onSkip}
+          disabled={undoing}
           // The label collapses under 640px (the bar must hold at 320px), so the
           // aria-label always carries the full meaning, shortcut included.
           aria-label={t('session.skipAria')}
           // Focus is the global double-ring indigo (styles.css :focus-visible).
-          className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted"
+          className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted disabled:pointer-events-none disabled:opacity-50"
         >
           <SkipForward aria-hidden className="size-3" />
           <span className="hidden sm:inline">{t('session.skip')}</span>
