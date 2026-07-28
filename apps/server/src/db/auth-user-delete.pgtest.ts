@@ -2,10 +2,10 @@
  * Opt-in proof of the ONE behaviour PGlite cannot reproduce: the best-effort
  * GoTrue `auth.users` delete inside the GDPR user-deletion (spec §5.2, amendment
  * A10). PGlite has no Supabase `auth` schema, so `authDeleted` is always false
- * there; only a REAL local Supabase (Docker up, port 54322) has the schema and
- * the owner grant to write it. Run via `bun run test:db:pg`.
+ * there; only a REAL local Supabase (Docker up, DB on 54322 by default) has the
+ * schema and the owner grant to write it. Run via `bun run test:db:pg`.
  *
- * Hard rules (A10): NEVER run DDL against anything but 127.0.0.1:54322; NEVER
+ * Hard rules (A10): NEVER run DDL against anything but a LOCAL Postgres; NEVER
  * touch the `auth` schema with DDL (it is provisioned by `supabase start` and the
  * stack is never reset); DELETE the seeded `auth.users` row in `afterAll` even on
  * failure (the local Supabase is shared). The shared `sql.end()` is owned by
@@ -16,19 +16,13 @@ import { fileURLToPath } from 'node:url'
 import { sql as dsql } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { db, sql } from './client'
+import { assertLocalDatabaseUrl } from './local-guard'
 import { resolveDatabaseUrl } from './paths'
 import { resetDb, seedCard, seedDeck, seedSubject, seedUserProfile } from '../test-support/harness'
 import { deleteUser } from '../services/admin.service'
 
-// Never run destructive DDL against anything but the local Supabase database.
-const { hostname, port } = new URL(resolveDatabaseUrl())
-const isLocal = (hostname === '127.0.0.1' || hostname === 'localhost') && port === '54322'
-if (!isLocal) {
-  throw new Error(
-    `test:db:pg refused: DATABASE_URL must point at the local Supabase DB ` +
-      `(127.0.0.1/localhost:54322), got ${hostname}:${port}.`,
-  )
-}
+// Never run destructive DDL against anything but a local Postgres (any port).
+assertLocalDatabaseUrl(resolveDatabaseUrl(), 'test:db:pg')
 
 const VICTIM = '11111111-2222-3333-4444-555555555555'
 let canWriteAuth = false

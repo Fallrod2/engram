@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { retentionResponseSchema, deckSuccessResponseSchema } from '@engram/shared'
 import { db, sql } from './client'
+import { assertLocalDatabaseUrl } from './local-guard'
 import { resolveDatabaseUrl } from './paths'
 import { card, reviewLog } from './schema'
 import { resetDb, seedCard, seedDeck, seedReviewLog, seedSubject } from '../test-support/harness'
@@ -28,15 +29,8 @@ import { reviewCard } from '../services/review.service'
 import { retention, deckSuccess } from '../services/analytics.service'
 import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 
-// Never run destructive DDL against anything but the local Supabase database.
-const { hostname, port } = new URL(resolveDatabaseUrl())
-const isLocal = (hostname === '127.0.0.1' || hostname === 'localhost') && port === '54322'
-if (!isLocal) {
-  throw new Error(
-    `test:db:pg refused: DATABASE_URL must point at the local Supabase DB ` +
-      `(127.0.0.1/localhost:54322), got ${hostname}:${port}.`,
-  )
-}
+// Never run destructive DDL against anything but a local Postgres (any port).
+assertLocalDatabaseUrl(resolveDatabaseUrl(), 'test:db:pg')
 
 beforeAll(async () => {
   // Fresh schema on the disposable local DB, then apply the Drizzle baseline.

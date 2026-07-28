@@ -12,10 +12,12 @@
  * `og.png` (the landing hero at the declared 1200×630) so every asset the landing
  * ships is script-reproducible. Re-run after any material UI change.
  *
- * Isolation: a throwaway `engram_fixlandingpolish_*` database on the LOCAL
- * Supabase Postgres (127.0.0.1:54322) — created + migrated + dropped here, never
- * touching the shared `postgres` db. Dev ports 3004 (API) / 5176 (web), never the
- * 3001/5173 dev or 3100/3110 e2e ranges. Everything is torn down in `finally`.
+ * Isolation: a throwaway `engram_fixlandingpolish_*` database on a LOCAL Postgres
+ * (the Supabase CLI stack on 127.0.0.1:54322 by default; override with
+ * `LANDING_DATABASE_URL` for a local instance on another port) — created +
+ * migrated + dropped here, never touching the shared `postgres` db. Dev ports
+ * 3004 (API) / 5176 (web), never the 3001/5173 dev or 3100/3110 e2e ranges.
+ * Everything is torn down in `finally`.
  *
  *   bun scripts/generate-landing-shots.ts            # product captures + og + verify shots
  *   bun scripts/generate-landing-shots.ts --verify   # only the before/after verify shots
@@ -25,6 +27,8 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import postgres from 'postgres'
 import { chromium, type Page } from '@playwright/test'
+import { assertLocalDatabaseUrl } from '../apps/server/src/db/local-guard'
+import { DEFAULT_DATABASE_URL } from '../apps/server/src/db/paths'
 import { buildSeedBackup } from './landing-seed'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -32,9 +36,26 @@ const API_PORT = 3004
 const WEB_PORT = 5176
 const API = `http://localhost:${API_PORT}`
 const WEB = `http://localhost:${WEB_PORT}`
-const ADMIN_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+/**
+ * Base connection string for the throwaway database. Any LOCAL Postgres works —
+ * the guard is on the host, never on the port (a stack on 5433 is as safe as the
+ * usual 54322) — and a non-local value is refused outright, so this script can
+ * never CREATE/DROP databases on the Supabase cloud project. `DATABASE_URL` is
+ * deliberately NOT read: in normal dev it points at the cloud.
+ */
+const BASE_URL = process.env.LANDING_DATABASE_URL || DEFAULT_DATABASE_URL
+assertLocalDatabaseUrl(BASE_URL, 'generate-landing-shots', 'LANDING_DATABASE_URL')
+
+/** Same instance, different database name. */
+const onBase = (database: string) => {
+  const url = new URL(BASE_URL)
+  url.pathname = `/${database}`
+  return url.toString()
+}
+
+const ADMIN_URL = onBase('postgres')
 const DB_NAME = `engram_fixlandingpolish_${Date.now()}`
-const DB_URL = `postgresql://postgres:postgres@127.0.0.1:54322/${DB_NAME}`
+const DB_URL = onBase(DB_NAME)
 
 const LANDING_DIR = `${ROOT}apps/web/public/landing`
 const VERIFY_DIR =

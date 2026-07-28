@@ -6,7 +6,7 @@
  * it is proven here against a REAL local Supabase Postgres. Run via
  * `bun run test:db:pg`.
  *
- * Hard rules (A10): NEVER run DDL against anything but 127.0.0.1:54322; NEVER
+ * Hard rules (A10): NEVER run DDL against anything but a LOCAL Postgres; NEVER
  * touch the `auth` schema; NEVER call `sql.end()` (the shared handle is owned by
  * `postgres-driver.pgtest.ts`, which sorts LAST in the gate's glob).
  */
@@ -15,19 +15,13 @@ import { fileURLToPath } from 'node:url'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { adminStatsResponseSchema } from '@engram/shared'
 import { db, sql } from './client'
+import { assertLocalDatabaseUrl } from './local-guard'
 import { resolveDatabaseUrl } from './paths'
 import { resetDb, seedUserProfile } from '../test-support/harness'
 import { stats } from '../services/admin.service'
 
-// Never run destructive DDL against anything but the local Supabase database.
-const { hostname, port } = new URL(resolveDatabaseUrl())
-const isLocal = (hostname === '127.0.0.1' || hostname === 'localhost') && port === '54322'
-if (!isLocal) {
-  throw new Error(
-    `test:db:pg refused: DATABASE_URL must point at the local Supabase DB ` +
-      `(127.0.0.1/localhost:54322), got ${hostname}:${port}.`,
-  )
-}
+// Never run destructive DDL against anything but a local Postgres (any port).
+assertLocalDatabaseUrl(resolveDatabaseUrl(), 'test:db:pg')
 
 beforeAll(async () => {
   // Rebuild only public/drizzle (idempotent if another pgtest already did it in
