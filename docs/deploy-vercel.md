@@ -94,8 +94,11 @@ Depuis la migration `0004_multi_user`, les données sont **scopées par
 `user_id`** sur les 7 tables de domaine (subjects, decks, cards, review_log,
 notes, generations, exams) — chaque utilisateur ne voit que les siennes. La
 config IA et les credentials restent globaux à l'instance ; leurs écritures et
-le backup sont réservés à `ENGRAM_ADMIN_USER_ID`. RLS n'est pas utilisé (le
-scoping est applicatif). Les nouveaux comptes se créent par **invitation**
+le backup sont réservés à `ENGRAM_ADMIN_USER_ID`. **Le gate réel est
+applicatif** (`requireUserId` + scoping `user_id`) : le serveur se connecte en
+propriétaire du schéma, qui _contourne_ RLS. Les policies RLS posées par
+`0004`/`0006`/`0008`/`0009` sont une seconde couche dormante, décrite ci-dessous
+(§ « API données (PostgREST) »). Les nouveaux comptes se créent par **invitation**
 (Dashboard → Authentication → Users → Invite user) : le lien e-mail atterrit
 sur l'écran `/set-password` de l'app.
 
@@ -145,6 +148,138 @@ Vercel « déploiera avec succès » puis **chaque requête renverra 500** jusqu
 que l'intégration Supabase soit active. ⇒ **activer l'intégration AVANT d'émettre
 du trafic** au premier déploiement.
 
+### API données (PostgREST) — surface fermée
+
+Un projet Supabase expose, **en plus** de l'auth, une API données auto-générée
+(PostgREST sur `/rest/v1/*`, plus GraphQL via `graphql_public` — **non couvert**
+par `0010`, voir l'angle mort n°2 plus bas) atteignable avec la clé
+**`anon`** — qui est publique par construction : elle est compilée dans le bundle
+du front. Par défaut, `anon` et `authenticated` reçoivent
+`SELECT/INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER` sur **toutes** les
+tables de `public`, et sur toutes les **futures** via `ALTER DEFAULT PRIVILEGES`.
+
+engram n'utilise Supabase **que pour l'authentification** : `apps/web` ne
+contient aucun `.from(`, `.rpc(`, `.channel(` ni `.storage`, toutes les données
+passent par `/api/*`. Cette API données était donc une seconde porte d'entrée,
+que le gate `requireUserId` ne protège pas et devant laquelle il ne restait que
+RLS. La migration **`0010_revoke_data_api_grants`** la retire :
+
+- `REVOKE ALL` pour `anon` et `authenticated` sur toutes les tables, séquences et
+  fonctions de `public` ;
+- `ALTER DEFAULT PRIVILEGES ... REVOKE ALL` pour les mêmes rôles, sinon le
+  `CREATE TABLE` de la migration suivante leur re-donnerait tout en silence ;
+- **`service_role` est laissé intact** : sa clé est un secret, elle n'est
+  déployée nulle part ici, et l'outillage Supabase (éditeur de table du
+  dashboard, `pg_meta`, backups) passe par lui ;
+- **`USAGE ON SCHEMA public` est conservé** : `public` accorde `USAGE` au
+  pseudo-rôle `PUBLIC` (`=U/pg_database_owner`), donc le révoquer à `anon` seul
+  ne changerait rien, et le révoquer à `PUBLIC` toucherait tous les rôles du
+  cluster. Sans le moindre privilège d'objet, `USAGE` n'ouvre l'accès à rien.
+- La migration est **portable** : elle se garde sur l'existence des rôles
+  (`pg_roles`), car **PGlite** (`bun run test:db`) ne les a pas. À l'inverse, les
+  rôles sont **globaux au cluster** : la base jetable des e2e est créée dans la
+  stack Supabase locale, qui les possède — les e2e exécutent donc réellement la
+  branche `REVOKE` sur un vrai Postgres. La garde y reste utile pour le
+  `postgres:16` nu proposé en repli par `e2e/support/db.ts`.
+
+Résultat observé en local (PostgREST + clé `anon`), avant → après :
+`GET /rest/v1/card` passe de `200 []` à `401 {"code":"42501","message":
+"permission denied for table card"}`, un `POST` de `201 Created` à `401`, et le
+document OpenAPI racine passe de 16 tables listées à **aucune**.
+
+#### ⚠️ Ce que `0010` ne ferme PAS — deux angles morts connus
+
+**1. Le grantor `supabase_admin`.** Les privilèges par défaut sont indexés par
+**grantor**, et la base de prod en porte **deux** sur `public` : `postgres` et
+`supabase_admin`. Le rôle de migration est `postgres`, qui n'est **pas** membre
+de `supabase_admin` (ni superuser sur Supabase hébergé) — le filtre
+`pg_has_role` de `0010` saute donc cette entrée, et ses
+`ALTER DEFAULT PRIVILEGES ... GRANT ALL TO anon, authenticated` **restent actifs
+en production** après le déploiement.
+
+C'est jugé **inerte aujourd'hui**, et voici pourquoi (vérifié en lecture sur la
+prod, pas supposé) : les privilèges par défaut s'appliquent au rôle qui **crée**
+l'objet, et les **15 tables de `public` appartiennent toutes à `postgres`** —
+aucune n'a été créée par `supabase_admin`. Tant que le schéma n'est alimenté que
+par les migrations Drizzle, l'entrée orpheline ne s'applique à rien.
+
+**Ce qui le rendrait faux demain :** tout objet créé dans `public` **par**
+`supabase_admin` — un `CREATE TABLE` depuis la console Supabase si elle passe par
+ce rôle, une extension qui installe ses tables dans `public`, un outil de
+migration tiers — récupérerait immédiatement les grants `anon`/`authenticated`,
+**sans que rien ne le signale** : ni le test `migration-0010.spec.ts` (il tourne
+sur PGlite, où ce grantor n'existe pas), ni le linter Supabase, ni le build.
+Aucun correctif sûr n'est possible depuis une migration : on ne peut pas
+`SET ROLE supabase_admin`, un `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin`
+ferait **échouer le build Vercel**, et un event trigger défensif exigerait le
+superuser, que `postgres` n'a pas. La fermeture propre est un réglage de
+dashboard (voir plus bas).
+
+**2. `graphql_public` / pg_graphql.** `0010` porte exclusivement sur le schéma
+`public` et **ne couvre pas** `graphql_public`. La fonction
+`graphql_public.graphql(...)` vit hors de `public`, appartient à
+`supabase_admin`, et son `EXECUTE` est accordé au pseudo-rôle `PUBLIC`
+(`=X/supabase_admin`) en plus de `anon`/`authenticated` : la révoquer aux deux
+rôles seuls serait **cosmétique**, exactement comme pour `USAGE`. Et nous ne
+pourrions pas la révoquer à `PUBLIC` même en le voulant — seul le grantor
+(`supabase_admin`) ou un de ses membres le peut.
+
+Ce qui est **mesuré** : `pg_graphql` **n'est pas installé** sur le projet cloud
+(extensions présentes : `pg_stat_statements`, `pgcrypto`, `plpgsql`,
+`supabase_vault`, `uuid-ossp`). `graphql_public.graphql(...)` y est donc le
+_placeholder_ posé par Supabase, qui répond à **toute** requête, introspection
+comprise : `{"errors":[{"message":"pg_graphql extension is not enabled."}]}` —
+réponse observée en local sur le placeholder identique. L'angle mort est donc
+théorique tant que l'extension n'est pas activée.
+
+Ce qui est **du raisonnement, non vérifié** : si `pg_graphql` était activé un
+jour, pg_graphql résout sous le rôle appelant réel, donc les `REVOKE` de table de
+`0010` devraient s'appliquer aux **données**. En revanche l'**introspection de
+schéma** est un mécanisme distinct et pourrait continuer d'exposer les noms de
+tables et de colonnes indépendamment de l'accès aux lignes. Une mesure locale a
+été tentée (installation de `pg_graphql` sur la stack locale, requêtes
+d'introspection et de données avec la clé `anon`) : elle est **non concluante**
+— le résolveur renvoyait un schéma vide y compris pour `postgres`, donc l'échec
+ne prouvait rien. L'installation locale a été retirée et l'état d'origine
+restauré. **À considérer comme non vérifié.**
+
+#### 🔧 Action pour Alex (dashboard, pas migration)
+
+La seule façon de fermer proprement les deux portes **à la fois** — PostgREST et
+GraphQL, quel que soit le grantor des privilèges par défaut — est un réglage de
+tableau de bord : **Dashboard → Settings → API → « Exposed schemas »**, retirer
+`public` (et `graphql_public`) de la liste des schémas servis par l'API données.
+Ça ne se fait pas en SQL et ce n'est donc pas dans cette migration. `0010` reste
+utile indépendamment : elle protège au niveau des privilèges, y compris si le
+réglage est un jour remis par défaut.
+
+**Si l'API données est un jour ouverte volontairement** (client Supabase dans le
+front, Realtime, Storage…), il ne suffit pas de re-`GRANT` : il faut, dans une
+nouvelle migration, (1) re-`GRANT` uniquement les privilèges **strictement**
+nécessaires, table par table et colonne par colonne — jamais `ALL ON ALL
+TABLES` ; (2) restaurer les `ALTER DEFAULT PRIVILEGES` correspondants **si et
+seulement si** on accepte que toute table future soit exposée (sinon, laisser
+les défauts fermés et grant-er explicitement) ; (3) écrire de vraies policies RLS
+`FOR SELECT/INSERT/UPDATE/DELETE` avec `WITH CHECK`, adossées à `auth.uid()` et
+non à `current_setting('app.user_id')` — les policies actuelles sont écrites pour
+le rôle applicatif, pas pour `authenticated` ; (4) mettre à jour le test
+`apps/server/src/db/migration-0010.spec.ts`, qui épingle l'invariant « `anon` et
+`authenticated` n'ont aucun privilège sur `public` » et échouera au premier
+`GRANT`.
+
+#### Pourquoi `admin_audit`, `user_group`, `group_member`, `group_permission` n'ont pas de policy
+
+Le linter Supabase (« RLS enabled, no policy ») signale ces quatre tables. **Ce
+n'est pas une régression et il ne faut pas y ajouter de policy** : RLS activé
+_sans_ policy signifie **deny-all** pour tout rôle non-propriétaire, ce qui est
+exactement l'intention documentée dans `0008_iam_admin.sql` et
+`0009_rbac_groups.sql`. Ces tables sont réservées à l'admin et lues par le rôle
+applicatif, qui est propriétaire du schéma et contourne RLS. Ajouter une policy
+pour faire taire l'avertissement **ouvrirait** un accès afin de satisfaire un
+avis automatique : c'est l'inverse du but. Depuis `0010`, `anon` et
+`authenticated` n'ont de toute façon plus aucun privilège sur ces tables, donc
+l'avertissement porte sur une porte déjà condamnée deux fois.
+
 ### `DATABASE_URL` — quel port ?
 
 Utiliser le **Transaction Pooler** Supabase (`...pooler.supabase.com:6543`), pas
@@ -167,6 +302,32 @@ pointant `DATABASE_URL` sur la base cloud :
 ```bash
 DATABASE_URL='postgresql://…pooler.supabase.com:6543/postgres' bun run db:migrate
 ```
+
+### `0010_revoke_data_api_grants` — ce qu'elle fait à chaque build
+
+`0010` n'est pas une migration de schéma : elle ne crée ni table ni colonne, elle
+**retire des privilèges**. Elle révoque tout ce que `anon` et `authenticated`
+détiennent sur `public` (tables, séquences, fonctions) et efface les
+`ALTER DEFAULT PRIVILEGES` qui les leur redonneraient sur les objets créés
+ensuite. Détail du raisonnement, du choix de garder `USAGE`, des **deux angles
+morts assumés** (grantor `supabase_admin`, `graphql_public`) et de la marche à
+suivre pour rouvrir l'API données : § « API données (PostgREST) ».
+
+Deux conséquences pratiques pour les migrations **suivantes** :
+
+- une nouvelle table est créée **sans aucun privilège** pour `anon`/
+  `authenticated` — c'est voulu, il n'y a rien à faire ;
+- un `GRANT ... TO anon` (ou `authenticated`) ajouté par une migration ultérieure
+  **casse volontairement** `apps/server/src/db/migration-0010.spec.ts`. Si ce
+  test échoue, la question n'est pas « comment le faire passer » mais « qui
+  rouvre l'API données, et pourquoi ».
+
+Comme la migration se garde sur `pg_roles`, elle est un no-op silencieux sur
+**PGlite**, qui n'a pas ces rôles. Ce n'est **pas** le cas de la base jetable des
+e2e : les rôles sont globaux au cluster et cette base est créée dans la stack
+Supabase locale, qui les possède — les e2e exécutent donc bien la branche
+`REVOKE` sur un vrai Postgres. La migration est aussi rejouable sans erreur (un
+`REVOKE` d'un privilège absent réussit).
 
 ## `maxDuration` et génération IA
 
