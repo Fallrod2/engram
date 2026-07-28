@@ -4,7 +4,8 @@ import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
 import { card, deck, exam, examSubject, reviewLog, subject } from '../db/schema'
 import { localDayDiff, localMidnight } from '../lib/day'
-import { readDemoMarker, seedDemo, wipeUserData } from './demo.service'
+import { DEMO_QCM_CARDS, readDemoMarker, seedDemo, wipeUserData } from './demo.service'
+import { dueQueue } from './review-queue.service'
 import { createSubject as makeSubject } from './subjects.service'
 import { createDeck } from './decks.service'
 import { createCard } from './cards.service'
@@ -50,6 +51,24 @@ describe('seedDemo', () => {
     const now = new Date()
     const today = localMidnight(now.getFullYear(), now.getMonth(), now.getDate())
     expect(localDayDiff(today, e!.date)).toBe(10)
+  })
+
+  it('seeds every multiple-choice card (T-022)', async () => {
+    await runSeed('no-session')
+    const fronts = new Set(
+      (await db.select().from(card).where(eq(card.userId, DEMO))).map((c) => c.front),
+    )
+    for (const qcm of DEMO_QCM_CARDS) expect(fronts.has(qcm.front)).toBe(true)
+  })
+
+  it('hands a QCM to the visitor at the head of the due queue', async () => {
+    await runSeed('no-session')
+    // The whole point of seeding QCM: a visitor must MEET one. `dueQueue` orders
+    // by due asc then created_at asc, and the learning-profile QCM is both 6 days
+    // overdue and seeded first, so it comes out top of the queue.
+    const { cards } = await dueQueue(db, DEMO, { limit: 3, now: new Date() })
+    const qcmFronts = new Set(DEMO_QCM_CARDS.map((q) => q.front))
+    expect(cards.filter((c) => qcmFronts.has(c.front)).length).toBeGreaterThan(0)
   })
 
   it('stores the session marker', async () => {
