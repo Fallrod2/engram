@@ -54,6 +54,22 @@ export interface AuthConfig {
   adminUserId: string | undefined
   /** `ENGRAM_DEMO_USER_ID` — the demo account, reset on each new login (§4). */
   demoUserId: string | undefined
+  /**
+   * Supabase anon (publishable) key — PUBLIC by design; it identifies the project
+   * and grants nothing on its own. Read here only so the server can call GoTrue's
+   * `token?grant_type=password` endpoint for the public demo login. On Vercel the
+   * Supabase integration injects `SUPABASE_ANON_KEY`.
+   */
+  anonKey: string | undefined
+  /** `ENGRAM_DEMO_EMAIL` — login of the demo Supabase account (demo CTA). */
+  demoEmail: string | undefined
+  /**
+   * `ENGRAM_DEMO_PASSWORD` — password of the demo account. SERVER ONLY: read here,
+   * consumed ONLY by `auth/demo-client.ts`, and NEVER reflected in a response
+   * (/health, /me, POST /api/demo/session), never logged, never in an error
+   * message. It must never reach the client bundle — hence no `VITE_` twin.
+   */
+  demoPassword: string | undefined
 }
 
 /** Pure: reads an env object, no network, no logging, never throws. */
@@ -75,6 +91,9 @@ export function resolveAuthConfig(env: Record<string, string | undefined>): Auth
     devUserId: env.ENGRAM_DEV_USER_ID || DEFAULT_DEV_USER_ID,
     adminUserId: env.ENGRAM_ADMIN_USER_ID || undefined,
     demoUserId: env.ENGRAM_DEMO_USER_ID || undefined,
+    anonKey: env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || undefined,
+    demoEmail: env.ENGRAM_DEMO_EMAIL || undefined,
+    demoPassword: env.ENGRAM_DEMO_PASSWORD || undefined,
   }
 }
 

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   apiErrorSchema,
   cardSchema,
+  demoSessionResponseSchema,
   hardestCardsResponseSchema,
   healthResponseSchema,
   reviewPreviewSchema,
@@ -10,6 +11,7 @@ import {
   undoReviewResponseSchema,
   type ApiErrorCode,
   type Card,
+  type DemoSessionResponse,
   type HardestCardsResponse,
   type HealthResponse,
   type ReviewCard,
@@ -159,6 +161,16 @@ export function qs(params: Record<string, string | number | boolean | undefined>
 /** Fetch + validate `GET /api/health` (kept from Phase 0). */
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return api.get('/health', healthResponseSchema, signal)
+}
+
+/**
+ * Open a session on the public demo account (`POST /api/demo/session`, landing
+ * CTA). Deliberately takes NO argument and sends NO body: the credentials live in
+ * the server environment only, and the route ignores anything posted to it. The
+ * returned token pair is handed straight to `supabase.auth.setSession`.
+ */
+export function createDemoSession(): Promise<DemoSessionResponse> {
+  return api.post('/demo/session', undefined, demoSessionResponseSchema)
 }
 
 /**

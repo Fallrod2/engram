@@ -591,8 +591,10 @@ export const apiErrorCodeSchema = z.enum([
   'conflict',
   'email_taken', // 409 — account CRUD: the email is already registered (GoTrue is the authority)
   'payload_too_large', // 413 — uploaded file exceeds the size limit
+  'rate_limited', // 429 — too many calls in the current window (public demo session route)
   'service_unavailable', // 503 — AI generation unavailable (no ANTHROPIC_API_KEY)
   'account_mgmt_unavailable', // 503 — account CRUD needs SUPABASE_URL + service_role (absent → clean 503)
+  'demo_unavailable', // 503 — the public demo account is not configured on this server
   'invalid_email', // 400 — account CRUD: GoTrue rejected the email as malformed
   'upstream_error', // 502 — a trusted upstream (e.g. OpenAI device-code init, GoTrue) refused/failed
   'internal_error',

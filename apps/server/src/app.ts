@@ -8,6 +8,7 @@ import { resolveAuthConfig } from './auth/config'
 import { createAuthMiddleware } from './http/auth'
 import { createProfileMiddleware } from './http/profile'
 import { createDemoMiddleware } from './http/demo'
+import { resolveDemoAuthClient } from './auth/demo-client'
 import { getCardGenerator, configuredGenerator } from './ai/generator'
 import { subjectsRouter } from './routes/subjects'
 import { decksRouter } from './routes/decks'
@@ -23,6 +24,7 @@ import { aiRouter } from './routes/ai'
 import { meRouter } from './routes/me'
 import { adminRouter } from './routes/admin'
 import { groupsRouter } from './routes/groups'
+import { demoRouter } from './routes/demo'
 
 /**
  * The Hono application, exported without a server binding so it can be
@@ -47,6 +49,7 @@ app.use('/api/*', createProfileMiddleware())
 app.use('/api/*', createDemoMiddleware())
 
 app.get('/api/health', (c) => {
+  const cfg = resolveAuthConfig(process.env)
   const body: HealthResponse = {
     status: 'ok',
     service: 'engram-server',
@@ -59,10 +62,16 @@ app.get('/api/health', (c) => {
     // Self-report of the gate. This call is PURE and never throws — the
     // fail-closed `misconfigured` case is judged ONLY by the middleware, so the
     // probe stays readable even on a prod misconfig (reports authEnforced:false).
-    authEnforced: resolveAuthConfig(process.env).enforced,
-    // Whether a demo account is wired (ENGRAM_DEMO_USER_ID). Read for the wave-2
-    // landing CTA; never leaks the demo id itself. `false` in the current prod.
-    demoEnabled: Boolean(process.env.ENGRAM_DEMO_USER_ID),
+    authEnforced: cfg.enforced,
+    // Whether a demo account is wired (ENGRAM_DEMO_USER_ID) — i.e. whether the
+    // wipe+reseed middleware has a target. Never leaks the demo id itself.
+    demoEnabled: Boolean(cfg.demoUserId),
+    // Whether `POST /api/demo/session` can actually open a session (URL + anon key
+    // + ENGRAM_DEMO_EMAIL + ENGRAM_DEMO_PASSWORD). This is what the landing reads
+    // to decide whether to render the demo CTA, so turning the demo on is a server
+    // env change — no front-end rebuild. Same predicate as the route's, so the two
+    // can never disagree. Never leaks a credential.
+    demoLoginEnabled: resolveDemoAuthClient(cfg) !== null,
   }
   // Validate against the shared contract before it leaves the server.
   return c.json(healthResponseSchema.parse(body))
@@ -82,12 +91,16 @@ app.route('/api/ai', aiRouter) // multi-provider AI config (settings, keys, test
 app.route('/api/me', meRouter) // authenticated identity probe (guard + nav + suspended screen)
 app.route('/api/admin', adminRouter) // IAM console: users, role/status/demo, delete, stats, audit
 app.route('/api/admin/groups', groupsRouter) // delegated-admin groups: CRUD, permissions, members
+app.route('/api/demo', demoRouter) // PUBLIC: POST /session opens the demo account's session
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
 
 app.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json(err.toResponse(), err.status as 400 | 401 | 403 | 404 | 409 | 413 | 502 | 503)
+    return c.json(
+      err.toResponse(),
+      err.status as 400 | 401 | 403 | 404 | 409 | 413 | 429 | 502 | 503,
+    )
   }
   // Hono-level failures (e.g. malformed JSON body → HTTPException 400) mapped
   // to the single error envelope so they never surface as an opaque 500.

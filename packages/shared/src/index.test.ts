@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { healthResponseSchema } from './index'
+import { demoSessionResponseSchema, healthResponseSchema } from './index'
 
 describe('healthResponseSchema', () => {
   it('accepts a well-formed payload', () => {
@@ -10,6 +10,7 @@ describe('healthResponseSchema', () => {
       fakeAi: false,
       authEnforced: false,
       demoEnabled: false,
+      demoLoginEnabled: false,
     })
     expect(result.success).toBe(true)
   })
@@ -30,5 +31,22 @@ describe('healthResponseSchema', () => {
       timestamp: 'not-a-date',
     })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('demoSessionResponseSchema', () => {
+  it('accepts a pair of non-empty tokens', () => {
+    const result = demoSessionResponseSchema.safeParse({
+      accessToken: 'access',
+      refreshToken: 'refresh',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects an empty token (a session the browser could not install)', () => {
+    expect(
+      demoSessionResponseSchema.safeParse({ accessToken: '', refreshToken: 'refresh' }).success,
+    ).toBe(false)
+    expect(demoSessionResponseSchema.safeParse({ accessToken: 'access' }).success).toBe(false)
   })
 })

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { Hono } from 'hono'
 import { SignJWT } from 'jose'
-import { createAuthMiddleware } from './auth'
+import { createAuthMiddleware, isPublicRoute } from './auth'
 import { ApiError } from './errors'
 
 /**
@@ -45,6 +45,15 @@ function makeApp() {
     c.json({ ok: true, sub: c.get('authClaims')?.sub ?? null }),
   )
   app.get('/api/health', (c) => c.json({ status: 'ok' }))
+  // Stand-ins for the real public route and its nearest neighbours, so a request
+  // that PASSES the gate lands on a 200 handler and a request that does not can
+  // only be answered by the middleware itself (401).
+  app.all('/api/demo/session', (c) => c.json({ ok: true }))
+  app.all('/api/demo/session/', (c) => c.json({ ok: true }))
+  app.all('/api/demo/sessions', (c) => c.json({ ok: true }))
+  app.all('/api/demo', (c) => c.json({ ok: true }))
+  app.all('/api/health/', (c) => c.json({ ok: true }))
+  app.all('/api/healthz', (c) => c.json({ ok: true }))
   app.onError((err, c) => {
     if (err instanceof ApiError) return c.json(err.toResponse(), err.status as 401)
     return c.json({ error: { code: 'internal_error', message: 'boom' } }, 500)
@@ -146,6 +155,75 @@ describe('createAuthMiddleware', () => {
     process.env.VERCEL = '1'
     const res = await makeApp().request('/api/health')
     expect(res.status).toBe(200)
+  })
+
+  it('POST /api/demo/session is public even when ON (the demo CTA holds no token)', async () => {
+    process.env.SUPABASE_URL = 'https://x.supabase.co'
+    const res = await makeApp().request('/api/demo/session', { method: 'POST' })
+    expect(res.status).toBe(200)
+  })
+
+  /**
+   * THE breach test. The gate exempts exactly two (method, path) pairs; anything
+   * else under `/api/*` must still 401 without a token. Enumerated as a table so
+   * a future exemption cannot slip in unnoticed: a new public route has to be
+   * added to `PUBLIC` here, in plain sight, or the "everything else is closed"
+   * case fails.
+   */
+  describe('the exemption is a two-entry allowlist', () => {
+    const PUBLIC: [string, string][] = [
+      ['GET', '/api/health'],
+      ['POST', '/api/demo/session'],
+    ]
+
+    const CLOSED: [string, string][] = [
+      // Same path, other verbs — the exemption is method-scoped.
+      ['GET', '/api/demo/session'],
+      ['PUT', '/api/demo/session'],
+      ['PATCH', '/api/demo/session'],
+      ['DELETE', '/api/demo/session'],
+      ['POST', '/api/health'],
+      ['DELETE', '/api/health'],
+      // Near-miss paths — the exemption is exact, not a prefix and not fuzzy.
+      ['POST', '/api/demo/session/'],
+      ['POST', '/api/demo/sessions'],
+      ['POST', '/api/demo'],
+      ['GET', '/api/demo'],
+      ['GET', '/api/health/'],
+      ['GET', '/api/healthz'],
+      // A representative slice of the real API surface.
+      ['GET', '/api/subjects'],
+      ['GET', '/api/me'],
+      ['GET', '/api/admin/users'],
+      ['POST', '/api/review/queue'],
+      ['GET', '/api/ping'],
+    ]
+
+    it('accepts exactly the two documented pairs and nothing else', () => {
+      for (const [method, path] of PUBLIC) expect(isPublicRoute(method, path)).toBe(true)
+      for (const [method, path] of CLOSED) expect(isPublicRoute(method, path)).toBe(false)
+      // Casing is not normalised anywhere — a case-mangled probe stays closed.
+      expect(isPublicRoute('post', '/api/demo/session')).toBe(false)
+      expect(isPublicRoute('POST', '/API/DEMO/SESSION')).toBe(false)
+    })
+
+    it('with the gate ON, every non-exempt route 401s without a token', async () => {
+      process.env.SUPABASE_URL = 'https://x.supabase.co'
+      const app = makeApp()
+      for (const [method, path] of CLOSED) {
+        const res = await app.request(path, { method })
+        expect(`${method} ${path} → ${res.status}`).toBe(`${method} ${path} → 401`)
+      }
+    })
+
+    it('with the gate ON, the two exempt pairs pass through', async () => {
+      process.env.SUPABASE_URL = 'https://x.supabase.co'
+      const app = makeApp()
+      for (const [method, path] of PUBLIC) {
+        const res = await app.request(path, { method })
+        expect(`${method} ${path} → ${res.status}`).toBe(`${method} ${path} → 200`)
+      }
+    })
   })
 
   it('bypass is logged loudly (audit §7)', async () => {

@@ -32,9 +32,33 @@ export const healthResponseSchema = z.object({
    * whether to show a "Try the demo" CTA. Never exposes the demo user id.
    */
   demoEnabled: z.boolean(),
+  /**
+   * True iff `POST /api/demo/session` can actually open a demo session — i.e. the
+   * server holds a Supabase URL + anon key AND the demo credentials
+   * (`ENGRAM_DEMO_EMAIL` / `ENGRAM_DEMO_PASSWORD`). STRICTLY NARROWER than
+   * `demoEnabled`, which only says a demo *account id* is wired for the reset
+   * middleware: one can be true without the other. The landing reads THIS one to
+   * decide whether to render the "Try the demo" CTA, so activating the demo is a
+   * server env change with no front-end redeploy. Never exposes the email, the
+   * password, or the demo user id.
+   */
+  demoLoginEnabled: z.boolean(),
 })
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>
+
+/**
+ * Response of `POST /api/demo/session` — the public demo login (landing CTA).
+ * Carries ONLY what `supabase.auth.setSession()` needs to install the session in
+ * the browser. The demo account's password is server-side only and NEVER appears
+ * here (nor in any error body or log).
+ */
+export const demoSessionResponseSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1),
+})
+
+export type DemoSessionResponse = z.infer<typeof demoSessionResponseSchema>
 
 export * from './domain'
 export * from './backup'

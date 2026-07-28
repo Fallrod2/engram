@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 /**
  * Landing render tests (landing spec §5.1). The landing renders bare and its
@@ -8,9 +9,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
  * anon-vs-authenticated routing decision is proven separately by the `requireAuth`
  * guard unit tests (auth-store.test.ts) and the e2e suites, so here we exercise
  * the presentational component with the REAL i18n + theme providers and mock only
- * the router `Link` (no RouterProvider in a unit test).
+ * the router (no RouterProvider in a unit test), the API client and Supabase.
  */
+const navigate = vi.fn()
 vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => navigate,
   Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) => (
     <a href={typeof to === 'string' ? to : '#'} {...props}>
       {children}
@@ -18,10 +21,34 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
+const { fetchHealth, createDemoSession, setSession } = vi.hoisted(() => ({
+  fetchHealth: vi.fn(),
+  createDemoSession: vi.fn(),
+  setSession: vi.fn(),
+}))
+vi.mock('@/lib/api', () => ({ fetchHealth, createDemoSession }))
+vi.mock('@/lib/supabase', () => ({
+  supabase: { auth: { setSession } },
+  AUTH_ENABLED_WEB: true,
+}))
+
 import { ThemeProvider } from '@/lib/theme'
 import { LangProvider } from '@/lib/i18n'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import LandingPage from './landing-page'
+
+/** The `/api/health` payload, with the demo switch under the test's control. */
+function health(demoLoginEnabled: boolean) {
+  return {
+    status: 'ok' as const,
+    service: 'engram-server' as const,
+    timestamp: new Date().toISOString(),
+    fakeAi: false,
+    authEnforced: true,
+    demoEnabled: demoLoginEnabled,
+    demoLoginEnabled,
+  }
+}
 
 function installMatchMedia() {
   Object.defineProperty(window, 'matchMedia', {
@@ -71,19 +98,35 @@ beforeEach(() => {
   installMatchMedia()
   installMockStorage()
   installNavigatorLanguage('fr-FR')
+  navigate.mockReset()
+  createDemoSession.mockReset()
+  setSession.mockReset()
+  // Default for the tests that do not care: no demo configured server-side.
+  fetchHealth.mockReset()
+  fetchHealth.mockResolvedValue(health(false))
 })
 afterEach(cleanup)
 
 function renderLanding() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  })
   render(
     <ThemeProvider>
       <LangProvider>
-        <TooltipProvider>
-          <LandingPage />
-        </TooltipProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <LandingPage />
+          </TooltipProvider>
+        </QueryClientProvider>
       </LangProvider>
     </ThemeProvider>,
   )
+}
+
+/** Wait for the health probe to settle so the CTA slot stops being a skeleton. */
+async function settleDemoProbe() {
+  await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
 }
 
 describe('<LandingPage>', () => {
@@ -142,5 +185,98 @@ describe('<LandingPage>', () => {
     const create = screen.getAllByRole('link', { name: /Create an account/ })
     expect(create.length).toBeGreaterThanOrEqual(2)
     for (const cta of create) expect(cta.getAttribute('href')).toBe('/signup')
+  })
+})
+
+/**
+ * Demo CTA. The whole point is that its presence is decided by the SERVER at
+ * runtime (`/api/health.demoLoginEnabled`), so enabling the demo needs no
+ * front-end deploy — and that clicking it never sends a credential.
+ */
+describe('<LandingPage> — demo CTA', () => {
+  const demoButton = () => screen.queryByRole('button', { name: 'Essayer la démo' })
+
+  it('is absent while the availability probe is in flight (a skeleton holds the slot)', () => {
+    fetchHealth.mockReturnValue(new Promise(() => {})) // never settles
+    renderLanding()
+    expect(demoButton()).toBeNull()
+    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.getByRole('status').getAttribute('aria-label')).toBe('Vérification de la démo')
+  })
+
+  it('stays hidden when the server reports no demo login', async () => {
+    renderLanding() // default health: demoLoginEnabled false
+    await settleDemoProbe()
+    expect(demoButton()).toBeNull()
+  })
+
+  it('stays hidden when the health probe itself fails', async () => {
+    fetchHealth.mockRejectedValue(new Error('offline'))
+    renderLanding()
+    await settleDemoProbe()
+    expect(demoButton()).toBeNull()
+  })
+
+  it('appears when the server reports a demo login, with no rebuild involved', async () => {
+    fetchHealth.mockResolvedValue(health(true))
+    renderLanding()
+    expect(await screen.findByRole('button', { name: 'Essayer la démo' })).toBeTruthy()
+  })
+
+  it('opens the session and enters the app, sending NO credential', async () => {
+    fetchHealth.mockResolvedValue(health(true))
+    createDemoSession.mockResolvedValue({ accessToken: 'acc', refreshToken: 'ref' })
+    setSession.mockResolvedValue({ error: null })
+    renderLanding()
+    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    await waitFor(() => expect(setSession).toHaveBeenCalled())
+    // No argument at all: the browser never holds nor transmits the demo password.
+    expect(createDemoSession).toHaveBeenCalledWith()
+    expect(setSession).toHaveBeenCalledWith({ access_token: 'acc', refresh_token: 'ref' })
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/' }))
+  })
+
+  it('shows a pending label and disables the button while opening the session', async () => {
+    fetchHealth.mockResolvedValue(health(true))
+    let release!: (v: { accessToken: string; refreshToken: string }) => void
+    createDemoSession.mockReturnValue(new Promise((r) => (release = r)))
+    setSession.mockResolvedValue({ error: null })
+    renderLanding()
+    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    const pending = await screen.findByRole('button', { name: 'Ouverture de la démo…' })
+    expect((pending as HTMLButtonElement).disabled).toBe(true)
+    release({ accessToken: 'acc', refreshToken: 'ref' })
+    await waitFor(() => expect(setSession).toHaveBeenCalled())
+  })
+
+  it('surfaces a readable error and re-enables the button when the demo fails', async () => {
+    fetchHealth.mockResolvedValue(health(true))
+    createDemoSession.mockRejectedValue(new Error('503'))
+    renderLanding()
+    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(
+      'La démo est indisponible pour le moment. Réessaie dans un instant.',
+    )
+    expect((demoButton() as HTMLButtonElement).disabled).toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('treats a Supabase setSession failure as a failure (no silent half-login)', async () => {
+    fetchHealth.mockResolvedValue(health(true))
+    createDemoSession.mockResolvedValue({ accessToken: 'acc', refreshToken: 'ref' })
+    setSession.mockResolvedValue({ error: { message: 'bad token' } })
+    renderLanding()
+    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('is localized like the rest of the page', async () => {
+    fetchHealth.mockResolvedValue(health(true))
+    renderLanding()
+    await screen.findByRole('button', { name: 'Essayer la démo' })
+    fireEvent.click(screen.getByRole('button', { name: 'en' }))
+    expect(screen.getByRole('button', { name: 'Try the demo' })).toBeTruthy()
   })
 })

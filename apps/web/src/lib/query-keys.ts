@@ -6,6 +6,12 @@
 export const qk = {
   /** The caller's own identity (`GET /api/me`) — drives the guard + admin nav. */
   me: ['me'] as const,
+  /**
+   * Public server capabilities (`GET /api/health`). Read by the landing to learn,
+   * AT RUNTIME, whether the demo login is configured — so enabling the demo is a
+   * server env change with no front-end redeploy.
+   */
+  health: ['health'] as const,
   admin: {
     all: ['admin'] as const,
     users: (q: { query: string | undefined; page: number; sort: string; dir: string }) =>
