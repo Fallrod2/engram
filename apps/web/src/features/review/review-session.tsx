@@ -1,22 +1,23 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { CloudOff, X } from 'lucide-react'
+import { CloudOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import { RewardIllustration } from '@/components/illustrations'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { useT, type TFunction } from '@/lib/i18n'
-import { useCoarsePointer } from '@/lib/use-media-query'
 import { useShell } from '@/components/shell/shell-context'
 import type { ReviewScope } from '@/lib/api'
 import { CardEditDialog } from '@/features/cards/card-edit-dialog'
 import { useReviewSession } from './use-review-session'
-import { SessionHeader } from './session-header'
+import { SessionExitButton, SessionHeader } from './session-header'
+import { useTouchSession } from './pointer-labels'
 import { ProgressBar } from './progress-bar'
 import { ReviewCard } from './review-card'
 import { RatingBar } from './rating-bar'
-import { SessionContextBar } from './session-context-bar'
+import { CONTEXT_ACTION_ROW, CONTEXT_INFO_ROW, SessionContextBar } from './session-context-bar'
 import { SessionSummary } from './session-summary'
 import { ExitConfirm } from './exit-confirm'
 import { IdleOverlay } from './idle-overlay'
@@ -96,7 +97,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
   if (api.phase === 'ERROR') {
     return (
-      <TerminalView onExit={api.requestExit} t={t}>
+      <TerminalView onExit={api.requestExit}>
         <EmptyState
           icon={CloudOff}
           title={t('empty.sessionErrorTitle')}
@@ -109,7 +110,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
   if (api.phase === 'EMPTY') {
     return (
-      <TerminalView onExit={api.requestExit} t={t}>
+      <TerminalView onExit={api.requestExit}>
         <EmptyState
           illustration={<RewardIllustration />}
           title={t('empty.sessionTitle')}
@@ -144,7 +145,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 
 function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
   const t = useT()
-  const coarse = useCoarsePointer()
+  const touch = useTouchSession()
   const current = api.current
   return (
     <>
@@ -233,8 +234,14 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
               <p className="text-center text-xs text-danger">{t('session.saveError')}</p>
             )}
             {/* Keyboard cheat-sheet — pointless (and a false promise) without a
-                keyboard, so it is hidden on touch devices (fix-session §3). */}
-            {!coarse && (
+                keyboard, so it is hidden on touch devices (fix-session §3).
+                T-029 — its room is not left empty on touch: the 17px it gives
+                back is re-spent, one row up, on the 44px labelled action row
+                `SessionContextBar` opens there. The reservation is per pointer
+                type and constant for the whole session, so nothing shifts
+                between ASKING and REVEALED on either device — and the LOADING
+                skeleton below mirrors it from the SAME two constants. */}
+            {!touch && (
               <p className="text-center text-2xs uppercase tracking-[0.08em] text-text-faint">
                 {t('session.footerHint')}
               </p>
@@ -253,45 +260,29 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
 }
 
 /** A close affordance for the terminal load states (Échap also exits). */
-function CloseButton({ onExit, t }: { onExit: () => void; t: TFunction }) {
+function CloseButton({ onExit }: { onExit: () => void }) {
   return (
     <div className="flex h-12 shrink-0 items-center justify-end px-4">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onExit}
-        aria-label={t('session.exitAria')}
-        className="text-text-muted"
-      >
-        <X className="size-4" />
-      </Button>
+      <SessionExitButton onExit={onExit} />
     </div>
   )
 }
 
-function TerminalView({
-  children,
-  onExit,
-  t,
-}: {
-  children: React.ReactNode
-  onExit: () => void
-  t: TFunction
-}) {
+function TerminalView({ children, onExit }: { children: React.ReactNode; onExit: () => void }) {
   return (
     <>
-      <CloseButton onExit={onExit} t={t} />
+      <CloseButton onExit={onExit} />
       <div className="flex flex-1 items-center justify-center">{children}</div>
     </>
   )
 }
 
 function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
-  const coarse = useCoarsePointer()
+  const touch = useTouchSession()
   return (
     <>
       <div className="h-0.5 w-full bg-surface-2" />
-      <CloseButton onExit={onExit} t={t} />
+      <CloseButton onExit={onExit} />
       {/* Mirrors PlayView's geometry exactly (same anchored region, same 680px
           column, same 12px gap, same 24px context strip, same rating row) so
           LOADING → ASKING swaps content in place instead of jumping. Since
@@ -303,7 +294,11 @@ function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
         <div className="flex min-h-0 w-full max-w-[680px] flex-1 flex-col gap-3">
           <Skeleton className="min-h-0 w-full flex-1 rounded-lg" />
           <div className="flex shrink-0 flex-col gap-2">
-            <Skeleton className="h-6 w-full rounded-sm" />
+            {/* Both heights come from `session-context-bar`, never from a number
+                retyped here: mirroring by hand is exactly what left this
+                skeleton 25px off the play screen before T-023. */}
+            <Skeleton className={cn(CONTEXT_INFO_ROW, 'w-full rounded-sm')} />
+            {touch && <Skeleton className={cn(CONTEXT_ACTION_ROW, 'w-full rounded-sm')} />}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-16 rounded-md" />
@@ -314,7 +309,7 @@ function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
                 would promise content that never loads — this only reserves the
                 space, on exactly the same `!coarse` condition, so the swap is
                 pixel-identical on both pointer types. */}
-            {!coarse && (
+            {!touch && (
               <p aria-hidden className="invisible text-center text-2xs uppercase tracking-[0.08em]">
                 {t('session.footerHint')}
               </p>

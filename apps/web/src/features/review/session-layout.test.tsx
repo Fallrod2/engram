@@ -32,6 +32,19 @@ import { RatingBar } from './rating-bar'
  *
  * The pixel-level proof stays a browser measurement (see the before/after
  * geometry captured for T-023); these are the invariants that make it hold.
+ *
+ * T-029 amendment. The touch adaptation ADDS a constant row to the control
+ * stack (`SessionContextBar`'s 44px action row) and REMOVES a constant one (the
+ * keyboard cheat-sheet). Neither weakens what this file pins, and the contract
+ * asserted here is deliberately unchanged: the rating zone still reserves ONE
+ * box, the same on both pointer types, at both breakpoints — the touch reveal
+ * button is laid out inside it exactly as the `Espace` hint was. What T-029
+ * changes lives one level up and is pinned in `touch-affordances.test.tsx`
+ * ("the instrumentation strip keeps its 24px on BOTH pointer types"), plus the
+ * Chromium measurement in the T-029 report: at 390×844, 320×568 and 834×1112
+ * the card, the question and the control stack sit at the same y in ASKING, in
+ * REVEALED and on the next card, and the LOADING skeleton mirrors the play
+ * stack to the pixel (both read the same two exported constants).
  */
 
 // jsdom defines no `Element.scrollTo`; `ReviewCard` calls it on reveal.

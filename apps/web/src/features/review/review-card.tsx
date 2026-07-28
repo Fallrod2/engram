@@ -5,6 +5,7 @@ import type { ParsedQcm, QcmOption } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { Markdown } from '@/components/markdown'
+import { useTouchSession } from './pointer-labels'
 import { contentAlign } from './content-align'
 
 /**
@@ -61,6 +62,7 @@ export function ReviewCard({
   onSelect: (index: number) => void
 }) {
   const t = useT()
+  const touch = useTouchSession()
   const scrollRef = useRef<HTMLDivElement>(null)
   const answerRef = useRef<HTMLDivElement>(null)
   const frontAlign = useMemo(() => contentAlign(front), [front])
@@ -75,6 +77,14 @@ export function ReviewCard({
     [qcm],
   )
   const interactive = !revealed && !!onReveal && qcm === null
+  // T-029 — tapping the card still reveals on a phone, but it stops ADVERTISING
+  // itself as a button there: the rating zone already renders an explicit
+  // "Révéler la réponse" control with the very same accessible name, and two
+  // identically-named buttons for one action is a screen reader walking past
+  // the same command twice. Found by the browser harness, which refused the
+  // ambiguous locator. On a fine pointer the card is the ONLY reveal affordance
+  // (the hint next to it is plain text), so there the role has to stay.
+  const named = interactive && !touch
   // A QCM whose back says nothing beyond the answer letter has no answer block
   // at all: the options already carry the verdict, and a structural rule that
   // announces an empty section is worse than no rule.
@@ -99,8 +109,8 @@ export function ReviewCard({
   return (
     <article
       data-revealed={revealed}
-      role={interactive ? 'button' : undefined}
-      aria-label={interactive ? t('session.revealAria') : undefined}
+      role={named ? 'button' : undefined}
+      aria-label={named ? t('session.revealAria') : undefined}
       onClick={interactive ? onReveal : undefined}
       // No `min-h-0` here: what lets this flex item shrink below its intrinsic
       // size is `overflow-hidden` (automatic minimum size is 0 once `overflow`
@@ -233,6 +243,11 @@ function QcmOptions({
             aria-keyshortcuts={option.letter}
             onClick={() => onSelect(index)}
             className={cn(
+              // T-029 — a QCM is answered by pointing at an option, so the option
+              // IS the primary target on a phone. No floor is added here: measured
+              // at 390×844, `py-2.5` around one line of `text-card` already gives
+              // 49.2px, over the 44px WCAG 2.5.5 target. A `min-h-11` would be an
+              // inert class documenting a problem that does not exist.
               'flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left',
               'transition-colors duration-fast ease-out disabled:pointer-events-none',
               !revealed && 'cursor-pointer border-border bg-surface-3 hover:border-border-strong',

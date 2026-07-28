@@ -436,6 +436,9 @@ export const dictFr = {
     noCardsBody:
       'Tes matières sont prêtes — crée un deck et des cartes pour lancer ta première session.',
     viewMySubjects: 'Voir mes matières',
+    loadingStreak: 'Chargement de la série',
+    loadingExams: 'Chargement des prochains examens',
+    loadingActivity: 'Chargement de l’activité récente',
     streak: {
       label: 'Série',
       daysStreak_one: 'jour de suite',
@@ -463,6 +466,12 @@ export const dictFr = {
   today: {
     nothingTitle: 'Rien à réviser aujourd’hui.',
     nothingBody: 'Tout est à jour.',
+    // T-027 : « tout est à jour » est une AFFIRMATION. Tant que la file n'est pas
+    // revenue du serveur, on ne la prononce pas — on charge, ou on dit qu'on ne
+    // sait pas.
+    loadingAria: 'Chargement de la file du jour',
+    unknownTitle: 'File du jour indisponible.',
+    unknownBody: 'Impossible de savoir ce qu’il y a à réviser pour l’instant.',
     toReviewToday: 'à réviser aujourd’hui',
     overdue: 'dont {n} en retard',
     examPrompt: 'Examen',
@@ -509,16 +518,45 @@ export const dictFr = {
     note: 'Impossible de charger cette note.',
     generation: 'Impossible de charger cette génération.',
     planning: 'Impossible de charger le planning.',
+    // 404 sur un détail (T-028) : le serveur a répondu, et sa réponse est que
+    // l'entité n'existe pas. Ce n'est PAS un échec de chargement — le dire
+    // autrement laissait croire à un incident réseau et invitait à réessayer.
+    missing: {
+      subject: 'Cette matière n’existe plus.',
+      deck: 'Ce deck n’existe plus.',
+      note: 'Cette note n’existe plus.',
+      generation: 'Cette génération n’existe plus.',
+    },
+  },
+
+  // Écran d'URL inconnue (T-028 b), monté comme `notFoundComponent` de la racine.
+  notFound: {
+    // Titre de section dans l'en-tête du shell — l'écran 404 porte son propre
+    // <h1>, donc l'en-tête n'affiche plus « engram » ni un second <h1>.
+    headerTitle: 'Page introuvable',
+    code: 'Erreur 404',
+    title: 'Cette page n’existe pas.',
+    body: 'Le lien est peut-être périmé, ou l’adresse contient une faute. Rien n’a été perdu.',
+    goBack: 'Page précédente',
+    meta: 'Page introuvable · engram',
   },
 
   session: {
     scopeDeck: 'Deck',
     scopeSubject: 'Matière',
     scopeAll: 'Toutes les cartes',
-    exitAria: 'Quitter la session (Échap)',
+    exitAria: 'Quitter la session',
+    // T-029 : un raccourci ne s'annonce que là où on peut l'appuyer. Le suffixe
+    // est un gabarit, pas un morceau de chaque libellé : au doigt, la phrase lue
+    // est la même moins la touche — dans les deux langues, et sans entretenir
+    // deux copies de chaque phrase qui finiraient par diverger.
+    withShortcut: '{label} ({key})',
     keySpace: 'Espace',
     keyEnter: 'Entrée',
     keyEsc: 'Échap',
+    keyEdit: 'E',
+    keySkip: 'S',
+    keyUndo: 'U',
     revealHint: 'pour révéler',
     revealButton: 'Révéler la réponse',
     revealAria: 'Révéler la réponse',
@@ -535,12 +573,14 @@ export const dictFr = {
     difficultyAria: 'Difficulté de cette carte : {value} sur 10',
     difficultyUnknown: 'Difficulté de cette carte : pas encore évaluée',
     skip: 'Passer',
-    skipAria: 'Passer cette carte sans la noter (S)',
+    skipAria: 'Passer cette carte sans la noter',
     edit: 'Éditer',
-    editAria: 'Éditer cette carte (E)',
+    editAria: 'Éditer cette carte',
     undo: 'Annuler',
-    undoAria: 'Annuler la dernière note (U)',
+    undoAria: 'Annuler la dernière note',
     paused: 'Session en pause — appuie sur une touche ou clique pour reprendre',
+    // La même phrase pour un doigt : ni touche à appuyer, ni clic à faire.
+    pausedTouch: 'Session en pause — touche l’écran pour reprendre',
     exitTitle: 'Quitter la session ?',
     exitDesc: 'Ta progression est déjà enregistrée.',
     exitResume: 'Reprendre',
