@@ -1,11 +1,11 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { motion } from 'motion/react'
 import { Check, X } from 'lucide-react'
+import type { ParsedQcm, QcmOption } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { Markdown } from '@/components/markdown'
 import { contentAlign } from './content-align'
-import type { ParsedQcm, QcmOption } from './qcm'
 
 /**
  * The flashcard — a vertical reveal, not a 3D flip. The question is anchored at

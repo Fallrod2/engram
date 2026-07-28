@@ -166,7 +166,7 @@ export interface DemoQcm {
  * database: a card renders as an interactive quiz when its Markdown matches the
  * shape the generation prompt asks for (`ai/prompts/cards.v1.ts`,
  * `QUIZ_INSTRUCTIONS`) and the render-time parser accepts
- * (`apps/web/src/features/review/qcm.ts`, `parseQcm`). That shape is a CONTRACT,
+ * (`packages/shared/src/qcm.ts`, `parseQcm`). That shape is a CONTRACT,
  * and breaking it fails SILENTLY — the card just falls back to the plain
  * Markdown rendering, which is exactly the bug this seed had:
  *

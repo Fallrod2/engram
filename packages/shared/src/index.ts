@@ -63,3 +63,4 @@ export type DemoSessionResponse = z.infer<typeof demoSessionResponseSchema>
 export * from './domain'
 export * from './backup'
 export * from './admin'
+export * from './qcm'

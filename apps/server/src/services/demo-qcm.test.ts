@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEMO_QCM_CARDS } from '../../apps/server/src/services/demo.service'
-import { parseQcm } from '../../apps/web/src/features/review/qcm'
+import { parseQcm } from '@engram/shared'
+import { DEMO_QCM_CARDS } from './demo.service'
 
 /**
  * The demo seed writes QCM as plain Markdown (T-022), and nothing at write time
@@ -8,13 +8,9 @@ import { parseQcm } from '../../apps/web/src/features/review/qcm'
  * ordinary front/back rendering. This suite closes that hole by running the REAL
  * render-time parser over the seeded cards.
  *
- * It lives in `e2e/` because that is the only place in the repo a single test
- * can import both `apps/server` and `apps/web`: `parseQcm` is a pure,
- * dependency-free module but it sits under `apps/web/src`, which the server's
- * `rootDir` forbids it from reaching. The proper fix is to move `qcm.ts` to
- * `packages/shared` — the format is a contract between the generation prompt
- * (server), this seed (server) and the renderer (web), so `shared` is where it
- * belongs — after which this file moves next to `demo.service.spec.ts`.
+ * Vitest, not `bun:test`, hence `.test.ts` and not the `.spec.ts` of its
+ * neighbour `demo.service.spec.ts`: nothing here touches the database, only the
+ * literal `DEMO_QCM_CARDS` and the pure parser.
  */
 
 /**
