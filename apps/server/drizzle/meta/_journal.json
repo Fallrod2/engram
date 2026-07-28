@@ -71,6 +71,13 @@
       "when": 1784300000000,
       "tag": "0009_rbac_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784400000000,
+      "tag": "0010_revoke_data_api_grants",
+      "breakpoints": true
     }
   ]
 }
