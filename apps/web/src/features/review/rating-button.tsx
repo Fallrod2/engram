@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
+import { useTouchSession } from './pointer-labels'
 import type { RatingMeta } from './labels'
 
 /**
@@ -8,6 +9,18 @@ import type { RatingMeta } from './labels'
  * mono `tabular-nums` colored by the rating token. Border is neutral at rest;
  * hover/focus borrows the token color + its `-subtle` fill. Never a full colored
  * fill at rest (design: color reserved). Focus is the global indigo double-ring.
+ *
+ * T-029 — the `1` `2` `3` `4` chip is dropped on a touch pointer. It was the
+ * last piece of the screen still teaching a keyboard to a device that has none:
+ * the grid itself was already thumb-sized (64px tall, two columns under 640px)
+ * and the tester called it out for that reason alone. The chip is the ONLY thing
+ * that goes — `aria-keyshortcuts` stays on the button and the key stays live in
+ * the session's global router, so a tablet with a keyboard case loses the
+ * advertisement and keeps the shortcut.
+ *
+ * Geometry is untouched by the swap: the button is a fixed `h-16` whose first
+ * row is `max(Kbd 16px, label 20px) = 20px` with or without the chip, so the
+ * anchored control stack (T-023) measures the same on both pointer types.
  */
 
 interface TokenClasses {
@@ -62,6 +75,7 @@ export function RatingButton({
   onRate: () => void
 }) {
   const t = useT()
+  const touch = useTouchSession()
   const tokenCls = TOKENS[meta.token]
   const ratingLabel = t(meta.a11y)
   // The name has to START with the rating label: `reviewAllGood` (in
@@ -84,7 +98,7 @@ export function RatingButton({
       )}
     >
       <span className="flex items-center gap-1.5">
-        <Kbd>{meta.grade}</Kbd>
+        {!touch && <Kbd>{meta.grade}</Kbd>}
         <span className="text-sm font-medium text-text">{t(meta.label)}</span>
       </span>
       <span

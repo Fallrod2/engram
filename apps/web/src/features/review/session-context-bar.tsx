@@ -1,10 +1,28 @@
+import type { LucideIcon } from 'lucide-react'
 import { Pencil, SkipForward, Undo2 } from 'lucide-react'
 import { FSRS_STATE_LABEL_KEYS, glyphClass } from '@/components/fsrs-state-glyph'
 import { Kbd } from '@/components/ui/kbd'
-import { useT, type TFunction } from '@/lib/i18n'
-import { useCoarsePointer } from '@/lib/use-media-query'
+import { useT, type TFunction, type TKey } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { useShortcutName, useTouchSession } from './pointer-labels'
 import { REMAINING_KEY_BY_STATE, REMAINING_STATES, type RemainingByState } from './queue-stats'
+
+/**
+ * The instrumentation strip: 24px, on every pointer type. Exported because the
+ * LOADING skeleton (`review-session.tsx`) mirrors this block pixel for pixel and
+ * must not copy the number by hand — that is exactly how the skeleton ended up
+ * 25px off the play screen before T-023.
+ */
+export const CONTEXT_INFO_ROW = 'h-6'
+
+/**
+ * The touch-only action row (T-029). 44px is not a taste: `Éditer` and `Passer`
+ * were a 12×12px glyph each, measured at 390×844 — a quarter of the 44×44 floor
+ * WCAG 2.5.5 asks for, and unlabelled on top of that. On a keyboard the same two
+ * actions stay where they were, inside the 24px strip, because there they are
+ * pointed at with a cursor and pressed with `E` / `S`.
+ */
+export const CONTEXT_ACTION_ROW = 'h-11'
 
 /** Segments of the difficulty gauge — one per two points of the 1-10 scale. */
 const DIFFICULTY_SEGMENTS = 5
@@ -108,10 +126,78 @@ function DifficultyGauge({ difficulty, t }: { difficulty: number; t: TFunction }
 }
 
 /**
+ * One per-card action, in the two forms the two pointer types need.
+ *
+ * KEYBOARD (unchanged, to the class): a 17px line of `text-2xs` — icon, label
+ * collapsing under 640px, `<Kbd>` chip. It is a footnote next to the ratings,
+ * which is the correct weight when `E` and `S` do the job.
+ *
+ * TOUCH: a labelled 44px control. The three things the tester had to guess are
+ * all answered here — the word instead of the letter (`Passer`, not `S`), a
+ * target a thumb can hit, and no chip promising a key the device lacks. The
+ * label is NEVER hidden on touch: a lone glyph is what made "Passer" read as
+ * decoration.
+ */
+function ActionButton({
+  icon: Icon,
+  label,
+  labelKey,
+  shortcut,
+  touch,
+  disabled,
+  onClick,
+}: {
+  icon: LucideIcon
+  /** Accessible name, already composed for the pointer type. */
+  label: string
+  labelKey: TKey
+  shortcut: string
+  touch: boolean
+  disabled: boolean
+  onClick: () => void
+}) {
+  const t = useT()
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-keyshortcuts={shortcut}
+      // Focus is the global double-ring indigo (styles.css :focus-visible).
+      className={cn(
+        'flex items-center transition-colors disabled:pointer-events-none disabled:opacity-50',
+        touch
+          ? // `active:` and not `hover:`: a finger has no hover, and a sticky
+            // hover state after a tap is the classic mobile artefact.
+            'h-11 gap-2 rounded-sm px-3 text-sm text-text-muted active:bg-surface-2'
+          : 'gap-1.5 text-text-faint hover:text-text-muted',
+      )}
+    >
+      <Icon aria-hidden className={touch ? 'size-4' : 'size-3'} />
+      {/* On a keyboard the label still collapses under 640px — the 24px strip
+          has to hold three buttons and four counters at 320px. On touch it is
+          on its own row, so it always has the room. */}
+      <span className={touch ? undefined : 'hidden sm:inline'}>{t(labelKey)}</span>
+      {!touch && <Kbd>{shortcut}</Kbd>}
+    </button>
+  )
+}
+
+/**
  * The strip between the card and the ratings: 24px of session instrumentation
  * that never touches the reading surface. It holds what is still ahead — the
  * four FSRS counters, right-aligned — the per-card actions on the left, and the
  * current card's difficulty in between.
+ *
+ * T-029 — on touch the actions move OUT of that strip and onto a 44px row of
+ * their own, under it. They cannot stay: at 320px the three labelled buttons
+ * measure ~196px and the four counters ~120px, which overflows the 296px the
+ * column has, and 44px controls next to 11px counters read as one row anyway.
+ * The strip itself keeps its 24px on both pointer types, so the only thing that
+ * differs between a phone and a laptop is one extra row that is present for the
+ * whole session — never appearing or disappearing between ASKING and REVEALED,
+ * which is the invariant T-023 bought.
  */
 export function SessionContextBar({
   remaining,
@@ -134,84 +220,97 @@ export function SessionContextBar({
   onUndo: () => void
 }) {
   const t = useT()
-  // No keyboard on touch → drop the `S` chip (fix-session §3).
-  const coarse = useCoarsePointer()
+  const touch = useTouchSession()
+  const name = useShortcutName()
+
+  // The three per-card actions, declared once and rendered in whichever row the
+  // pointer type puts them in. Order is the same on both: Annuler · Éditer ·
+  // Passer — undo looks BACKWARD (the card you just left), while the two others
+  // act on the card in front of you.
+  //
+  // "Annuler" exists only when there is something to take back, rather than
+  // standing there permanently dead; once armed it STAYS mounted for the whole
+  // undo — `disabled` while the POST is in flight, never removed under the
+  // finger (T-010). While an undo is in flight the reducer also refuses
+  // OPEN_EDIT and SKIP_CARD, so those two say so instead of eating the tap.
+  const actions = (
+    <>
+      {canUndo && (
+        <ActionButton
+          icon={Undo2}
+          label={name('session.undoAria', t('session.keyUndo'))}
+          labelKey="session.undo"
+          shortcut={t('session.keyUndo')}
+          touch={touch}
+          disabled={undoing}
+          onClick={onUndo}
+        />
+      )}
+      <ActionButton
+        icon={Pencil}
+        label={name('session.editAria', t('session.keyEdit'))}
+        labelKey="session.edit"
+        shortcut={t('session.keyEdit')}
+        touch={touch}
+        disabled={undoing}
+        onClick={onEdit}
+      />
+      <ActionButton
+        icon={SkipForward}
+        label={name('session.skipAria', t('session.keySkip'))}
+        labelKey="session.skip"
+        shortcut={t('session.keySkip')}
+        touch={touch}
+        disabled={undoing}
+        onClick={onSkip}
+      />
+    </>
+  )
+
   return (
-    <div className="flex h-6 shrink-0 items-center justify-between text-2xs">
-      {/* Left slot: the per-card actions. A flex row, so the steps that follow
-          can drop their own buttons next to this one. */}
-      <div className="flex items-center gap-3">
-        {/* Leftmost, and only when there is something to take back: undo looks
-            BACKWARD (the card you just left), while the two others act on the
-            card in front of you. Nothing to undo → no button at all, rather than
-            a permanently dead control. Once armed it STAYS mounted for the whole
-            undo — `disabled` while the POST is in flight, never removed under
-            the pointer (T-010). */}
-        {canUndo && (
-          <button
-            type="button"
-            onClick={onUndo}
-            disabled={undoing}
-            aria-label={t('session.undoAria')}
-            className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted disabled:pointer-events-none disabled:opacity-50"
-          >
-            <Undo2 aria-hidden className="size-3" />
-            <span className="hidden sm:inline">{t('session.undo')}</span>
-            {!coarse && <Kbd>U</Kbd>}
-          </button>
-        )}
-        {/* While an undo is in flight the reducer refuses OPEN_EDIT and
-            SKIP_CARD, so the bar says so instead of swallowing the click. */}
-        {/* Editing sits between "Annuler" and "Passer": a correction is about
-            the card you are on, a skip leaves it. */}
-        <button
-          type="button"
-          onClick={onEdit}
-          disabled={undoing}
-          aria-label={t('session.editAria')}
-          className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted disabled:pointer-events-none disabled:opacity-50"
-        >
-          <Pencil aria-hidden className="size-3" />
-          <span className="hidden sm:inline">{t('session.edit')}</span>
-          {!coarse && <Kbd>E</Kbd>}
-        </button>
-        <button
-          type="button"
-          onClick={onSkip}
-          disabled={undoing}
-          // The label collapses under 640px (the bar must hold at 320px), so the
-          // aria-label always carries the full meaning, shortcut included.
-          aria-label={t('session.skipAria')}
-          // Focus is the global double-ring indigo (styles.css :focus-visible).
-          className="flex items-center gap-1.5 text-text-faint transition-colors hover:text-text-muted disabled:pointer-events-none disabled:opacity-50"
-        >
-          <SkipForward aria-hidden className="size-3" />
-          <span className="hidden sm:inline">{t('session.skip')}</span>
-          {!coarse && <Kbd>S</Kbd>}
-        </button>
-      </div>
-      {difficulty !== null && <DifficultyGauge difficulty={difficulty} t={t} />}
+    <div className="flex shrink-0 flex-col gap-2">
       <div
-        role="group"
-        aria-label={t('session.remainingAria')}
-        className="flex items-center gap-3 font-mono tabular-nums"
+        className={cn(
+          'flex shrink-0 items-center gap-3 text-2xs',
+          CONTEXT_INFO_ROW,
+          // On touch the left slot is empty (the actions live on their own row),
+          // so the counters would drift left under `justify-between`. They stay
+          // pinned to the right edge, exactly where the keyboard layout has them.
+          touch ? 'justify-end' : 'justify-between',
+        )}
       >
-        {REMAINING_STATES.map((state) => {
-          const value = remaining[REMAINING_KEY_BY_STATE[state]]
-          return (
-            <span key={state} className="flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className={cn('inline-block size-2 shrink-0 rounded-xs', glyphClass(state))}
-              />
-              {/* The square carries no text, so the state name is spoken from
-                  here: the group reads "Nouvelle 3, Apprentissage 1, …". */}
-              <span className="sr-only">{t(FSRS_STATE_LABEL_KEYS[state])}</span>
-              <span className={value === 0 ? 'text-text-faint' : 'text-text-muted'}>{value}</span>
-            </span>
-          )
-        })}
+        {/* Left slot: the per-card actions on a keyboard. A flex row, so the
+            steps that follow can drop their own buttons next to these. */}
+        {!touch && <div className="flex items-center gap-3">{actions}</div>}
+        {difficulty !== null && <DifficultyGauge difficulty={difficulty} t={t} />}
+        <div
+          role="group"
+          aria-label={t('session.remainingAria')}
+          className="flex items-center gap-3 font-mono tabular-nums"
+        >
+          {REMAINING_STATES.map((state) => {
+            const value = remaining[REMAINING_KEY_BY_STATE[state]]
+            return (
+              <span key={state} className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className={cn('inline-block size-2 shrink-0 rounded-xs', glyphClass(state))}
+                />
+                {/* The square carries no text, so the state name is spoken from
+                    here: the group reads "Nouvelle 3, Apprentissage 1, …". */}
+                <span className="sr-only">{t(FSRS_STATE_LABEL_KEYS[state])}</span>
+                <span className={value === 0 ? 'text-text-faint' : 'text-text-muted'}>{value}</span>
+              </span>
+            )
+          })}
+        </div>
       </div>
+      {/* `-ml-3` cancels the first button's own padding so its glyph lines up
+          with the card's left edge one row above — the padding is the tap
+          target, not an indent. */}
+      {touch && (
+        <div className={cn('-ml-3 flex shrink-0 items-center', CONTEXT_ACTION_ROW)}>{actions}</div>
+      )}
     </div>
   )
 }

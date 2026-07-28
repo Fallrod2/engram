@@ -122,29 +122,86 @@ function profile(i: number): CardSpec['reviews'] {
   }
 }
 
-/** Small pools of neutral, credible flashcards (no personal data). */
+/**
+ * Content pools — neutral, credible flashcards, no personal data (T-027).
+ *
+ * Each pool must hold AT LEAST as many entries as the slots its deck receives
+ * (7 each today, see `demoCardSpecs`). It used to hold fewer, and the builder
+ * cycled with a modulo: the visitor answered the same question twice in one
+ * session and "Cartes les plus dures" listed the same card twice. The modulo is
+ * gone — a pool that runs short now throws — and `demo-seed.test.ts` pins that
+ * no two seeded cards share a front.
+ *
+ * This is the demo's shop window: write real cards here, not filler.
+ */
 const AUTOMATA = [
-  ['Qu’est-ce qu’un automate fini déterministe ?', 'Un 5-uplet (Q, Σ, δ, q₀, F) avec δ totale.'],
-  ['Différence AFD / AFN ?', 'L’AFN autorise plusieurs transitions (ou ε) par symbole.'],
-  ['Théorème de Kleene ?', 'Langages réguliers = langages reconnus par un automate fini.'],
-  ['Lemme de l’étoile sert à…', 'prouver qu’un langage n’est PAS régulier.'],
-  ['Déterminisation d’un AFN ?', 'Construction des sous-ensembles (2^Q états au pire).'],
+  [
+    'Qu’est-ce qu’un automate fini déterministe ?',
+    'Un 5-uplet (Q, Σ, δ, q₀, F) où δ : Q × Σ → Q est une fonction totale : un seul état atteignable par symbole lu.',
+  ],
+  [
+    'Différence AFD / AFN ?',
+    'L’AFN autorise plusieurs transitions (ou des ε-transitions) pour un même symbole ; l’AFD en impose exactement une.',
+  ],
+  [
+    'Théorème de Kleene ?',
+    'Langages réguliers = langages reconnus par un automate fini = langages décrits par une expression régulière.',
+  ],
+  [
+    'À quoi sert le lemme de l’étoile ?',
+    'À prouver qu’un langage n’est PAS régulier : au-delà d’une longueur seuil, tout mot devrait pouvoir se pomper.',
+  ],
+  [
+    'Comment déterminiser un AFN ?',
+    'Par la construction des sous-ensembles : un état de l’AFD est un ensemble d’états de l’AFN, d’où 2^|Q| états au pire.',
+  ],
+  [
+    'Que dit le théorème de Myhill-Nerode ?',
+    'Un langage est régulier ssi son nombre de classes d’équivalence à droite est fini ; ce nombre est la taille de l’AFD minimal.',
+  ],
+  [
+    'Comment obtenir le complémentaire d’un langage régulier ?',
+    'On déterminise, on complète la fonction de transition (état puits), puis on échange états finaux et non finaux.',
+  ],
 ]
 const GRAMMARS = [
-  ['Grammaire hors-contexte ?', 'Règles A → α avec A non-terminal, α ∈ (V∪Σ)*.'],
-  ['Forme normale de Chomsky ?', 'A → BC ou A → a (plus S → ε éventuellement).'],
-  ['Ambiguïté d’une grammaire ?', 'Un mot admet ≥ 2 arbres de dérivation distincts.'],
-  ['Automate à pile reconnaît…', 'les langages hors-contexte.'],
+  [
+    'Grammaire hors-contexte ?',
+    'Un ensemble de règles A → α, avec A non-terminal et α ∈ (V ∪ Σ)* : le membre gauche ne dépend d’aucun contexte.',
+  ],
+  [
+    'Forme normale de Chomsky ?',
+    'Toute règle est A → BC ou A → a, plus S → ε si le langage contient le mot vide.',
+  ],
+  [
+    'Quand une grammaire est-elle ambiguë ?',
+    'Quand un même mot admet au moins deux arbres de dérivation distincts.',
+  ],
+  [
+    'Que reconnaît un automate à pile ?',
+    'Exactement les langages hors-contexte : la pile mémorise un contexte non borné, ce qu’un automate fini ne sait pas faire.',
+  ],
+  [
+    'Hiérarchie de Chomsky, du plus général au plus restreint ?',
+    'Type 0 (récursivement énumérables) ⊃ type 1 (contextuels) ⊃ type 2 (hors-contexte) ⊃ type 3 (réguliers).',
+  ],
+  [
+    'Que contient FIRST(α) ?',
+    'Les terminaux qui peuvent commencer un mot dérivé de α, plus ε si α se dérive en ε.',
+  ],
+  [
+    'Comment éliminer la récursivité à gauche de A → Aα | β ?',
+    'On la rend droite : A → β A′ et A′ → α A′ | ε.',
+  ],
 ]
 const VOCAB = [
   ['to improve', 'améliorer'],
-  ['to achieve', 'atteindre / réaliser'],
-  ['a deadline', 'une échéance'],
-  ['to gather', 'rassembler'],
+  ['to achieve', 'atteindre, mener à bien'],
+  ['a deadline', 'une échéance, une date limite'],
+  ['to gather', 'rassembler, recueillir'],
   ['reliable', 'fiable'],
   ['to overcome', 'surmonter'],
-  ['a flaw', 'un défaut'],
-  ['to enhance', 'renforcer / améliorer'],
+  ['a flaw', 'un défaut, une faille'],
 ]
 
 /** Index into the `pools` array built in `seedDemo` — hence the target deck. */
@@ -177,8 +234,8 @@ export interface DemoQcm {
  *    NEVER the letter followed by `.`: that form is refused on purpose, it
  *    collides with French abbreviations and initials (`c.-à-d.`, `A. Aho`).
  *
- * These four cards TAKE OVER the last four slots of the 25-card loop below
- * (n = 21…24): they reuse those slots' decks and review profiles, so the dataset
+ * These four cards TAKE the first four of the 25 slots built by
+ * `demoCardSpecs()`, declaring their own deck and review profile, so the dataset
  * keeps its exact shape — 25 cards, 60 review logs, same per-deck counts.
  *
  * Profile 1 is load-bearing. It replays a single `Good` 6 days ago, which leaves
@@ -245,6 +302,51 @@ export const DEMO_QCM_CARDS: readonly DemoQcm[] = [
 /** The seed always holds 25 cards — the QCM take four of those slots. */
 const TOTAL_CARDS = 25
 
+/** A card the seed will write, still pool-indexed (deck ids only exist in `seedDemo`). */
+export interface DemoCardSpec {
+  /** `POOL_AUTOMATA` | `POOL_GRAMMARS` | `POOL_VOCAB`. */
+  pool: number
+  front: string
+  back: string
+  reviews: CardSpec['reviews']
+}
+
+/**
+ * The 25 cards of the seed, as pure data — no DB, no clock beyond the relative
+ * `daysAgo` of the profiles. Extracted from `seedDemo` so the invariants can be
+ * tested without a database (`demo-seed.test.ts`).
+ *
+ * Order matters: QCM first, because seeding order decides `created_at`, which is
+ * how `dueQueue` breaks ties between cards sharing a due date (`DEMO_QCM_CARDS`).
+ *
+ * Then a round-robin over the three pools: slot n goes to pool n % 3 and takes
+ * that pool's entry ⌊n / 3⌋. NO modulo on the entry index — running past the end
+ * of a pool is a bug (it used to duplicate cards silently, T-027), so it throws.
+ */
+export function demoCardSpecs(): DemoCardSpec[] {
+  const pools = [AUTOMATA, GRAMMARS, VOCAB]
+  const specs: DemoCardSpec[] = DEMO_QCM_CARDS.map((q) => ({
+    pool: q.pool,
+    front: q.front,
+    back: q.back,
+    reviews: profile(q.profile),
+  }))
+  for (let n = 0; n < TOTAL_CARDS - DEMO_QCM_CARDS.length; n++) {
+    const poolIndex = n % pools.length
+    const pool = pools[poolIndex]!
+    const entryIndex = Math.floor(n / pools.length)
+    const pair = pool[entryIndex]
+    if (!pair) {
+      throw new Error(
+        `demo seed: pool ${poolIndex} has ${pool.length} entries but slot ${n} needs entry ${entryIndex}. ` +
+          'Write more distinct cards — never cycle, it duplicates them (T-027).',
+      )
+    }
+    specs.push({ pool: poolIndex, front: pair[0]!, back: pair[1]!, reviews: profile(n) })
+  }
+  return specs
+}
+
 /**
  * Wipe the demo user's data and reseed the demo dataset in ONE call (the caller
  * wraps it in a transaction + advisory lock). Idempotent by construction: it
@@ -287,24 +389,9 @@ export async function seedDemo(tx: Tx, userId: string, marker: string): Promise<
     .values({ userId, subjectId: subjEN!.id, name: 'Vocabulaire', position: 0 })
     .returning()
 
-  // Build the 25-card spec by cycling the pools across the three decks.
-  const specs: { deckId: string; front: string; back: string; reviews: CardSpec['reviews'] }[] = []
-  const pools = [
-    { deckId: deckAuto!.id, pool: AUTOMATA },
-    { deckId: deckGram!.id, pool: GRAMMARS },
-    { deckId: deckVoc!.id, pool: VOCAB },
-  ]
-  // QCM first: seeding order decides `created_at`, which is how `dueQueue`
-  // breaks ties between cards sharing a due date (see `DEMO_QCM_CARDS`).
-  for (const q of DEMO_QCM_CARDS) {
-    const p = pools[q.pool]!
-    specs.push({ deckId: p.deckId, front: q.front, back: q.back, reviews: profile(q.profile) })
-  }
-  for (let n = 0; n < TOTAL_CARDS - DEMO_QCM_CARDS.length; n++) {
-    const p = pools[n % pools.length]!
-    const pair = p.pool[Math.floor(n / pools.length) % p.pool.length]!
-    specs.push({ deckId: p.deckId, front: pair[0]!, back: pair[1]!, reviews: profile(n) })
-  }
+  // Pool index → deck. Same order as POOL_AUTOMATA / POOL_GRAMMARS / POOL_VOCAB.
+  const deckOfPool = [deckAuto!.id, deckGram!.id, deckVoc!.id]
+  const specs = demoCardSpecs().map((s) => ({ ...s, deckId: deckOfPool[s.pool]! }))
 
   for (const s of specs) {
     // Simulate the past reviews with ts-fsrs to get a coherent final state + logs.

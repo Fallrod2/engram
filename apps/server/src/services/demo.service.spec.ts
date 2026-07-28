@@ -53,6 +53,14 @@ describe('seedDemo', () => {
     expect(localDayDiff(today, e!.date)).toBe(10)
   })
 
+  it('writes 25 DISTINCT cards — no duplicate ever reaches the database (T-027)', async () => {
+    // The pure invariant lives in `demo-seed.test.ts`; this is the same claim
+    // asserted on what actually landed in the tables, QCM included.
+    await runSeed('no-session')
+    const rows = await db.select().from(card).where(eq(card.userId, DEMO))
+    expect(new Set(rows.map((c) => c.front.trim().toLowerCase())).size).toBe(rows.length)
+  })
+
   it('seeds every multiple-choice card (T-022)', async () => {
     await runSeed('no-session')
     const fronts = new Set(

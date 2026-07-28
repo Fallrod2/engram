@@ -98,6 +98,7 @@ function CardsError({ error }: { error: Error }) {
   return (
     <ErrorState
       kind={notFound ? 'deck' : 'cards'}
+      notFound={notFound}
       {...(notFound
         ? {
             back: (

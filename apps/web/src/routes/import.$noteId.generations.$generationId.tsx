@@ -72,6 +72,7 @@ function ReviewError({ error }: { error: Error }) {
   return (
     <ErrorState
       kind="generation"
+      notFound={notFound}
       {...(notFound
         ? {
             back: (

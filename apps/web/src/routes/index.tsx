@@ -5,6 +5,7 @@ import { Layers } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { useT, type TFunction } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/error-state'
 import { subjectsById as buildSubjectsById } from '@/features/planning/plan-utils'
 import { subjectsListOptions, useCreateSubject } from '@/features/subjects/queries'
@@ -76,15 +77,18 @@ function DashboardPage() {
   const createSubject = useCreateSubject()
 
   const subjectsQuery = useQuery(subjectsListOptions())
-  const dueCounts = useQuery(dueCountsOptions()).data
+  const dueCountsQuery = useQuery(dueCountsOptions())
   const decksQuery = useQuery(allDecksOptions())
   const examsQuery = useQuery(examsListOptions())
-  const streaks = useQuery(streaksOptions(now)).data
-  const heatmap = useQuery(heatmapOptions(now.getFullYear())).data
+  const streaksQuery = useQuery(streaksOptions(now))
+  const heatmapQuery = useQuery(heatmapOptions(now.getFullYear()))
 
   const subjects = subjectsQuery.data ?? []
   const byId = useMemo(() => buildSubjectsById(subjectsQuery.data), [subjectsQuery.data])
-  const total = dueCounts?.total ?? 0
+  // `dueKnown` gates every claim made from the queue size. Without it a failed
+  // read collapsed to `total = 0` and the screen said "tout est à jour" (T-027).
+  const dueKnown = dueCountsQuery.isSuccess
+  const total = dueCountsQuery.data?.total ?? 0
 
   // Three states without a naked zero (§5.4). `dbEmpty` requires a *successful*
   // empty read (never onboarding on a failed fetch). `noCardsYet` distinguishes
@@ -92,12 +96,21 @@ function DashboardPage() {
   // via `allDecks` (one query), NOT a per-deck cardCount fan-out (Phase 7).
   const dbEmpty = subjectsQuery.isSuccess && subjects.length === 0
   const noCardsYet =
-    !dbEmpty && total === 0 && decksQuery.isSuccess && (decksQuery.data?.length ?? 0) === 0
+    !dbEmpty &&
+    dueKnown &&
+    total === 0 &&
+    decksQuery.isSuccess &&
+    (decksQuery.data?.length ?? 0) === 0
 
   // Subjects are the backbone — without them the layout can't be decided.
   if (subjectsQuery.isError) {
     return <ErrorState kind="subjects" onRetry={() => void router.invalidate()} />
   }
+  // …and until they are back, the layout is UNDECIDED: `dbEmpty` would be false
+  // and the onboarding/reward branches would render on nothing at all (T-027).
+  if (subjectsQuery.isPending) return <DashboardSkeleton />
+
+  const showCounter = dueKnown && total > 0
 
   return (
     <>
@@ -110,43 +123,70 @@ function DashboardPage() {
           <div className="lg:col-span-8">
             {noCardsYet ? (
               <NoCardsHero t={t} />
-            ) : total === 0 ? (
-              <HeroCard>
-                {/* Cards exist, queue is clear → the legitimate reward. */}
-                <TodayPanel subjectsById={byId} now={now} />
-              </HeroCard>
             ) : (
+              // ONE hero card in every other case. The `3xl` counter appears only
+              // once the queue is actually known (`showCounter`); the panel below
+              // owns the three states of that same query — skeleton, unavailable,
+              // or the legitimate "all caught up" reward (T-027 b).
               <HeroCard>
-                <div className="mb-4 flex items-baseline gap-2.5">
-                  <span className="font-mono text-3xl font-medium leading-none tabular-nums text-text">
-                    {total}
-                  </span>
-                  <span className="text-sm text-text-muted">{t('dashboard.toReviewToday')}</span>
-                </div>
-                <TodayPanel subjectsById={byId} now={now} hideTotal />
+                {showCounter && (
+                  <div className="mb-4 flex items-baseline gap-2.5">
+                    <span className="font-mono text-3xl font-medium leading-none tabular-nums text-text">
+                      {total}
+                    </span>
+                    <span className="text-sm text-text-muted">{t('dashboard.toReviewToday')}</span>
+                  </div>
+                )}
+                <TodayPanel subjectsById={byId} now={now} hideTotal={showCounter} />
               </HeroCard>
             )}
           </div>
 
           <div className="flex flex-col gap-4 lg:col-span-4">
-            {streaks ? (
-              <StreakCard streaks={streaks} />
+            {/* Pending ≠ unavailable (T-027): a query still in flight gets a
+                skeleton at the block's final height, never a verdict. */}
+            {streaksQuery.isPending ? (
+              <Skeleton
+                className="h-[120px] rounded-lg"
+                role="status"
+                aria-busy="true"
+                aria-label={t('dashboard.loadingStreak')}
+              />
+            ) : streaksQuery.isSuccess ? (
+              <StreakCard streaks={streaksQuery.data} />
             ) : (
               <BlockUnavailable label={t('dashboard.streak.label')} t={t} />
             )}
-            {examsQuery.isSuccess ? (
+            {examsQuery.isPending ? (
+              <Skeleton
+                className="h-[140px] rounded-lg"
+                role="status"
+                aria-busy="true"
+                aria-label={t('dashboard.loadingExams')}
+              />
+            ) : examsQuery.isSuccess ? (
               <UpcomingExams exams={examsQuery.data} subjectsById={byId} now={now} />
             ) : (
               <BlockUnavailable label={t('dashboard.exams.label')} t={t} />
             )}
           </div>
 
-          {/* Recent activity — soft Phase 5 dependency (§5.3.D): shown only when
-              the heatmap is available; its absence never blocks the dashboard. */}
-          {heatmap && (
-            <div className="lg:col-span-12">
-              <RecentActivity heatmap={heatmap} now={now} />
-            </div>
+          {/* Recent activity — soft Phase 5 dependency (§5.3.D): its absence never
+              blocks the dashboard. Still in flight → a skeleton holds the slot;
+              failed → the strip is simply not part of the page. */}
+          {heatmapQuery.isPending ? (
+            <Skeleton
+              className="h-[92px] rounded-lg lg:col-span-12"
+              role="status"
+              aria-busy="true"
+              aria-label={t('dashboard.loadingActivity')}
+            />
+          ) : (
+            heatmapQuery.isSuccess && (
+              <div className="lg:col-span-12">
+                <RecentActivity heatmap={heatmapQuery.data} now={now} />
+              </div>
+            )
           )}
         </div>
       )}

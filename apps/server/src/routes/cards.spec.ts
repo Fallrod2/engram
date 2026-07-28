@@ -99,6 +99,58 @@ describe('cards routes', () => {
     expect(row!.state).toBe(0)
   })
 
+  /**
+   * T-026, end to end: route → service → `toFsrsCard` → scheduler. The unit
+   * tests in `services/fsrs.test.ts` pin the scheduler; this one pins the wiring
+   * that feeds it the card id — drop `card_id` from the mapper and the fuzz goes
+   * back to being drawn from the wall clock, which this test would catch.
+   */
+  it('GET /api/cards/:id/preview is stable and equals what the review writes', async () => {
+    // Fixed instants in the past: same UTC day, so `elapsed_days` (the only
+    // thing that legitimately moves a projection) is identical for both reads.
+    const lastReview = new Date('2026-07-02T10:00:00.000Z')
+    const t1 = '2026-07-12T10:00:00.000Z'
+    const t2 = '2026-07-12T16:00:00.000Z'
+    const c = await seedCard(db, await newDeck())
+    // Promote it to a mature Review card: short-term steps are never fuzzed
+    // (intervals under 2.5 days), so a fresh card would prove nothing.
+    await db
+      .update(card)
+      .set({
+        state: 2,
+        stability: 30,
+        difficulty: 5,
+        elapsedDays: 10,
+        scheduledDays: 10,
+        reps: 4,
+        lastReview,
+        due: new Date('2026-07-09T10:00:00.000Z'),
+      })
+      .where(eq(card.id, c.id))
+
+    const preview = async (now: string) =>
+      reviewPreviewSchema.parse(
+        await (
+          await app.request(`/api/cards/${c.id}/preview?now=${encodeURIComponent(now)}`)
+        ).json(),
+      )
+    const first = await preview(t1)
+    const second = await preview(t2)
+    for (const g of ['again', 'hard', 'good', 'easy'] as const) {
+      expect(second[g].scheduledDays).toBe(first[g].scheduledDays)
+    }
+    // Sanity: this card really is in fuzz territory, otherwise the test is vacuous.
+    expect(first.good.scheduledDays).toBeGreaterThan(3)
+
+    // Grading now writes exactly the interval the button advertised.
+    expect((await postJson(`/api/cards/${c.id}/review`, { grade: 3, reviewedAt: t1 })).status).toBe(
+      200,
+    )
+    const [row] = await db.select().from(card).where(eq(card.id, c.id))
+    expect(row!.scheduledDays).toBe(first.good.scheduledDays)
+    expect(row!.due.toISOString()).toBe(first.good.due)
+  })
+
   it('GET /api/cards/:id/preview: missing → 404, bad now → 400', async () => {
     expect((await app.request('/api/cards/nope/preview')).status).toBe(404)
     const c = await seedCard(db, await newDeck())

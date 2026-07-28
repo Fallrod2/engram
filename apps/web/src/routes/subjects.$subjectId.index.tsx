@@ -63,6 +63,7 @@ function DecksError({ error }: { error: Error }) {
   return (
     <ErrorState
       kind={notFound ? 'subject' : 'decks'}
+      notFound={notFound}
       {...(notFound
         ? { back: <Link to="/subjects">{t('subjects.backToSubjects')}</Link> }
         : { onRetry: () => void router.invalidate() })}

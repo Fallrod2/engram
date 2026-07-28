@@ -6,6 +6,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import { AppShell } from '@/components/shell/app-shell'
+import { NotFoundScreen } from '@/components/not-found'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth, useAuthLink } from '@/lib/auth'
 import { linkRedirect, requireAuth, type AuthStore } from '@/lib/auth-store'
@@ -38,6 +39,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     if (redirectTo) throw redirect(redirectTo)
   },
   component: RootLayout,
+  // Unmatched URL (T-028 b). Without this the router falls back to its built-in
+  // bare `Not Found` string: untranslated, unstyled and with no way back.
+  notFoundComponent: NotFoundScreen,
 })
 
 /** Centered skeleton while the initial session resolves (no full-screen spinner). */

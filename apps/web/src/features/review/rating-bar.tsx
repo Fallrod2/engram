@@ -4,7 +4,7 @@ import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useCoarsePointer } from '@/lib/use-media-query'
+import { useTouchSession } from './pointer-labels'
 import type { Grade } from './session-reducer'
 import { PREVIEW_KEY, RATING_BY_GRADE, RATINGS } from './labels'
 import { formatInterval } from './interval-format'
@@ -65,7 +65,7 @@ export function RatingBar({
   onRate: (grade: Grade) => void
 }) {
   const t = useT()
-  const coarse = useCoarsePointer()
+  const touch = useTouchSession()
 
   if (!revealed) {
     // T-023 — the ASKING branch reserves the box the four rating buttons will
@@ -78,9 +78,11 @@ export function RatingBar({
     // (and the hand) already were.
     return (
       <div className={RATING_ZONE}>
-        {coarse ? (
+        {touch ? (
           // Touch: a real ≥48px tap target — the keyboard hint is meaningless
-          // and inoperative without a keyboard (fix-session §1 & §3).
+          // and inoperative without a keyboard (fix-session §1 & §3). It sits
+          // INSIDE the same reserved box as the four rating buttons, so the
+          // question above it does not move when the answer appears (T-023).
           <Button
             type="button"
             size="lg"
@@ -123,7 +125,7 @@ export function RatingBar({
         >
           <span className="flex items-center gap-1.5">
             <span>{t('session.next')}</span>
-            {!coarse && <Kbd aria-hidden>{t('session.keyEnter')}</Kbd>}
+            {!touch && <Kbd aria-hidden>{t('session.keyEnter')}</Kbd>}
           </span>
           <span className="flex items-center gap-1.5 font-mono text-2xs tabular-nums text-text-faint">
             <span>{t(meta.label)}</span>

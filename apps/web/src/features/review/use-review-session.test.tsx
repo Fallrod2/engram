@@ -1007,3 +1007,77 @@ describe('useReviewSession — modifiers are not session shortcuts', () => {
     expect(result.current.paused).toBe(true)
   })
 })
+
+describe('useReviewSession — a coarse pointer takes nothing away from the keyboard (T-029)', () => {
+  /**
+   * The whole T-029 lot hangs on one promise: the touch adaptation swaps what
+   * the screen ADVERTISES, never what the session ACCEPTS. `(pointer: coarse)`
+   * is the primary pointing device, so an iPad with a keyboard case reports
+   * `coarse` and would lose every shortcut if any of them were gated on it.
+   *
+   * The strongest statement of that promise is structural: this hook imports no
+   * media query at all. Since "it does not import it" cannot be asserted from
+   * the outside, the next best thing is to make the browser insist it is a
+   * touch device and then drive the ENTIRE session from the keyboard alone.
+   */
+  function stubCoarsePointer() {
+    vi.stubGlobal(
+      'matchMedia',
+      (query: string) =>
+        ({
+          matches: query.includes('pointer: coarse'),
+          media: query,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as unknown as MediaQueryList,
+    )
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('reveals with Space, rates with 1-4 and skips with S on a touch device', async () => {
+    stubCoarsePointer()
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(matchMedia('(pointer: coarse)').matches).toBe(true)
+
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(result.current.phase).toBe('REVEALED')
+
+    fireEvent.keyDown(window, { key: '3' })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.counts[3]).toBe(1)
+    expect(result.current.current?.id).toBe('c2')
+
+    fireEvent.keyDown(window, { key: 's' })
+    expect(result.current.progress.done).toBe(2)
+  })
+
+  it('still opens the editor with E and takes a rating back with U on a touch device', async () => {
+    stubCoarsePointer()
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    postUndoReview.mockResolvedValue({ card: makeCard('c1'), undoneLogId: 'log-1' })
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    fireEvent.keyDown(window, { key: 'e' })
+    expect(result.current.editing).toBe(true)
+    act(() => result.current.closeEdit())
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+
+    fireEvent.keyDown(window, { key: 'u' })
+    await waitFor(() => expect(result.current.phase).toBe('REVEALED'))
+    expect(result.current.current?.id).toBe('c1')
+    expect(result.current.counts[3]).toBe(0)
+  })
+})

@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
-import { useCoarsePointer } from '@/lib/use-media-query'
+import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
+import { useTouchSession } from './pointer-labels'
 
 /**
  * Exit confirmation (spec §3.6, §4.6). Rendered inside the session overlay (not
@@ -12,9 +13,12 @@ import { useT } from '@/lib/i18n'
  * stray keystroke mid-flow.
  */
 export function ExitConfirm({ onResume, onQuit }: { onResume: () => void; onQuit: () => void }) {
-  // No keyboard on touch → drop the Échap/Q chips (fix-session §3).
-  const coarse = useCoarsePointer()
+  // No keyboard on touch → drop the Échap/Q chips (fix-session §3) and grow the
+  // two buttons from 32px to a 44px thumb target (T-029): with no key to press,
+  // a tap is the ONLY way out of this dialog.
+  const touch = useTouchSession()
   const t = useT()
+  const tap = cn(touch && 'h-11 px-4')
   return (
     <div
       className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
@@ -31,13 +35,13 @@ export function ExitConfirm({ onResume, onQuit }: { onResume: () => void; onQuit
           {t('session.exitDesc')}
         </p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button autoFocus variant="secondary" onClick={onResume}>
+          <Button autoFocus variant="secondary" onClick={onResume} className={tap}>
             {t('session.exitResume')}
-            {!coarse && <Kbd className="ml-1">{t('session.keyEsc')}</Kbd>}
+            {!touch && <Kbd className="ml-1">{t('session.keyEsc')}</Kbd>}
           </Button>
-          <Button variant="destructive" onClick={onQuit}>
+          <Button variant="destructive" onClick={onQuit} className={tap}>
             {t('session.exitQuit')}
-            {!coarse && (
+            {!touch && (
               <Kbd className="ml-1 border-danger-fg/30 bg-transparent text-danger-fg">Q</Kbd>
             )}
           </Button>

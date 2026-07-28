@@ -13,16 +13,25 @@ import { useT } from '@/lib/i18n'
 
 function ShellInner() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  // An unmatched URL: the root's `notFoundComponent` is what fills the content
+  // slot (T-028 b). The header must follow it — otherwise the shell announced
+  // the fallback section name ("engram") next to the 404's own <h1>, giving the
+  // page two headings and a title that named nothing.
+  const isNotFound = useRouterState({
+    select: (s) => s.matches.some((m) => m.globalNotFound === true),
+  })
   const reduceMotion = useReducedMotion()
   const t = useT()
   const [scrolled, setScrolled] = useState(false)
 
   // The static index.html carries the marketing <title> for the public landing
   // (landing spec §4); reset it to the app name once the authenticated shell
-  // mounts so the browser tab reads 'engram', not the marketing headline.
+  // mounts so the browser tab reads 'engram', not the marketing headline. On a
+  // 404 the shell writes the SAME string the screen writes for itself, so the
+  // two effects can never disagree whichever order React runs them in.
   useEffect(() => {
-    document.title = 'engram'
-  }, [])
+    document.title = isNotFound ? t('notFound.meta') : 'engram'
+  }, [isNotFound, t])
 
   // Lock document scroll to the shell while it's mounted: only <main> scrolls, so
   // a window-level scroll (drag scrollbar, PageDown/Space with focus on body,
@@ -62,9 +71,9 @@ function ShellInner() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
-          title={t(getPageTitleKey(pathname))}
+          title={isNotFound ? t('notFound.headerTitle') : t(getPageTitleKey(pathname))}
           scrolled={scrolled}
-          asHeading={shellOwnsHeading(pathname)}
+          asHeading={!isNotFound && shellOwnsHeading(pathname)}
         />
         <main
           id="main-content"

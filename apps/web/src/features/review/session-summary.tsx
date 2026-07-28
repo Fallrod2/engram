@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
 import { useT, usePlural } from '@/lib/i18n'
-import { useCoarsePointer } from '@/lib/use-media-query'
+import { useShortcutName, useTouchSession } from './pointer-labels'
 import { RATINGS } from './labels'
 import type { SessionSummary as Summary } from './summary'
 import { formatDurationClock, formatSeconds } from './interval-format'
@@ -48,8 +48,11 @@ export function SessionSummary({
 }) {
   const t = useT()
   const plural = usePlural()
-  // No keyboard on touch → drop the Entrée/R chips (fix-session §3).
-  const coarse = useCoarsePointer()
+  // No keyboard on touch → drop the Entrée/R chips (fix-session §3), grow the
+  // three buttons to a 44px thumb target and stop announcing "(U)" (T-029).
+  const touch = useTouchSession()
+  const name = useShortcutName()
+  const tap = cn(touch && 'h-11 px-4')
   const { viewed, byGrade, totalMs, avgMs, successRate } = summary
 
   return (
@@ -98,9 +101,9 @@ export function SessionSummary({
       </div>
 
       <div className="flex flex-col items-center gap-2">
-        <Button autoFocus onClick={onExit}>
+        <Button autoFocus onClick={onExit} className={tap}>
           {t('common.backToDashboard')}
-          {!coarse && (
+          {!touch && (
             <Kbd className="ml-1 border-accent-fg/30 bg-transparent text-accent-fg">
               {t('session.keyEnter')}
             </Kbd>
@@ -110,10 +113,10 @@ export function SessionSummary({
             side by side and the row simply disappears when neither applies. */}
         <div className="flex items-center gap-1">
           {canReviewAgain && (
-            <Button variant="ghost" onClick={onReviewAgain} className="text-text-muted">
+            <Button variant="ghost" onClick={onReviewAgain} className={cn('text-text-muted', tap)}>
               <RotateCcw className="size-4" />
               {t('session.summary.reviewAgain')}
-              {!coarse && <Kbd className="ml-1">R</Kbd>}
+              {!touch && <Kbd className="ml-1">R</Kbd>}
             </Button>
           )}
           {canUndo && (
@@ -121,12 +124,12 @@ export function SessionSummary({
               variant="ghost"
               onClick={onUndo}
               disabled={undoing}
-              aria-label={t('session.undoAria')}
-              className="text-text-muted"
+              aria-label={name('session.undoAria', t('session.keyUndo'))}
+              className={cn('text-text-muted', tap)}
             >
               <Undo2 className="size-4" />
               {t('session.undo')}
-              {!coarse && <Kbd className="ml-1">U</Kbd>}
+              {!touch && <Kbd className="ml-1">U</Kbd>}
             </Button>
           )}
         </div>
