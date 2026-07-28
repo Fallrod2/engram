@@ -47,9 +47,15 @@ const KATEX_PROSE =
 
 // Scale-independent: colors, borders, weights, em-relative metrics (§5.3).
 const PROSE_COMMON = [
-  // Headings — Inter 600; sizes and vertical rhythm belong to the variants.
-  '[&_h1]:font-semibold [&_h1]:tracking-[-0.01em]',
-  '[&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold',
+  // Headings — Inter 600. Their SIZE belongs to the variants; their vertical
+  // rhythm does not: the card reads on the same heading/rule spacing scale as
+  // the chrome (T-003), so it is declared once here instead of being restated —
+  // and left to drift — in each variant. Tailwind's preflight resets `h*` to
+  // `margin: 0`, so without these a `##` sits flush against its paragraph.
+  '[&_h1]:font-semibold [&_h1]:tracking-[-0.01em] [&_h1]:mt-3 [&_h1]:mb-1.5',
+  '[&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5',
+  '[&_h3]:font-semibold [&_h3]:mt-2.5 [&_h3]:mb-1',
+  '[&_h4]:font-semibold [&_h4]:mt-2 [&_h4]:mb-1',
   // Inline emphasis.
   '[&_strong]:font-semibold [&_strong]:text-text [&_em]:italic',
   '[&_del]:text-text-faint [&_del]:line-through',
@@ -67,7 +73,7 @@ const PROSE_COMMON = [
   // Blockquote, links, rules, images.
   '[&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:text-text-muted',
   '[&_a]:text-accent [&_a]:underline-offset-2 hover:[&_a]:underline',
-  '[&_hr]:border-border',
+  '[&_hr]:border-border [&_hr]:my-3',
   '[&_img]:max-w-full [&_img]:rounded-md',
   // Alignment guardrails: `align="center"` centers prose, never the blocks whose
   // readability depends on a left edge (code, cells, list items).
@@ -75,11 +81,12 @@ const PROSE_COMMON = [
 ].join(' ')
 
 // Chrome scale — anchored on 14px, dense. The default everywhere but the card.
+// Heading and `hr` spacing is NOT here: it is shared with the card (PROSE_COMMON).
 const PROSE_UI = [
-  '[&_h1]:text-lg [&_h1]:mt-3 [&_h1]:mb-1.5',
-  '[&_h2]:text-base [&_h2]:mt-3 [&_h2]:mb-1.5',
-  '[&_h3]:text-sm [&_h3]:mt-2.5 [&_h3]:mb-1',
-  '[&_h4]:text-sm [&_h4]:text-text-muted [&_h4]:mt-2 [&_h4]:mb-1',
+  '[&_h1]:text-lg',
+  '[&_h2]:text-base',
+  '[&_h3]:text-sm',
+  '[&_h4]:text-sm [&_h4]:text-text-muted',
   '[&_p]:my-2 [&_p]:leading-[1.55] [&_:first-child]:mt-0 [&_:last-child]:mb-0',
   '[&_code]:text-[0.85em]',
   '[&_pre]:my-2 [&_pre]:p-3 [&_pre_code]:text-xs',
@@ -87,10 +94,10 @@ const PROSE_UI = [
   '[&_li]:my-0.5',
   '[&_table]:my-2 [&_table]:text-xs',
   '[&_blockquote]:my-2 [&_blockquote]:pl-3',
-  '[&_hr]:my-3',
 ].join(' ')
 
 // Card reading scale — anchored on 17px/1.6, looser rhythm, its own register.
+// Headings carry their SIZE here and take their margins from PROSE_COMMON.
 const PROSE_CARD = [
   'text-card leading-[1.6]',
   '[&_h1]:text-card-lg [&_h2]:text-card-md [&_h3]:text-card',
