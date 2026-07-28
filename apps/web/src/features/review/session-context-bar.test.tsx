@@ -217,28 +217,34 @@ describe('<SessionContextBar> undo action', () => {
 describe('<SessionContextBar> affordance while an undo is in flight', () => {
   const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
 
-  // The realistic combination: the hook computes `canUndo = lastReview !== null && !undoing`,
-  // so an in-flight undo means the "Annuler" button is not rendered at all.
-  it('disables "Éditer" and "Passer" — and swallows no click', () => {
+  // The realistic combination since T-010: the hook computes `canUndo` from the
+  // presence of a target ALONE, so an in-flight undo keeps the "Annuler" button
+  // mounted and greyed out — it no longer disappears mid-request.
+  it('keeps the three controls mounted and disables all of them — no click swallowed', () => {
     const onEdit = vi.fn()
     const onSkip = vi.fn()
+    const onUndo = vi.fn()
     render(
       <SessionContextBar
         remaining={remaining}
         difficulty={null}
-        canUndo={false}
+        canUndo
         undoing
         onEdit={onEdit}
         onSkip={onSkip}
-        onUndo={NOOP}
+        onUndo={onUndo}
       />,
     )
+    const undo = screen.getByRole('button', { name: 'Annuler la dernière note (U)' })
     const edit = screen.getByRole('button', { name: 'Éditer cette carte (E)' })
     const skip = screen.getByRole('button', { name: 'Passer cette carte sans la noter (S)' })
+    expect((undo as HTMLButtonElement).disabled).toBe(true)
     expect((edit as HTMLButtonElement).disabled).toBe(true)
     expect((skip as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(undo)
     fireEvent.click(edit)
     fireEvent.click(skip)
+    expect(onUndo).not.toHaveBeenCalled()
     expect(onEdit).not.toHaveBeenCalled()
     expect(onSkip).not.toHaveBeenCalled()
   })

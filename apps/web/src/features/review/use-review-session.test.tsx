@@ -450,9 +450,38 @@ describe('useReviewSession — undoing the last rating (U)', () => {
     await waitFor(() => expect(postUndoReview).toHaveBeenCalled())
     expect(postUndoReview).toHaveBeenCalledTimes(1)
     expect(postUndoReview).toHaveBeenCalledWith('c1', { logId: 'log-1' })
-    // While the POST is in flight the affordance is closed.
+    // While the POST is in flight the control stays MOUNTED and greys out: the
+    // target is still armed (`canUndo`), and `undoing` is what disables it. The
+    // two are read together by the button — see T-010.
     expect(result.current.undoing).toBe(true)
-    expect(result.current.canUndo).toBe(false)
+    expect(result.current.canUndo).toBe(true)
+  })
+
+  it('a second undo fired while the first is in flight POSTs nothing (T-010)', async () => {
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    // Never settles: the whole test lives inside the in-flight window.
+    postUndoReview.mockReturnValue(new Promise(() => {}))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+
+    act(() => result.current.undo())
+    await waitFor(() => expect(postUndoReview).toHaveBeenCalledTimes(1))
+    expect(result.current.undoing).toBe(true)
+
+    // `canUndo` no longer carries the exclusion, so this is the real check: a
+    // later call — the U key, or a click on a control a caller forgot to disable
+    // — must still be refused by `undo()` itself.
+    act(() => result.current.undo())
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'u' }))
+    })
+    await act(async () => {})
+    expect(postUndoReview).toHaveBeenCalledTimes(1)
+    expect(result.current.undoing).toBe(true)
   })
 
   it('U on the keyboard unwinds from SUMMARY, where the session had ended', async () => {

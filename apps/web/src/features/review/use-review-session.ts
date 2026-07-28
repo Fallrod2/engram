@@ -56,7 +56,11 @@ export interface SessionApi {
   /** Card-edit dialog open (E) — the card clock is frozen while it is. */
   editing: boolean
   flashGrade: Grade | null
-  /** True while the last rating can still be taken back (U). */
+  /**
+   * There is a rating to take back — i.e. the "Annuler" affordance exists. It
+   * does NOT mean an undo can be fired right now: pair it with `undoing`, which
+   * disables the control while a previous undo is still in flight (T-010).
+   */
   canUndo: boolean
   /** An undo POST is in flight — the affordance stays visible but disabled. */
   undoing: boolean
@@ -771,13 +775,23 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     [state.phase, state.results],
   )
 
-  // Mirrors the reducer's UNDO guard exactly, so the affordance is only ever
-  // offered where the action would actually be accepted. Excluding SUBMITTING is
-  // how "nothing in flight" is expressed in reactive state.
+  // "There IS a rating to take back", and nothing else (T-010): the phases where
+  // UNDO is accepted, plus an armed target. Deliberately NOT gated on
+  // `state.undoing` — the buttons render `{canUndo && <button disabled={undoing}>}`,
+  // so folding the in-flight test in here made the disabled state unreachable and
+  // the control VANISH for the length of the POST instead of greying out.
+  // SUBMITTING stays excluded: a review is in flight for the current card, and
+  // that refusal is not transient — it lasts as long as the phase, so hiding the
+  // button is the right reading of it.
+  //
+  // The mutual exclusion "one undo at a time" does NOT live here. It is enforced
+  // where the action is triggered, on both paths that can fire it: `undo()`
+  // (which returns early on `state.undoing` and on `undoInFlightRef`, the U key
+  // included) and the reducer's UNDO case. No caller may read `canUndo` as "a
+  // second undo would be accepted" — see the audit in the T-010 tests.
   const canUndo =
     (state.phase === 'ASKING' || state.phase === 'REVEALED' || state.phase === 'SUMMARY') &&
-    state.lastReview !== null &&
-    !state.undoing
+    state.lastReview !== null
 
   return {
     phase: state.phase,
