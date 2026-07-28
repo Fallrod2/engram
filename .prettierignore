@@ -17,6 +17,9 @@ apps/server/drizzle/
 # Généré par le plugin TanStack Router — format imposé par l'outil
 apps/web/src/routeTree.gen.ts
 
+# Config MCP locale, réécrite par l'outillage — pas à nous de la formater
+.mcp.json
+
 # Orchestrator / agent-owned docs — not formatted by this workspace
 CLAUDE.md
 PROGRESS.md
