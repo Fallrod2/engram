@@ -51,6 +51,43 @@ test.describe('auth gate (ON, HS256)', () => {
     expect(withToken.status()).toBe(200)
   })
 
+  /**
+   * The gate's public allowlist, checked against the REAL running server (gate
+   * enforced) rather than a throwaway Hono app. Two entries pass; their nearest
+   * neighbours do not. The demo is NOT configured in this harness, so the public
+   * route answers 503 `demo_unavailable` — which is exactly the point: it got
+   * PAST the gate (401 would mean the exemption never applied) and then degraded
+   * cleanly instead of 500ing.
+   */
+  test('only GET /api/health and POST /api/demo/session are public', async ({ request }) => {
+    expect((await request.get(`${AUTH_API_BASE}/api/health`)).status()).toBe(200)
+
+    const demo = await request.post(`${AUTH_API_BASE}/api/demo/session`)
+    expect(demo.status()).toBe(503)
+    expect(((await demo.json()) as { error: { code: string } }).error.code).toBe('demo_unavailable')
+
+    // Neighbours of the exemption — every one of them still needs a token.
+    for (const res of [
+      await request.get(`${AUTH_API_BASE}/api/demo/session`),
+      await request.post(`${AUTH_API_BASE}/api/demo/session/`),
+      await request.post(`${AUTH_API_BASE}/api/demo`),
+      await request.post(`${AUTH_API_BASE}/api/health`),
+      await request.get(`${AUTH_API_BASE}/api/me`),
+    ]) {
+      expect(res.status()).toBe(401)
+    }
+  })
+
+  /** A body posted to the public route is ignored — it is not a login proxy. */
+  test('POST /api/demo/session ignores anything in the request body', async ({ request }) => {
+    const res = await request.post(`${AUTH_API_BASE}/api/demo/session`, {
+      data: { email: 'attacker@example.com', password: 'hunter2' },
+    })
+    // Same 503 as the credential-free call: the body changed nothing at all.
+    expect(res.status()).toBe(503)
+    expect(await res.text()).not.toContain('attacker@example.com')
+  })
+
   test('seeded session → protected app loads (Bearer injected end-to-end)', async ({ page }) => {
     await seedStorage(page, token(AUTH_TEST_SECRET))
     await page.goto('/')

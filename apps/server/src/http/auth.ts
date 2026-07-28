@@ -22,7 +22,27 @@ declare module 'hono' {
   }
 }
 
-const PUBLIC_PATHS = new Set(['/api/health'])
+/**
+ * The COMPLETE list of routes exempt from the JWT gate, keyed `"<METHOD> <path>"`.
+ *
+ * Method-scoped and exact-match on purpose — this is the whole attack surface of
+ * the gate, so it is deliberately the least expressive matcher possible: no
+ * prefix, no wildcard, no normalisation. `/api/demo/session/`, `/API/HEALTH`,
+ * `GET /api/demo/session` and anything under `/api/demo/*` are all NOT in the set
+ * and therefore still gated. `http/auth.spec.ts` pins that (`the exemption is a
+ * two-entry allowlist`).
+ *
+ *  - `GET /api/health` — the ops probe, readable even during a prod misconfig.
+ *  - `POST /api/demo/session` — the public demo login. It accepts NO caller input
+ *    whatsoever (see routes/demo.ts): the credentials come from the server env,
+ *    so this is not a login proxy, and it is rate-limited.
+ */
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set(['GET /api/health', 'POST /api/demo/session'])
+
+/** Exact, method-scoped membership test against `PUBLIC_ROUTES`. */
+export function isPublicRoute(method: string, path: string): boolean {
+  return PUBLIC_ROUTES.has(`${method} ${path}`)
+}
 
 function configKey(cfg: AuthConfig): string {
   return `${cfg.supabaseUrl ?? ''}|${cfg.jwtSecret ? 'hs' : ''}`
@@ -39,9 +59,11 @@ export function createAuthMiddleware(): MiddlewareHandler {
 
     // `/api/health` stays readable even during a prod misconfiguration (spec §2.6):
     // it self-reports `authEnforced:false`, which is the ops runbook for diagnosing
-    // *why* a bad deploy is 500ing. So the public-path exemption is checked BEFORE
+    // *why* a bad deploy is 500ing. So the public-route exemption is checked BEFORE
     // the fail-closed throw below (the probe never carries an Authorization header).
-    if (PUBLIC_PATHS.has(c.req.path)) return next() // /api/health is public
+    // `POST /api/demo/session` rides the same exemption: the landing CTA must be
+    // able to obtain a demo session while holding no token at all.
+    if (isPublicRoute(c.req.method, c.req.path)) return next()
 
     // Fail-closed (audit §6/§13): EVALUATED HERE, per request — never at import.
     // On Vercel the bundle is lazy-imported, so this 500s at the first cold-start

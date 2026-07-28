@@ -99,6 +99,18 @@ export class AccountMgmtUnavailableError extends ApiError {
   }
 }
 
+/**
+ * 503 — the public demo login is not configured on this server (any of
+ * SUPABASE_URL / SUPABASE_ANON_KEY / ENGRAM_DEMO_EMAIL / ENGRAM_DEMO_PASSWORD
+ * missing). A dedicated code so the front can tell "no demo here" apart from "the
+ * demo broke", and so the absence of a demo is never a 500.
+ */
+export class DemoUnavailableError extends ApiError {
+  constructor() {
+    super(503, 'demo_unavailable', 'La démo n’est pas configurée sur ce serveur.')
+  }
+}
+
 /** 400 — account CRUD: GoTrue rejected the email as malformed (amendment A3). */
 export class InvalidEmailError extends ApiError {
   constructor(message = 'invalid email address') {
