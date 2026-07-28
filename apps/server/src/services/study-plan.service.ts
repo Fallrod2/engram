@@ -208,8 +208,11 @@ export async function studyPlan(
 export async function studyToday(db: DB, userId: string, now: Date): Promise<StudyTodayResponse> {
   const counts = await dueCounts(db, userId, now)
   const todayMidnight = localMidnight(now.getFullYear(), now.getMonth(), now.getDate())
-  // Cards due strictly before local midnight today = the overdue backlog.
-  const overdueCount = (await dueCounts(db, userId, new Date(todayMidnight.getTime() - 1))).total
+  // Cards due strictly before local midnight today = the overdue backlog. It now
+  // comes straight out of `dueCounts` (T-013), which cuts on the same local
+  // midnight — this used to be a SECOND full `dueCounts` query at `midnight-1ms`,
+  // two sources for one number and one query too many.
+  const overdueCount = counts.overdueCount
 
   // Next upcoming exam per subject, batched into ONE query (no N+1).
   const subjectIds = counts.bySubject.map((b) => b.subjectId)

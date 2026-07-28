@@ -686,15 +686,34 @@ export const reviewQueueResponseSchema = z.object({
   cards: z.array(cardSchema),
 })
 export const reviewResultSchema = z.object({ card: cardSchema, log: reviewLogSchema })
+/**
+ * The two halves of a due count (T-013). A single number confused the backlog
+ * with the day's normal load, and only the backlog deserves attention:
+ *
+ *   `overdueCount` — cards whose `due` is BEFORE local midnight today (backlog)
+ *   `todayCount`   — cards due since local midnight and already due at `now`
+ *   `dueCount`     — the unchanged total, invariant `= overdueCount + todayCount`
+ *
+ * The split is a pure partition of what `dueCount` already counted: no card
+ * disappears, none is counted twice. "Local" is the SERVER's timezone, the same
+ * convention as `study_plan` / analytics (`apps/server/src/lib/day.ts`).
+ */
+const dueSplitShape = {
+  dueCount: z.number().int().nonnegative(),
+  overdueCount: z.number().int().nonnegative(),
+  todayCount: z.number().int().nonnegative(),
+}
 export const dueCountsSchema = z.object({
   now: iso,
   total: z.number().int().nonnegative(),
-  bySubject: z.array(z.object({ subjectId: z.string(), dueCount: z.number().int().nonnegative() })),
+  overdueCount: z.number().int().nonnegative(),
+  todayCount: z.number().int().nonnegative(),
+  bySubject: z.array(z.object({ subjectId: z.string(), ...dueSplitShape })),
   byDeck: z.array(
     z.object({
       deckId: z.string(),
       subjectId: z.string(),
-      dueCount: z.number().int().nonnegative(),
+      ...dueSplitShape,
     }),
   ),
 })

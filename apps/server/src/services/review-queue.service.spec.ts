@@ -3,6 +3,7 @@ import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
 import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import { seedCard, seedDeck, seedSubject } from '../test-support/harness'
+import { localMidnight } from '../lib/day'
 import { dueCounts, dueQueue } from './review-queue.service'
 
 let t: TestDb
@@ -139,6 +140,128 @@ describe('dueCounts', () => {
     expect(res.bySubject.find((b) => b.subjectId === s.id)).toEqual({
       subjectId: s.id,
       dueCount: 0,
+      overdueCount: 0,
+      todayCount: 0,
     })
+  })
+})
+
+/**
+ * T-013 — the backlog/today split. The cut is local midnight of `now`'s calendar
+ * day (`lib/day.ts` convention, the same one `study_plan` uses), and it is a
+ * PARTITION: every card the old single number counted lands in exactly one side.
+ */
+describe('dueCounts backlog/today split', () => {
+  // A fixed instant at midday of today's LOCAL calendar day: far enough from
+  // both midnights that a DST shift cannot move it to another day, and never
+  // dependent on the wall clock at which the suite happens to run.
+  const TODAY_MIDNIGHT = localMidnight(NOW.getFullYear(), NOW.getMonth(), NOW.getDate())
+  const NOON = new Date(TODAY_MIDNIGHT.getTime() + 12 * HOUR)
+
+  /** Every level (total, per subject, per deck) must satisfy due = overdue + today. */
+  function expectPartition(res: Awaited<ReturnType<typeof dueCounts>>): void {
+    expect(res.total).toBe(res.overdueCount + res.todayCount)
+    for (const b of res.bySubject) expect(b.dueCount).toBe(b.overdueCount + b.todayCount)
+    for (const b of res.byDeck) expect(b.dueCount).toBe(b.overdueCount + b.todayCount)
+    expect(res.bySubject.reduce((n, b) => n + b.dueCount, 0)).toBe(res.total)
+    expect(res.bySubject.reduce((n, b) => n + b.overdueCount, 0)).toBe(res.overdueCount)
+    expect(res.bySubject.reduce((n, b) => n + b.todayCount, 0)).toBe(res.todayCount)
+  }
+
+  it('split_backlog_vs_today_sums_to_the_unchanged_total', async () => {
+    const s = await seedSubject(db)
+    const d = await seedDeck(db, s.id)
+    await seedCard(db, d.id, { due: new Date(TODAY_MIDNIGHT.getTime() - 3 * 24 * HOUR) })
+    await seedCard(db, d.id, { due: new Date(TODAY_MIDNIGHT.getTime() - HOUR) })
+    await seedCard(db, d.id, { due: new Date(TODAY_MIDNIGHT.getTime() + HOUR) })
+    await seedCard(db, d.id, { due: new Date(NOON.getTime() - 60_000) })
+    await seedCard(db, d.id, { due: new Date(NOON.getTime() + HOUR) }) // later today, NOT due yet
+
+    const res = await dueCounts(db, U, NOON)
+    expect(res.total).toBe(4)
+    expect(res.overdueCount).toBe(2)
+    expect(res.todayCount).toBe(2)
+    expectPartition(res)
+
+    const bucket = res.bySubject.find((b) => b.subjectId === s.id)!
+    expect(bucket).toEqual({ subjectId: s.id, dueCount: 4, overdueCount: 2, todayCount: 2 })
+    expect(res.byDeck.find((b) => b.deckId === d.id)).toEqual({
+      deckId: d.id,
+      subjectId: s.id,
+      dueCount: 4,
+      overdueCount: 2,
+      todayCount: 2,
+    })
+  })
+
+  it('split_local_midnight_is_the_boundary', async () => {
+    const d = await seedDeck(db, (await seedSubject(db)).id)
+    // 1ms before local midnight → backlog; local midnight exactly → today.
+    await seedCard(db, d.id, { due: new Date(TODAY_MIDNIGHT.getTime() - 1) })
+    await seedCard(db, d.id, { due: TODAY_MIDNIGHT })
+
+    const res = await dueCounts(db, U, NOON)
+    expect(res.overdueCount).toBe(1)
+    expect(res.todayCount).toBe(1)
+    expectPartition(res)
+  })
+
+  it('split_uses_the_local_day_not_the_utc_day', async () => {
+    // A card due at 23:30 UTC yesterday and a `now` at 00:30 UTC today land on
+    // DIFFERENT UTC days but on the SAME local day whenever the server runs east
+    // of Greenwich — and vice-versa. Anchoring on the local midnight of `now`
+    // keeps the answer stable: an instant strictly inside today's local day is
+    // never backlog, whatever its UTC date.
+    const d = await seedDeck(db, (await seedSubject(db)).id)
+    const justAfterMidnight = new Date(TODAY_MIDNIGHT.getTime() + 60_000)
+    const justBeforeMidnight = new Date(TODAY_MIDNIGHT.getTime() - 60_000)
+    await seedCard(db, d.id, { due: justAfterMidnight })
+    await seedCard(db, d.id, { due: justBeforeMidnight })
+
+    const res = await dueCounts(db, U, new Date(TODAY_MIDNIGHT.getTime() + 2 * HOUR))
+    expect(res.todayCount).toBe(1)
+    expect(res.overdueCount).toBe(1)
+    expectPartition(res)
+  })
+
+  it('split_is_all_zero_when_nothing_is_due', async () => {
+    const s = await seedSubject(db)
+    const d = await seedDeck(db, s.id)
+    await seedCard(db, d.id, { due: new Date(NOON.getTime() + 24 * HOUR) })
+
+    const res = await dueCounts(db, U, NOON)
+    expect(res.total).toBe(0)
+    expect(res.overdueCount).toBe(0)
+    expect(res.todayCount).toBe(0)
+    expect(res.bySubject.find((b) => b.subjectId === s.id)).toEqual({
+      subjectId: s.id,
+      dueCount: 0,
+      overdueCount: 0,
+      todayCount: 0,
+    })
+    expectPartition(res)
+  })
+
+  it('split_reports_pure_backlog_with_a_zero_today', async () => {
+    const d = await seedDeck(db, (await seedSubject(db)).id)
+    for (let i = 1; i <= 3; i++) {
+      await seedCard(db, d.id, { due: new Date(TODAY_MIDNIGHT.getTime() - i * 24 * HOUR) })
+    }
+    const res = await dueCounts(db, U, NOON)
+    expect(res.total).toBe(3)
+    expect(res.overdueCount).toBe(3)
+    expect(res.todayCount).toBe(0)
+    expectPartition(res)
+  })
+
+  it('split_excludes_archived_subjects_like_the_total_does', async () => {
+    const archived = await seedSubject(db, { archived: true })
+    await seedCard(db, (await seedDeck(db, archived.id)).id, {
+      due: new Date(TODAY_MIDNIGHT.getTime() - HOUR),
+    })
+    const res = await dueCounts(db, U, NOON)
+    expect(res.total).toBe(0)
+    expect(res.overdueCount).toBe(0)
+    expectPartition(res)
   })
 })
