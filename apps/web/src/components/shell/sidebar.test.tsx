@@ -46,6 +46,7 @@ vi.mock('./streak-pill', () => ({
 }))
 
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { LangProvider } from '@/lib/i18n'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import { meQuery } from '@/features/admin/queries'
 import { dueCountsOptions } from '@/features/due-counts/queries'
@@ -63,11 +64,32 @@ const SUBJECT: Subject = {
   updatedAt: '2026-07-01T00:00:00.000Z',
 }
 
+/** Backlog present on both rows: 128 = 100 + 28 overall, 42 = 12 + 30 for the subject. */
 const DUE_COUNTS: DueCounts = {
   now: '2026-07-01T00:00:00.000Z',
   total: 128,
-  bySubject: [{ subjectId: SUBJECT.id, dueCount: 42 }],
+  overdueCount: 100,
+  todayCount: 28,
+  bySubject: [{ subjectId: SUBJECT.id, dueCount: 42, overdueCount: 12, todayCount: 30 }],
   byDeck: [],
+}
+
+/** The healthy case: everything due is due today, nothing has piled up. */
+const NO_BACKLOG: DueCounts = {
+  ...DUE_COUNTS,
+  total: 7,
+  overdueCount: 0,
+  todayCount: 7,
+  bySubject: [{ subjectId: SUBJECT.id, dueCount: 5, overdueCount: 0, todayCount: 5 }],
+}
+
+/** Nothing due at all. */
+const EMPTY_COUNTS: DueCounts = {
+  ...DUE_COUNTS,
+  total: 0,
+  overdueCount: 0,
+  todayCount: 0,
+  bySubject: [{ subjectId: SUBJECT.id, dueCount: 0, overdueCount: 0, todayCount: 0 }],
 }
 
 const ME: MeResponse = {
@@ -88,21 +110,30 @@ const STREAKS: StreaksResponse = {
   totalStudyDays: 12,
 }
 
-function renderSidebar() {
+function renderSidebar(counts: DueCounts = DUE_COUNTS, lang?: 'fr' | 'en') {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity, refetchOnWindowFocus: false } },
   })
   qc.setQueryData(subjectsListOptions().queryKey, [SUBJECT])
-  qc.setQueryData(dueCountsOptions().queryKey, DUE_COUNTS)
+  qc.setQueryData(dueCountsOptions().queryKey, counts)
   qc.setQueryData(meQuery().queryKey, ME)
   qc.setQueryData(streaksOptions(new Date()).queryKey, STREAKS)
-  return render(
+  const tree = (
     <QueryClientProvider client={qc}>
       <TooltipProvider>
         <Sidebar />
       </TooltipProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
+  // No provider ⇒ the default FR dictionary, which is what most cases assert.
+  if (!lang) return render(tree)
+  localStorage.setItem('engram-lang', lang)
+  return render(<LangProvider>{tree}</LangProvider>)
+}
+
+/** Every graduated due dot currently painted, in DOM order. */
+function dueDots(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>('[data-due-tier]'))
 }
 
 /** The sidebar footer, identified by its border — the only bordered block. */
@@ -112,10 +143,28 @@ function footer(container: HTMLElement): HTMLElement {
   return el
 }
 
+// jsdom's Storage is not fully implemented here — install a tiny in-memory mock
+// (same shim as `streak-pill.test.tsx`). `<LangProvider>` persists the language.
+function installMockStorage() {
+  const store = new Map<string, string>()
+  const mock: Storage = {
+    get length() {
+      return store.size
+    },
+    clear: () => store.clear(),
+    getItem: (k) => store.get(k) ?? null,
+    key: (i) => Array.from(store.keys())[i] ?? null,
+    removeItem: (k) => void store.delete(k),
+    setItem: (k, v) => void store.set(k, String(v)),
+  }
+  Object.defineProperty(globalThis, 'localStorage', { value: mock, configurable: true })
+}
+
 beforeEach(() => {
   collapsed = false
   canToggleCollapse = true
   toggleCollapse.mockClear()
+  installMockStorage()
 })
 afterEach(cleanup)
 
@@ -166,26 +215,205 @@ describe('<Sidebar> collapse toggle placement', () => {
   })
 })
 
-describe('<Sidebar> collapsed due badges', () => {
-  it('caps at 9+ and hugs its icon so it cannot spill onto the row above', () => {
+describe('<Sidebar> collapsed due graduation (T-013)', () => {
+  it('replaces the truncated `9+` badge with a graduated dot', () => {
     collapsed = true
-    renderSidebar()
-    // Both the /review total (128) and the subject count (42) collapse to `9+`.
-    expect(screen.getAllByText('9+')).toHaveLength(2)
-    expect(screen.queryByText('99+')).toBeNull()
+    const { container } = renderSidebar()
+    // No digits at all in the rail: the number was unreadable and truncated.
+    expect(screen.queryByText('9+')).toBeNull()
     expect(screen.queryByText('128')).toBeNull()
+    expect(screen.queryByText('42')).toBeNull()
 
-    for (const badge of screen.getAllByText('9+')) {
-      expect(badge.className).toContain('-top-1')
-      expect(badge.className).not.toContain('-top-2')
+    const dots = dueDots(container)
+    expect(dots).toHaveLength(2) // /review total + the one subject
+  })
+
+  it('grades the dot by magnitude on the shared 20/50 thresholds', () => {
+    collapsed = true
+    const { container } = renderSidebar()
+    const [review, subject] = dueDots(container)
+    // 128 → high (>50), 42 → mid (21–50): bigger dot for the bigger backlog.
+    expect(review?.dataset.dueTier).toBe('high')
+    expect(review?.className).toContain('size-2')
+    expect(subject?.dataset.dueTier).toBe('mid')
+    expect(subject?.className).toContain('size-1.5')
+  })
+
+  it('uses the low grade for a small count and drops the dot entirely at zero', () => {
+    collapsed = true
+    const { container, unmount } = renderSidebar(NO_BACKLOG)
+    const dots = dueDots(container)
+    expect(dots.map((d) => d.dataset.dueTier)).toEqual(['low', 'low'])
+    expect(dots[0]?.className).toContain('size-1')
+    unmount()
+
+    const empty = renderSidebar(EMPTY_COUNTS)
+    expect(dueDots(empty.container)).toHaveLength(0)
+  })
+
+  it('marks the presence of a backlog, and leaves a clean rail unmarked', () => {
+    collapsed = true
+    const { container, unmount } = renderSidebar()
+    for (const dot of dueDots(container)) {
+      expect(dot.dataset.dueBacklog).toBe('true')
+      expect(dot.className).toMatch(/\bbg-text\b/) // full strength, not `bg-text-faint`
+      expect(dot.className).not.toMatch(/\bring-/) // tone only — see `DueDot`
+    }
+    unmount()
+
+    const calm = renderSidebar(NO_BACKLOG)
+    for (const dot of dueDots(calm.container)) {
+      expect(dot.dataset.dueBacklog).toBeUndefined()
+      expect(dot.className).toContain('bg-text-faint')
     }
   })
 
-  it('shows the exact counts once expanded', () => {
+  it('never paints the dot with the accent reserved for the active row', () => {
+    collapsed = true
+    const { container } = renderSidebar()
+    for (const dot of dueDots(container)) expect(dot.className).not.toMatch(/accent/)
+  })
+
+  it('parks the dot in the trailing gutter, never on the glyph', () => {
+    // Anchored to the icon's corner, the `mid`/`high` dot fused with the 8px
+    // subject dot and clipped the nav glyph. Living in its own gutter, it cannot
+    // overlap either — this pins the structure, not just the offsets.
+    collapsed = true
+    const { container } = renderSidebar()
+    for (const dot of dueDots(container)) {
+      const box = dot.parentElement
+      expect(box?.className).toContain('absolute')
+      expect(box?.className).toContain('inset-y-0') // full height ⇒ vertically centred
+      expect(box?.className).toContain('right-0.5') // trailing edge, clear of the glyph
+      // A sibling of the glyph span, not nested inside it.
+      expect(box?.parentElement?.tagName).toBe('A')
+      expect(box?.querySelector('svg')).toBeNull()
+    }
+  })
+})
+
+describe('<Sidebar> expanded due split (T-013)', () => {
+  it('prints backlog and today as an explicit sum whose halves are told apart', () => {
+    const { container } = renderSidebar()
+    // /review: 128 = 100 + 28 — the backlog leads, in primary text at semibold.
+    const backlog = screen.getByText('100')
+    expect(backlog.className).toContain('font-semibold')
+    expect(backlog.className).toContain('text-text')
+    expect(screen.getByText('28')).toBeTruthy()
+    expect(screen.getByText('12')).toBeTruthy() // subject backlog
+    expect(screen.getByText('30')).toBeTruthy() // subject today
+    // The bare totals are no longer printed as one lump.
+    expect(screen.queryByText('128')).toBeNull()
+    expect(screen.queryByText('42')).toBeNull()
+    expect(container.textContent).toContain('100+28')
+  })
+
+  it('stays exactly as calm as before when there is no backlog', () => {
+    const { container } = renderSidebar(NO_BACKLOG)
+    // A single lump number per row, in the plain tier tone — the exact markup
+    // the badge had before the split existed. No sum sign, no bolder segment.
+    for (const value of ['7', '5']) {
+      const count = screen.getByText(value)
+      expect(count.textContent).toBe(value)
+      expect(count.className).toContain('font-mono')
+      expect(count.className).not.toContain('font-semibold')
+    }
+    expect(container.textContent).not.toContain('+')
+  })
+
+  it('keeps the retreating `·` at zero', () => {
+    renderSidebar(EMPTY_COUNTS)
+    expect(screen.getAllByText('·').length).toBeGreaterThan(0)
+  })
+})
+
+describe('<Sidebar> due counts are announced (T-017)', () => {
+  it('names the row with the subject and BOTH figures, expanded', () => {
     renderSidebar()
-    expect(screen.getByText('128')).toBeTruthy()
-    expect(screen.getByText('42')).toBeTruthy()
-    expect(screen.queryByText('9+')).toBeNull()
+    expect(
+      screen.getByRole('link', {
+        name: 'Théorie des langages, 12 cartes en retard, 30 pour aujourd’hui',
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('link', {
+        name: 'Session de révision, 100 cartes en retard, 28 pour aujourd’hui',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('names the row identically once collapsed — never `9+`, never silence', () => {
+    collapsed = true
+    renderSidebar()
+    expect(
+      screen.getByRole('link', {
+        name: 'Théorie des langages, 12 cartes en retard, 30 pour aujourd’hui',
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('link', {
+        name: 'Session de révision, 100 cartes en retard, 28 pour aujourd’hui',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('drops the zero half instead of announcing it, and spells out the empty case', () => {
+    const { unmount } = renderSidebar(NO_BACKLOG)
+    // Alone, the today half says "cartes" — the backlog half is not there to
+    // carry the noun for it.
+    expect(
+      screen.getByRole('link', { name: 'Théorie des langages, 5 cartes pour aujourd’hui' }),
+    ).toBeTruthy()
+    unmount()
+
+    renderSidebar(EMPTY_COUNTS)
+    expect(
+      screen.getByRole('link', { name: 'Théorie des langages, aucune carte à réviser' }),
+    ).toBeTruthy()
+  })
+
+  it('singularises correctly (FR treats 0 and 1 as singular)', () => {
+    const { unmount } = renderSidebar({
+      ...DUE_COUNTS,
+      total: 2,
+      overdueCount: 1,
+      todayCount: 1,
+      bySubject: [{ subjectId: SUBJECT.id, dueCount: 2, overdueCount: 1, todayCount: 1 }],
+    })
+    expect(
+      screen.getByRole('link', {
+        name: 'Théorie des langages, 1 carte en retard, 1 pour aujourd’hui',
+      }),
+    ).toBeTruthy()
+    unmount()
+
+    renderSidebar({
+      ...DUE_COUNTS,
+      total: 3,
+      overdueCount: 3,
+      todayCount: 0,
+      bySubject: [{ subjectId: SUBJECT.id, dueCount: 3, overdueCount: 3, todayCount: 0 }],
+    })
+    // A pure backlog announces only the backlog — no "0 pour aujourd'hui".
+    expect(
+      screen.getByRole('link', { name: 'Théorie des langages, 3 cartes en retard' }),
+    ).toBeTruthy()
+  })
+
+  it('translates the whole sentence in English', () => {
+    renderSidebar(DUE_COUNTS, 'en')
+    expect(
+      screen.getByRole('link', { name: 'Théorie des langages, 12 cards overdue, 30 due today' }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: 'Review session, 100 cards overdue, 28 due today' }),
+    ).toBeTruthy()
+  })
+
+  it('leaves count-less nav rows named by their label alone', () => {
+    renderSidebar()
+    expect(screen.getByRole('link', { name: 'Planning' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Analytics' })).toBeTruthy()
   })
 })
 

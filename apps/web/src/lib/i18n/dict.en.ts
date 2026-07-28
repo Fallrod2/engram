@@ -86,6 +86,17 @@ export const dictEn: Dict = {
     collapseAria: 'Collapse sidebar',
     expand: 'Expand',
     expandAria: 'Expand sidebar',
+    dueRow: {
+      row: '{name}, {counts}',
+      join: '{first}, {second}',
+      overdue_one: '{count} card overdue',
+      overdue_other: '{count} cards overdue',
+      today_one: '{count} due today',
+      today_other: '{count} due today',
+      todayOnly_one: '{count} card due today',
+      todayOnly_other: '{count} cards due today',
+      none: 'no cards due',
+    },
   },
 
   admin: {

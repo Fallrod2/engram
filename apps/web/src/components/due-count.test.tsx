@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { DueCount, DueBadge } from './due-count'
+import { DueCount, DueDot } from './due-count'
 
 afterEach(cleanup)
 
@@ -47,42 +47,102 @@ describe('<DueCount> intensity encoding (design §6.1)', () => {
   })
 })
 
-describe('<DueBadge> collapsed-sidebar variant (spec §5)', () => {
-  it('hides at zero (the calm `·` has no badge form)', () => {
-    const { container } = render(<DueBadge value={0} />)
+describe('<DueCount> backlog/today split (T-013)', () => {
+  it('prints the two halves as a literal sum, backlog first and heavier', () => {
+    const { container } = render(<DueCount value={17} overdue={12} label={null} />)
+    expect(container.textContent).toBe('12+5')
+    const backlog = screen.getByText('12')
+    expect(backlog.className).toContain('font-semibold')
+    expect(backlog.className).toContain('text-text')
+    // The day's own load keeps the tone the whole count would have had (low tier).
+    expect(screen.getByText('5').className).toContain('font-normal')
+  })
+
+  it('changes nothing at all when the backlog is zero', () => {
+    const plain = render(<DueCount value={17} label={null} />).container.innerHTML
+    const split = render(<DueCount value={17} overdue={0} label={null} />).container.innerHTML
+    expect(split).toBe(plain)
+    expect(plain).not.toContain('+')
+  })
+
+  it('omits the `+0` when everything due is backlog', () => {
+    const { container } = render(<DueCount value={9} overdue={9} label={null} />)
+    expect(container.textContent).toBe('9')
+    expect(screen.getByText('9').className).toContain('font-semibold')
+  })
+
+  it('clamps a backlog that would exceed the total', () => {
+    const { container } = render(<DueCount value={4} overdue={40} label={null} />)
+    expect(container.textContent).toBe('4')
+  })
+
+  it('opts out of its own accessible name when the container carries it', () => {
+    const { container } = render(<DueCount value={17} overdue={12} label={null} />)
+    expect((container.firstChild as HTMLElement).hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('keeps the legacy label for callers that do not supply one', () => {
+    render(<DueCount value={12} />)
+    expect(screen.getByLabelText('12 à réviser')).toBeTruthy()
+  })
+})
+
+describe('<DueDot> collapsed-rail graduation (T-013)', () => {
+  it('paints nothing at zero — the calm `·` has no dot form', () => {
+    const { container } = render(<DueDot value={0} />)
     expect(container.firstChild).toBeNull()
   })
 
-  it('caps overflow at 99+ by default', () => {
-    render(<DueBadge value={150} />)
-    expect(screen.getByText('99+')).toBeTruthy()
+  it('grows with the count across the shared 20/50 thresholds', () => {
+    const sizes = [1, 20, 21, 50, 51, 400].map((v) => {
+      const { container } = render(<DueDot value={v} />)
+      const dot = container.querySelector('[data-due-tier]') as HTMLElement
+      cleanup()
+      return [dot.dataset.dueTier, dot.className.match(/size-[\d.]+/)?.[0]]
+    })
+    expect(sizes).toEqual([
+      ['low', 'size-1'],
+      ['low', 'size-1'],
+      ['mid', 'size-1.5'],
+      ['mid', 'size-1.5'],
+      ['high', 'size-2'],
+      ['high', 'size-2'],
+    ])
   })
 
-  it('honours a caller-supplied cap (the 64px rail asks for two characters)', () => {
-    render(<DueBadge value={42} max={9} />)
-    expect(screen.getByText('9+')).toBeTruthy()
+  it('marks a backlog by tone alone, so size keeps meaning quantity', () => {
+    const { container } = render(<DueDot value={30} overdue={4} />)
+    const dot = container.querySelector('[data-due-tier]') as HTMLElement
+    expect(dot.dataset.dueBacklog).toBe('true')
+    expect(dot.className).toMatch(/\bbg-text\b/)
+    // No ring: it paints OUTSIDE the layout box, so a haloed `low` dot would
+    // measure the same as a bare `high` one and the size axis would lie.
+    expect(dot.className).not.toMatch(/\bring-/)
   })
 
-  it('shows the exact value while it stays under the cap', () => {
-    render(<DueBadge value={7} max={9} />)
-    expect(screen.getByText('7')).toBeTruthy()
+  it('leaves a backlog-free dot faint and unmarked', () => {
+    const { container } = render(<DueDot value={30} />)
+    const dot = container.querySelector('[data-due-tier]') as HTMLElement
+    expect(dot.dataset.dueBacklog).toBeUndefined()
+    expect(dot.className).toContain('bg-text-faint')
+    expect(dot.className).not.toMatch(/\bring-/)
   })
 
-  it('shows the exact value at the cap itself', () => {
-    render(<DueBadge value={9} max={9} />)
-    expect(screen.getByText('9')).toBeTruthy()
+  it('keeps the painted box equal to the tier size, whatever the backlog', () => {
+    // Same tier, both backlog states → same size class and no extra paint.
+    for (const overdue of [0, 9]) {
+      const { container } = render(<DueDot value={30} overdue={overdue} />)
+      const dot = container.querySelector('[data-due-tier]') as HTMLElement
+      expect(dot.className).toContain('size-1.5')
+      expect(dot.className).not.toMatch(/\bring-|\bborder\b|\boutline\b/)
+      cleanup()
+    }
   })
 
-  it('stays neutral — the accent is reserved for the active nav row', () => {
-    const { container } = render(<DueBadge value={7} max={9} />)
-    const badge = container.firstChild as HTMLElement
-    expect(badge.className).not.toMatch(/accent/)
-    expect(badge.className).toContain('bg-surface-3')
-    expect(badge.className).toContain('text-text')
-  })
-
-  it('stays aria-hidden — the count is announced by the row, not the badge', () => {
-    const { container } = render(<DueBadge value={42} max={9} />)
-    expect((container.firstChild as HTMLElement).getAttribute('aria-hidden')).toBe('true')
+  it('stays neutral and aria-hidden — never the accent, never the announcer', () => {
+    const { container } = render(<DueDot value={80} overdue={80} />)
+    const dot = container.querySelector('[data-due-tier]') as HTMLElement
+    expect(dot.className).not.toMatch(/accent/)
+    expect(dot.getAttribute('aria-hidden')).toBe('true')
   })
 })

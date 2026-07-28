@@ -92,6 +92,26 @@ export const dictFr = {
     collapseAria: 'Réduire la barre latérale',
     expand: 'Déployer',
     expandAria: 'Déployer la barre latérale',
+    // Accessible name of a nav row that carries a due count (T-017). Collapsed,
+    // the count is a graduated dot and the digits are gone entirely; expanded,
+    // they are a two-part number. In BOTH states the row itself must announce
+    // the exact figures, so the label is composed here, in words, never `9+`.
+    //   `row` glues the entry name to the counts: "Matière, 12 cartes en retard,
+    //   5 pour aujourd'hui". A zero half is left OUT (announcing "0 en retard"
+    //   on every calm row is noise); both halves at zero collapse to `none`.
+    dueRow: {
+      row: '{name}, {counts}',
+      join: '{first}, {second}',
+      overdue_one: '{count} carte en retard',
+      overdue_other: '{count} cartes en retard',
+      today_one: '{count} pour aujourd’hui',
+      today_other: '{count} pour aujourd’hui',
+      // Standing alone the elliptical form ("6 pour aujourd'hui") has no noun to
+      // lean on — the backlog half carried it. Say "cartes" then.
+      todayOnly_one: '{count} carte pour aujourd’hui',
+      todayOnly_other: '{count} cartes pour aujourd’hui',
+      none: 'aucune carte à réviser',
+    },
   },
 
   admin: {

@@ -30,3 +30,17 @@ export function byDeckMap(counts: DueCounts | undefined): Map<string, number> {
   for (const { deckId, dueCount } of counts.byDeck) m.set(deckId, dueCount)
   return m
 }
+
+/**
+ * A subject's due count with its backlog/today split (T-013). The shape is the
+ * server's own row type — derived from the shared Zod schema, never restated.
+ */
+export type SubjectDueSplit = DueCounts['bySubject'][number]
+
+/** Index `bySubject` into a `subjectId → {dueCount, overdueCount, todayCount}` lookup. */
+export function splitBySubjectMap(counts: DueCounts | undefined): Map<string, SubjectDueSplit> {
+  const m = new Map<string, SubjectDueSplit>()
+  if (!counts) return m
+  for (const row of counts.bySubject) m.set(row.subjectId, row)
+  return m
+}
