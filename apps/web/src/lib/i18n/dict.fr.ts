@@ -1200,6 +1200,12 @@ export const dictFr = {
         'engram programme chaque révision au bon moment et transforme tes notes — Markdown, PDF ou photo de cours — en cartes prêtes à réviser.',
       cta: 'Créer un compte',
       demoCta: 'Essayer la démo',
+      /** Label of the demo button while the session is being opened. */
+      demoCtaPending: 'Ouverture de la démo…',
+      /** Accessible name of the placeholder shown while we check for a demo. */
+      demoCtaLoading: 'Vérification de la démo',
+      /** Shown when the demo session could not be opened (server or network). */
+      demoError: 'La démo est indisponible pour le moment. Réessaie dans un instant.',
       note: 'Gratuit, self-hosted, open source.',
       shotAlt:
         'Tableau de bord d’engram : cartes à réviser du jour, série de révision et activité récente.',

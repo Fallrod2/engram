@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Keyboard, LineChart, ScanLine } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLang, useT } from '@/lib/i18n'
 import { useTheme } from '@/lib/theme'
+import { createDemoSession, fetchHealth } from '@/lib/api'
+import { qk } from '@/lib/query-keys'
+import { supabase, AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
 
 /**
@@ -178,6 +183,10 @@ function LangToggle() {
 function Hero() {
   const t = useT()
   const reduce = useReducedMotion()
+  // Owned by the hero, not by <DemoCta>, so the message renders UNDER the whole
+  // CTA row: a message inside the row would widen its column and shove the
+  // primary "Créer un compte" button sideways the moment the demo fails.
+  const [demoFailed, setDemoFailed] = useState(false)
 
   const rise = (delay: number) => ({
     initial: reduce ? false : ({ opacity: 0, y: 10 } as const),
@@ -219,18 +228,23 @@ function Hero() {
             {t('landing.hero.subtitle')}
           </motion.p>
 
-          <motion.div {...rise(0.18)} className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-            <Button asChild size="lg" className="min-w-40">
-              <Link to="/signup">
-                {t('landing.hero.cta')}
-                <ArrowRight />
-              </Link>
-            </Button>
-            {/* Second CTA — activated once the demo account exists (landing spec
-                §2). Intentionally not rendered until then. */}
-            {/* <Button asChild variant="outline" size="lg">
-              <Link to="/login">{t('landing.hero.demoCta')}</Link>
-            </Button> */}
+          <motion.div {...rise(0.18)} className="mt-8 flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <Button asChild size="lg" className="min-w-40">
+                <Link to="/signup">
+                  {t('landing.hero.cta')}
+                  <ArrowRight />
+                </Link>
+              </Button>
+              {/* Second CTA — rendered only when the SERVER says a demo login is
+                  configured (landing spec §2). See <DemoCta>. */}
+              <DemoCta onFailedChange={setDemoFailed} />
+            </div>
+            {demoFailed && (
+              <p role="alert" className="max-w-sm text-pretty text-xs text-danger">
+                {t('landing.hero.demoError')}
+              </p>
+            )}
           </motion.div>
 
           <motion.p {...rise(0.22)} className="mt-4 text-xs text-text-faint">
@@ -245,6 +259,86 @@ function Hero() {
         </motion.div>
       </div>
     </section>
+  )
+}
+
+/* ---------------------------------------------------------------- demo CTA -- */
+
+/**
+ * "Try the demo" CTA (landing spec §2). Three things worth knowing:
+ *
+ *  1. AVAILABILITY IS LEARNED AT RUNTIME, not at build time. `GET /api/health` is
+ *     public and reports `demoLoginEnabled` — the exact predicate the server route
+ *     uses. So Alex can turn the demo on by setting the env vars on Vercel, with
+ *     NO front-end redeploy. Nothing about the demo is baked into the bundle: the
+ *     account's password lives on the server only and has no `VITE_` twin.
+ *  2. IT NEVER SENDS CREDENTIALS. `POST /api/demo/session` takes no input; the
+ *     server signs in with its own env credentials and hands back a token pair,
+ *     which we install with `supabase.auth.setSession`. `AUTH_ENABLED_WEB` is part
+ *     of the condition because without a Supabase client there is nowhere to put
+ *     the session (local dev / e2e, where the whole auth flow is off anyway).
+ *  3. WHILE THE PROBE IS IN FLIGHT we hold the button's footprint with a skeleton
+ *     rather than popping the CTA in (or spinning): the hero must not reflow under
+ *     the reader. Probe failed, or no demo → nothing is rendered at all.
+ */
+function DemoCta({ onFailedChange }: { onFailedChange: (failed: boolean) => void }) {
+  const t = useT()
+  const navigate = useNavigate()
+  const [pending, setPending] = useState(false)
+
+  const health = useQuery({
+    queryKey: qk.health,
+    queryFn: ({ signal }) => fetchHealth(signal),
+    // One shot: a server that cannot answer its own health probe is not going to
+    // serve a demo session either, and the landing must never retry-storm.
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+
+  if (health.isPending) {
+    return (
+      <Skeleton
+        role="status"
+        aria-label={t('landing.hero.demoCtaLoading')}
+        className="h-9 w-36 rounded-sm"
+      />
+    )
+  }
+  if (!AUTH_ENABLED_WEB || !health.data?.demoLoginEnabled) return null
+
+  const start = async () => {
+    onFailedChange(false)
+    setPending(true)
+    try {
+      const session = await createDemoSession()
+      // `AUTH_ENABLED_WEB` above already implies a client; narrow for TypeScript.
+      if (!supabase) throw new Error('no supabase client')
+      const { error } = await supabase.auth.setSession({
+        access_token: session.accessToken,
+        refresh_token: session.refreshToken,
+      })
+      if (error) throw error
+      // Deliberately stay `pending` on the success path: the landing is about to
+      // unmount and the button must not become clickable again in between.
+      await navigate({ to: '/' })
+    } catch {
+      // Server-side detail (503 not configured, 429 rate-limited, 502 upstream)
+      // is not actionable for a visitor — one honest "try again in a moment".
+      onFailedChange(true)
+      setPending(false)
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="lg"
+      disabled={pending}
+      onClick={() => void start()}
+    >
+      {pending ? t('landing.hero.demoCtaPending') : t('landing.hero.demoCta')}
+    </Button>
   )
 }
 
