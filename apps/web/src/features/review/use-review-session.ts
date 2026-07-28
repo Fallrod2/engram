@@ -3,7 +3,13 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useReducedMotion } from 'motion/react'
 import { toast } from 'sonner'
-import type { Card, ReviewPreview, ReviewQueueResponse } from '@engram/shared'
+import {
+  parseQcm,
+  type Card,
+  type ParsedQcm,
+  type ReviewPreview,
+  type ReviewQueueResponse,
+} from '@engram/shared'
 import { ApiError, postReview, postUndoReview, updateCard, type ReviewScope } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
 import { isEditableTarget, isModalSurfaceOpen } from '@/lib/use-hotkeys'
@@ -20,7 +26,6 @@ import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
 import { remainingByState, type RemainingByState } from './queue-stats'
 import { orderQueue } from './queue-order'
-import { parseQcm, type ParsedQcm } from './qcm'
 
 /**
  * Keys A-D, mapped onto option indices 0-3 (spec: a QCM has 2 to 4 options).

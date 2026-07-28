@@ -147,6 +147,104 @@ const VOCAB = [
   ['to enhance', 'renforcer / améliorer'],
 ]
 
+/** Index into the `pools` array built in `seedDemo` — hence the target deck. */
+const POOL_AUTOMATA = 0
+const POOL_GRAMMARS = 1
+const POOL_VOCAB = 2
+
+export interface DemoQcm {
+  /** `POOL_AUTOMATA` | `POOL_GRAMMARS` | `POOL_VOCAB`. */
+  pool: number
+  front: string
+  back: string
+  /** Index into `profile()` — the FSRS history replayed for this card. */
+  profile: number
+}
+
+/**
+ * Multiple-choice cards (T-022). A QCM has NO structured representation in the
+ * database: a card renders as an interactive quiz when its Markdown matches the
+ * shape the generation prompt asks for (`ai/prompts/cards.v1.ts`,
+ * `QUIZ_INSTRUCTIONS`) and the render-time parser accepts
+ * (`packages/shared/src/qcm.ts`, `parseQcm`). That shape is a CONTRACT,
+ * and breaking it fails SILENTLY — the card just falls back to the plain
+ * Markdown rendering, which is exactly the bug this seed had:
+ *
+ *  - FRONT: the question, then 2 to 4 options — never 5, `E` is the edit
+ *    shortcut — as a Markdown list `- A) …`, lettered consecutively from A, the
+ *    option block being the LAST block of the front;
+ *  - BACK: the answer letter followed by `)`, then a one-sentence justification.
+ *    NEVER the letter followed by `.`: that form is refused on purpose, it
+ *    collides with French abbreviations and initials (`c.-à-d.`, `A. Aho`).
+ *
+ * These four cards TAKE OVER the last four slots of the 25-card loop below
+ * (n = 21…24): they reuse those slots' decks and review profiles, so the dataset
+ * keeps its exact shape — 25 cards, 60 review logs, same per-deck counts.
+ *
+ * Profile 1 is load-bearing. It replays a single `Good` 6 days ago, which leaves
+ * the card in `learning` on a 10-minute step: its due date is therefore 6 days
+ * in the PAST. That QCM is due the second the demo session opens, and since it
+ * is seeded FIRST it also wins the `created_at` tie-break against the other
+ * equally-overdue learning cards — so `dueQueue` (ordered by `due`, then
+ * `created_at`) hands it to the visitor as the very first card. Without that, a
+ * visitor could finish a whole session without ever meeting a QCM.
+ */
+export const DEMO_QCM_CARDS: readonly DemoQcm[] = [
+  {
+    pool: POOL_AUTOMATA,
+    profile: 1,
+    front: [
+      'Par quelles opérations la classe des langages réguliers est-elle close ?',
+      '',
+      '- A) L’union uniquement',
+      '- B) L’union et la concaténation uniquement',
+      '- C) L’union, l’intersection et le complément',
+      '- D) Aucune opération booléenne',
+    ].join('\n'),
+    back: 'C) Les langages réguliers forment une algèbre de Boole : union, intersection et complément restent réguliers.',
+  },
+  {
+    pool: POOL_GRAMMARS,
+    profile: 2,
+    front: [
+      'Pourquoi une grammaire récursive à gauche bloque-t-elle un analyseur descendant ?',
+      '',
+      '- A) Elle engendre un langage vide',
+      '- B) L’analyseur boucle sans consommer de symbole',
+      '- C) Elle devient nécessairement ambiguë',
+    ].join('\n'),
+    back: 'B) La règle A → Aα se réapplique indéfiniment avant toute consommation de l’entrée.',
+  },
+  {
+    pool: POOL_VOCAB,
+    profile: 3,
+    front: [
+      'Which verb collocates with “deadline”?',
+      '',
+      '- A) to meet',
+      '- B) to gather',
+      '- C) to overcome',
+      '- D) to enhance',
+    ].join('\n'),
+    back: 'A) You meet a deadline — the other three verbs never take it as an object.',
+  },
+  {
+    pool: POOL_AUTOMATA,
+    profile: 4,
+    front: [
+      'Que fait une ε-transition dans un automate fini non déterministe ?',
+      '',
+      '- A) Elle consomme un symbole de l’entrée',
+      '- B) Elle change d’état sans lire de symbole',
+      '- C) Elle interdit tout retour en arrière',
+    ].join('\n'),
+    back: 'B) Elle change d’état sans consommer de symbole ; on l’élimine par clôture epsilon.',
+  },
+]
+
+/** The seed always holds 25 cards — the QCM take four of those slots. */
+const TOTAL_CARDS = 25
+
 /**
  * Wipe the demo user's data and reseed the demo dataset in ONE call (the caller
  * wraps it in a transaction + advisory lock). Idempotent by construction: it
@@ -196,12 +294,16 @@ export async function seedDemo(tx: Tx, userId: string, marker: string): Promise<
     { deckId: deckGram!.id, pool: GRAMMARS },
     { deckId: deckVoc!.id, pool: VOCAB },
   ]
-  let idx = 0
-  for (let n = 0; n < 25; n++) {
+  // QCM first: seeding order decides `created_at`, which is how `dueQueue`
+  // breaks ties between cards sharing a due date (see `DEMO_QCM_CARDS`).
+  for (const q of DEMO_QCM_CARDS) {
+    const p = pools[q.pool]!
+    specs.push({ deckId: p.deckId, front: q.front, back: q.back, reviews: profile(q.profile) })
+  }
+  for (let n = 0; n < TOTAL_CARDS - DEMO_QCM_CARDS.length; n++) {
     const p = pools[n % pools.length]!
     const pair = p.pool[Math.floor(n / pools.length) % p.pool.length]!
-    specs.push({ deckId: p.deckId, front: pair[0]!, back: pair[1]!, reviews: profile(idx) })
-    idx++
+    specs.push({ deckId: p.deckId, front: pair[0]!, back: pair[1]!, reviews: profile(n) })
   }
 
   for (const s of specs) {

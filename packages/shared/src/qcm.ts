@@ -1,6 +1,13 @@
 /**
  * Recognise a multiple-choice card from its Markdown, at render time.
  *
+ * This module lives in `@engram/shared` because the QCM format is a contract
+ * between three places: the generation prompt writes it
+ * (`apps/server/src/ai/prompts/cards.v1.ts`), the demo seed writes it
+ * (`apps/server/src/services/demo.service.ts`), and the review session reads it
+ * (`apps/web/src/features/review/`). It is a pure parser, not a Zod schema, and
+ * it adds no dependency to the package.
+ *
  * A QCM card has NO structured representation in the database: it is a plain
  * card whose `front`/`back` happen to follow the shape asked for by the
  * generation prompt (`cards.v1.ts`, QUIZ_INSTRUCTIONS):
@@ -88,8 +95,8 @@ const MIN_OPTIONS = 2
  * Maximum number of options. A product constraint, not a parsing one: the
  * review session maps the keys A to D onto the options, and the next letters
  * are already taken by its own shortcuts — `E` edits the card, `S` skips it,
- * `U` undoes the last review (see `lib/keymap.ts`). A 5-option QCM would make
- * its option `E` collide with card editing. The generation prompt asks for 3 to
+ * `U` undoes the last review (see `apps/web/src/lib/keymap.ts`). A 5-option QCM
+ * would make its option `E` collide with card editing. The prompt asks for 3 to
  * 4 options anyway; beyond that, falling back to the Markdown rendering is the
  * safe behaviour.
  */

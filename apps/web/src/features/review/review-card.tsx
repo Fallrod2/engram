@@ -1,11 +1,11 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { motion } from 'motion/react'
 import { Check, X } from 'lucide-react'
+import type { ParsedQcm, QcmOption } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { Markdown } from '@/components/markdown'
 import { contentAlign } from './content-align'
-import type { ParsedQcm, QcmOption } from './qcm'
 
 /**
  * The flashcard — a vertical reveal, not a 3D flip. The question is anchored at
@@ -104,10 +104,30 @@ export function ReviewCard({
       onClick={interactive ? onReveal : undefined}
       // No `min-h-0` here: what lets this flex item shrink below its intrinsic
       // size is `overflow-hidden` (automatic minimum size is 0 once `overflow`
-      // is not `visible`); the `min-h-*` below is the deliberate floor.
+      // is not `visible`).
+      //
+      // T-023 — the card FILLS its region (`flex-1`) instead of standing on a
+      // `min-h-[180px]/[220px]` floor. The floor was the wrong instrument: it
+      // could not shrink to a two-word card (it left ~190px of empty box under
+      // "a flaw" at 1512×797) and it could not grow to a long one either, so
+      // the session's chrome ended up positioned by the content. Filling the
+      // region does BOTH jobs at once — the reading surface is the same size on
+      // every card, the question always starts at the same y, and a long verso
+      // scrolls inside a scroller that is now as tall as the screen allows.
+      //
+      // The other branch of T-023 — a card whose HEIGHT follows its content —
+      // was built and measured before this one was kept, because it is the more
+      // obvious reading of "the box is bigger than what is in it". Rendered, it
+      // is worse: honouring the other constraint (the rating bar may not move
+      // with the content) pins the controls to the bottom anyway, so a two-word
+      // card became a 169px slab at the top of the screen with 430px of bare
+      // page between it and the buttons. That is the original complaint — an
+      // object adrift — moved upward, not answered. Emptiness INSIDE a reading
+      // surface reads as a page with little on it; the same emptiness outside it
+      // reads as a screen that failed to load.
       className={cn(
-        'flex w-full flex-col overflow-hidden rounded-lg',
-        'min-h-[180px] border border-border bg-surface-2 sm:min-h-[220px]',
+        'flex w-full flex-1 flex-col overflow-hidden rounded-lg',
+        'border border-border bg-surface-2',
         interactive && 'cursor-pointer',
       )}
     >

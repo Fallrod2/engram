@@ -160,20 +160,31 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
       {/* Elastic region. `min-h-0` is what ALLOWS shrinking below the intrinsic
           size — without it flexbox refuses and the rating bar is pushed out of
           the viewport. No `overflow-hidden`: the overflow scrolls INSIDE the
-          card, so nothing is ever silently truncated (no `vh` anywhere). */}
-      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-4 sm:px-4 sm:pb-5">
-        {/* Card + ratings are ONE centred block: on a tall screen the bar no
-            longer anchors to the bottom edge, it stays 12px under the card. */}
-        <div className="flex max-h-full w-full max-w-[680px] flex-col gap-3">
-          {/* No `flex-1` here — that would re-inflate the zone and push the
-              ratings back down. The default `flex-shrink: 1` lets it give way
-              under pressure and hands the overflow to the card's scroller. */}
-          <div className="flex min-h-0 flex-col">
+          card, so nothing is ever silently truncated (no `vh` anywhere).
+          T-023 — the block is ANCHORED, not centred. Centring it made every
+          fixed point on this screen depend on how much content happened to be
+          on it: measured at 1512×797, revealing a two-word card slid the
+          question 22.7px UP (the block grew by the 45.4px the rating bar gains
+          when the hint becomes four buttons, and centring split that in two),
+          and the rating bar sat at y=501 on a short card but y=688 on a long
+          one — 187px apart, under a keyboard whose whole point is that 1-4 can
+          be pressed without looking. Both are the same root cause, and both
+          disappear the moment the column stops being centred: the card region
+          takes ALL the slack (`flex-1`) and the control stack is pinned to the
+          bottom, so the card's top edge, the question, the context bar and the
+          ratings are at constant y for every card and every state. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center px-3 pb-4 sm:px-4 sm:pb-5">
+        <div className="flex min-h-0 w-full max-w-[680px] flex-1 flex-col gap-3">
+          {/* `flex-1` is what pins the geometry: this zone absorbs the whole
+              elastic height, so what varies with the content is how full the
+              card is — never where anything sits. `min-h-0` still lets it hand
+              its overflow to the card's own scroller. */}
+          <div className="flex min-h-0 flex-1 flex-col">
             {current && (
               <AnimatePresence mode="wait">
                 <motion.div
                   key={current.id}
-                  className="flex min-h-0 flex-col"
+                  className="flex min-h-0 flex-1 flex-col"
                   initial={api.reduce ? false : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={api.reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
@@ -194,7 +205,8 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
             )}
           </div>
 
-          {/* Natural height, never compressed. */}
+          {/* Natural height, never compressed — and now the anchor of the whole
+              screen: everything in here keeps a constant y (T-023). */}
           <div className="flex shrink-0 flex-col gap-2">
             <SessionContextBar
               remaining={api.remaining}
@@ -275,20 +287,38 @@ function TerminalView({
 }
 
 function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
+  const coarse = useCoarsePointer()
   return (
     <>
       <div className="h-0.5 w-full bg-surface-2" />
       <CloseButton onExit={onExit} t={t} />
-      {/* Mirrors PlayView's geometry exactly (same elastic region, same 680px
-          column, same 12px gap) so LOADING → ASKING swaps content in place
-          instead of jumping. */}
-      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-4 sm:px-4 sm:pb-5">
-        <div className="flex max-h-full w-full max-w-[680px] flex-col gap-3">
-          <Skeleton className="h-[280px] min-h-0 w-full rounded-lg" />
-          <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-md" />
-            ))}
+      {/* Mirrors PlayView's geometry exactly (same anchored region, same 680px
+          column, same 12px gap, same 24px context strip, same rating row) so
+          LOADING → ASKING swaps content in place instead of jumping. Since
+          T-023 that mirroring is cheap to hold: the play geometry no longer
+          depends on the card, so the skeleton only has to copy constants.
+          Measured, it was 25px out — the cheat-sheet line was missing, so the
+          card skeleton stood 25px taller than the card that replaced it. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center px-3 pb-4 sm:px-4 sm:pb-5">
+        <div className="flex min-h-0 w-full max-w-[680px] flex-1 flex-col gap-3">
+          <Skeleton className="min-h-0 w-full flex-1 rounded-lg" />
+          <div className="flex shrink-0 flex-col gap-2">
+            <Skeleton className="h-6 w-full rounded-sm" />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-md" />
+              ))}
+            </div>
+            {/* Not a skeleton: it is the very line PlayView renders, held
+                invisible. A shimmering placeholder for a static cheat-sheet
+                would promise content that never loads — this only reserves the
+                space, on exactly the same `!coarse` condition, so the swap is
+                pixel-identical on both pointer types. */}
+            {!coarse && (
+              <p aria-hidden className="invisible text-center text-2xs uppercase tracking-[0.08em]">
+                {t('session.footerHint')}
+              </p>
+            )}
           </div>
         </div>
       </div>

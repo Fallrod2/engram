@@ -270,10 +270,18 @@ describe('<SessionContextBar> difficulty gauge', () => {
     )
   }
 
-  /** Segments lit up, read off the fill token rather than off a count of nodes. */
+  /**
+   * Segments lit up, read off the state the component publishes on each node
+   * (`data-segment`) rather than off whichever utility class paints it — the
+   * fill token moved once already (T-024) and the reading did not.
+   */
   function filledCount(): number {
-    const gauge = screen.getByRole('img')
-    return gauge.querySelectorAll('.bg-text-muted').length
+    return screen.getByRole('img').querySelectorAll('[data-segment="filled"]').length
+  }
+
+  /** The unlit remainder — the denominator, which T-024 made visible. */
+  function emptyCount(): number {
+    return screen.getByRole('img').querySelectorAll('[data-segment="empty"]').length
   }
 
   it('fills every segment at the top of the scale', () => {
@@ -287,6 +295,35 @@ describe('<SessionContextBar> difficulty gauge', () => {
   it('fills a single segment at the bottom of the scale', () => {
     renderWith(1)
     expect(filledCount()).toBe(1)
+  })
+
+  /**
+   * T-024 — a gauge is a fraction, so the unlit remainder has to be RENDERED,
+   * not merely absent. It used to be painted `border-strong`, which measures
+   * 1.71:1 against the page in dark and 1.47:1 in light: present in the DOM,
+   * invisible on screen, and with it went the denominator. Whatever the reading,
+   * the five segments are all there and the two states are two distinct tokens.
+   */
+  it('renders the unlit remainder as a visible track, in a tone distinct from the fill', () => {
+    for (const [difficulty, lit] of [
+      [0, 0],
+      [1, 1],
+      [5.4, 3],
+      [10, 5],
+    ] as const) {
+      renderWith(difficulty)
+      expect(filledCount()).toBe(lit)
+      expect(emptyCount()).toBe(5 - lit)
+      const gauge = screen.getByRole('img')
+      const tone = (sel: string) =>
+        new Set([...gauge.querySelectorAll(sel)].map((n) => n.className))
+      // Two states, two tones — never the same class on both sides, which is
+      // what an invisible track amounts to visually.
+      const filledTones = tone('[data-segment="filled"]')
+      const emptyTones = tone('[data-segment="empty"]')
+      for (const f of filledTones) expect(emptyTones.has(f)).toBe(false)
+      cleanup()
+    }
   })
 
   it('rounds the spoken value to one decimal', () => {

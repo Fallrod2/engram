@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { ParsedQcm } from '@engram/shared'
 import { ReviewCard } from './review-card'
-import type { ParsedQcm } from './qcm'
 
 /** What a plain (non-QCM) card passes for the multiple-choice props. */
 const PLAIN = { qcm: null, selectedChoice: null, onSelect: () => {} } as const

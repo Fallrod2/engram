@@ -27,7 +27,7 @@ Tu renvoies les cartes UNIQUEMENT via l'outil "emit_cards". Aucun texte hors de 
  * Kind-specific instruction for 'quiz' (multiple choice), added to the user message.
  *
  * The front/back shape spelled out below is a CONTRACT with the render-time QCM
- * parser, `apps/web/src/features/review/qcm.ts`: loosening it here makes the
+ * parser, `packages/shared/src/qcm.ts`: loosening it here makes the
  * generated cards unrecognisable as QCM, and they fall back to the plain
  * Markdown rendering. Two points are load-bearing on that side — the `)` after
  * the answer letter (`.` is refused, it collides with French abbreviations and
