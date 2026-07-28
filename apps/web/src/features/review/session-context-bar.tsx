@@ -29,11 +29,49 @@ function filledSegments(difficulty: number): number {
 }
 
 /**
- * The difficulty of the card on screen, as five segments. Discreet on purpose:
- * it explains why some cards keep coming back (the queue draw is weighted by
- * `card.fsrs.difficulty`, see `queue-order.ts`) without competing with the
- * counters next to it — hence no colour of its own, and never `danger`: a hard
- * card is work to do, not a failure.
+ * The difficulty of the card on screen, as five segments. Second-plane by
+ * intent — it explains why some cards keep coming back (the queue draw is
+ * weighted by `card.fsrs.difficulty`, see `queue-order.ts`) without competing
+ * with the counters next to it — but second-plane is not the same as illegible,
+ * and T-024 was the second.
+ *
+ * What the measurement said (Chromium, both themes, WCAG 2.x ratios computed
+ * from the browser's own sRGB rasterisation of the oklch tokens):
+ *
+ *   fill  `text-muted`    vs page   7.52:1 dark · 6.53:1 light  — already loud
+ *   track `border-strong` vs page   1.71:1 dark · 1.47:1 light  — INVISIBLE
+ *   fill vs track                   4.39:1 dark · 4.46:1 light
+ *
+ * So the lit segments were never the problem. The TRACK was: at 1.7:1 the unlit
+ * segments simply are not there, which leaves the gauge with no denominator —
+ * four bright pickets and nothing to read them against, so "4 out of 5" and
+ * "some marks" look the same. WCAG 1.4.11 wants 3:1 for the visual information
+ * that identifies a component's state, and the track carries exactly that.
+ *
+ * Holding BOTH sides of that bar (track ≥ 3:1 against the page AND fill ≥ 3:1
+ * against the track) forces the pair, it is not a taste call: a track at ≥ 3:1
+ * needs `text-faint` (5.10:1 dark · 4.76:1 light — `border-strong`, `border`,
+ * `surface-3` are all under 1.8:1), and a fill 3:1 above `text-faint` needs
+ * `text` (3.26:1 dark · 3.32:1 light). `text-muted` cannot clear it — it sits
+ * 1.48:1 over `text-faint`. That is the same `text` / `text-faint` pair `DueDot`
+ * landed on for the collapsed rail, for the same reason, so the two marks stay
+ * one family. Loudness is then dosed with SIZE, not with tone: 6×8px segments
+ * instead of 4×8, a 38px mark instead of 28px.
+ *
+ * Still neutral by construction: no accent (that means "active row" elsewhere)
+ * and never `danger` — a hard card is work to do, not a failure.
+ *
+ * One consequence, accepted knowingly: a visible track means the two EXTREMES
+ * (0/5 on a never-reviewed card, 5/5 on the hardest) now differ by tone alone,
+ * where before an invisible track made them look nothing alike. That is the
+ * right trade — the extremes are the two readings a user needs least often, and
+ * every value between them was unreadable before. The screen reader is not
+ * asked to rely on tone: `difficultyUnknown` and `difficultyAria` are different
+ * sentences.
+ *
+ * The exact figure is deliberately NOT printed here. It already has a home one
+ * row up: the header's `FsrsStateGlyph` tooltip prints difficulty, stability and
+ * due together. This mark is the at-a-glance form of the same number.
  *
  * Hidden under 640px like the neighbouring button labels — the bar already
  * holds three buttons and four counters and must stay readable at 320px.
@@ -55,9 +93,13 @@ function DifficultyGauge({ difficulty, t }: { difficulty: number; t: TFunction }
         <span
           key={i}
           aria-hidden
+          // The state is on the node, like `DueDot`'s `data-due-tier`: it IS the
+          // encoding, so a test can assert the reading without reverse-
+          // engineering which utility class happens to paint the fill today.
+          data-segment={i < filled ? 'filled' : 'empty'}
           className={cn(
-            'inline-block h-2 w-1 shrink-0 rounded-xs',
-            i < filled ? 'bg-text-muted' : 'bg-border-strong',
+            'inline-block h-2 w-1.5 shrink-0 rounded-xs',
+            i < filled ? 'bg-text' : 'bg-text-faint',
           )}
         />
       ))}
