@@ -4,19 +4,24 @@ import { useQuery } from '@tanstack/react-query'
 import { PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck } from 'lucide-react'
 import type { Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
-import { useT } from '@/lib/i18n'
+import { usePlural, useT, type PluralCategory, type TFunction } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/kbd'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SubjectDot } from '@/components/subject-dot'
-import { DueBadge, DueCount } from '@/components/due-count'
+import { DueCount, DueDot } from '@/components/due-count'
 import { subjectsListOptions } from '@/features/subjects/queries'
 import { meQuery } from '@/features/admin/queries'
-import { dueCountsOptions, bySubjectMap } from '@/features/due-counts/queries'
+import {
+  dueCountsOptions,
+  splitBySubjectMap,
+  type SubjectDueSplit,
+} from '@/features/due-counts/queries'
 import { streaksOptions } from '@/features/analytics/queries'
 import { useShell } from './shell-context'
+import { dueRowLabel } from './due-row-label'
 import { NAV_GROUPS, type NavItem } from './nav'
 import { StreakPill } from './streak-pill'
 import { ThemeToggle } from './theme-toggle'
@@ -25,10 +30,10 @@ import { ApiStatus } from './api-status'
 export function Sidebar() {
   const { collapsed, canToggleCollapse, toggleCollapse, setCommandOpen } = useShell()
   const t = useT()
+  const plural = usePlural()
 
   const subjectsQuery = useQuery(subjectsListOptions())
   const dueQuery = useQuery(dueCountsOptions())
-  const dueLoading = dueQuery.isPending
   // Conditional "Administration" entry (spec §4 + rbac-groups §5, amendment G1).
   // Driven by the SAME shared /api/me cache as the /admin guard (amendment A12)
   // and hidden while pending — so it never flashes in. Visible for an admin OR
@@ -48,8 +53,16 @@ export function Sidebar() {
         .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
     [subjectsQuery.data],
   )
-  const dueMap = useMemo(() => bySubjectMap(dueQuery.data), [dueQuery.data])
-  const totalDue = dueQuery.data?.total
+  const dueMap = useMemo(() => splitBySubjectMap(dueQuery.data), [dueQuery.data])
+  // The "Session de révision" row carries the instance-wide split, shaped like a
+  // per-subject row so both row kinds share one renderer and one label builder.
+  const totalDue: DueSplit | undefined = dueQuery.data
+    ? {
+        dueCount: dueQuery.data.total,
+        overdueCount: dueQuery.data.overdueCount,
+        todayCount: dueQuery.data.todayCount,
+      }
+    : undefined
 
   // Ordered list of every focusable entry (nav items + real subjects) → roving.
   const focusKeys = useMemo(() => {
@@ -212,9 +225,11 @@ export function Sidebar() {
                     key={item.to}
                     item={item}
                     label={t(item.label)}
+                    t={t}
+                    plural={plural}
                     collapsed={collapsed}
-                    count={item.to === '/review' ? totalDue : undefined}
-                    countLoading={item.to === '/review' && dueLoading}
+                    showDue={item.to === '/review'}
+                    due={item.to === '/review' ? totalDue : undefined}
                     tabIndex={idx === rovingIndex ? 0 : -1}
                     ref={(el) => {
                       linkRefs.current[idx] = el
@@ -236,8 +251,9 @@ export function Sidebar() {
                         <SubjectNavRow
                           key={s.id}
                           subject={s}
-                          due={dueMap.get(s.id) ?? 0}
-                          dueLoading={dueLoading}
+                          t={t}
+                          plural={plural}
+                          due={dueMap.get(s.id)}
                           collapsed={collapsed}
                           tabIndex={idx === rovingIndex ? 0 : -1}
                           ref={(el) => {
@@ -333,13 +349,51 @@ export function Sidebar() {
   )
 }
 
+/**
+ * A due count with its backlog/today split, as both row kinds consume it —
+ * derived from the shared API row so the shape has a single source (T-013).
+ */
+type DueSplit = Omit<SubjectDueSplit, 'subjectId'>
+
+/** Shared row chrome: base classes + the 2px indigo active edge bar (spec §5). */
+const ROW_CLASS = cn(
+  'group/nav relative flex h-8 items-center rounded-sm text-sm text-text-muted',
+  'transition-colors duration-fast hover:bg-surface-2 hover:text-text',
+  'data-[status=active]:bg-accent-subtle data-[status=active]:text-text',
+)
+const EDGE_CLASS =
+  'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent opacity-0 transition-opacity duration-fast group-data-[status=active]/nav:opacity-100'
+/**
+ * Collapsed rail: the graduated dot lives in the row's TRAILING GUTTER, not on
+ * the icon. Anchored to the icon's top-right corner it overlapped whatever it
+ * sat on — at the `mid` and `high` tiers the 8px dot fused with the 8px
+ * `SubjectDot` into one bicolour blob and ate a corner of the graduation-cap
+ * glyph, so the two signals stopped reading as two. Pushing it further out ran
+ * into the other wall: the 32px row has ~8px of vertical slack, and a diagonal
+ * offset big enough to clear an icon spills onto the row above (the same trap
+ * that had capped the old badge at two characters).
+ *
+ * The gutter removes the conflict by construction instead of tuning around it:
+ * the collapsed row is 48px wide with a 16px icon centred (x ∈ [16,32]), so the
+ * dot occupies x ∈ [38,46] at its largest — never within 6px of the icon box or
+ * 10px of the subject dot, at any tier, with or without a halo. It is also
+ * vertically centred, so no tier can ever reach the row's edge. As a bonus the
+ * mark now sits on the same trailing edge as the expanded `DueCount`, so
+ * collapsing the sidebar moves it in a straight line instead of jumping.
+ */
+const DOT_GUTTER = 'absolute inset-y-0 right-0.5'
+
 interface NavLinkProps {
   item: NavItem
   /** Pre-resolved (translated) label; `item.label` is an i18n key. */
   label: string
+  t: TFunction
+  plural: (count: number) => PluralCategory
   collapsed: boolean
-  count: number | undefined
-  countLoading: boolean
+  /** Whether this row carries a due count at all (only "Session de révision"). */
+  showDue: boolean
+  /** The split; `undefined` while the counts query is still pending. */
+  due: DueSplit | undefined
   tabIndex: number
   onFocus: () => void
   ref: (el: HTMLAnchorElement | null) => void
@@ -349,52 +403,46 @@ interface NavLinkProps {
 function NavLink({
   item,
   label,
+  t,
+  plural,
   collapsed,
-  count,
-  countLoading,
+  showDue,
+  due,
   tabIndex,
   onFocus,
   ref,
 }: NavLinkProps) {
   const Icon = item.icon
+  // One sentence, both states (T-017): collapsed the digits are gone entirely,
+  // expanded they are a two-part number — neither is something a screen reader
+  // should have to reconstruct, so the row spells it out itself.
+  const name = showDue ? dueRowLabel(t, plural, label, due) : label
   const row = (
     <Link
       ref={ref}
       to={item.to}
       tabIndex={tabIndex}
       onFocus={onFocus}
-      aria-label={collapsed ? label : undefined}
-      className={cn(
-        'group/nav relative flex h-8 items-center rounded-sm text-sm text-text-muted',
-        'transition-colors duration-fast hover:bg-surface-2 hover:text-text',
-        'data-[status=active]:bg-accent-subtle data-[status=active]:text-text',
-        collapsed ? 'justify-center px-0' : 'gap-2 px-2',
-      )}
+      aria-label={collapsed || showDue ? name : undefined}
+      className={cn(ROW_CLASS, collapsed ? 'justify-center px-0' : 'gap-2 px-2')}
     >
-      <span
-        className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent opacity-0 transition-opacity duration-fast group-data-[status=active]/nav:opacity-100"
-        aria-hidden
-      />
-      <span className="relative flex items-center justify-center">
+      <span className={EDGE_CLASS} aria-hidden />
+      <span className="flex items-center justify-center">
         <Icon className="size-4 shrink-0" />
-        {/* The rail leaves 48px of usable width and 32px rows: a three-character
-            badge overflowed onto the row above. Two characters and a tighter
-            offset keep it on its own icon. `9+` is purely a display truncation:
-            the exact count is only readable once the sidebar is expanded, where
-            `DueCount` prints it in full. Collapsed, nothing carries it for a
-            screen reader either — the badge is `aria-hidden` and the tooltip
-            only repeats the label. That gap predates this cap and is not made
-            worse by it; closing it would change the rows' accessible names. */}
-        {collapsed && count != null && (
-          <DueBadge value={count} max={9} className="absolute -right-1 -top-1" />
-        )}
       </span>
+      {collapsed && showDue && due && (
+        <DueDot value={due.dueCount} overdue={due.overdueCount} className={DOT_GUTTER} />
+      )}
       {!collapsed && (
         <>
           <span className="truncate">{label}</span>
-          {count != null && (
+          {showDue && (
             <span className="ml-auto">
-              {countLoading ? <CountShimmer /> : <DueCount value={count} />}
+              {due ? (
+                <DueCount value={due.dueCount} overdue={due.overdueCount} label={null} />
+              ) : (
+                <CountShimmer />
+              )}
             </span>
           )}
         </>
@@ -405,15 +453,20 @@ function NavLink({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{row}</TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      {/* The tooltip used to repeat the bare label, which told a collapsed-rail
+          user nothing about the dot they were pointing at. It now carries the
+          same sentence as the accessible name. */}
+      <TooltipContent side="right">{name}</TooltipContent>
     </Tooltip>
   )
 }
 
 interface SubjectNavRowProps {
   subject: Subject
-  due: number
-  dueLoading: boolean
+  t: TFunction
+  plural: (count: number) => PluralCategory
+  /** The split; `undefined` while the counts query is still pending. */
+  due: DueSplit | undefined
   collapsed: boolean
   tabIndex: number
   onFocus: () => void
@@ -423,13 +476,15 @@ interface SubjectNavRowProps {
 /** A real subject row in the Matières group (spec §5 item 4). */
 function SubjectNavRow({
   subject,
+  t,
+  plural,
   due,
-  dueLoading,
   collapsed,
   tabIndex,
   onFocus,
   ref,
 }: SubjectNavRowProps) {
+  const name = dueRowLabel(t, plural, subject.name, due)
   const row = (
     <Link
       ref={ref}
@@ -437,27 +492,30 @@ function SubjectNavRow({
       params={{ subjectId: subject.id }}
       tabIndex={tabIndex}
       onFocus={onFocus}
-      aria-label={collapsed ? subject.name : undefined}
-      className={cn(
-        'group/nav relative flex h-8 items-center rounded-sm text-sm text-text-muted',
-        'transition-colors duration-fast hover:bg-surface-2 hover:text-text',
-        'data-[status=active]:bg-accent-subtle data-[status=active]:text-text',
-        collapsed ? 'justify-center px-0' : 'gap-2 px-2',
-      )}
+      aria-label={name}
+      className={cn(ROW_CLASS, collapsed ? 'justify-center px-0' : 'gap-2 px-2')}
     >
-      <span
-        className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent opacity-0 transition-opacity duration-fast group-data-[status=active]/nav:opacity-100"
-        aria-hidden
-      />
-      <span className="relative flex items-center justify-center">
+      <span className={EDGE_CLASS} aria-hidden />
+      <span className="flex items-center justify-center">
         <SubjectDot color={subject.color} />
-        {collapsed && <DueBadge value={due} max={9} className="absolute -right-1 -top-1" />}
       </span>
+      {collapsed && due && (
+        <DueDot value={due.dueCount} overdue={due.overdueCount} className={DOT_GUTTER} />
+      )}
       {!collapsed && (
         <>
           <span className="truncate">{subject.name}</span>
           <span className="ml-auto">
-            {dueLoading ? <CountShimmer /> : <DueCount value={due} colorHex={subject.color} />}
+            {due ? (
+              <DueCount
+                value={due.dueCount}
+                overdue={due.overdueCount}
+                colorHex={subject.color}
+                label={null}
+              />
+            ) : (
+              <CountShimmer />
+            )}
           </span>
         </>
       )}
@@ -467,7 +525,7 @@ function SubjectNavRow({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{row}</TooltipTrigger>
-      <TooltipContent side="right">{subject.name}</TooltipContent>
+      <TooltipContent side="right">{name}</TooltipContent>
     </Tooltip>
   )
 }
