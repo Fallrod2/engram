@@ -10,9 +10,12 @@ import { createTestDb, type TestDb } from './test-db'
  * `authenticated` must hold NO privilege on `public`, on the tables that exist
  * today AND on the ones a future migration will create.
  *
- * The difficulty is that the roles do not exist on PGlite (nor on the bare
- * Postgres of the e2e harness), so a naive "assert anon has nothing" test would
- * pass forever without ever exercising a single REVOKE. This spec therefore
+ * The difficulty is that the roles do not exist on PGlite, which is the ONLY
+ * environment this suite runs on — so a naive "assert anon has nothing" test
+ * would pass forever without ever exercising a single REVOKE. (The e2e harness
+ * is a different story: roles are cluster-global and its throwaway database
+ * lives in the local Supabase cluster, so e2e really does run the REVOKE branch
+ * on a real Postgres — but that happens outside this file.) This spec therefore
  * BUILDS the roles instead of skipping: `supabaseLikeDb()` reproduces a stock
  * Supabase project in-process (the two Data API roles, USAGE on `public`, and
  * the `ALTER DEFAULT PRIVILEGES` that hand every future table to them), then
@@ -182,7 +185,15 @@ describe('migration 0010 — anon/authenticated hold nothing on public', () => {
   })
 })
 
-describe('migration 0010 — portability where the roles do NOT exist', () => {
+/**
+ * Coverage note, so this block does not over-claim: it is a SECOND PGlite —
+ * the stock `createTestDb()` one, without the Supabase role fixture. It proves
+ * the `pg_roles` guard on the only engine this suite can reach that lacks the
+ * roles. Real-Postgres coverage (roles present, REVOKE branch executed) comes
+ * from the e2e suites, whose throwaway database is created in the local
+ * Supabase cluster — not from here.
+ */
+describe('migration 0010 — the pg_roles guard, on the stock PGlite fixture', () => {
   let t: TestDb
 
   beforeEach(async () => {
@@ -192,7 +203,7 @@ describe('migration 0010 — portability where the roles do NOT exist', () => {
     await t.cleanup()
   })
 
-  it('applies on a plain Postgres that has neither anon nor authenticated', async () => {
+  it('applies on a PGlite that has neither anon nor authenticated', async () => {
     // `createTestDb()` already ran the whole chain; reaching here means 0010 did
     // not raise 42704. Assert the premise so this stays an honest statement.
     for (const role of DATA_API_ROLES) {

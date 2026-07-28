@@ -31,11 +31,22 @@
 -- extension code resolving through search_path) for no marginal gain: USAGE
 -- without a single object privilege opens access to nothing.
 --
--- PORTABILITY — this is what dictates the shape below. The same file runs on
--- PGlite (`bun run test:db`) and on the bare Postgres of the e2e harness
--- (`e2e/support/db.ts` creates a throwaway database), where `anon` and
--- `authenticated` DO NOT EXIST: a plain `REVOKE ... FROM anon` would abort with
--- 42704 (role does not exist) and take the whole suite down with it. Every
+-- The `graphql_public` schema is NOT covered by this file — see the same doc
+-- section. `graphql_public.graphql()` lives outside `public`, is owned by
+-- `supabase_admin`, and its EXECUTE is granted to the pseudo-role PUBLIC
+-- (`=X/supabase_admin`), so revoking it from `anon`/`authenticated` alone would
+-- be cosmetic — and the grant cannot be revoked by us anyway (only its grantor
+-- or a member of it can, and the migration role is neither).
+--
+-- PORTABILITY — this is what dictates the shape below. The ONLY environment
+-- without `anon`/`authenticated` is PGlite (`bun run test:db`, and the preload
+-- of the route specs): a plain `REVOKE ... FROM anon` would abort there with
+-- 42704 (role does not exist) and take the whole suite down with it. Note that
+-- the e2e harness is NOT such an environment: roles are cluster-global, and
+-- `e2e/support/db.ts` creates its throwaway database inside the local Supabase
+-- cluster, which HAS both roles — so e2e actually exercises the REVOKE branch on
+-- a real Postgres. (The guard still matters there for the plain `postgres:16`
+-- fallback that `e2e/support/db.ts` documents, which has neither role.) Every
 -- statement is therefore guarded on `pg_roles` and expressed through EXECUTE.
 -- Re-running the file is a no-op: REVOKE of an absent privilege succeeds.
 DO $$
@@ -58,9 +69,22 @@ BEGIN
 		-- that holds an entry on `public` AND that we are allowed to alter, plus our
 		-- own role: it is the one that will create the tables of migration 0011, and
 		-- it may not have an entry yet. `pg_has_role(..., 'USAGE')` is exactly the
-		-- privilege ALTER DEFAULT PRIVILEGES FOR ROLE requires — on the cloud it
-		-- skips the `supabase_admin` entry (the app role is not a member of it),
-		-- which is fine: `supabase_admin` creates nothing in `public` for us.
+		-- privilege ALTER DEFAULT PRIVILEGES FOR ROLE requires.
+		--
+		-- ⚠️ KNOWN GAP, deliberate and documented (docs/deploy-vercel.md, § « API
+		-- données »): the cloud carries TWO grantors on `public`, `postgres` and
+		-- `supabase_admin`, and the migration role (`postgres`, NOT superuser) is
+		-- not a member of the second — so its `GRANT ALL TO anon, authenticated`
+		-- defaults SURVIVE this migration. Inert today, because all 15 tables of
+		-- `public` are owned by `postgres` (verified) and default privileges apply
+		-- to the role that CREATES the object; it would stop being inert the day
+		-- something creates an object in `public` as `supabase_admin`. No safe fix
+		-- exists from inside a migration: we cannot SET ROLE supabase_admin, and an
+		-- `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin` would abort the build.
+		-- A defensive `ddl_command_end` event trigger would close it regardless of
+		-- grantor, but creating one requires superuser, which `postgres` is not on
+		-- hosted Supabase. The real closure is a dashboard setting (Data API →
+		-- exposed schemas), not SQL — tracked as an action, not attempted here.
 		FOR grantor IN
 			SELECT pg_get_userbyid(d.defaclrole)
 			  FROM pg_default_acl d
