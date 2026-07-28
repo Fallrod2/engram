@@ -1,6 +1,7 @@
 import type { Card as FsrsCard, ReviewLog as FsrsReviewLog } from 'ts-fsrs'
 import type { InferSelectModel } from 'drizzle-orm'
 import type { card, reviewLog } from './schema'
+import { SEED_CARD_ID_FIELD, type SchedulableCard } from '../services/fsrs'
 
 /**
  * Adapters at the DB ⇄ ts-fsrs boundary. Drizzle FSRS properties are camelCase;
@@ -11,9 +12,17 @@ import type { card, reviewLog } from './schema'
 type CardRow = InferSelectModel<typeof card>
 type ReviewLogRow = InferSelectModel<typeof reviewLog>
 
-/** DB row → ts-fsrs `Card` (to feed `fsrs.next` / `fsrs.repeat`). */
-export function toFsrsCard(row: CardRow): FsrsCard {
+/**
+ * DB row → ts-fsrs `Card` (to feed `fsrs.next` / `fsrs.repeat`).
+ *
+ * The row id rides along in `card_id`: ts-fsrs ignores the field but the
+ * scheduler's SEED strategy reads it to make the interval fuzz deterministic
+ * per card (T-026, see `services/fsrs.ts`). Putting it here rather than at each
+ * call site means no caller can forget it. `fsrsCardToColumns` drops it again.
+ */
+export function toFsrsCard(row: CardRow): SchedulableCard {
   return {
+    [SEED_CARD_ID_FIELD]: row.id,
     due: row.due,
     stability: row.stability,
     difficulty: row.difficulty,

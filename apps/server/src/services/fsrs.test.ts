@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyCard, fsrs, generatorParameters, State, type Card as FsrsCard } from 'ts-fsrs'
-import { previewAll, schedule, toGrade } from './fsrs'
+import {
+  createEmptyCard,
+  fsrs,
+  generatorParameters,
+  get_fuzz_range,
+  Rating,
+  State,
+  type Card as FsrsCard,
+  type Grade,
+} from 'ts-fsrs'
+import { FSRS_PARAMS, previewAll, schedule, toGrade, type SchedulableCard } from './fsrs'
 
 /** Deterministic scheduler (no fuzz) so exact intervals are reproducible. */
 const sched = fsrs(generatorParameters({ enable_fuzz: false }))
@@ -102,5 +111,117 @@ describe('fsrs service (pure)', () => {
     const b = schedule(createEmptyCard(t0), toGrade(3), t0, sched)
     // No fuzz => the due date is exactly reproducible.
     expect(a.card.due.getTime()).toBe(b.card.due.getTime())
+  })
+})
+
+/**
+ * T-026 — the rating buttons show `previewAll`'s intervals. Before this, the
+ * production scheduler seeded its fuzz PRNG from the wall clock, so the same
+ * card re-rendered showed 7 j, then 9 j, then 5 j, and none of them was what
+ * the review would write. These tests pin the two properties the fix buys, and
+ * characterise the one gap it does NOT close.
+ *
+ * They all run against the DEFAULT (production) scheduler — fuzz ON — because
+ * that is precisely what was broken; a no-fuzz scheduler would prove nothing.
+ */
+describe('fsrs preview determinism (production scheduler, fuzz on)', () => {
+  const GRADES = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy] as Grade[]
+  /** Mature Review-state card, 10 days since the last review, well past the 2.5 d fuzz floor. */
+  function matureCard(id: string): SchedulableCard {
+    return {
+      card_id: id,
+      due: new Date(t0.getTime() - 3 * 24 * 60 * MIN),
+      stability: 30,
+      difficulty: 5,
+      elapsed_days: 10,
+      scheduled_days: 10,
+      learning_steps: 0,
+      reps: 4,
+      lapses: 0,
+      state: State.Review,
+      last_review: new Date(t0.getTime() - 10 * 24 * 60 * MIN),
+    }
+  }
+  const days = (card: SchedulableCard, now: Date): number[] =>
+    GRADES.map((g) => previewAll(card, now)[g as 1].card.scheduled_days)
+
+  it('preview_is_stable_across_calls', () => {
+    const card = matureCard('card-abc')
+    // Three renders of the same card, at three instants of the same day: the
+    // client sends a fresh `now` each time, the four numbers must not move.
+    const first = days(card, t0)
+    expect(days(card, new Date(t0.getTime() + 1000))).toEqual(first)
+    expect(days(card, new Date(t0.getTime() + 6 * 60 * MIN))).toEqual(first)
+    // Two independent calls at the same instant agree down to the due date.
+    const a = previewAll(card, t0)
+    const b = previewAll(card, t0)
+    for (const g of GRADES) {
+      expect(b[g as 1].card.due.getTime()).toBe(a[g as 1].card.due.getTime())
+    }
+  })
+
+  it('preview_matches_the_review_that_follows', () => {
+    // The contract the user cares about: the number on the button is the number
+    // written to the DB. Same card, same instant → same interval AND same due.
+    const card = matureCard('card-abc')
+    const preview = previewAll(card, t0)
+    for (const g of GRADES) {
+      const applied = schedule(card, g, t0)
+      expect(applied.card.scheduled_days).toBe(preview[g as 1].card.scheduled_days)
+      expect(applied.card.due.getTime()).toBe(preview[g as 1].card.due.getTime())
+    }
+  })
+
+  it('preview_is_fuzzed_so_it_is_not_the_raw_fsrs_interval', () => {
+    // Characterises the residual difference vs. the textbook FSRS interval: the
+    // displayed value is the FUZZED one — inside `get_fuzz_range`, rarely equal
+    // to the unfuzzed centre. Fuzz stays on: it is what stops a cohort of cards
+    // from all coming back on the same day.
+    const raw = sched.repeat(matureCard('card-abc'), t0)
+    const shown = new Set<number>()
+    for (let i = 0; i < 30; i++) {
+      const ivl = previewAll(matureCard(`card-${i}`), t0)[Rating.Good].card.scheduled_days
+      const { min_ivl, max_ivl } = get_fuzz_range(
+        raw[Rating.Good].card.scheduled_days,
+        10,
+        FSRS_PARAMS.maximum_interval,
+      )
+      expect(ivl).toBeGreaterThanOrEqual(min_ivl)
+      expect(ivl).toBeLessThanOrEqual(max_ivl)
+      shown.add(ivl)
+    }
+    // Different cards in the same state land on different days (load spreading)
+    // and the spread is not centred on the raw interval alone.
+    expect(shown.size).toBeGreaterThan(1)
+    expect([...shown].some((d) => d !== raw[Rating.Good].card.scheduled_days)).toBe(true)
+  })
+
+  it('preview_shifts_only_when_the_elapsed_day_count_does', () => {
+    // The gap the fix does NOT close, made explicit: the fuzz is frozen per
+    // (card, rep), but the BASE interval still depends on how long the card has
+    // actually been waiting. Answering after the UTC day rolls over moves the
+    // projection — by the same amount the unfuzzed scheduler moves, i.e. the
+    // fuzz contributes nothing to the drift.
+    const card = matureCard('card-abc')
+    const nextDay = new Date(t0.getTime() + 20 * 60 * MIN) // t0 +20 h, crosses UTC midnight
+    const shownNow = previewAll(card, t0)[Rating.Good].card.scheduled_days
+    const shownLater = previewAll(card, nextDay)[Rating.Good].card.scheduled_days
+    const rawNow = sched.repeat(card, t0)[Rating.Good].card.scheduled_days
+    const rawLater = sched.repeat(card, nextDay)[Rating.Good].card.scheduled_days
+    expect(shownLater).not.toBe(shownNow)
+    expect(shownLater - shownNow).toBe(rawLater - rawNow)
+    // Within the same UTC day nothing moves.
+    expect(
+      previewAll(card, new Date(t0.getTime() + 13 * 60 * MIN))[Rating.Good].card.scheduled_days,
+    ).toBe(shownNow)
+  })
+
+  it('preview_without_card_id_is_still_deterministic', () => {
+    // Defensive: a card built by hand (not via `toFsrsCard`) has no `card_id`.
+    // The seed then falls back to the rep count — degraded (all such cards share
+    // a fuzz factor) but never random.
+    const anonymous = { ...matureCard('ignored') }
+    delete anonymous.card_id
+    expect(days(anonymous, new Date(t0.getTime() + 5000))).toEqual(days(anonymous, t0))
   })
 })
