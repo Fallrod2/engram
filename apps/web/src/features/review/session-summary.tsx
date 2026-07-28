@@ -40,6 +40,7 @@ export function SessionSummary({
   canReviewAgain: boolean
   /** The rating that ended the session is still undoable — offer it here too. */
   canUndo: boolean
+  /** An undo is in flight: the button stays in place, greyed out (T-010). */
   undoing: boolean
   onExit: () => void
   onReviewAgain: () => void

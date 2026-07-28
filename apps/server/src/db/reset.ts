@@ -1,4 +1,5 @@
 import postgres from 'postgres'
+import { isLocalDatabaseUrl, localDatabaseUrlRefusal } from './local-guard'
 import { resolveDatabaseUrl } from './paths'
 
 /**
@@ -7,19 +8,13 @@ import { resolveDatabaseUrl } from './paths'
  * from scratch (a regenerated `0000_*.sql` otherwise collides with the tables
  * an earlier baseline already created → `42P07 relation already exists`).
  *
- * Guard rail: refuses to run unless `DATABASE_URL` points at the local Supabase
- * database (`127.0.0.1`/`localhost` on the default DB port `54322`). This can
- * never fire against the cloud, even by accident. Chained with `db:migrate` by
- * the `db:reset` script.
+ * Guard rail: refuses to run unless `DATABASE_URL` points at a LOCAL Postgres
+ * (any port — see `local-guard.ts`), so this can never fire against the cloud
+ * project, even by accident. Chained with `db:migrate` by the `db:reset` script.
  */
 const url = resolveDatabaseUrl()
-const { hostname, port } = new URL(url)
-const isLocal = (hostname === '127.0.0.1' || hostname === 'localhost') && port === '54322'
-if (!isLocal) {
-  console.error(
-    `db:reset refused: DATABASE_URL must point at the local Supabase database ` +
-      `(127.0.0.1/localhost:54322), got ${hostname}:${port || '(default)'}.`,
-  )
+if (!isLocalDatabaseUrl(url)) {
+  console.error(localDatabaseUrlRefusal(url, 'db:reset'))
   process.exit(1)
 }
 

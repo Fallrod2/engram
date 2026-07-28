@@ -8,17 +8,18 @@ import postgres from 'postgres'
  *
  * This module runs `CREATE DATABASE` / `DROP DATABASE`, so it must NEVER target
  * the Supabase cloud project. The guard below therefore refuses any non-local
- * host — but it accepts ANY local Postgres, on any port: the historical
- * 127.0.0.1:54322 was just the local Supabase CLI stack, which no longer exists.
- * We only ever create/drop a uniquely-named database; the instance's own
- * databases are never mutated and `db:reset` is never used here.
+ * host — but it accepts ANY local Postgres, on any port: the throwaway database
+ * only needs a local instance, and 127.0.0.1:54322 is merely the usual one (the
+ * local Supabase CLI stack, started by `bun run dev:db`). We only ever
+ * create/drop a uniquely-named database; the instance's own databases are never
+ * mutated and `db:reset` is never used here.
  *
  * `createRunDb()` runs in the BODY of `playwright.config.ts` (top-level await),
  * BEFORE Playwright freezes each `webServer.env` — so the migrated database URL
  * can be injected into the server env. `dropRunDb()` runs in `globalTeardown`.
  */
 
-/** Historical local Supabase CLI port; still the default a `docker run` maps to. */
+/** The local Supabase CLI stack (`bun run dev:db`), and what the hint below maps to. */
 const DEFAULT_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 /** `new URL()` keeps IPv6 hosts bracketed (`[::1]`); accept the bare form too. */
@@ -67,7 +68,7 @@ function rejectNonLocal(raw: string): never {
  * 2. `DATABASE_URL` — used ONLY when local. In normal dev it points at the cloud
  *    project, and silently inheriting that would be both unsafe and confusing, so
  *    a non-local (or unparsable) value is ignored without error.
- * 3. The historical local default.
+ * 3. The local Supabase CLI stack default (`127.0.0.1:54322`).
  *
  * Pure and env-injected so the guard is unit-testable without touching `process.env`.
  */

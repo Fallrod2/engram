@@ -1,3 +1,4 @@
+import type { ReviewPreview } from '@engram/shared'
 import type { TKey } from '@/lib/i18n'
 import type { Grade } from './session-reducer'
 
@@ -16,23 +17,37 @@ export interface RatingMeta {
   token: 'danger' | 'warning' | 'success' | 'info'
 }
 
-export const RATINGS: readonly [RatingMeta, RatingMeta, RatingMeta, RatingMeta] = [
-  { grade: 1, label: 'session.ratings.again', a11y: 'session.ratings.again', token: 'danger' },
-  { grade: 2, label: 'session.ratings.hard', a11y: 'session.ratings.hard', token: 'warning' },
-  { grade: 3, label: 'session.ratings.good', a11y: 'session.ratings.good', token: 'success' },
-  { grade: 4, label: 'session.ratings.easy', a11y: 'session.ratings.easy', token: 'info' },
-]
-
-/** Rating metadata by grade — the tuple above is the single source of its order. */
-export const RATING_BY_GRADE: Record<Grade, RatingMeta> = {
-  1: RATINGS[0],
-  2: RATINGS[1],
-  3: RATINGS[2],
-  4: RATINGS[3],
+/**
+ * The table keyed by grade IS the source (T-019): every entry is reached by its
+ * key, never by a position. `RatingMeta & { grade: G }` pins each `grade` field
+ * to the key it sits under, so a copy/paste that leaves `grade: 2` under `3`
+ * fails to compile instead of shipping a button that rates the wrong thing.
+ */
+export const RATING_BY_GRADE: { [G in Grade]: RatingMeta & { grade: G } } = {
+  1: { grade: 1, label: 'session.ratings.again', a11y: 'session.ratings.again', token: 'danger' },
+  2: { grade: 2, label: 'session.ratings.hard', a11y: 'session.ratings.hard', token: 'warning' },
+  3: { grade: 3, label: 'session.ratings.good', a11y: 'session.ratings.good', token: 'success' },
+  4: { grade: 4, label: 'session.ratings.easy', a11y: 'session.ratings.easy', token: 'info' },
 }
 
-/** Preview response field (again/hard/good/easy) for a grade. */
-export const PREVIEW_KEY: Record<Grade, 'again' | 'hard' | 'good' | 'easy'> = {
+/**
+ * The four ratings in bar order (Again → Easy), for anything that iterates:
+ * rating bar, summary distribution, analytics legend. Built by explicit key, so
+ * the order is stated once, here, and nothing else depends on a position.
+ */
+export const RATINGS: readonly [RatingMeta, RatingMeta, RatingMeta, RatingMeta] = [
+  RATING_BY_GRADE[1],
+  RATING_BY_GRADE[2],
+  RATING_BY_GRADE[3],
+  RATING_BY_GRADE[4],
+]
+
+/**
+ * Preview response field for a grade. The value type is derived from the shared
+ * Zod schema (`ReviewPreview` minus its `now`), so renaming a field server-side
+ * breaks this map at compile time rather than silently returning `undefined`.
+ */
+export const PREVIEW_KEY: Record<Grade, Exclude<keyof ReviewPreview, 'now'>> = {
   1: 'again',
   2: 'hard',
   3: 'good',

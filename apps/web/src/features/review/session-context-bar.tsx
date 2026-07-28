@@ -85,6 +85,7 @@ export function SessionContextBar({
   difficulty: number | null
   /** There is a rating left to take back — the button exists only then. */
   canUndo: boolean
+  /** An undo is in flight: the button stays in place, greyed out (T-010). */
   undoing: boolean
   onEdit: () => void
   onSkip: () => void
@@ -101,7 +102,9 @@ export function SessionContextBar({
         {/* Leftmost, and only when there is something to take back: undo looks
             BACKWARD (the card you just left), while the two others act on the
             card in front of you. Nothing to undo → no button at all, rather than
-            a permanently dead control. */}
+            a permanently dead control. Once armed it STAYS mounted for the whole
+            undo — `disabled` while the POST is in flight, never removed under
+            the pointer (T-010). */}
         {canUndo && (
           <button
             type="button"

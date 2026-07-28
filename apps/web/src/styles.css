@@ -113,12 +113,15 @@
 
   /* — Motion — budget dur : tout < 250ms —
      Namespace: the `duration-*` utility reads `--transition-duration-*` (like
-     `ease-*` reads `--ease-*`); a `--duration-*` key generates no class at all. */
+     `ease-*` reads `--ease-*`); a `--duration-*` key generates no class at all.
+     Two durations, both with callers: `duration-fast` for hovers/focus,
+     `duration-base` for layout and overlays. A third ("slow", 220ms) was
+     declared and never used — a token nothing references emits no CSS, so it
+     was dropped (T-018); reintroduce it the day a transition needs that value. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
   --transition-duration-fast: 120ms;
   --transition-duration-base: 180ms;
-  --transition-duration-slow: 220ms;
 }
 
 /* ==================== DARK (défaut) ==================== */

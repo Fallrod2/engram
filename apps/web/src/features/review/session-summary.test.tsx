@@ -87,4 +87,33 @@ describe('computeSummary + <SessionSummary> (§16.2 item 14)', () => {
     fireEvent.click(screen.getByText('Réviser encore'))
     expect(onReviewAgain).toHaveBeenCalledTimes(1)
   })
+
+  // T-010: `canUndo` means "there is a rating to take back", `undoing` means "a
+  // POST is in flight". The button is mounted on the first and disabled by the
+  // second — it must not vanish for the length of the request.
+  it('offers "Annuler" once a rating is undoable, and greys it out while it flies', () => {
+    const onUndo = vi.fn()
+    const props = {
+      summary: computeSummary(RESULTS),
+      canReviewAgain: false,
+      onExit: () => {},
+      onReviewAgain: () => {},
+      onUndo,
+    }
+    const label = 'Annuler la dernière note (U)'
+    const { rerender } = render(<SessionSummary {...props} canUndo={false} undoing={false} />)
+    expect(screen.queryByRole('button', { name: label })).toBeNull()
+
+    rerender(<SessionSummary {...props} canUndo undoing={false} />)
+    const button = screen.getByRole('button', { name: label })
+    expect((button as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(button)
+    expect(onUndo).toHaveBeenCalledTimes(1)
+
+    rerender(<SessionSummary {...props} canUndo undoing />)
+    const pending = screen.getByRole('button', { name: label })
+    expect((pending as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(pending)
+    expect(onUndo).toHaveBeenCalledTimes(1) // still one: the click was refused
+  })
 })
