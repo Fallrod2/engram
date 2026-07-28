@@ -115,6 +115,18 @@ export function RewardIllustration({ className }: IllustrationProps) {
   )
 }
 
+/** 404 — a signpost whose two plates disagree: the address leads nowhere. */
+export function NotFoundIllustration({ className }: IllustrationProps) {
+  return (
+    <Svg className={className}>
+      <path d="M28 12v32" />
+      <path d="M28 19h13l4 4-4 4H28Z" />
+      <path d="M28 33H15l-4 4 4 4h13Z" opacity={0.5} />
+      <path d="M21 46h14" opacity={0.35} />
+    </Svg>
+  )
+}
+
 /** Welcome (onboarding) — engram's diamond mark, a fresh start. */
 export function WelcomeIllustration({ className }: IllustrationProps) {
   return (

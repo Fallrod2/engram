@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { GraduationCap, Sparkles } from 'lucide-react'
+import { GraduationCap, Sparkles, Unplug } from 'lucide-react'
 import type { Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { useT, type TFunction } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { SubjectDot } from '@/components/subject-dot'
 import { Countdown } from '@/components/countdown'
 import { dueCountsOptions } from '@/features/due-counts/queries'
@@ -34,7 +35,8 @@ export function TodayPanel({
   className?: string
 }) {
   const t = useT()
-  const counts = useQuery(dueCountsOptions()).data
+  const countsQuery = useQuery(dueCountsOptions())
+  const counts = countsQuery.data
   const today = useQuery(studyTodayOptions()).data
 
   const total = counts?.total ?? 0
@@ -56,6 +58,50 @@ export function TodayPanel({
       .map((s) => s.subjectId)
     return { title: soonest.title, date: soonest.date, subjectIds }
   }, [today])
+
+  // "Tout est à jour" is an ASSERTION about the queue, and `counts?.total ?? 0`
+  // let a pending — or outright failed — read produce it (T-027 b): while the
+  // demo account was still being seeded server-side, every dashboard read was
+  // in flight or erroring and the screen calmly told the visitor there was
+  // nothing to review. Three states, never two: unknown-yet, unknown-because-it
+  // -failed, and known. Only the last one is allowed to say anything.
+  if (countsQuery.isPending) {
+    return (
+      <div
+        className={cn('flex flex-col gap-3', className)}
+        role="status"
+        aria-busy="true"
+        aria-label={t('today.loadingAria')}
+      >
+        <div className="flex items-start gap-2.5">
+          <Skeleton className="mt-0.5 size-8 rounded-lg" />
+          <div className="flex flex-col gap-1.5 pt-1">
+            <Skeleton className="h-3.5 w-44" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (countsQuery.isError) {
+    return (
+      <div className={cn('flex flex-col items-start gap-3', className)}>
+        <div className="flex items-start gap-2.5">
+          <span className="mt-0.5 flex size-8 items-center justify-center rounded-lg border border-border bg-surface-2 text-text-faint">
+            <Unplug className="size-4" strokeWidth={1.75} />
+          </span>
+          <div className="flex flex-col gap-0.5">
+            <p className="text-base font-medium text-text">{t('today.unknownTitle')}</p>
+            <p className="text-xs text-text-muted">{t('today.unknownBody')}</p>
+          </div>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => void countsQuery.refetch()}>
+          {t('common.retry')}
+        </Button>
+      </div>
+    )
+  }
 
   if (total === 0) {
     return (

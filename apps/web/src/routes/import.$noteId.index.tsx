@@ -57,6 +57,7 @@ function NoteError({ error }: { error: Error }) {
   return (
     <ErrorState
       kind="note"
+      notFound={notFound}
       {...(notFound
         ? { back: <Link to="/import">{t('ocr.route.backLink')}</Link> }
         : { onRetry: () => void router.invalidate() })}

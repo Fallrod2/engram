@@ -23,12 +23,33 @@ const MESSAGE_KEYS = {
   planning: 'errorState.planning',
 } as const satisfies Record<string, TKey>
 
+/**
+ * 404 wording (T-028). "Impossible de charger cette matière" describes an
+ * incident; a 404 is not one — the server answered, and the answer is that the
+ * entity is gone. Only the kinds addressable by id get a variant; the list
+ * screens keep the load-failure wording (they cannot 404).
+ */
+const MISSING_KEYS = {
+  subject: 'errorState.missing.subject',
+  deck: 'errorState.missing.deck',
+  note: 'errorState.missing.note',
+  generation: 'errorState.missing.generation',
+} as const satisfies Partial<Record<keyof typeof MESSAGE_KEYS, TKey>>
+
+function messageKey(kind: keyof typeof MESSAGE_KEYS, notFound: boolean): TKey {
+  if (notFound && kind in MISSING_KEYS) return MISSING_KEYS[kind as keyof typeof MISSING_KEYS]
+  return MESSAGE_KEYS[kind]
+}
+
 export function ErrorState({
   kind,
+  notFound = false,
   onRetry,
   back,
 }: {
   kind: keyof typeof MESSAGE_KEYS
+  /** The request came back 404 — say "gone", not "could not load". */
+  notFound?: boolean
   onRetry?: () => void
   /** A pre-built typed Link, shown instead of retry (e.g. for a 404). */
   back?: ReactNode
@@ -39,7 +60,7 @@ export function ErrorState({
       <span className="flex size-12 items-center justify-center rounded-lg border border-border bg-surface-2 text-text-faint">
         <Unplug className="size-5" strokeWidth={1.75} />
       </span>
-      <p className="text-base text-text-muted">{t(MESSAGE_KEYS[kind])}</p>
+      <p className="text-base text-text-muted">{t(messageKey(kind, notFound))}</p>
       {back ? (
         <Button asChild variant="secondary">
           {back}
