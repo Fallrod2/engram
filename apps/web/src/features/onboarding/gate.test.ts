@@ -60,3 +60,45 @@ describe('the anti-loop latch', () => {
     expect(wouldRedirect()).toBe(false)
   })
 })
+
+/**
+ * The gate's own contribution to the race fixed in `onboarding-flow.tsx`: an
+ * exempt path returns BEFORE latching, on purpose, and that is precisely why
+ * `finish()` has to latch by itself. The ordering assertion lives with the
+ * component (`onboarding-flow.test.tsx`); what belongs here is the precondition
+ * — that landing on the journey leaves the gate unlatched, and that this is
+ * required rather than an oversight.
+ */
+describe('the state a direct landing leaves behind', () => {
+  /** The gate's decision, in the order `__root.tsx` takes it. */
+  function visit(pathname: string): 'skipped' | 'probed' {
+    if (hasOfferedOnboarding()) return 'skipped'
+    if (isOnboardingExempt(pathname)) return 'skipped'
+    markOnboardingOffered() // `__root.tsx` latches on the probe's resolution
+    return 'probed'
+  }
+
+  it('leaves the latch UNSET after landing straight on /onboarding', () => {
+    // A reload mid-journey, or « Revoir » opened in a new tab. Nothing has been
+    // probed, so nothing has been latched — and the very next navigation would
+    // probe, racing the completion PATCH, if `finish()` did not latch first.
+    expect(visit('/onboarding')).toBe('skipped')
+    expect(hasOfferedOnboarding()).toBe(false)
+    expect(visit('/')).toBe('probed')
+  })
+
+  it('must NOT latch on an exempt path — that would swallow the real entry point', () => {
+    // The tempting "fix" is to latch inside the gate for every path. It breaks
+    // the main flow: a new user signs in on /login (exempt), then lands on /,
+    // and that landing is the one moment the journey is supposed to be offered.
+    expect(visit('/login')).toBe('skipped')
+    expect(visit('/')).toBe('probed')
+  })
+
+  it('probes at most once per page load, whatever the route sequence', () => {
+    expect(visit('/')).toBe('probed')
+    for (const p of ['/subjects', '/planning', '/settings', '/']) {
+      expect(visit(p), p).toBe('skipped')
+    }
+  })
+})

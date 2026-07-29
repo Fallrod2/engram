@@ -490,7 +490,6 @@ export const dictEn: Dict = {
       quitAria: 'Quit getting started',
       back: 'Back',
       next: 'Continue',
-      skipStep: 'Skip this step',
       skipLast: 'Finish without AI',
       doneToast: 'You’re all set.',
       saveMarkerError: 'Could not record that you finished — this may show up again.',

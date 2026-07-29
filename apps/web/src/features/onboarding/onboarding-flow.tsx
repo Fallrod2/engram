@@ -12,6 +12,7 @@ import { LanguageSelect, ThemeSelect } from '@/features/settings/appearance-cont
 import { StudyPaceFields } from '@/features/study-settings/study-pace-fields'
 import { DURATION_BASE, EASE_OUT } from '@/features/review/reveal-motion'
 import { AiStep } from './ai-step'
+import { markOnboardingOffered } from './gate'
 import { useCompleteOnboarding } from './queries'
 import {
   ONBOARDING_STEP_COUNT,
@@ -37,13 +38,19 @@ import {
  *
  * ═══ NOTHING IS BLOCKING, AND NOTHING IS WRITTEN BY ARRIVING ═══
  *
- * Every step has « Passer cette étape »; the header has « Quitter ». Both end
- * the journey the same way — by marking it done, because "I do not want this"
- * is a complete answer to "shall we ask again". The steps themselves write only
- * on an explicit choice: theme/language persist in `setTheme`/`setLang`, the
- * pace fields PATCH only on a committed change, and the AI step never sends
- * anything unless a key is typed. Skipping all three leaves the account exactly
- * as it was found.
+ * « Quitter » sits in the header on every step, and the last step's « Terminer
+ * sans IA » is the same door under the name that fits there. Both end the
+ * journey by marking it done, because "I do not want this" is a complete answer
+ * to "shall we ask again".
+ *
+ * There is deliberately NO « Passer cette étape » on the intermediate steps: the
+ * steps write only on an explicit choice — theme/language persist in
+ * `setTheme`/`setLang`, the pace fields PATCH only on a committed change, the AI
+ * step sends nothing unless a key is typed — so arriving on a step and leaving
+ * it both write nothing, and "skipping" step 1 or 2 IS continuing. Two buttons
+ * for one behaviour only invite the reader to hunt for a difference that is not
+ * there. Walking the whole journey without touching a control leaves the account
+ * exactly as it was found.
  *
  * ═══ ACCESSIBILITY ═══
  *
@@ -78,12 +85,40 @@ export function OnboardingFlow() {
    * End the journey. `completed: true` whichever door was used — finishing and
    * quitting are the same answer to "ask again?".
    *
-   * The navigation happens whatever the PATCH did. A marker that failed to save
-   * is a nuisance (the journey may reappear on the next full page load); being
-   * stuck on a screen one has explicitly left is a defect. The anti-loop latch
-   * in `gate.ts` is what makes that safe within this page load.
+   * ═══ THE LATCH IS SET FIRST, AND THAT ORDER IS THE FIX ═══
+   *
+   * The PATCH is fired without being awaited, and the navigation that follows
+   * runs the root `beforeLoad`. Landing DIRECTLY on `/onboarding` — a reload
+   * mid-journey, or « Revoir » opened in a new tab — leaves the latch unset,
+   * because the gate exempts this path and returns BEFORE latching, and leaves
+   * the query cache empty, so `staleTime: Infinity` protects nothing. That
+   * `beforeLoad` would then fire a fresh `GET /api/onboarding` racing the PATCH
+   * still in flight: a read is shorter than an upsert-then-reread, nothing
+   * orders them in serverless, and the read winning means `pending: true` and a
+   * bounce straight back into the screen the user just left.
+   *
+   * Three fixes were on the table; this is why it is the latch:
+   *
+   *  · AWAIT THE MUTATION — correct, and it puts a network round trip between
+   *    "I'm done" and being done. Delaying an exit the user explicitly asked for
+   *    is the friction this whole journey is built to avoid, and on a cold
+   *    serverless function that is not 50 ms.
+   *  · WRITE THE CACHE OPTIMISTICALLY — instant, but it states a SERVER fact
+   *    ("this account is marked") that may never become true. Every later reader
+   *    of that cache inherits the lie.
+   *  · LATCH — instant, and it asserts only what is already true: the journey
+   *    has been offered once during this page load, so do not offer it again.
+   *    It makes no claim about the server at all.
+   *
+   * IF THE WRITE FAILS: the user still leaves (the toast says the marker could
+   * not be saved), and the journey stays gone for the rest of this page load.
+   * It comes back on the NEXT full load — a reload, a new tab, tomorrow — which
+   * is exactly what "the marker was never written" should look like. That is the
+   * honest failure mode, and it is strictly better than being bounced back into
+   * a screen one has explicitly left.
    */
   function finish(opts: { announce?: boolean } = {}) {
+    markOnboardingOffered()
     complete.mutate(
       { completed: true },
       { onError: () => toast.error(t('onboarding.journey.saveMarkerError')) },
@@ -195,19 +230,24 @@ export function OnboardingFlow() {
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={goNext}>
-                {isLastStep(step)
-                  ? t('onboarding.journey.skipLast')
-                  : t('onboarding.journey.skipStep')}
-              </Button>
-              {!isLastStep(step) && (
-                <Button onClick={goNext}>
-                  {t('onboarding.journey.next')}
-                  <Check />
-                </Button>
-              )}
-            </div>
+            {/* ONE forward control per step, never two that do the same thing.
+                An intermediate step used to offer « Passer cette étape » AND
+                « Continuer » wired to the same handler — indistinguishable in
+                effect, since arriving on a step writes nothing and advancing off
+                it writes nothing either, so "skipping" step 1 or 2 IS continuing.
+                Two labels for one behaviour only invited the reader to look for
+                the difference. The genuine exit is « Quitter », present on every
+                step in the header; the last step keeps its own label because
+                there the two really do differ — the card's primary action stores
+                a key, this one leaves without one. */}
+            <Button
+              variant={isLastStep(step) ? 'ghost' : 'default'}
+              onClick={goNext}
+              className="ml-auto"
+            >
+              {isLastStep(step) ? t('onboarding.journey.skipLast') : t('onboarding.journey.next')}
+              {!isLastStep(step) && <Check />}
+            </Button>
           </div>
 
           <p className="text-xs text-text-faint">{t('onboarding.journey.reopenHint')}</p>

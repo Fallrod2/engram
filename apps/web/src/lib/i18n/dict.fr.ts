@@ -522,7 +522,12 @@ export const dictFr = {
       quitAria: 'Quitter la mise en route',
       back: 'Retour',
       next: 'Continuer',
-      skipStep: 'Passer cette étape',
+      /**
+       * Une seule commande d'avancement par étape. Il n'y a PAS de « Passer cette
+       * étape » sur les étapes intermédiaires : arriver sur une étape n'écrit
+       * rien et en repartir non plus, donc « passer » y est exactement
+       * « continuer ». La sortie, elle, est « Quitter », présente partout.
+       */
       skipLast: 'Terminer sans IA',
       doneToast: 'Mise en route terminée.',
       saveMarkerError: 'Impossible d’enregistrer la fin du parcours — il pourra réapparaître.',
