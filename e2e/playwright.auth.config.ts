@@ -61,6 +61,10 @@ export default defineConfig({
         // via the permanent env filet; every other minted `sub` is a plain user.
         ENGRAM_ADMIN_USER_ID: AUTH_ADMIN_SUB,
         ANTHROPIC_API_KEY: 'e2e-fake-key',
+        // The first-run journey OFF (T-049) — same reason as the default suite:
+        // a database created empty for the run makes every minted `sub` a
+        // brand-new account, which the journey would intercept.
+        ENGRAM_ONBOARDING_DISABLED: '1',
         TZ: 'Europe/Paris',
       },
     },

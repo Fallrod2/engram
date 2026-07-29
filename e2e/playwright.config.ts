@@ -68,6 +68,12 @@ export default defineConfig({
         // Non-empty placeholder so the route's key guard passes; the fake
         // generator answers, so this is NEVER sent to Anthropic.
         ANTHROPIC_API_KEY: 'e2e-fake-key',
+        // The first-run journey OFF (T-049). Every spec runs against a database
+        // created empty seconds earlier, so every spec would open on a "new
+        // account with no content" and be redirected to /onboarding before it
+        // reached the screen it came to test. Explicit, like ENGRAM_FAKE_AI
+        // above — the journey itself is covered by unit tests, not here.
+        ENGRAM_ONBOARDING_DISABLED: '1',
         // Deterministic local-day bucketing for analytics/planning.
         TZ: 'Europe/Paris',
       },

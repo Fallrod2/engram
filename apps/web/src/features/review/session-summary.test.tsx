@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
+import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { QueueNewCards } from '@engram/shared'
+
+/**
+ * Plain anchor instead of the router's `Link` (same stub as `not-found.test.tsx`):
+ * the summary gained a « Modifier ma limite » link to Settings with T-049, and
+ * this file renders the component bare, with no RouterProvider.
+ */
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 import type { RatingResult } from './session-reducer'
 import { computeSummary } from './summary'
 import { SessionSummary } from './session-summary'

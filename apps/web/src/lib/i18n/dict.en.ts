@@ -481,6 +481,51 @@ export const dictEn: Dict = {
     createSubject: 'Create a subject',
     importNotes: 'Import notes',
     loadExample: 'Load an example',
+
+    journey: {
+      title: 'Getting started',
+      stepOf: 'Step {current} of {total}',
+      progressLabel: 'Getting-started progress',
+      quit: 'Quit',
+      quitAria: 'Quit getting started',
+      back: 'Back',
+      next: 'Continue',
+      skipLast: 'Finish without AI',
+      doneToast: 'You’re all set.',
+      saveMarkerError: 'Could not record that you finished — this may show up again.',
+      reopenHint: 'You can reopen this walkthrough any time from Settings → About.',
+
+      appearance: {
+        title: 'Language and theme',
+        body: 'engram follows your system by default. Change either one if you prefer — it applies straight away.',
+        systemNote:
+          'Until you pick something, nothing is stored: the app follows your browser and your system, and keeps following them if they change.',
+      },
+      pace: {
+        title: 'Your study pace',
+        body: 'How many never-seen cards engram introduces each day. It is the only setting here that changes what a session will hand you.',
+      },
+      ai: {
+        title: 'Connect an AI',
+        body: 'With a provider key, engram builds cards and quizzes from your notes. Without one, skip this step — that is expected.',
+        provider: 'Provider',
+        key: 'API key',
+        keyPlaceholder: 'Paste your key…',
+        keyServerSide:
+          'The key goes straight to the server, where it is stored. It is never shown back in the browser.',
+        save: 'Save and finish',
+        saving: 'Saving…',
+        saveError: 'Could not save the key.',
+        consequencesTitle: 'If you skip, here is what stays unavailable',
+        consequenceCards: 'generating cards and quizzes from a note,',
+        consequencePdf: 'making use of the text in the PDFs you import,',
+        consequenceOcr: 'reading (OCR) photos of your notes.',
+        consequencesRest:
+          'Everything else works: creating subjects and decks, writing your own cards, reviewing, planning, tracking your stats. You can add a key later from Settings.',
+        demoNotice:
+          'Demo account: its AI configuration is provided and shared between visitors, so it cannot be changed here.',
+      },
+    },
   },
 
   empty: {
@@ -836,6 +881,27 @@ export const dictEn: Dict = {
         'Your system asks for reduced motion; you chose to keep the animations. This choice only applies to engram.',
       noticeSystemNeutral: 'Your system asks for no reduction: animations are already on.',
     },
+    pace: {
+      title: 'Study pace',
+      desc: 'How many new cards engram introduces each day, and the goal you set yourself.',
+      newCardsLabel: 'New cards per day',
+      newCardsHint: 'A hard limit. A card that is already due is never held back.',
+      goalLabel: 'Daily goal',
+      goalHint: 'Indicative only — nothing stops you going further.',
+      presetsLabel: 'Quick values',
+      projection:
+        'A new card is not one review: it comes back three to five times during its first week. At this pace, expect {min} to {max} reviews a day once it settles.',
+      projectionPaused:
+        'No new card will be introduced. Cards you have already started keep coming as usual.',
+      todayNew: '{introduced} / {limit} new cards introduced today',
+      todayGoal: '{done} / {goal} reviews today',
+      why: 'This number decides whether the app stays liveable after a big import: without it, 300 cards imported on a Sunday become over a thousand reviews that week, and you give up on day three. Nothing is lost — the extra cards arrive on the following days.',
+      unavailable: 'Study pace unavailable right now.',
+      error: 'Could not save your study pace.',
+      adjust: 'Change my limit',
+    },
+    onboarding: 'Getting started',
+    onboardingAction: 'Reopen',
     languageTitle: 'Language',
     languageDesc: 'Interface language. “System” follows your browser’s language.',
     language: 'Language',

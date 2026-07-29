@@ -4,7 +4,7 @@ import { State } from 'ts-fsrs'
 import { STUDY_DAILY_GOAL_DEFAULT, STUDY_NEW_CARDS_PER_DAY_DEFAULT } from '@engram/shared'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
-import { card, deck, exam, examSubject, reviewLog, subject } from '../db/schema'
+import { appSettings, card, deck, exam, examSubject, reviewLog, subject } from '../db/schema'
 import { localDayDiff, localMidnight } from '../lib/day'
 import {
   DEMO_LOCK_KEY,
@@ -16,6 +16,7 @@ import {
 } from './demo.service'
 import { dueQueue } from './review-queue.service'
 import { readStudySettings, updateStudySettings } from './study-settings.service'
+import { getOnboardingStatus, setOnboardingCompleted } from './onboarding.service'
 import { createSubject as makeSubject } from './subjects.service'
 import { createDeck } from './decks.service'
 import { createCard } from './cards.service'
@@ -128,6 +129,52 @@ describe('seedDemo', () => {
     })
     // …and the session marker written by the same transaction survived it.
     expect(await readDemoMarker(db, DEMO)).toBe('sess-2')
+  })
+
+  it('resets the first-run journey a previous visitor may have completed', async () => {
+    // The twin of the test above, and the same guarantee: what a visitor does
+    // must not be visible to the next one. Without this reset, one visitor
+    // finishing (or quitting) the journey would leave behind a marker carrying
+    // the instant they did it — on an account every later visitor logs into.
+    // The route already refuses to write that marker for the demo, so this is
+    // the second lock on the same door, and the one that also clears a marker
+    // written before the account was flagged `is_demo`.
+    await runSeed('sess-1')
+    await setOnboardingCompleted(db, DEMO, true, { isDemo: false, env: {} })
+    const completed = await getOnboardingStatus(db, DEMO, { isDemo: false, env: {} })
+    expect(completed.reason).toBe('completed')
+    expect(completed.completedAt).not.toBeNull()
+
+    await runSeed('sess-2')
+
+    // Nothing a visitor authored survives. Read as a NORMAL account (the demo
+    // short-circuits to `reason: 'demo'` before it ever looks at the table, so
+    // that reading would pass even with the marker still there): no marker, no
+    // completion instant. The reason is now `existing-account` — derived from the
+    // freshly seeded dataset, never from anything the previous visitor wrote.
+    const after = await getOnboardingStatus(db, DEMO, { isDemo: false, env: {} })
+    expect(after.reason).toBe('existing-account')
+    expect(after.completedAt).toBeNull()
+    // …and the session marker written by the same transaction survived it.
+    expect(await readDemoMarker(db, DEMO)).toBe('sess-2')
+  })
+
+  it('clears the pacing and the journey in ONE statement, without touching the rest', async () => {
+    // The two keys share a single scoped DELETE (`inArray`), so a regression that
+    // drops one of them, or that widens the delete into "every key of this user",
+    // is caught here rather than in production: widening would take the `demo`
+    // session marker with it and make every request reseed for ever.
+    await runSeed('sess-1')
+    await updateStudySettings(db, DEMO, { newCardsPerDay: 3 }, new Date())
+    await setOnboardingCompleted(db, DEMO, true, { isDemo: false, env: {} })
+
+    const before = await db.select().from(appSettings).where(eq(appSettings.userId, DEMO))
+    expect(before.map((r) => r.key).sort()).toEqual(['demo', 'onboarding', 'study'])
+
+    await runSeed('sess-2')
+
+    const after = await db.select().from(appSettings).where(eq(appSettings.userId, DEMO))
+    expect(after.map((r) => r.key)).toEqual(['demo'])
   })
 
   it('is idempotent under the same marker (no doubling)', async () => {

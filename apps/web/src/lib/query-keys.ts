@@ -66,6 +66,15 @@ export const qk = {
     listByNote: (noteId: string) => ['generations', 'list', { noteId }] as const,
     detail: (generationId: string) => ['generations', 'detail', generationId] as const,
   },
+  /**
+   * Daily pacing (`GET /api/study-settings`). NOT window-scoped and NOT keyed by
+   * `now`: the response carries a `today` block the server computes from its own
+   * clock, so a key carrying the browser's would only fragment the cache and
+   * strand the value the session screen just wrote.
+   */
+  studySettings: ['study-settings'] as const,
+  /** First-run journey marker (`GET /api/onboarding`) — one row, one key. */
+  onboarding: ['onboarding'] as const,
   ai: {
     // Config + per-provider status (invalidated after every set/delete/update).
     settings: ['ai', 'settings'] as const,

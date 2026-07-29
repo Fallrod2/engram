@@ -23,6 +23,7 @@ import {
 import { fsrsCardToColumns, fsrsLogToRow } from '../db/mappers'
 import { localMidnight } from '../lib/day'
 import { STUDY_KEY } from './study-settings.service'
+import { ONBOARDING_KEY } from './onboarding.service'
 
 /**
  * Demo account seeding (spec §4). A compact, credible FR dataset seeded on every
@@ -465,15 +466,27 @@ export async function seedDemo(tx: Tx, userId: string, marker: string): Promise<
 
   await wipeUserData(tx, userId)
 
-  // The demo account is SHARED by every visitor, so its pacing must be reset with
-  // its data — otherwise one visitor setting `newCardsPerDay: 0` in the settings
-  // screen would hand the next visitor a queue with no new cards, for good. NOT
-  // folded into `wipeUserData`: that helper is also the GDPR delete path, where
-  // `admin.service.ts` already drops the whole `app_settings` row set, and the
-  // demo must keep its OTHER keys (the session marker it rewrites below).
+  // The demo account is SHARED by every visitor, so every preference a visitor
+  // can write must be reset with its data — otherwise one visitor's choice
+  // becomes the next visitor's app. Two keys qualify today:
+  //
+  //   `study`      — one visitor setting `newCardsPerDay: 0` would hand the next
+  //                  one a queue with no new cards, for good.
+  //   `onboarding` — the first-run marker (T-049). The route already refuses to
+  //                  write it for the demo, so this is belt-and-braces rather
+  //                  than the primary guarantee: it also cleans up a marker
+  //                  written before the account was flagged `is_demo`.
+  //
+  // The key list is EXPLICIT, never "delete every key": the session marker
+  // (`demo`) is rewritten below and the AI config (`ai`) is not visitor-writable
+  // (`requireNotDemo` guards every AI write). NOT folded into `wipeUserData`
+  // either: that helper is also the GDPR delete path, where `admin.service.ts`
+  // already drops the whole `app_settings` row set.
   await tx
     .delete(appSettings)
-    .where(and(eq(appSettings.userId, userId), eq(appSettings.key, STUDY_KEY)))
+    .where(
+      and(eq(appSettings.userId, userId), inArray(appSettings.key, [STUDY_KEY, ONBOARDING_KEY])),
+    )
 
   const subjTLId = crypto.randomUUID()
   const subjENId = crypto.randomUUID()

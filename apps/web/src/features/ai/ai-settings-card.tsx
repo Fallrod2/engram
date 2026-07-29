@@ -44,15 +44,13 @@ import {
   useUnlinkCodex,
   useUpdateAiSettings,
 } from './queries'
-
-const PROVIDER_ORDER: AiProviderId[] = [
-  'anthropic',
-  'openrouter',
-  'ollama',
-  'openai-compat',
-  'mistral',
-  'openai-codex',
-]
+import {
+  PROVIDER_KEY_EXAMPLE,
+  PROVIDER_KEY_URLS,
+  PROVIDER_ORDER,
+  providerLabel,
+  providerShortLabel,
+} from './providers'
 
 /**
  * Providers offered in the OCR provider Select. openai-codex is now INCLUDED
@@ -89,22 +87,6 @@ const OCR_MODEL_PRESETS: Record<AiProviderId, string[]> = {
   'openai-codex': ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
 }
 
-/** Console URL where a non-tech user obtains a key, per key-based provider. */
-const PROVIDER_KEY_URLS: Partial<Record<AiProviderId, string>> = {
-  anthropic: 'https://console.anthropic.com/settings/keys',
-  openrouter: 'https://openrouter.ai/keys',
-  mistral: 'https://console.mistral.ai/api-keys',
-}
-
-/**
- * A short "your key looks like…" example prefix, per key-based provider. Only
- * providers with a recognisable prefix are listed (Mistral keys have none).
- */
-const PROVIDER_KEY_EXAMPLE: Partial<Record<AiProviderId, string>> = {
-  anthropic: 'sk-ant-…',
-  openrouter: 'sk-or-…',
-}
-
 /** First sensible OCR model for a provider (used when switching OCR provider). */
 function defaultOcrModel(p: AiProviderId): string {
   return OCR_MODEL_PRESETS[p][0] ?? ''
@@ -114,28 +96,6 @@ function defaultOcrModel(p: AiProviderId): string {
 function testDetailMessage(t: TFunction, res: TestConnectionResponse): string {
   const base = t(`settings.ai.testDetail.${res.detailCode}`)
   return res.httpStatus ? `${base} (HTTP ${res.httpStatus})` : base
-}
-
-function providerLabel(t: TFunction, p: AiProviderId): string {
-  switch (p) {
-    case 'anthropic':
-      return t('settings.ai.providerAnthropic')
-    case 'openrouter':
-      return t('settings.ai.providerOpenrouter')
-    case 'ollama':
-      return t('settings.ai.providerOllama')
-    case 'openai-compat':
-      return t('settings.ai.providerOpenaiCompat')
-    case 'mistral':
-      return t('settings.ai.providerMistral')
-    case 'openai-codex':
-      return t('settings.ai.providerCodex')
-  }
-}
-
-/** Short label for the trigger — keeps it on one line (spec: no two-line trigger). */
-function providerShortLabel(t: TFunction, p: AiProviderId): string {
-  return p === 'openai-codex' ? 'ChatGPT' : providerLabel(t, p)
 }
 
 /** Clickable model preset chips. Highlights the one matching the current value. */

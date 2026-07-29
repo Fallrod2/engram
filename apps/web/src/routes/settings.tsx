@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowUpRight } from 'lucide-react'
-import { useTheme, type ThemePreference } from '@/lib/theme'
-import { useLang, useT, type LangPreference } from '@/lib/i18n'
+import { ArrowUpRight, Compass } from 'lucide-react'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -17,17 +16,12 @@ import {
 } from '@/components/ui/dialog'
 import { SetPasswordForm } from '@/features/auth/set-password-form'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { BackupCard } from '@/features/backup/backup-card'
 import { AiSettingsCard } from '@/features/ai/ai-settings-card'
 import { MotionRow } from '@/features/settings/motion-row'
+import { LanguageSelect, ThemeSelect } from '@/features/settings/appearance-controls'
+import { StudyPaceCard } from '@/features/study-settings/study-pace-card'
 import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { appVersionLabel } from '@/lib/build-info'
@@ -39,33 +33,7 @@ export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 })
 
-const THEME_KEYS: Record<
-  ThemePreference,
-  'settings.themeSystem' | 'settings.themeDark' | 'settings.themeLight'
-> = {
-  system: 'settings.themeSystem',
-  dark: 'settings.themeDark',
-  light: 'settings.themeLight',
-}
-
-/**
- * `system` first, and it IS the default (29/07/2026): no stored choice means the app
- * follows the browser/OS language list. Picking a language here is an explicit
- * choice that outranks the system for good — and picking « Système » again is
- * the way back, which is why the value has to be in the list at all.
- */
-const LANG_KEYS: Record<
-  LangPreference,
-  'settings.langSystem' | 'settings.langFr' | 'settings.langEn'
-> = {
-  system: 'settings.langSystem',
-  fr: 'settings.langFr',
-  en: 'settings.langEn',
-}
-
 function SettingsPage() {
-  const { theme, setTheme } = useTheme()
-  const { preference: langPreference, setLang } = useLang()
   const t = useT()
 
   return (
@@ -82,18 +50,7 @@ function SettingsPage() {
         <CardContent className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
             <Label htmlFor="theme-select">{t('settings.theme')}</Label>
-            <Select value={theme} onValueChange={(v) => setTheme(v as ThemePreference)}>
-              <SelectTrigger id="theme-select" className="w-40">
-                <SelectValue placeholder={t('settings.theme')} />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(THEME_KEYS) as ThemePreference[]).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {t(THEME_KEYS[key])}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ThemeSelect id="theme-select" className="w-40" />
           </div>
           <Separator />
           <MotionRow />
@@ -107,20 +64,15 @@ function SettingsPage() {
         </CardHeader>
         <CardContent className="flex items-center justify-between gap-4">
           <Label htmlFor="lang-select">{t('settings.language')}</Label>
-          <Select value={langPreference} onValueChange={(v) => setLang(v as LangPreference)}>
-            <SelectTrigger id="lang-select" className="w-40">
-              <SelectValue placeholder={t('settings.language')} />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(LANG_KEYS) as LangPreference[]).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {t(LANG_KEYS[key])}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <LanguageSelect id="lang-select" className="w-40" />
         </CardContent>
       </Card>
+
+      {/* Pacing sits ABOVE the AI card and below appearance: it is the only
+          setting on this screen that changes what the review session hands the
+          user, so it outranks configuration they may never touch. Same component
+          as step 2 of the first-run journey. */}
+      <StudyPaceCard />
 
       <AiSettingsCard />
 
@@ -142,6 +94,22 @@ function SettingsPage() {
           </div>
           <Separator />
           <ModeRow />
+          <Separator />
+          {/* Re-entry to the first-run journey (T-049). It lives HERE, next to
+              the landing, because both are "open a product surface again" rather
+              than a setting — and because the journey is not a setting: it is a
+              guided pass over settings that already exist on this screen.
+              Reopening never re-arms the marker, so finishing it a second time
+              changes nothing but the values the user picks. */}
+          <div className="flex items-center justify-between gap-4">
+            <span>{t('settings.onboarding')}</span>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/onboarding">
+                {t('settings.onboardingAction')}
+                <Compass />
+              </Link>
+            </Button>
+          </div>
           <Separator />
           {/* The public landing lives at `/welcome` and renders whatever the
               session says — signing in used to bury it for good, since `/` turns
