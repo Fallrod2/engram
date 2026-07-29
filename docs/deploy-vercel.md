@@ -56,6 +56,40 @@ boote et vérifie qu'une route protégée répond 401 et que `/api/health` expos
   est indisponible sur Hobby**. On protège donc l'app avec une auth applicative
   maison (JWT Supabase vérifiés côté serveur + inscriptions fermées).
 
+## Région d'exécution — `"regions": ["cdg1"]`
+
+`vercel.json` épingle la fonction serverless à **`cdg1` (Paris)**. Ce n'est pas un
+détail de confort : **c'est la variable dominante du temps de réponse de l'app.**
+
+**Le problème.** Sans clé `regions`, Vercel place la fonction sur son défaut,
+`iad1` (Washington, DC). La base Postgres, elle, est le projet Supabase en
+**`eu-west-3` (Paris)**. Chaque aller-retour SQL traversait donc l'Atlantique :
+**~80 ms**, mesuré. Et ce coût n'est pas payé par une page en particulier — il
+est payé par **chaque requête de chaque écran**, autant de fois qu'elle émet de
+requêtes SQL. Le symptôme le plus visible était le semis du compte démo (une
+centaine d'allers-retours ⇒ ~15 s d'écran vide), mais un simple
+`GET /api/subjects` payait déjà ~80 ms de trajet pour rien.
+
+**Le correctif.** `"regions": ["cdg1"]` au niveau racine de `vercel.json` (clé
+documentée : « default deployment area for all functions »). Fonction et base se
+retrouvent dans la même ville : l'aller-retour tombe à **quelques millisecondes**.
+Le plan **Hobby autorise exactement UNE région** — d'où le tableau à un seul
+élément. En ajouter une deuxième ferait échouer le déploiement.
+
+**Ce qu'on perd, et c'est assumé.** Une fonction serverless ne vit qu'à un seul
+endroit : la latence qu'on retire aux utilisateurs européens, on l'ajoute aux
+autres. Un visiteur nord-américain paie désormais l'aller-retour transatlantique
+sur **le trajet navigateur → fonction** (une fois par requête HTTP) au lieu que la
+fonction le paie sur **le trajet fonction → base** (une fois par requête SQL, et
+une page en émet plusieurs). Le compromis penche donc franchement du bon côté même
+pour eux, et l'app est d'abord utilisée depuis l'Europe. Le **front statique**
+n'est pas concerné : il reste servi par le CDN, donc depuis le POP le plus proche
+du visiteur, où qu'il soit.
+
+**Si la base déménage un jour**, cette clé doit bouger avec elle — sinon on
+recrée exactement le problème qu'elle corrige, en silence. La règle est :
+`regions` suit la région du projet Supabase, pas les utilisateurs.
+
 ## Variables d'environnement (Vercel → Settings → Environment Variables)
 
 > ⚠️ Aucune valeur réelle n'est committée dans le repo. Renseigner ces variables
@@ -347,6 +381,64 @@ l'appel au fournisseur IA tourne en arrière-plan, maintenu vivant par
 - Si la génération IA n'est pas utilisée (aucun fournisseur configuré), la valeur
   n'a aucun impact.
 
+## Compte démo — semis et fenêtre d'initialisation
+
+### Le semis reste **bloquant**, et c'est un choix
+
+Le wipe + reseed du compte démo tourne toujours dans le middleware
+(`apps/server/src/http/demo.ts`), dans **une** transaction tenant un verrou
+consultatif, sur la première requête authentifiée d'une nouvelle session. Il n'a
+pas été basculé en tâche de fond, pour trois raisons :
+
+1. **Il n'y a pas de tâche de fond garantie en serverless.** Une fonction Vercel
+   peut être gelée dès la réponse envoyée ; seul `waitUntil` la maintient vivante,
+   et encore, dans la limite de `maxDuration`. Un semis en tâche de fond aurait
+   donc besoin, de toute façon, du chemin bloquant en filet de reprise.
+2. **L'atomicité est ce qui rend le mécanisme correct.** Le marqueur de session
+   est écrit dans la même transaction que les données ; aucune requête ne peut
+   observer une base à moitié semée. En arrière-plan, la première page se
+   chargerait pendant le semis et afficherait un tableau de bord vide — c'est-à-
+   dire précisément le bug qu'on corrige.
+3. **La garantie d'achèvement vient du client.** Le semis appartient à une requête
+   que le navigateur attend : s'il échoue, la transaction est annulée (rien de
+   semé), la requête échoue, et la suivante le rejoue. Rien à réconcilier.
+
+Depuis le lot perf, le semis émet **15 requêtes SQL** (contre 101 : une insertion
+par carte et par journal de révision). Combiné à `cdg1`, ce n'est plus une attente
+de quinze secondes mais quelques centaines de millisecondes.
+
+### `GET /api/demo/status` — un état réel, sans étapes inventées
+
+Route **authentifiée** (elle n'est PAS dans `PUBLIC_ROUTES`) et **réservée au
+compte démo** (403 sinon) : elle ne renseigne sur aucun autre utilisateur, ne
+renvoie ni identifiant, ni e-mail, ni marqueur de session. C'est la seule route
+que le middleware de reset **ignore** — la sonder ne doit jamais déclencher un
+semis ni se mettre en file derrière celui qu'elle observe.
+
+```jsonc
+{ "state": "pending" | "seeding" | "ready", "readyAt": "2026-07-29T…Z" | null }
+```
+
+- `ready` — le marqueur de **cette** session est commité. Seul état où les données
+  sont complètes (marqueur et données commitent ensemble).
+- `seeding` — un semis tourne **en ce moment** : le serveur voit son verrou
+  consultatif tenu dans `pg_locks`. Ce n'est ni une estimation ni un minuteur.
+- `pending` — rien de commité pour cette session et rien en cours. Le semis est
+  déclenché par la première requête authentifiée qui n'est pas cette sonde.
+
+**Pourquoi pas d'étapes (« matières », « cartes », « révisions »…).** Le semis
+tient dans une seule transaction : depuis toute autre connexion, son travail est
+**strictement invisible** jusqu'au commit. Une barre de progression par phase
+serait donc soit inventée, soit alimentée par un second écrivain hors transaction
+— qui coûterait, en écritures et en risque, plus que les ~150 ms qu'il décrirait.
+Le verrou consultatif est la seule chose qu'une transaction en cours expose
+réellement au reste du cluster : on rapporte ça, et rien de plus.
+
+La fenêtre d'initialisation du front n'en est pas privée de contenu pour autant :
+ses premières étapes sont **ses propres actions réelles** (ouvrir la session démo
+via `POST /api/demo/session`, l'installer dans le navigateur), et les dernières
+sont l'état réel renvoyé ici.
+
 ## Vérifier après déploiement
 
 ```bash
@@ -365,6 +457,14 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://engram.alexabriel.com/a
 curl -s -o /dev/null -w '%{http_code}\n'       https://engram.alexabriel.com/api/demo/session    # 401 (GET)
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://engram.alexabriel.com/api/demo/session/ # 401 (slash final)
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://engram.alexabriel.com/api/demo          # 401
+
+# La sonde d'initialisation de la démo est authentifiée ET réservée au compte
+# démo : sans token → 401, avec le token d'un autre compte → 403.
+curl -s -o /dev/null -w '%{http_code}\n' https://engram.alexabriel.com/api/demo/status          # 401
+
+# Région d'exécution : l'en-tête `x-vercel-id` commence par le code de région
+# servant la fonction. Attendu `cdg1`, PAS `iad1`.
+curl -sI https://engram.alexabriel.com/api/health | grep -i 'x-vercel-id'
 
 # Le front répond en SPA
 curl -I https://engram.alexabriel.com/
