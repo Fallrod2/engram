@@ -136,6 +136,10 @@ export async function exportBackup(db: DB, userId: string): Promise<Backup> {
         deckId: r.deckId,
         kind: r.kind,
         status: r.status,
+        // Provenance travels with the row: a dump that dropped it would come
+        // back as a real generation (the column default), i.e. the restore would
+        // reintroduce exactly the claim T-031 exists to prevent.
+        origin: r.origin as 'live' | 'prerecorded',
         model: r.model,
         items: r.items,
         promptTokens: r.promptTokens,
@@ -336,6 +340,8 @@ export async function importBackup(
             deckId: r.deckId,
             kind: r.kind,
             status: r.status,
+            // Absent in a pre-T-031 dump → 'live', which is what those rows were.
+            origin: r.origin ?? 'live',
             model: r.model,
             items: r.items,
             promptTokens: r.promptTokens,

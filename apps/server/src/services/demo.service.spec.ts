@@ -4,16 +4,29 @@ import { State } from 'ts-fsrs'
 import { STUDY_DAILY_GOAL_DEFAULT, STUDY_NEW_CARDS_PER_DAY_DEFAULT } from '@engram/shared'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
-import { appSettings, card, deck, exam, examSubject, reviewLog, subject } from '../db/schema'
+import {
+  appSettings,
+  card,
+  deck,
+  exam,
+  examSubject,
+  generation,
+  note,
+  reviewLog,
+  subject,
+} from '../db/schema'
 import { localDayDiff, localMidnight } from '../lib/day'
 import {
   DEMO_LOCK_KEY,
+  DEMO_PRERECORDED_MODEL,
   DEMO_QCM_CARDS,
+  DEMO_SAMPLE_NOTE_TITLE,
   demoSeedStatus,
   readDemoMarker,
   seedDemo,
   wipeUserData,
 } from './demo.service'
+import { resolveGeneration } from './generations.service'
 import { dueQueue } from './review-queue.service'
 import { readStudySettings, updateStudySettings } from './study-settings.service'
 import { getOnboardingStatus, setOnboardingCompleted } from './onboarding.service'
@@ -88,6 +101,88 @@ describe('seedDemo', () => {
     const { cards } = await dueQueue(db, DEMO, { limit: 3, now: new Date() })
     const qcmFronts = new Set(DEMO_QCM_CARDS.map((q) => q.front))
     expect(cards.filter((c) => qcmFronts.has(c.front)).length).toBeGreaterThan(0)
+  })
+
+  /**
+   * The pre-recorded generation (T-031). The visitor must be able to DO the real
+   * card-by-card review without a provider — and must be told the result was
+   * written in advance. These assertions pin both halves: the run is reviewable
+   * (succeeded, items still to triage, a target deck to insert into) AND it is
+   * marked, in the database, as what it is.
+   */
+  it('ships a sample note carrying a PRE-RECORDED generation', async () => {
+    await runSeed('no-session')
+    const notes = await db.select().from(note).where(eq(note.userId, DEMO))
+    expect(notes.length).toBe(1)
+    expect(notes[0]!.title).toBe(DEMO_SAMPLE_NOTE_TITLE)
+    // A real import, not a stub: the note screen shows this content.
+    expect(notes[0]!.content.length).toBeGreaterThan(1500)
+
+    const gens = await db.select().from(generation).where(eq(generation.userId, DEMO))
+    expect(gens.length).toBe(1)
+    const g = gens[0]!
+    expect(g.noteId).toBe(notes[0]!.id)
+    expect(g.origin).toBe('prerecorded')
+    expect(g.status).toBe('succeeded')
+    expect(g.kind).toBe('mixed')
+    // Reviewable: a target deck exists, so accepted cards have somewhere to land.
+    expect(g.deckId).not.toBeNull()
+  })
+
+  it('never claims a model wrote the sample, and never invents a token count', async () => {
+    // The one assertion that keeps the staging honest at the storage layer: a
+    // reader of the raw table must not be able to mistake this for a real run.
+    await runSeed('no-session')
+    const [g] = await db.select().from(generation).where(eq(generation.userId, DEMO))
+    expect(g!.model).toBe(DEMO_PRERECORDED_MODEL)
+    expect(g!.model).not.toMatch(/claude|gpt|mistral|llama|sonnet|opus|haiku/i)
+    expect(g!.provider).toBeNull()
+    expect(g!.promptTokens).toBeNull()
+    expect(g!.completionTokens).toBeNull()
+  })
+
+  it('leaves every proposal to triage — nothing is pre-accepted', async () => {
+    await runSeed('no-session')
+    const [g] = await db.select().from(generation).where(eq(generation.userId, DEMO))
+    expect(g!.items.length).toBeGreaterThanOrEqual(6)
+    expect(g!.items.every((i) => i.status === 'pending')).toBe(true)
+    expect(g!.items.every((i) => i.cardId === undefined)).toBe(true)
+    // At least one materialised cloze, so the review has more than one format.
+    expect(g!.items.some((i) => i.kind === 'cloze')).toBe(true)
+  })
+
+  it('inserts the accepted proposals into a REAL deck (the flow is not staged)', async () => {
+    // The claim the banner makes — "the review below is real" — verified end to
+    // end through the production resolve path: accept one proposal, and a card
+    // exists in the target deck, reviewable like any other.
+    await runSeed('no-session')
+    const [g] = await db.select().from(generation).where(eq(generation.userId, DEMO))
+    const first = g!.items[0]!
+    const before = (await db.select().from(card).where(eq(card.deckId, g!.deckId!))).length
+
+    const resolved = await resolveGeneration(db, DEMO, g!.id, {
+      items: [{ id: first.id, status: 'accepted', front: first.front, back: first.back }],
+    })
+
+    const inserted = resolved.items.find((i) => i.id === first.id)!
+    expect(inserted.status).toBe('accepted')
+    expect(inserted.cardId).toBeDefined()
+    const after = await db.select().from(card).where(eq(card.deckId, g!.deckId!))
+    expect(after.length).toBe(before + 1)
+    expect(after.some((c) => c.id === inserted.cardId)).toBe(true)
+  })
+
+  it('a reseed wipes the visitor’s triage — the next visitor starts untouched', async () => {
+    await runSeed('sess-1')
+    const [g1] = await db.select().from(generation).where(eq(generation.userId, DEMO))
+    await resolveGeneration(db, DEMO, g1!.id, {
+      items: [{ id: g1!.items[0]!.id, status: 'rejected', front: 'x', back: 'y' }],
+    })
+
+    await runSeed('sess-2')
+    const gens = await db.select().from(generation).where(eq(generation.userId, DEMO))
+    expect(gens.length).toBe(1)
+    expect(gens[0]!.items.every((i) => i.status === 'pending')).toBe(true)
   })
 
   it('stores the session marker', async () => {
@@ -213,6 +308,11 @@ describe('seedDemo round-trip budget', () => {
    * (one scoped DELETE on `app_settings`): a preference a previous visitor left
    * behind must not follow the next one. Fixed cost, independent of the dataset.
    *
+   * 16 → 18 for the pre-recorded generation (T-031): one INSERT into `note` and
+   * one into `generation`. Also fixed cost, and irreducible — two tables cannot
+   * share a statement. That is the whole increase: the items are a single jsonb
+   * value, so the 7 proposals cost nothing beyond the row that carries them.
+   *
    * drizzle-orm/pglite calls `client.query()` exactly once per executed
    * statement, so this counts real round-trips. `seedDemo` is driven WITHOUT
    * `db.transaction` on purpose: PGlite's transaction handle is a different
@@ -224,7 +324,7 @@ describe('seedDemo round-trip budget', () => {
     await seedDemo(db as never, DEMO, 'budget')
     const emitted = spy.mock.calls.length - before
     spy.mockRestore()
-    expect(emitted).toBe(16)
+    expect(emitted).toBe(18)
   })
 
   it('still writes the whole dataset in that budget', async () => {

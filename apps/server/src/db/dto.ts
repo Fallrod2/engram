@@ -98,6 +98,7 @@ export function generationToDto(row: InferSelectModel<typeof generation>): Gener
     deckId: row.deckId,
     kind: row.kind as Generation['kind'],
     status: row.status as Generation['status'],
+    origin: row.origin as Generation['origin'],
     model: row.model,
     provider: row.provider,
     items: row.items,

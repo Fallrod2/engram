@@ -190,12 +190,33 @@ export const generationItemSchema = z.object({
 export const generationKindSchema = z.enum(['cards', 'quiz', 'mixed'])
 export const generationStatusSchema = z.enum(['pending', 'succeeded', 'failed'])
 
+/**
+ * WHERE THE ITEMS OF A GENERATION COME FROM (T-031). Not a status, not a kind:
+ * a PROVENANCE claim, and the only one the UI is allowed to make.
+ *
+ * - `live`        — a provider was called and answered. Every row written by
+ *                   `startGeneration` is this, and every row that existed before
+ *                   migration 0011 was backfilled to it.
+ * - `prerecorded` — the items were WRITTEN BY HAND and shipped with the demo
+ *                   dataset. No model ran, no token was spent. It exists so a
+ *                   visitor without an API key can still do the real card-by-card
+ *                   review, and it is displayed as such: a staged result passed
+ *                   off as a real generation would be a lie to the visitor.
+ *
+ * The value is carried all the way to the client on purpose. The banner that
+ * discloses the staging is driven by THIS field, so "the database says
+ * prerecorded" and "the screen says prerecorded" cannot drift apart.
+ */
+export const generationOriginSchema = z.enum(['live', 'prerecorded'])
+
 export const generationSchema = z.object({
   id: z.string(),
   noteId: z.string(),
   deckId: z.string().nullable(),
   kind: generationKindSchema,
   status: generationStatusSchema,
+  /** Provenance of the items — see `generationOriginSchema`. */
+  origin: generationOriginSchema,
   model: z.string(),
   /** Provider used for this run (nullable: rows created before multi-provider). */
   provider: z.string().nullable(),
@@ -232,6 +253,7 @@ export type GenerationItemKind = z.infer<typeof generationItemKindSchema>
 export type GenerationItemContentType = z.infer<typeof generationItemContentTypeSchema>
 export type GenerationKind = z.infer<typeof generationKindSchema>
 export type GenerationStatus = z.infer<typeof generationStatusSchema>
+export type GenerationOrigin = z.infer<typeof generationOriginSchema>
 export type Generation = z.infer<typeof generationSchema>
 export type Exam = z.infer<typeof examSchema>
 

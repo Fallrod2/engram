@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Rating } from 'ts-fsrs'
-import { DEMO_QCM_CARDS, demoCardSpecs } from './demo.service'
+import {
+  DEMO_PRERECORDED_MODEL,
+  DEMO_QCM_CARDS,
+  DEMO_SAMPLE_NOTE_CONTENT,
+  demoCardSpecs,
+  demoSampleGenerationItems,
+} from './demo.service'
 
 /**
  * Invariants of the demo dataset (T-027). The bug this suite exists for: the
@@ -81,5 +87,75 @@ describe('the demo seed keeps its shape', () => {
       expect(s.back.trim().length).toBeGreaterThan(2)
       expect(normalize(s.front)).not.toBe(normalize(s.back))
     }
+  })
+})
+
+/**
+ * The pre-recorded generation (T-031). Its point is that the visitor does the
+ * REAL review, so what has to hold is exactly what would hold after a live run:
+ * every proposal untriaged, both formats present, no duplicate, and — the part
+ * that is not cosmetic — nothing anywhere claiming a model produced it.
+ */
+describe('the demo sample generation is a credible run, honestly labelled', () => {
+  const items = demoSampleGenerationItems()
+
+  it('proposes 6 to 8 cards, all still to triage', () => {
+    expect(items.length).toBeGreaterThanOrEqual(6)
+    expect(items.length).toBeLessThanOrEqual(8)
+    expect(items.every((i) => i.status === 'pending')).toBe(true)
+    expect(items.every((i) => i.cardId === undefined)).toBe(true)
+    // Ids are what the review board keys on; a collision would silently merge two
+    // proposals into one row.
+    expect(new Set(items.map((i) => i.id)).size).toBe(items.length)
+  })
+
+  it('materialises at least one cloze, blanked the way the live path blanks it', () => {
+    const cloze = items.filter((i) => i.kind === 'cloze')
+    expect(cloze.length).toBeGreaterThanOrEqual(2)
+    for (const c of cloze) {
+      // `expandCloze` renders the masked span as `**[…]**` on the front and the
+      // answer in bold on the back. Asserting the rendering, not just the flag,
+      // is what proves these went through the real expander.
+      expect(c.front).toContain('**[…]**')
+      expect(c.back).not.toContain('**[…]**')
+      expect(c.clozeText).toBeDefined()
+    }
+    // …and the two masks of one template produce two DIFFERENT cards.
+    expect(new Set(cloze.map((c) => c.front)).size).toBe(cloze.length)
+  })
+
+  it('mixes the two formats and carries the evaluation metadata', () => {
+    const kinds = new Set(items.map((i) => i.kind))
+    expect(kinds.has('qa')).toBe(true)
+    expect(kinds.has('cloze')).toBe(true)
+    // `mixed` runs badge every item with a content type; a missing one would show
+    // up as a proposal with no badge next to six that have one.
+    expect(items.every((i) => i.contentType !== undefined)).toBe(true)
+  })
+
+  it('never repeats a proposal', () => {
+    expect(new Set(items.map((i) => normalize(i.front))).size).toBe(items.length)
+    expect(new Set(items.map((i) => normalize(i.back))).size).toBe(items.length)
+    for (const i of items) expect(normalize(i.front)).not.toBe(normalize(i.back))
+  })
+
+  it('is answerable FROM the sample note — the cards are not about something else', () => {
+    // A generation whose cards do not come from the note on screen would be the
+    // second lie (after the provenance). Cheap but real check: every proposal
+    // mentions a term the note actually defines.
+    const note = normalize(DEMO_SAMPLE_NOTE_CONTENT)
+    const anchors = ['lexème', 'unité lexicale', 'motif', 'attribut', 'commentaire', 'thompson']
+    for (const a of anchors) expect(note).toContain(a)
+    for (const i of items) {
+      const text = normalize(`${i.front} ${i.back}`)
+      expect(anchors.some((a) => text.includes(a))).toBe(true)
+    }
+  })
+
+  it('names no model — the `model` column must not assert a false thing', () => {
+    expect(DEMO_PRERECORDED_MODEL).not.toMatch(/claude|gpt|mistral|llama|sonnet|opus|haiku|o\d/i)
+    // And it says what it is, rather than being an opaque sentinel a reader of
+    // the raw table would have to look up.
+    expect(DEMO_PRERECORDED_MODEL.toLowerCase()).toContain('hand-written')
   })
 })

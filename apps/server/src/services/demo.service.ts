@@ -7,7 +7,7 @@ import {
   type Card as FsrsCard,
   type Grade,
 } from 'ts-fsrs'
-import type { DemoSeedStatusResponse } from '@engram/shared'
+import type { DemoSeedStatusResponse, GenerationItem } from '@engram/shared'
 import type { DB, Tx } from '../db/client'
 import {
   appSettings,
@@ -21,6 +21,7 @@ import {
   subject,
 } from '../db/schema'
 import { fsrsCardToColumns, fsrsLogToRow } from '../db/mappers'
+import { expandCloze } from '../ai/cloze'
 import { localMidnight } from '../lib/day'
 import { STUDY_KEY } from './study-settings.service'
 import { ONBOARDING_KEY } from './onboarding.service'
@@ -428,6 +429,183 @@ export function demoCardSpecs(): DemoCardSpec[] {
   return specs
 }
 
+/* ------------------------------------------- the pre-recorded generation -- */
+
+/**
+ * The sample note shipped with the demo (T-031). Real course Markdown on a topic
+ * the seeded subjects already cover ("Théorie des langages"), deliberately
+ * ADJACENT to the seeded decks rather than overlapping them: nothing here repeats
+ * a card of `AUTOMATA` / `GRAMMARS`, so a visitor who accepts the proposals below
+ * ends up with a deck that grew, not with duplicates.
+ *
+ * Its length matters. Too short and the generation would look implausible; too
+ * long and the note screen becomes a wall. ~2 000 characters is roughly one
+ * lecture section, which is what a real import looks like.
+ */
+export const DEMO_SAMPLE_NOTE_TITLE = 'Analyse lexicale — du texte aux lexèmes'
+
+export const DEMO_SAMPLE_NOTE_CONTENT = `# Analyse lexicale
+
+L'analyseur lexical (ou *scanner*) est le premier étage d'un compilateur. Il lit
+le texte source caractère par caractère et le découpe en **lexèmes**, les plus
+petites unités porteuses de sens du langage.
+
+## Vocabulaire
+
+- **Lexème** : la suite de caractères effectivement lue dans la source
+  (\`compteur\`, \`42\`, \`:=\`).
+- **Unité lexicale** (*token*) : la catégorie à laquelle appartient ce lexème
+  (\`IDENT\`, \`NOMBRE\`, \`AFFECTATION\`). C'est elle que l'analyseur syntaxique
+  consomme — le parseur ne voit jamais les caractères.
+- **Motif** : la description, presque toujours une expression régulière, de
+  l'ensemble des lexèmes d'une unité lexicale.
+- **Attribut** : l'information annexe transportée avec le token — valeur
+  numérique, entrée dans la table des symboles, position dans le fichier.
+
+## De l'expression régulière à l'automate
+
+Chaque motif est une expression régulière. La construction de Thompson en fait un
+AFN, la construction des sous-ensembles un AFD, et la minimisation de Moore
+réduit cet AFD au plus petit reconnaissant le même langage. L'analyseur exécute
+l'union de tous ces automates : un seul parcours du texte suffit, sans retour en
+arrière dans le cas courant.
+
+## Deux règles de désambiguïsation
+
+Plusieurs motifs peuvent reconnaître le même préfixe. Deux règles tranchent, dans
+cet ordre :
+
+1. **Plus longue correspondance** (*maximal munch*) : on retient le plus long
+   préfixe reconnu. C'est ce qui fait lire \`>=\` comme un seul token et non comme
+   \`>\` suivi de \`=\`.
+2. **Priorité de la première règle déclarée** : à longueur égale, le motif écrit
+   en premier gagne. C'est ainsi que \`while\` devient le mot-clé WHILE et non un
+   identificateur — les mots-clés sont déclarés avant le motif des identificateurs.
+
+## Ce que le scanner jette, et ce qu'il garde
+
+Espaces, tabulations, retours à la ligne et commentaires sont reconnus puis
+**absorbés** : ils ne produisent aucun token. En revanche le scanner tient à jour
+le numéro de ligne et de colonne, sans quoi aucun message d'erreur du compilateur
+ne pourrait désigner un endroit précis du fichier.
+
+Enfin, un langage dont l'analyse lexicale dépend du contexte syntaxique (les
+chevrons de \`List<List<int>>\` en C++, l'indentation significative en Python)
+force à faire remonter de l'information du parseur vers le scanner : la séparation
+nette des deux étages est une simplification de cours, pas une loi.
+`
+
+/**
+ * WHAT GOES IN \`generation.model\` FOR A RUN THAT NEVER RAN.
+ *
+ * No model produced these cards, so no model id may appear here. Writing
+ * \`claude-sonnet-4-6\` would make the database itself assert something false, and
+ * every later reader — an export, an analytics query, a future cost report —
+ * would inherit the lie. This sentinel is deliberately NOT parseable as a model
+ * name and states the situation in the value itself. \`provider\` is \`null\` and
+ * \`promptTokens\`/\`completionTokens\` stay \`null\` for the same reason: zero would
+ * be a measurement, null is the absence of one.
+ */
+export const DEMO_PRERECORDED_MODEL = 'none — hand-written demo sample'
+
+/** One hand-written proposal, before the cloze templates are materialised. */
+type SampleSpec =
+  | { kind: 'qa'; contentType: GenerationItem['contentType']; front: string; back: string }
+  | { kind: 'cloze'; contentType: GenerationItem['contentType']; clozeText: string }
+
+/**
+ * The proposals of the pre-recorded run, as pure data. They are written the way
+ * the \`mixed\` evaluator writes them (a format + a content type per unit), because
+ * the review screen downstream is the REAL one: badges, editing, accept/reject
+ * and insertion all behave exactly as they would after a live generation. Only
+ * the provenance is staged — hence \`origin: 'prerecorded'\` and the banner.
+ */
+const DEMO_SAMPLE_SPECS: readonly SampleSpec[] = [
+  {
+    kind: 'qa',
+    contentType: 'definition',
+    front: 'Quelle est la différence entre un lexème et une unité lexicale ?',
+    back: 'Le lexème est la suite de caractères réellement lue dans la source (`compteur`) ; l’unité lexicale est la catégorie à laquelle il appartient (`IDENT`). Le parseur consomme des unités, jamais des lexèmes.',
+  },
+  {
+    // Two distinct masks → `expandCloze` materialises TWO independent cards, so
+    // the visitor meets the cloze format without any special path existing.
+    kind: 'cloze',
+    contentType: 'concept',
+    clozeText:
+      'Quand plusieurs motifs reconnaissent le même préfixe, la règle de la {{c1::plus longue correspondance}} s’applique d’abord ; à longueur égale, c’est la {{c2::priorité de la première règle déclarée}} qui tranche.',
+  },
+  {
+    kind: 'qa',
+    contentType: 'concept',
+    front: 'Pourquoi les mots-clés sont-ils déclarés avant le motif des identificateurs ?',
+    back: 'Parce qu’à longueur de correspondance égale, c’est le motif écrit en premier qui l’emporte. Sans cet ordre, `while` serait reconnu comme un identificateur ordinaire.',
+  },
+  {
+    kind: 'qa',
+    contentType: 'list',
+    front:
+      'Quelle chaîne de constructions mène d’une expression régulière à l’automate exécuté par le scanner ?',
+    back: 'Thompson : expression régulière → AFN. Sous-ensembles : AFN → AFD. Minimisation de Moore : AFD → AFD minimal.',
+  },
+  {
+    kind: 'qa',
+    contentType: 'fact',
+    front: 'Que devient un commentaire pendant l’analyse lexicale ?',
+    back: 'Il est reconnu par un motif puis absorbé : il ne produit aucun token. Seuls le numéro de ligne et de colonne continuent d’être mis à jour.',
+  },
+  {
+    kind: 'qa',
+    contentType: 'definition',
+    front: 'Qu’appelle-t-on l’attribut d’une unité lexicale ?',
+    back: 'L’information annexe transportée avec le token : valeur numérique, entrée dans la table des symboles, position dans le fichier.',
+  },
+]
+
+/**
+ * Materialise the pre-recorded proposals into the exact \`GenerationItem\` shape a
+ * real \`mixed\` run produces — cloze templates expanded through the SAME
+ * \`expandCloze\` the job uses, every item \`status: 'pending'\` (nothing is
+ * pre-triaged: the whole point is that the visitor does the triage).
+ *
+ * Pure (no DB, no clock beyond the ids), so \`demo-seed.test.ts\` can pin its
+ * invariants. A malformed template THROWS rather than silently shipping fewer
+ * cards — in the live path a bad cloze is a model mistake to skip, here it would
+ * be OUR typo, and a demo that quietly loses a card is worse than a failing test.
+ */
+export function demoSampleGenerationItems(): GenerationItem[] {
+  const items: GenerationItem[] = []
+  for (const spec of DEMO_SAMPLE_SPECS) {
+    if (spec.kind === 'cloze') {
+      const expansion = expandCloze(spec.clozeText)
+      if (!expansion.ok) {
+        throw new Error(`demo sample generation: cloze invalide — ${expansion.reason}`)
+      }
+      for (const c of expansion.cards) {
+        items.push({
+          id: crypto.randomUUID(),
+          front: c.front,
+          back: c.back,
+          status: 'pending',
+          kind: 'cloze',
+          ...(spec.contentType ? { contentType: spec.contentType } : {}),
+          clozeText: spec.clozeText,
+        })
+      }
+      continue
+    }
+    items.push({
+      id: crypto.randomUUID(),
+      front: spec.front,
+      back: spec.back,
+      status: 'pending',
+      kind: 'qa',
+      ...(spec.contentType ? { contentType: spec.contentType } : {}),
+    })
+  }
+  return items
+}
+
 /**
  * Wipe the demo user's data and reseed the demo dataset in ONE call (the caller
  * wraps it in a transaction + advisory lock). Idempotent by construction: it
@@ -561,6 +739,39 @@ export async function seedDemo(tx: Tx, userId: string, marker: string): Promise<
 
   await tx.insert(card).values(cardRows)
   await tx.insert(reviewLog).values(logRows)
+
+  // The sample note + its PRE-RECORDED generation (T-031). Two extra statements,
+  // one per table — the budget line in `demo.service.spec.ts` moved 16 → 18 for
+  // exactly these, and there is no way to fold them: a note and a generation are
+  // two tables. Fixed cost, independent of the dataset size.
+  //
+  // The visitor lands on a `succeeded` run whose items are all `pending`, i.e. on
+  // the real triage board: accept / edit / reject, then insert into `Automates`
+  // and revise. Everything downstream is the production path; the ONLY staged
+  // thing is that no provider was called — which `origin: 'prerecorded'` states
+  // in the database and the review screen repeats to the visitor.
+  const sampleNoteId = crypto.randomUUID()
+  await tx.insert(note).values({
+    id: sampleNoteId,
+    userId,
+    subjectId: subjTLId,
+    title: DEMO_SAMPLE_NOTE_TITLE,
+    sourceType: 'md',
+    originalFilename: 'analyse-lexicale.md',
+    content: DEMO_SAMPLE_NOTE_CONTENT,
+  })
+  await tx.insert(generation).values({
+    userId,
+    noteId: sampleNoteId,
+    deckId: deckAutoId,
+    kind: 'mixed',
+    status: 'succeeded',
+    origin: 'prerecorded',
+    model: DEMO_PRERECORDED_MODEL,
+    // `provider` and the token counts stay NULL: nothing ran, so there is nothing
+    // to report. A zero would read as a measurement.
+    items: demoSampleGenerationItems(),
+  })
 
   // One exam at J+10 (local midnight) linked to the TL subject.
   const examId = crypto.randomUUID()

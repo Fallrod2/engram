@@ -91,6 +91,14 @@ export const backupGenerationRowSchema = z.object({
   deckId: z.string().nullable(),
   kind: z.string(),
   status: z.string(),
+  /**
+   * Provenance (T-031). OPTIONAL so backup files written before the field
+   * existed still import; absent → 'live', which is what those rows were. It is
+   * carried at all because a restore that silently relabelled a hand-written
+   * generation as a real one would put the lie back into the database — the
+   * banner reads this field, and it must not be able to disappear on a restore.
+   */
+  origin: z.enum(['live', 'prerecorded']).optional(),
   model: z.string(),
   items: z.array(generationItemSchema),
   promptTokens: z.number().int().nullable(),
