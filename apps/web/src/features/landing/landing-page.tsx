@@ -5,7 +5,9 @@ import { motion } from 'motion/react'
 import { useReducedMotion } from '@/lib/motion'
 import { ArrowRight, Keyboard, LineChart, ScanLine } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useLang, useT } from '@/lib/i18n'
+import type { AiProviderId } from '@engram/shared'
+import { useLang, useT, type TKey } from '@/lib/i18n'
+import { PROVIDER_ORDER, providerLabel } from '@/features/ai/providers'
 import { useTheme } from '@/lib/theme'
 import { fetchHealth } from '@/lib/api'
 import { siteHost } from '@/lib/build-info'
@@ -602,15 +604,37 @@ function HowItWorks() {
 
 /* --------------------------------------------------------------- providers -- */
 
+/**
+ * A landing-only nuance appended to a provider's chip, when the bare name would
+ * over-promise. `null` = the name says everything a visitor needs.
+ *
+ * EXHAUSTIVE over `AiProviderId` on purpose (`Record`, not `Partial<Record>`):
+ * adding a provider breaks THIS file until someone decides what the landing says
+ * about it. That is the point — the chips used to be a hand-copied array of five
+ * strings, it silently lost `openai-codex`, and nothing failed (fix 29/07/2026).
+ * Now the *set* comes from `PROVIDER_ORDER` and the *names* from
+ * `providerLabel()`, so the only thing that can go missing is a nuance, and the
+ * compiler catches that.
+ *
+ * Not derived from `providerUsesKey()`, tempting as it looks: that predicate is
+ * false for BOTH `ollama` and `openai-codex`, which need opposite copy ("runs on
+ * your machine, no key" vs "rides an unofficial route, do not count on it").
+ */
+const PROVIDER_NOTE: Record<AiProviderId, TKey | null> = {
+  anthropic: null,
+  openrouter: null,
+  // No key, no account, nothing leaves the machine — the one thing worth saying
+  // to someone still choosing.
+  ollama: 'landing.providers.local',
+  'openai-compat': null,
+  mistral: null,
+  // Never announced bare: it rides an existing ChatGPT subscription through an
+  // unofficial route. See `landing.providers.codexNote` for the full caveat.
+  'openai-codex': 'landing.providers.experimental',
+}
+
 function Providers() {
   const t = useT()
-  const chips = [
-    'Anthropic',
-    'Mistral',
-    'OpenRouter',
-    `Ollama · ${t('landing.providers.local')}`,
-    t('landing.providers.openaiCompat'),
-  ]
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
@@ -623,15 +647,28 @@ function Providers() {
           {t('landing.providers.body')}
         </p>
         <ul className="mt-6 flex flex-wrap gap-2">
-          {chips.map((chip) => (
-            <li
-              key={chip}
-              className="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-2xs text-text-muted"
-            >
-              {chip}
-            </li>
-          ))}
+          {PROVIDER_ORDER.map((id) => {
+            const note = PROVIDER_NOTE[id]
+            return (
+              <li
+                key={id}
+                className="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-2xs text-text-muted"
+              >
+                {providerLabel(t, id)}
+                {note ? <span className="text-text-faint"> · {t(note)}</span> : null}
+              </li>
+            )
+          })}
         </ul>
+        {/*
+          The one chip whose availability is not the visitor's to control: the
+          subscription route depends on an unofficial OpenAI endpoint AND on the
+          server's `ENGRAM_ENABLE_CODEX` switch. Saying so here costs one faint
+          line and keeps the chip from being a promise the instance may not keep.
+        */}
+        <p className="mt-4 max-w-2xl text-xs leading-relaxed text-text-faint">
+          {t('landing.providers.codexNote')}
+        </p>
       </div>
     </section>
   )

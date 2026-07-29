@@ -3,6 +3,7 @@ import {
   generatorParameters,
   createEmptyCard,
   GenSeedStrategyWithCardId,
+  State,
   StrategyMode,
   type FSRS,
   type FSRSParameters,
@@ -96,4 +97,74 @@ export function previewAll(
 /** FSRS state of a brand-new card (used by card creation). */
 export function freshFsrsCard(now = new Date()): FsrsCard {
   return createEmptyCard(now)
+}
+
+/**
+ * The recall probability the scheduler itself targets — `request_retention`,
+ * 0.9 with the default parameters above. Exposed as the ONE threshold any
+ * "is this card known?" question in the app is allowed to use, so no screen
+ * invents its own bar. Read from `FSRS_PARAMS`, so tuning the scheduler moves
+ * the readiness gauge with it instead of quietly desynchronising the two.
+ */
+export const TARGET_RETENTION: number = FSRS_PARAMS.request_retention
+
+/**
+ * The FSRS columns of a `card` row a recall projection reads. Declared as its
+ * own shape (rather than reusing `toFsrsCard`, which needs the whole row) so a
+ * caller projecting hundreds of cards can select these ten small columns and
+ * leave the Markdown recto/verso in the database.
+ */
+export interface FsrsMemoryColumns {
+  due: Date
+  stability: number
+  difficulty: number
+  elapsedDays: number
+  scheduledDays: number
+  learningSteps: number
+  reps: number
+  lapses: number
+  state: number
+  lastReview: Date | null
+}
+
+/**
+ * Probability that a card is still recalled at the instant `at` — its FSRS
+ * forgetting curve, `R(t,S) = (1 + FACTOR · t/(9·S))^DECAY`, evaluated forward
+ * in time. Delegated to `ts-fsrs`' own `get_retrievability`, never
+ * re-implemented: the curve's decay/factor derive from the parameter vector, so
+ * a hand-rolled copy would drift the day the parameters change.
+ *
+ * RETURNS `null`, NOT 0, WHEN FSRS HAS NO MEMORY STATE for the card — i.e. it
+ * sits in `State.New`, or (a corrupt or restored row) claims another state while
+ * carrying no `last_review`. ts-fsrs answers a flat `0` for the New case and
+ * THROWS `Invalid date` for the second; neither is usable by a caller that has
+ * to tell "never learned" apart from "learned and now forgotten". They are the
+ * same number and very different facts, and only the caller knows which of the
+ * two its report must name. `null` forces that choice to be made explicitly.
+ *
+ * `at` before the last review clamps to zero elapsed days (ts-fsrs floors the
+ * elapsed count at 0), so a projection can never read as MORE than fully known.
+ */
+export function projectedRecall(
+  m: FsrsMemoryColumns,
+  at: Date,
+  sched: FSRS = scheduler,
+): number | null {
+  if (m.state === State.New || m.lastReview === null) return null
+  return sched.get_retrievability(
+    {
+      due: m.due,
+      stability: m.stability,
+      difficulty: m.difficulty,
+      elapsed_days: m.elapsedDays,
+      scheduled_days: m.scheduledDays,
+      learning_steps: m.learningSteps,
+      reps: m.reps,
+      lapses: m.lapses,
+      state: m.state,
+      last_review: m.lastReview,
+    },
+    at,
+    false,
+  )
 }

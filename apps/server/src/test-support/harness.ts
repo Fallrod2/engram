@@ -170,6 +170,12 @@ export async function seedDeck(
  * seen" and meters it against the daily new-card budget, so a test that wants an
  * ALREADY-SEEN due card — the population the budget must never touch — has to
  * say so with `state: State.Review`.
+ *
+ * `stability` + `lastReview` are the pair the FORGETTING CURVE reads: FSRS
+ * projects recall from "how long since `lastReview`, against a memory of
+ * strength `stability`". A card posed without them stays at `stability = 0` /
+ * `lastReview = NULL`, i.e. the never-reviewed state, whatever `state` says —
+ * so a readiness test must set all three together to pose a learned card.
  */
 export async function seedCard(
   db: DB,
@@ -180,9 +186,11 @@ export async function seedCard(
     due?: Date
     userId?: string
     difficulty?: number
+    stability?: number
     reps?: number
     lapses?: number
     state?: number
+    lastReview?: Date | null
   } = {},
 ) {
   const cols = fsrsCardToColumns(createEmptyCard(new Date()))
@@ -196,9 +204,11 @@ export async function seedCard(
       ...cols,
       ...(o.due !== undefined ? { due: o.due } : {}),
       ...(o.difficulty !== undefined ? { difficulty: o.difficulty } : {}),
+      ...(o.stability !== undefined ? { stability: o.stability } : {}),
       ...(o.reps !== undefined ? { reps: o.reps } : {}),
       ...(o.lapses !== undefined ? { lapses: o.lapses } : {}),
       ...(o.state !== undefined ? { state: o.state } : {}),
+      ...(o.lastReview !== undefined ? { lastReview: o.lastReview } : {}),
     })
     .returning()
   return row!

@@ -823,6 +823,73 @@ export const dictFr = {
     windowAria: 'Fenêtre temporelle',
     yearPrev: 'Année précédente',
     yearNext: 'Année suivante',
+    // Filtre par matière (écran Analytics)
+    allSubjects: 'Toutes les matières',
+    subjectFilterAria: 'Matière',
+    subjectScopeAll: 'toutes matières',
+    streakScopeNote: 'Une série mesure une habitude, pas une matière : ce chiffre reste global.',
+    retentionScopeNote:
+      '{name} en surbrillance. Les autres matières restent affichées : c’est une comparaison.',
+    // Section statistiques d’une matière
+    subjectSectionTitle: 'Statistiques',
+    openInAnalytics: 'Ouvrir dans Analytics',
+    successRateOf: '{value} de réussite',
+    colDeck: 'Deck',
+    colSuccess: 'Réussite',
+    deckSuccessTitle: 'Réussite par deck',
+    deckSuccessCaption: 'Taux de réussite par deck',
+    deckSuccessError: 'Impossible de charger la réussite par deck.',
+    deckSuccessEmpty: 'Pas encore assez de reviews sur cette période pour un taux fiable.',
+    deckSuccessHint_one: 'Un deck est noté à partir de {count} review sur la période.',
+    deckSuccessHint_other: 'Un deck est noté à partir de {count} reviews sur la période.',
+    // Préparation aux examens
+    readiness: {
+      title: 'Préparation aux examens',
+      overviewTitle: 'Préparation aux examens',
+      threshold: 'seuil {value} de rappel',
+      todayLabel: "Aujourd'hui",
+      baseline: 'base de lecture',
+      ready_one: 'prête',
+      ready_other: 'prêtes',
+      toReview_one: 'à revoir',
+      toReview_other: 'à revoir',
+      neverReviewed_one: 'jamais vue',
+      neverReviewed_other: 'jamais vues',
+      cardTotal_one: 'sur {count} carte',
+      cardTotal_other: 'sur {count} cartes',
+      neverShort_one: '{count} jamais vue',
+      neverShort_other: '{count} jamais vues',
+      percentAria: '{value} % des cartes prêtes',
+      unanswerableAria: 'Aucune carte : préparation non calculable',
+      deltaVsToday: "{points} pts vs aujourd'hui",
+      neverCountedNote_one:
+        '{count} carte n’a jamais été vue : elle compte comme non prête, ici et le jour de l’examen.',
+      neverCountedNote_other:
+        '{count} cartes n’ont jamais été vues : elles comptent comme non prêtes, ici et le jour de l’examen.',
+      noCardsTitle: 'Aucune carte dans cette matière',
+      noCardsWithExam:
+        'Il n’y a rien à réviser : la préparation ne se calcule pas sur zéro carte. Les échéances qui arrivent :',
+      noCardsNoExam:
+        'Il n’y a rien à réviser, et aucun examen n’est programmé. Ajoute des cartes pour suivre ta préparation.',
+      noCardsShort: 'Aucune carte — rien à réviser d’ici là.',
+      noExam: 'Aucun examen programmé pour cette matière.',
+      noExamHint: 'Le chiffre du jour reste ta base de lecture.',
+      pastGroup: 'Examens passés',
+      pastNoForecast: 'aucune projection',
+      error: 'Impossible de charger la préparation aux examens.',
+      unknownSubject: 'Aucune donnée de préparation pour cette matière.',
+      overviewEmpty: 'Aucun examen à venir.',
+      overviewEmptyHint: 'Ajoute une échéance depuis le planning pour suivre ta préparation.',
+      caption: 'Préparation aujourd’hui et à chaque examen',
+      overviewCaption: 'Préparation par examen à venir',
+      colExam: 'Échéance',
+      colWhen: 'Date',
+      colReady: 'Prêtes',
+      colNever: 'Jamais vues',
+      colReadiness: 'Préparation',
+      colToday: "Aujourd'hui",
+      colProjected: 'Le jour J',
+    },
   },
 
   subjects: {
@@ -1535,9 +1602,15 @@ export const dictFr = {
     providers: {
       label: 'IA multi-provider',
       title: 'Ton IA, ta clé.',
-      body: 'La génération de cartes fonctionne avec Anthropic, Mistral, OpenRouter, un Ollama en local ou n’importe quel endpoint compatible OpenAI. Tu apportes ta propre clé.',
+      // Volontairement SANS énumération : la liste des providers est rendue juste
+      // en dessous, depuis `PROVIDER_ORDER`. Une phrase qui les recite serait un
+      // second inventaire à tenir à jour à la main — c’est exactement ce qui a
+      // fait disparaître ChatGPT (abonnement) des puces.
+      body: 'La génération de cartes tourne sur le provider de ton choix : tu apportes ta clé, ou tu fais tourner un modèle en local sur ta machine.',
       local: 'local',
-      openaiCompat: 'Compatible OpenAI',
+      experimental: 'expérimental',
+      codexNote:
+        'ChatGPT (abonnement) passe par ton abonnement existant, sans clé API. C’est une voie expérimentale : elle dépend du bon vouloir d’OpenAI et peut être désactivée sur une instance donnée.',
     },
     footer: {
       tagline: 'engram — construit pour apprendre.',

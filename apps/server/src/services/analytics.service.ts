@@ -1,17 +1,21 @@
-import { and, asc, count, desc, eq, gt, gte, lt, lte, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm'
 import type {
   DeckSuccessResponse,
+  ExamReadinessResponse,
+  ExamReadinessStatus,
   HardestCardsResponse,
   HeatmapResponse,
+  ReadinessBreakdown,
   RetentionResponse,
   ReviewVolumeResponse,
   StreaksResponse,
   StudyTimeResponse,
 } from '@engram/shared'
 import type { DB } from '../db/client'
-import { card, deck, reviewLog, subject } from '../db/schema'
+import { card, deck, exam, examSubject, reviewLog, subject } from '../db/schema'
 import { localDayDiff, localDayKey, localMidnight, localWeekStart } from '../lib/day'
 import { ValidationError } from '../http/errors'
+import { TARGET_RETENTION, projectedRecall, type FsrsMemoryColumns } from './fsrs'
 
 // --- Constants (isolated, assumed, adjustable) -----------------------------
 /** Hard cap on a series/rate window, bounding scan cost and payload size. */
@@ -40,6 +44,14 @@ export const MIN_REPS = 3
  * flattens the excerpt at render time).
  */
 const FRONT_EXCERPT_CHARS = 160
+/**
+ * How far back a past exam is still reported by `examReadiness`. A partial you
+ * sat yesterday is still worth seeing on the subject's page ("where did I stand
+ * when I walked in"); one from eighteen months ago is archive, and returning
+ * every exam ever created would grow the payload without bound. 30 days is one
+ * exam period.
+ */
+export const PAST_EXAM_WINDOW_DAYS = 30
 
 type Granularity = 'day' | 'week'
 
@@ -176,12 +188,68 @@ function resolveRateWindow(from?: string, to?: string): RateWindow {
   }
 }
 
+// --- Per-subject narrowing -------------------------------------------------
+//
+// See `analyticsSubjectShape` in `@engram/shared` for the semantics the whole
+// family shares. Two mechanisms, because the endpoints read two different
+// tables; both are a WHERE clause, never a second code path.
+
+/**
+ * Narrow a `review_log` scan to one subject WITHOUT reshaping its query.
+ *
+ * The three series endpoints deliberately scan `review_log` alone — the row
+ * carries its own `user_id` precisely so they need no join (see the table's
+ * comment). Rewriting each of them into a three-table join for the subject case
+ * would fork every one of them in two. Instead the subject becomes an extra
+ * predicate: "this review's card currently sits under subject X", expressed as a
+ * semi-join on the card ids of the subject's decks. `review_log_card_idx` and
+ * `card_deck_idx` both cover it, and Postgres plans it as a hash semi-join — one
+ * query, whatever the card count.
+ *
+ * NO `subject` JOIN, so no `archived` predicate and no ownership predicate here:
+ * the caller's `review_log.user_id = userId` already fences the scan, and a
+ * `subjectId` belonging to somebody else simply matches no card of theirs.
+ *
+ * KNOWN AND ACCEPTED: this reads the CURRENT shape of the tree. A card moved to
+ * another deck, or a deck moved to another subject, carries its whole review
+ * history with it. Attribution is by where the card lives now, not by where it
+ * lived on the day of each review — the log stores no subject, and back-dating
+ * it would mean versioning the tree. Same trade-off the retention query has
+ * always made.
+ */
+function reviewsOfSubject(db: DB, subjectId: string | undefined): SQL | undefined {
+  if (subjectId === undefined) return undefined
+  return inArray(
+    reviewLog.cardId,
+    db
+      .select({ id: card.id })
+      .from(card)
+      .innerJoin(deck, eq(deck.id, card.deckId))
+      .where(eq(deck.subjectId, subjectId)),
+  )
+}
+
+/**
+ * The subject predicate of the endpoints that already join `subject`: one named
+ * subject whatever its `archived` flag, or every non-archived one. Archiving
+ * governs which subjects show up in a list nobody asked for; it does not erase
+ * the history of one asked for by id.
+ */
+function subjectScope(userId: string, subjectId: string | undefined): SQL | undefined {
+  return and(
+    eq(subject.userId, userId),
+    subjectId !== undefined ? eq(subject.id, subjectId) : eq(subject.archived, false),
+  )
+}
+
 // --- Endpoints -------------------------------------------------------------
 
 export interface SeriesParams {
   now: Date
   from?: string
   to?: string
+  /** Optional per-subject narrowing — see `reviewsOfSubject`. */
+  subjectId?: string
 }
 export interface GranularSeriesParams extends SeriesParams {
   granularity: Granularity
@@ -189,16 +257,28 @@ export interface GranularSeriesParams extends SeriesParams {
 export interface RateParams {
   from?: string
   to?: string
+  /** Optional per-subject narrowing — see `subjectScope`. */
+  subjectId?: string
 }
 export interface HardestCardsParams {
   /** Cards kept PER SUBJECT (bounded 1..20 by `hardestCardsQuerySchema`). */
   limit: number
+  /** Optional per-subject narrowing — see `subjectScope`. */
+  subjectId?: string
+}
+export interface ExamReadinessParams {
+  now: Date
+  /** Optional per-subject narrowing — see `subjectScope`. */
+  subjectId?: string
 }
 
 /**
  * Reviews per local calendar day over a window — a dense contribution-graph
  * feed. One indexed range scan on `review`, no join (retrospective: the past is
  * immutable, archived state is not applied). Manual(0) excluded.
+ *
+ * With `subjectId`, the same scan narrowed to that subject's cards — "when did I
+ * work on THIS", which is a real question about a subject, unlike a streak.
  */
 export async function heatmap(
   db: DB,
@@ -215,6 +295,7 @@ export async function heatmap(
         gte(reviewLog.review, w.fromMidnight),
         lt(reviewLog.review, w.endExclusive),
         gte(reviewLog.rating, RATING_MIN_COUNTED),
+        reviewsOfSubject(db, params.subjectId),
       ),
     )
 
@@ -302,6 +383,7 @@ export async function streaks(db: DB, userId: string, now: Date): Promise<Streak
 /**
  * Time spent per day/week — sum of non-null `durationMs` (NULL = not measured,
  * never counted as 0). One indexed range scan, no join. Manual(0) excluded.
+ * `subjectId` narrows it to one subject ("how much of my time went here").
  */
 export async function studyTime(
   db: DB,
@@ -318,6 +400,7 @@ export async function studyTime(
         gte(reviewLog.review, w.fromMidnight),
         lt(reviewLog.review, w.endExclusive),
         gte(reviewLog.rating, RATING_MIN_COUNTED),
+        reviewsOfSubject(db, params.subjectId),
       ),
     )
 
@@ -367,7 +450,7 @@ export async function studyTime(
 /**
  * Reviews per rating (Again/Hard/Good/Easy) per day/week. One indexed range
  * scan, no join. Manual(0) excluded in SQL → the 4 series + total can never
- * contain it.
+ * contain it. `subjectId` narrows it to one subject ("how did THIS one go").
  */
 export async function reviewVolume(
   db: DB,
@@ -384,6 +467,7 @@ export async function reviewVolume(
         gte(reviewLog.review, w.fromMidnight),
         lt(reviewLog.review, w.endExclusive),
         gte(reviewLog.rating, RATING_MIN_COUNTED),
+        reviewsOfSubject(db, params.subjectId),
       ),
     )
 
@@ -426,7 +510,8 @@ export async function reviewVolume(
 /**
  * True-retention per subject: recall rate over MATURE reviews only (state =
  * Review before the review). `retention = null` below `MIN_RATE_SAMPLE`.
- * Archived subjects excluded (present-tense view). Single aggregation query.
+ * Archived subjects excluded (present-tense view), unless one is named by
+ * `subjectId` — which then returns that subject alone. Single aggregation query.
  */
 export async function retention(
   db: DB,
@@ -458,7 +543,7 @@ export async function retention(
         win.clause,
       ),
     )
-    .where(and(eq(subject.userId, userId), eq(subject.archived, false)))
+    .where(subjectScope(userId, params.subjectId))
     .groupBy(subject.id)
 
   const subjects = rows.map((r) => ({
@@ -474,7 +559,8 @@ export async function retention(
 /**
  * Practical success rate per deck: `rating >= 2` over ALL reviews (every state,
  * learning reps included). `successRate = null` below `MIN_RATE_SAMPLE`.
- * Decks of archived subjects excluded. Single aggregation query.
+ * Decks of archived subjects excluded, unless `subjectId` names one — which then
+ * returns the decks of that subject alone. Single aggregation query.
  */
 export async function deckSuccess(
   db: DB,
@@ -500,7 +586,7 @@ export async function deckSuccess(
       reviewLog,
       and(eq(reviewLog.cardId, card.id), gte(reviewLog.rating, RATING_MIN_COUNTED), win.clause),
     )
-    .where(and(eq(subject.userId, userId), eq(subject.archived, false)))
+    .where(subjectScope(userId, params.subjectId))
     // Postgres (unlike SQLite) requires every non-aggregated selected column in
     // GROUP BY. `subject.id` is functionally determined by `deck.id` (one subject
     // per deck) but pg cannot infer that across the join, so group by both.
@@ -539,6 +625,10 @@ export async function deckSuccess(
  * ordering is fully deterministic (`difficulty DESC, lapses DESC, id ASC`): with
  * ties broken only by difficulty, two equally hard cards would swap places
  * between calls and the `limit` cut would be a coin flip.
+ *
+ * With `subjectId` there is a single partition, so `limit` becomes the total
+ * count returned and the window function degenerates harmlessly to a plain
+ * ordered top-N.
  */
 export async function hardestCards(
   db: DB,
@@ -568,8 +658,7 @@ export async function hardestCards(
     .innerJoin(subject, eq(subject.id, deck.subjectId))
     .where(
       and(
-        eq(subject.userId, userId),
-        eq(subject.archived, false),
+        subjectScope(userId, params.subjectId),
         gt(card.difficulty, 0), // never reviewed → unknown, not easy
         gte(card.reps, MIN_REPS),
       ),
@@ -593,4 +682,200 @@ export async function hardestCards(
     .orderBy(desc(ranked.difficulty), desc(ranked.lapses), asc(ranked.cardId))
 
   return { minReps: MIN_REPS, limit: params.limit, cards: rows }
+}
+
+// --- Exam readiness --------------------------------------------------------
+
+/**
+ * Readiness of one set of cards at one instant: the share whose FSRS forgetting
+ * curve is still above `TARGET_RETENTION` at `at`.
+ *
+ * NEVER-REVIEWED CARDS ARE COUNTED AS NOT READY — the whole point of the metric.
+ * `projectedRecall` returns `null` for them (FSRS holds no memory state), and
+ * this function reads that `null` as "0 % recalled": the card enters
+ * `cardTotal`, it never enters `ready`, and it pulls `meanRecall` down like the
+ * zero it is. Dropping them instead would let a subject of 100 cards, 90 of them
+ * untouched, report "100 % ready" off the 10 that were studied — an encouraging
+ * number, and the most dangerous thing this screen could say before an exam.
+ * They are also counted on their own (`neverReviewed`) so the UI can name them
+ * ("78 % prêt, dont 40 cartes jamais vues") instead of just looking pessimistic.
+ *
+ * `readiness` and `meanRecall` are BOTH null on an empty set: 0 ready out of 0
+ * cards is not 100 %, and it is not 0 % either — it is undefined, and saying so
+ * is what lets the UI show "aucune carte" rather than a gauge at either end.
+ *
+ * Pure and in-memory: the caller loads a subject's cards ONCE and calls this per
+ * exam, so N exams cost N passes over an array, never N queries.
+ */
+function breakdown(cards: FsrsMemoryColumns[], at: Date): ReadinessBreakdown {
+  let ready = 0
+  let neverReviewed = 0
+  let recallSum = 0
+  for (const c of cards) {
+    const r = projectedRecall(c, at)
+    if (r === null) {
+      neverReviewed += 1 // contributes 0 to recallSum, and never to `ready`
+      continue
+    }
+    recallSum += r
+    if (r >= TARGET_RETENTION) ready += 1
+  }
+  const cardTotal = cards.length
+  return {
+    at: at.toISOString(),
+    cardTotal,
+    ready,
+    notReady: cardTotal - ready,
+    neverReviewed,
+    readiness: cardTotal > 0 ? ready / cardTotal : null,
+    meanRecall: cardTotal > 0 ? recallSum / cardTotal : null,
+  }
+}
+
+/**
+ * "Will I know this on the day?" — per subject, per exam.
+ *
+ * THE DEFINITION (arbitrated, not re-opened here): the probability of recall AT
+ * THE DATE OF THE EXAM. Every card of the subject is projected forward along its
+ * own FSRS forgetting curve to the exam day, and the answer is how many land at
+ * or above the retention the scheduler already targets. It forecasts MEMORY, and
+ * deliberately measures no effort: review counts, streaks and study time all
+ * already have their own endpoints, and none of them answers this question — one
+ * can review a subject every day and still walk in having forgotten it.
+ *
+ * THE DAY CONVENTION. An exam is a DAY, not an instant (`exams.service.ts`
+ * stores it at local midnight). The projection instant is that local midnight,
+ * recomputed from the row's local components so it holds whatever wrote the row
+ * — the same instant `study-plan` and `study-today` already mean by "the exam" —
+ * FLOORED AT `now`, so an exam happening today is never "predicted" backwards
+ * into a morning that has already passed. `daysUntil` is `localDayDiff`, so a
+ * DST day still counts as one day, exactly like everywhere else.
+ *
+ * THE THREE DEGENERATE CASES, each answered rather than omitted:
+ *  - no exam at all → `exams: []`, but `today` is still computed, so the subject
+ *    page says "12 cartes, 4 jamais vues, aucun examen programmé".
+ *  - exam already past → the entry is returned with `status: 'past'` and NO
+ *    projection (`null`): a forecast for a date that has been and gone is a
+ *    contradiction, and computing one "at the exam date" from cards reviewed
+ *    since would silently describe a past self.
+ *  - subject with ZERO cards → `status: 'no_cards'`, projection present and
+ *    fully zeroed with `readiness: null`. This is the case the app used to
+ *    answer with nothing at all: an exam three weeks out on an empty subject.
+ *
+ * COST: exactly THREE queries, whatever the size of the account — the subjects,
+ * their cards (FSRS columns only, no Markdown), and their exams. The projection
+ * itself is arithmetic over arrays in memory, so a subject of several hundred
+ * cards is one row set, never one query per card.
+ */
+export async function examReadiness(
+  db: DB,
+  userId: string,
+  params: ExamReadinessParams,
+): Promise<ExamReadinessResponse> {
+  const { now } = params
+  const todayMidnight = localMidnight(now.getFullYear(), now.getMonth(), now.getDate())
+  const pastCutoff = localMidnight(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - PAST_EXAM_WINDOW_DAYS,
+  )
+  const envelope = {
+    now: now.toISOString(),
+    threshold: TARGET_RETENTION,
+    pastWindowDays: PAST_EXAM_WINDOW_DAYS,
+  }
+
+  // --- 1. The subjects in scope --------------------------------------------
+  const subjectRows = await db
+    .select({ id: subject.id })
+    .from(subject)
+    .where(subjectScope(userId, params.subjectId))
+    .orderBy(asc(subject.position), asc(subject.createdAt))
+  if (subjectRows.length === 0) return { ...envelope, subjects: [] }
+  const subjectIds = subjectRows.map((s) => s.id)
+
+  // --- 2. Their cards, FSRS columns only (never `front`/`back`) -------------
+  const cardRows = await db
+    .select({
+      subjectId: deck.subjectId,
+      due: card.due,
+      stability: card.stability,
+      difficulty: card.difficulty,
+      elapsedDays: card.elapsedDays,
+      scheduledDays: card.scheduledDays,
+      learningSteps: card.learningSteps,
+      reps: card.reps,
+      lapses: card.lapses,
+      state: card.state,
+      lastReview: card.lastReview,
+    })
+    .from(card)
+    .innerJoin(deck, eq(deck.id, card.deckId))
+    .where(and(eq(card.userId, userId), inArray(deck.subjectId, subjectIds)))
+
+  const cardsBySubject = new Map<string, FsrsMemoryColumns[]>()
+  for (const id of subjectIds) cardsBySubject.set(id, [])
+  for (const row of cardRows) {
+    const { subjectId, ...memory } = row
+    cardsBySubject.get(subjectId)?.push(memory)
+  }
+
+  // --- 3. Their exams (future, plus a bounded tail of past ones) ------------
+  const examRows = await db
+    .select({
+      subjectId: examSubject.subjectId,
+      examId: exam.id,
+      title: exam.title,
+      date: exam.date,
+      createdAt: exam.createdAt,
+    })
+    .from(exam)
+    .innerJoin(examSubject, eq(examSubject.examId, exam.id))
+    .where(
+      and(
+        eq(exam.userId, userId),
+        inArray(examSubject.subjectId, subjectIds),
+        gte(exam.date, pastCutoff),
+      ),
+    )
+    .orderBy(asc(exam.date), asc(exam.createdAt))
+
+  const examsBySubject = new Map<string, typeof examRows>()
+  for (const row of examRows) {
+    const list = examsBySubject.get(row.subjectId)
+    if (list) list.push(row)
+    else examsBySubject.set(row.subjectId, [row])
+  }
+
+  // --- 4. Project ----------------------------------------------------------
+  const subjects = subjectRows.map((s) => {
+    const cards = cardsBySubject.get(s.id) ?? []
+    const exams = (examsBySubject.get(s.id) ?? []).map((e) => {
+      // Local midnight of the exam DAY, recomputed from the row's own local
+      // components so the convention holds whatever wrote the row.
+      const examDay = localMidnight(e.date.getFullYear(), e.date.getMonth(), e.date.getDate())
+      const daysUntil = localDayDiff(todayMidnight, examDay)
+      const past = daysUntil < 0
+      const status: ExamReadinessStatus = past
+        ? 'past'
+        : cards.length === 0
+          ? 'no_cards'
+          : 'forecast'
+      // Floored at `now`: a same-day exam is projected from this instant, never
+      // from a midnight that has already gone by.
+      const projectAt = new Date(Math.max(examDay.getTime(), now.getTime()))
+      return {
+        examId: e.examId,
+        title: e.title,
+        date: examDay.toISOString(),
+        daysUntil,
+        status,
+        projectedAt: past ? null : projectAt.toISOString(),
+        projection: past ? null : breakdown(cards, projectAt),
+      }
+    })
+    return { subjectId: s.id, today: breakdown(cards, now), exams }
+  })
+
+  return { ...envelope, subjects }
 }

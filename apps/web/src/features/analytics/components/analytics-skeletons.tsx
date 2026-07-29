@@ -70,10 +70,36 @@ export function HardestCardsSkeleton() {
   )
 }
 
+/**
+ * The readiness panel is a stack of gauges: a headline figure, a bar, a legend
+ * line. Its placeholder mirrors that rhythm rather than a generic plot block, so
+ * the first paint does not jump when the real thing arrives.
+ */
+export function ReadinessSkeleton({ rows = 2 }: { rows?: number }) {
+  return (
+    <div className="rounded-md bg-surface-2 p-4">
+      <Skeleton className="h-5 w-48 bg-surface-3" />
+      <div className="mt-4 flex flex-col gap-5">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-40 bg-surface-3" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-6 w-14 bg-surface-3" />
+              <Skeleton className="h-2.5 flex-1 rounded-full bg-surface-3" />
+            </div>
+            <Skeleton className="h-3 w-64 bg-surface-3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function AnalyticsSkeleton() {
   return (
     <div className="flex flex-col gap-6">
       <StatTilesSkeleton />
+      <ReadinessSkeleton />
       <HeatmapSkeleton />
       <div className="grid gap-6 lg:grid-cols-2">
         <ChartCardSkeleton />
