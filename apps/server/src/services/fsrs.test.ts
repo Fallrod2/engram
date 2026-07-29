@@ -9,7 +9,16 @@ import {
   type Card as FsrsCard,
   type Grade,
 } from 'ts-fsrs'
-import { FSRS_PARAMS, previewAll, schedule, toGrade, type SchedulableCard } from './fsrs'
+import {
+  FSRS_PARAMS,
+  TARGET_RETENTION,
+  previewAll,
+  projectedRecall,
+  schedule,
+  toGrade,
+  type FsrsMemoryColumns,
+  type SchedulableCard,
+} from './fsrs'
 
 /** Deterministic scheduler (no fuzz) so exact intervals are reproducible. */
 const sched = fsrs(generatorParameters({ enable_fuzz: false }))
@@ -223,5 +232,98 @@ describe('fsrs preview determinism (production scheduler, fuzz on)', () => {
     const anonymous = { ...matureCard('ignored') }
     delete anonymous.card_id
     expect(days(anonymous, new Date(t0.getTime() + 5000))).toEqual(days(anonymous, t0))
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('projectedRecall (forgetting curve, forward in time)', () => {
+  const DAY = 24 * 60 * MIN
+  /** A learned card: memory of strength `stability` days, last seen at `seen`. */
+  const learned = (stability: number, seen: Date): FsrsMemoryColumns => ({
+    due: new Date(seen.getTime() + stability * DAY),
+    stability,
+    difficulty: 5,
+    elapsedDays: 0,
+    scheduledDays: stability,
+    learningSteps: 0,
+    reps: 3,
+    lapses: 0,
+    state: State.Review,
+    lastReview: seen,
+  })
+
+  it('threshold_is_the_scheduler_own_request_retention', () => {
+    // Not a number invented for the readiness screen: the very same retention
+    // every interval FSRS writes is aimed at.
+    expect(TARGET_RETENTION).toBe(FSRS_PARAMS.request_retention)
+    expect(TARGET_RETENTION).toBe(0.9)
+  })
+
+  it('recall_decays_monotonically_with_the_projection_distance', () => {
+    const c = learned(10, t0)
+    const r = [0, 5, 10, 30, 90].map((d) => projectedRecall(c, new Date(t0.getTime() + d * DAY))!)
+    for (let i = 1; i < r.length; i++) expect(r[i]!).toBeLessThan(r[i - 1]!)
+    expect(r[0]).toBeCloseTo(1, 10) // no time elapsed → nothing forgotten yet
+    expect(r.at(-1)!).toBeGreaterThan(0) // the curve is asymptotic, never exactly 0
+  })
+
+  it('recall_at_one_stability_is_the_target_retention', () => {
+    // Stability IS "the interval at which recall equals request_retention", so
+    // projecting exactly `stability` days out must land on the threshold. This
+    // is what makes the >= comparison agree with the scheduler's own due dates.
+    const r = projectedRecall(learned(10, t0), new Date(t0.getTime() + 10 * DAY))!
+    expect(r).toBeCloseTo(TARGET_RETENTION, 6)
+    expect(r).toBeGreaterThanOrEqual(TARGET_RETENTION)
+  })
+
+  it('a_stronger_memory_survives_the_same_projection_better', () => {
+    const at = new Date(t0.getTime() + 20 * DAY)
+    expect(projectedRecall(learned(60, t0), at)!).toBeGreaterThan(
+      projectedRecall(learned(6, t0), at)!,
+    )
+  })
+
+  it('projecting_before_the_last_review_clamps_at_fully_known', () => {
+    // Never MORE than 1: elapsed days floor at 0, so a backwards projection
+    // cannot manufacture a card that is better than perfectly fresh.
+    expect(projectedRecall(learned(10, t0), new Date(t0.getTime() - 30 * DAY))).toBeCloseTo(1, 10)
+  })
+
+  it('never_reviewed_card_is_null_not_zero_and_not_one', () => {
+    // The distinction the whole readiness metric rests on: "never learned" is
+    // not a low probability, it is the ABSENCE of one. ts-fsrs answers a flat 0
+    // here; `null` forces the caller to decide what to do with it.
+    const fresh: FsrsMemoryColumns = {
+      due: t0,
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: 0,
+      learningSteps: 0,
+      reps: 0,
+      lapses: 0,
+      state: State.New,
+      lastReview: null,
+    }
+    expect(projectedRecall(fresh, new Date(t0.getTime() + 10 * DAY))).toBeNull()
+  })
+
+  it('a_row_claiming_a_state_without_a_last_review_is_null_not_a_throw', () => {
+    // Defensive: ts-fsrs' date_diff THROWS "Invalid date" on a null last_review.
+    // A restored backup or a hand-edited row must degrade to "no memory state",
+    // never take an analytics endpoint down.
+    const corrupt = { ...learned(10, t0), lastReview: null }
+    expect(() => projectedRecall(corrupt, t0)).not.toThrow()
+    expect(projectedRecall(corrupt, t0)).toBeNull()
+  })
+
+  it('learning_and_relearning_states_are_projected_like_any_memory', () => {
+    // Only State.New is "no memory": a card mid-learning has a stability and a
+    // last review, so it has a curve, and dropping it would silently shrink the
+    // denominator of every readiness figure.
+    for (const state of [State.Learning, State.Relearning]) {
+      const c = { ...learned(2, t0), state }
+      expect(projectedRecall(c, new Date(t0.getTime() + DAY))).toBeGreaterThan(0)
+    }
   })
 })

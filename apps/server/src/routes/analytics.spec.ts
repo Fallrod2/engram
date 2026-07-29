@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
 import {
   deckSuccessResponseSchema,
+  examReadinessResponseSchema,
   hardestCardsResponseSchema,
   heatmapResponseSchema,
   retentionResponseSchema,
@@ -10,7 +11,14 @@ import {
 } from '@engram/shared'
 import { app } from '../app'
 import { db } from '../db/client'
-import { resetDb, seedCard, seedDeck, seedReviewLog, seedSubject } from '../test-support/harness'
+import {
+  resetDb,
+  seedCard,
+  seedDeck,
+  seedExam,
+  seedReviewLog,
+  seedSubject,
+} from '../test-support/harness'
 
 beforeEach(() => resetDb(db))
 
@@ -156,5 +164,80 @@ describe('analytics routes — window guards (400)', () => {
 
   it('retention from without to → 400', async () => {
     expect((await app.request('/api/analytics/retention?from=2026-07-01')).status).toBe(400)
+  })
+})
+
+describe('analytics routes — per-subject narrowing', () => {
+  it('every subject-aware endpoint accepts ?subjectId and narrows to it', async () => {
+    const a = await seedReviews()
+    const b = await seedReviews()
+    const q = `subjectId=${a.subjectId}`
+    const heat = heatmapResponseSchema.parse(
+      await (await app.request(`/api/analytics/heatmap?${q}&${nowParam}`)).json(),
+    )
+    expect(heat.total).toBe(12)
+    const all = heatmapResponseSchema.parse(
+      await (await app.request(`/api/analytics/heatmap?${nowParam}`)).json(),
+    )
+    expect(all.total).toBe(24)
+
+    const ret = retentionResponseSchema.parse(
+      await (await app.request(`/api/analytics/retention?${q}`)).json(),
+    )
+    expect(ret.subjects.map((s) => s.subjectId)).toEqual([a.subjectId])
+
+    const ds = deckSuccessResponseSchema.parse(
+      await (await app.request(`/api/analytics/deck-success?subjectId=${b.subjectId}`)).json(),
+    )
+    expect(ds.decks.map((d) => d.deckId)).toEqual([b.deckId])
+
+    const st = studyTimeResponseSchema.parse(
+      await (await app.request(`/api/analytics/study-time?${q}&${nowParam}`)).json(),
+    )
+    expect(st.totalReviews).toBe(12)
+
+    const rv = reviewVolumeResponseSchema.parse(
+      await (await app.request(`/api/analytics/review-volume?${q}&${nowParam}`)).json(),
+    )
+    expect(rv.totals.total).toBe(12)
+  })
+
+  it('an unknown subjectId is an empty result, never a 404', async () => {
+    await seedReviews()
+    const res = await app.request(`/api/analytics/heatmap?subjectId=ghost&${nowParam}`)
+    expect(res.status).toBe(200)
+    expect(heatmapResponseSchema.parse(await res.json()).total).toBe(0)
+  })
+})
+
+describe('analytics routes — exam readiness', () => {
+  it('GET /api/analytics/exam-readiness → 200 contract-valid', async () => {
+    const s = await seedSubject(db)
+    await seedExam(db, [s.id], { date: new Date(2026, 6, 26) })
+    const res = await app.request(`/api/analytics/exam-readiness?${nowParam}`)
+    expect(res.status).toBe(200)
+    const body = examReadinessResponseSchema.parse(await res.json())
+    expect(body.threshold).toBe(0.9)
+    expect(body.subjects).toHaveLength(1)
+    // The tester's case, end to end: an exam ahead on a subject with no card.
+    const e = body.subjects[0]!.exams[0]!
+    expect(e.status).toBe('no_cards')
+    expect(e.daysUntil).toBe(14)
+    expect(e.projection?.readiness).toBeNull()
+  })
+
+  it('GET /api/analytics/exam-readiness?subjectId=… narrows to one subject', async () => {
+    const a = await seedSubject(db)
+    await seedSubject(db)
+    const res = await app.request(`/api/analytics/exam-readiness?subjectId=${a.id}&${nowParam}`)
+    expect(res.status).toBe(200)
+    const body = examReadinessResponseSchema.parse(await res.json())
+    expect(body.subjects.map((s) => s.subjectId)).toEqual([a.id])
+  })
+
+  it('GET /api/analytics/exam-readiness with no subject at all → 200, empty', async () => {
+    const res = await app.request(`/api/analytics/exam-readiness?${nowParam}`)
+    expect(res.status).toBe(200)
+    expect(examReadinessResponseSchema.parse(await res.json()).subjects).toEqual([])
   })
 })

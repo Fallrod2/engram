@@ -16,7 +16,14 @@ import { dueCounts, dueQueue } from './review-queue.service'
 import { createNote, getNote, listNotes } from './notes.service'
 import { createExam, getExam, listExams } from './exams.service'
 import { studyPlan, studyToday } from './study-plan.service'
-import { deckSuccess, heatmap, retention, reviewVolume, streaks } from './analytics.service'
+import {
+  deckSuccess,
+  examReadiness,
+  heatmap,
+  retention,
+  reviewVolume,
+  streaks,
+} from './analytics.service'
 import { exportBackup, importBackup } from './backup.service'
 import { requireGenerationRow, resolveGeneration } from './generations.service'
 import {
@@ -141,8 +148,10 @@ describe('queue / counts / plan / analytics are empty for a fresh user', () => {
     expect((await reviewVolume(db, B, { now: NOW, granularity: 'day' })).totals.total).toBe(0)
     expect((await retention(db, B, {})).subjects).toHaveLength(0)
     expect((await deckSuccess(db, B, {})).decks).toHaveLength(0)
+    expect((await examReadiness(db, B, { now: NOW })).subjects).toHaveLength(0)
     // A’s analytics DO see A’s review.
     expect((await heatmap(db, A, { now: NOW })).total).toBe(1)
+    expect((await examReadiness(db, A, { now: NOW })).subjects).toHaveLength(1)
   })
 })
 

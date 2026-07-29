@@ -989,8 +989,30 @@ export const studyTodayResponseSchema = z.object({
 const analyticsWindowShape = { from: localDaySchema.optional(), to: localDaySchema.optional() }
 const analyticsGranularitySchema = z.enum(['day', 'week']).default('day')
 
+/**
+ * Optional per-SUBJECT narrowing, shared by every analytics endpoint that has a
+ * meaning restricted to one subject (`streaks` deliberately has none — see its
+ * schema below).
+ *
+ * SEMANTICS, uniform across all of them, so the web never has to special-case:
+ *  - omitted → the account-wide view, unchanged, which lists NON-ARCHIVED
+ *    subjects only (analytics are a present-tense view);
+ *  - present → that one subject, **archived or not**. Archiving hides a subject
+ *    from lists you did not ask for; it does not erase its history, and asking
+ *    for it by id is asking for it;
+ *  - present but unknown, or owned by somebody else → an EMPTY result (no rows,
+ *    zeroed series), never a 404. It is a filter, not a path resource, and an
+ *    empty answer is also what one's own empty subject returns, so it leaks
+ *    nothing about whether the id exists.
+ */
+const analyticsSubjectShape = { subjectId: z.string().optional() }
+
 // --- heatmap ---
-export const heatmapQuerySchema = z.object({ ...analyticsWindowShape, now: iso.optional() })
+export const heatmapQuerySchema = z.object({
+  ...analyticsWindowShape,
+  ...analyticsSubjectShape,
+  now: iso.optional(),
+})
 export const heatmapDaySchema = z.object({
   date: localDaySchema,
   count: z.number().int().nonnegative(),
@@ -1005,6 +1027,16 @@ export const heatmapResponseSchema = z.object({
 })
 
 // --- streaks ---
+/**
+ * NO `subjectId`, deliberately. A streak measures a HABIT — "did I show up
+ * today" — and a habit belongs to the person, not to one of their subjects.
+ * Per-subject streaks would be arithmetically correct and behaviourally
+ * poisonous: someone rotating healthily across five subjects would read
+ * "current streak: 0" on four of them every single day, while their real streak
+ * is 60. It would score interleaving — the practice spaced repetition exists to
+ * encourage — as failure. The number is computable; it is simply not worth
+ * knowing, so it is not offered.
+ */
 export const streaksQuerySchema = z.object({ now: iso.optional() })
 export const streaksResponseSchema = z.object({
   now: iso,
@@ -1018,6 +1050,7 @@ export const streaksResponseSchema = z.object({
 // --- study-time ---
 export const studyTimeQuerySchema = z.object({
   ...analyticsWindowShape,
+  ...analyticsSubjectShape,
   granularity: analyticsGranularitySchema,
   now: iso.optional(),
 })
@@ -1042,6 +1075,7 @@ export const studyTimeResponseSchema = z.object({
 // --- review-volume ---
 export const reviewVolumeQuerySchema = z.object({
   ...analyticsWindowShape,
+  ...analyticsSubjectShape,
   granularity: analyticsGranularitySchema,
   now: iso.optional(),
 })
@@ -1066,7 +1100,10 @@ export const reviewVolumeResponseSchema = z.object({
 })
 
 // --- retention (per subject) ---
-export const retentionQuerySchema = z.object({ ...analyticsWindowShape })
+export const retentionQuerySchema = z.object({
+  ...analyticsWindowShape,
+  ...analyticsSubjectShape,
+})
 export const retentionSubjectSchema = z.object({
   subjectId: z.string(),
   // Denominator name is DISTINCT from deckSuccess.reviewed (all states): here
@@ -1083,7 +1120,10 @@ export const retentionResponseSchema = z.object({
 })
 
 // --- deck-success (per deck) ---
-export const deckSuccessQuerySchema = z.object({ ...analyticsWindowShape })
+export const deckSuccessQuerySchema = z.object({
+  ...analyticsWindowShape,
+  ...analyticsSubjectShape,
+})
 export const deckSuccessSchema = z.object({
   deckId: z.string(),
   subjectId: z.string(),
@@ -1100,8 +1140,10 @@ export const deckSuccessResponseSchema = z.object({
 
 // --- hardest-cards (top-N per subject) ---
 export const hardestCardsQuerySchema = z.object({
+  ...analyticsSubjectShape,
   // Number of cards returned PER SUBJECT (not a global cap): the panel is a
-  // per-subject ranking, so the bound is applied inside each partition.
+  // per-subject ranking, so the bound is applied inside each partition. With
+  // `subjectId` there is exactly one partition, so it becomes the total.
   limit: z.coerce.number().int().min(1).max(20).default(5),
 })
 /**
@@ -1133,6 +1175,124 @@ export const hardestCardsResponseSchema = z.object({
   cards: z.array(hardestCardSchema),
 })
 
+// --- exam readiness (per subject × exam) -----------------------------------
+//
+// "Am I ready for this exam?" answered the only way FSRS can answer it: by
+// PROJECTING each card's forgetting curve to the exam day and counting how many
+// land above the retention the scheduler itself targets. It is a forecast of
+// memory, not a measure of effort — nothing here counts reviews.
+
+export const examReadinessQuerySchema = z.object({
+  ...analyticsSubjectShape,
+  now: iso.optional(),
+})
+
+/**
+ * Why an exam entry carries no forecast, or a forecast worth qualifying. The
+ * three cases are named rather than left to be inferred from nulls: the web must
+ * be able to SAY why, and re-deriving "no cards" from `cardTotal === 0` in the
+ * client is how that message gets forgotten.
+ *
+ *  - `forecast`  — a dated exam, today or later, with at least one card in the
+ *                  subject. `projection` is a real prediction.
+ *  - `past`      — the exam day is over. A forecast for it would be a
+ *                  contradiction, so `projection` and `projectedAt` are BOTH
+ *                  null. The entry still exists (title, date, `daysUntil` < 0)
+ *                  so the web can show the exam rather than silently drop it.
+ *  - `no_cards`  — the exam is ahead but the subject holds ZERO cards. This is
+ *                  the case that motivated the feature: an exam created three
+ *                  weeks out on an empty subject, about which the app said
+ *                  nothing at all. `projection` is present and fully zeroed
+ *                  (`readiness: null` — 0/0 is not 100 %), so the screen has
+ *                  something concrete to render: "0 carte, rien à réviser".
+ */
+export const examReadinessStatusSchema = z.enum(['forecast', 'past', 'no_cards'])
+
+/**
+ * A readiness figure over a set of cards, evaluated at ONE instant.
+ *
+ * NEVER-REVIEWED CARDS ARE COUNTED, NOT DROPPED. FSRS has no memory state for a
+ * card it has never seen graded, so its probability of recall is not "unknown",
+ * it is ZERO — there is nothing to recall. Excluding them would let a subject of
+ * 100 cards, 90 of them untouched, report "100 % ready" off the 10 that were
+ * studied: a comforting number, and a dangerous lie a week before an exam. They
+ * therefore land in `notReady`, they drag `meanRecall` down, and their count is
+ * published separately as `neverReviewed` so the UI can be explicit rather than
+ * merely pessimistic: "78 % prêt, dont 40 cartes jamais vues".
+ */
+export const readinessBreakdownSchema = z.object({
+  /** ISO instant this breakdown was evaluated at (see `examReadinessSchema.projectedAt`). */
+  at: iso,
+  /** Every card of the subject, across all its decks. */
+  cardTotal: z.number().int().nonnegative(),
+  /** Cards whose projected recall at `at` is >= `threshold`. */
+  ready: z.number().int().nonnegative(),
+  /** `cardTotal - ready`. Includes every never-reviewed card. */
+  notReady: z.number().int().nonnegative(),
+  /**
+   * Cards FSRS holds no memory state for (state = New, or a row whose
+   * `last_review` is missing). A SUBSET of `notReady`, never disjoint from it.
+   */
+  neverReviewed: z.number().int().nonnegative(),
+  /** `ready / cardTotal`. NULL iff `cardTotal === 0` — 0 cards is not 100 %. */
+  readiness: z.number().min(0).max(1).nullable(),
+  /**
+   * Mean projected recall over ALL cards, never-reviewed ones contributing 0.
+   * A softer companion to `readiness`, which is a hard cut at `threshold`: a
+   * subject sitting at 0.88 everywhere reads 0 % ready but ~0.88 mean recall.
+   * NULL iff `cardTotal === 0`.
+   */
+  meanRecall: z.number().min(0).max(1).nullable(),
+})
+
+export const examReadinessSchema = z.object({
+  examId: z.string(),
+  title: z.string(),
+  /** Local midnight of the exam day (exams are days, not instants). */
+  date: iso,
+  /** Whole local calendar days from today to the exam day; negative once past. */
+  daysUntil: z.number().int(),
+  status: examReadinessStatusSchema,
+  /**
+   * The instant the forecast was evaluated at: the exam day's local midnight,
+   * floored at `now` so a same-day exam is not "predicted" into the past. NULL
+   * iff `status === 'past'`.
+   */
+  projectedAt: iso.nullable(),
+  /** NULL iff `status === 'past'`. */
+  projection: readinessBreakdownSchema.nullable(),
+})
+
+export const subjectReadinessSchema = z.object({
+  subjectId: z.string(),
+  /**
+   * Readiness evaluated at `now`. ALWAYS present, including for a subject with
+   * no exam at all and for one with no cards — that is what makes "aucun examen
+   * programmé, 12 cartes dont 4 jamais vues" a usable answer instead of an empty
+   * panel. It also gives every exam gauge a baseline to be read against
+   * ("62 % aujourd'hui → 41 % le jour du partiel").
+   */
+  today: readinessBreakdownSchema,
+  /** Ascending by date. Empty when the subject has no exam in range. */
+  exams: z.array(examReadinessSchema),
+})
+
+export const examReadinessResponseSchema = z.object({
+  now: iso,
+  /**
+   * The recall probability a card must clear to count as `ready` — the FSRS
+   * `request_retention` the scheduler is already configured with, NOT a number
+   * invented for this screen. Every interval FSRS writes is chosen so recall
+   * lands here on the due date; using anything else would make the gauge and the
+   * scheduler disagree about what "known" means, and a card due exactly on the
+   * exam day would read "not ready" while FSRS considers it perfectly on track.
+   */
+  threshold: z.number().min(0).max(1),
+  /** How far back past exams are still reported (see `examReadinessSchema.status`). */
+  pastWindowDays: z.number().int().nonnegative(),
+  subjects: z.array(subjectReadinessSchema),
+})
+
 export type HeatmapQuery = z.infer<typeof heatmapQuerySchema>
 export type HeatmapDay = z.infer<typeof heatmapDaySchema>
 export type HeatmapResponse = z.infer<typeof heatmapResponseSchema>
@@ -1153,6 +1313,12 @@ export type DeckSuccessResponse = z.infer<typeof deckSuccessResponseSchema>
 export type HardestCardsQuery = z.infer<typeof hardestCardsQuerySchema>
 export type HardestCard = z.infer<typeof hardestCardSchema>
 export type HardestCardsResponse = z.infer<typeof hardestCardsResponseSchema>
+export type ExamReadinessQuery = z.infer<typeof examReadinessQuerySchema>
+export type ExamReadinessStatus = z.infer<typeof examReadinessStatusSchema>
+export type ReadinessBreakdown = z.infer<typeof readinessBreakdownSchema>
+export type ExamReadiness = z.infer<typeof examReadinessSchema>
+export type SubjectReadiness = z.infer<typeof subjectReadinessSchema>
+export type ExamReadinessResponse = z.infer<typeof examReadinessResponseSchema>
 
 export type ListExamsQuery = z.infer<typeof listExamsQuerySchema>
 export type StudyPlanQuery = z.infer<typeof studyPlanQuerySchema>
