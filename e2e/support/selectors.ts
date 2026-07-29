@@ -80,14 +80,19 @@ function escapeRegExp(s: string): string {
 /**
  * Play a full keyboard session, rating every card "Bien" (3). Waits on the
  * observable ASKING→REVEALED transition for each card, then asserts the summary.
+ *
+ * T-047 — the revealed plain card no longer offers a `Bien` button: it offers
+ * the two verdicts, and `J'ai eu juste` is the one that records grade 3. The
+ * WAIT moved to that button; the keystroke did not, because `1`-`4` stay live
+ * and unadvertised, which is precisely what this session is still exercising.
  */
 export async function reviewAllGood(page: Page, count: number): Promise<void> {
   const revealHint = page.getByText('pour révéler')
-  const goodButton = page.getByRole('button', { name: /^Bien/ })
+  const rightButton = page.getByRole('button', { name: /^J’ai eu juste/ })
   for (let i = 0; i < count; i++) {
     await expect(revealHint).toBeVisible()
     await page.keyboard.press('Space')
-    await expect(goodButton).toBeVisible()
+    await expect(rightButton).toBeVisible()
     await page.keyboard.press('3')
   }
   await expect(page.getByText('Session terminée')).toBeVisible()

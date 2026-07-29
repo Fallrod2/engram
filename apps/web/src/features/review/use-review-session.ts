@@ -28,6 +28,7 @@ import { againProbeOptions, previewOptions, queueOptions } from './queries'
 import { computeSummary, type SessionSummary } from './summary'
 import { remainingByState, type RemainingByState } from './queue-stats'
 import { orderQueue } from './queue-order'
+import { gradeForVerdict } from './verdict'
 
 /**
  * Keys A-D, mapped onto option indices 0-3 (spec: a QCM has 2 to 4 options).
@@ -337,17 +338,23 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   qcmRef.current = qcm
 
   /**
-   * The grade the QCM result argues for: a wrong pick is a lapse (1, Again), a
-   * right one an ordinary success (3, Good). Null in every other case — a plain
-   * card, or a QCM revealed with Space without answering it: no answer means no
-   * evidence, and without evidence the bar must behave exactly as it always has.
+   * The grade the QCM result argues for, through `gradeForVerdict` — the same
+   * table the two verdict buttons of a plain card write with (T-047). It used to
+   * be a ternary right here; it moved to `verdict.ts` the day a second caller
+   * started asking the same question, so "got it right → Bien, got it wrong →
+   * Encore" is stated once for the whole feature.
+   *
+   * Null in every other case — a plain card, or a QCM revealed with Space without
+   * answering it: no answer means no OBJECTIVE evidence, and the bar then falls
+   * back to asking the user (the verdicts), instead of asserting something the
+   * card cannot support.
    *
    * DERIVED, never stored: it is a pure reading of the card's parse and of the
    * option picked, so the reducer has nothing to say about it.
    */
   const suggestedGrade = useMemo<Grade | null>(() => {
     if (!qcm || state.selectedChoice === null) return null
-    return state.selectedChoice === qcm.answerIndex ? 3 : 1
+    return gradeForVerdict(state.selectedChoice === qcm.answerIndex)
   }, [qcm, state.selectedChoice])
   // Same reason as `qcmRef`: the keyboard router subscribes once and must not
   // re-subscribe on every pick.

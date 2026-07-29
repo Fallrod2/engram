@@ -5,8 +5,7 @@ import { dictEn } from '@/lib/i18n/dict.en'
 import { dictFr } from '@/lib/i18n/dict.fr'
 import { ExitConfirm } from './exit-confirm'
 import { IdleOverlay } from './idle-overlay'
-import { RATINGS } from './labels'
-import { RatingButton } from './rating-button'
+import { RatingBar } from './rating-bar'
 import { SessionContextBar, CONTEXT_ACTION_ROW, CONTEXT_INFO_ROW } from './session-context-bar'
 import { SessionExitButton } from './session-header'
 import { ReviewCard } from './review-card'
@@ -79,33 +78,69 @@ const classes = (el: Element) => el.className.split(/\s+/)
 
 afterEach(cleanup)
 
-describe('T-029 — the rating grid stops teaching keys it cannot be given', () => {
-  const GOOD = RATINGS[2] // grade 3 · Bien
+describe('T-029/T-047 — the rating zone advertises no key it cannot be given', () => {
+  const BAR = {
+    revealed: true,
+    preview: undefined,
+    disabled: false,
+    flashGrade: null,
+    reduce: true,
+    onReveal: () => {},
+    onRate: () => {},
+  } as const
 
-  function renderButton() {
-    render(
-      <RatingButton meta={GOOD} interval="7 j" disabled={false} flash={false} onRate={() => {}} />,
-    )
-    return screen.getByRole('button')
-  }
-
-  it('keeps the `3` chip on a keyboard', () => {
-    const btn = renderButton()
-    expect(screen.queryByText('3')).toBeTruthy()
-    expect(btn.getAttribute('aria-keyshortcuts')).toBe('3')
+  it('keeps the QCM `Entrée` chip on a keyboard and drops it on touch', () => {
+    render(<RatingBar {...BAR} suggestedGrade={3} />)
+    expect(screen.queryByText('Entrée')).toBeTruthy()
+    cleanup()
+    withTouchPointer(() => {
+      render(<RatingBar {...BAR} suggestedGrade={3} />)
+      const btn = screen.getByRole('button')
+      // The chip is gone…
+      expect(screen.queryByText('Entrée')).toBeNull()
+      // …what a thumb actually reads is not: the claim, and the grade being
+      // written on its behalf.
+      expect(screen.getByText('Suivant')).toBeTruthy()
+      expect(screen.getByText('Bien')).toBeTruthy()
+      // …and the key still works, so it is still declared to assistive tech.
+      expect(btn.getAttribute('aria-keyshortcuts')).toBe('Enter')
+      expect(btn.getAttribute('aria-label')).toBe('Suivant — noté Bien')
+    })
   })
 
-  it('drops the chip on touch — and keeps the label, the interval and the shortcut', () => {
+  it('gives the two verdicts words, a 64px target and no chip on either pointer', () => {
+    for (const run of [(f: () => void) => f(), withTouchPointer]) {
+      run(() => {
+        render(<RatingBar {...BAR} />)
+        const buttons = screen.getAllByRole('button')
+        expect(buttons).toHaveLength(2)
+        // A word for the claim, a word for the grade it writes — no glyph-only
+        // control, on either pointer.
+        for (const word of ['J’ai eu faux', 'Encore', 'J’ai eu juste', 'Bien']) {
+          expect(screen.getByText(word)).toBeTruthy()
+        }
+        // T-047's arbitration: `1`-`4` stay live and stay off the buttons.
+        for (const key of ['1', '2', '3', '4']) expect(screen.queryByText(key)).toBeNull()
+        for (const btn of buttons) {
+          // 64px on a keyboard, and the full 136px box under 640px — either way
+          // past the 44px WCAG 2.5.5 target without a floor of its own.
+          expect(classes(btn)).toContain('h-full')
+          expect(classes(btn)).toContain('sm:h-16')
+        }
+        cleanup()
+      })
+    }
+  })
+
+  it('names them without promising a key, and declares the key all the same', () => {
     withTouchPointer(() => {
-      const btn = renderButton()
-      // The chip is gone…
-      expect(screen.queryByText('3')).toBeNull()
-      // …the two things a thumb actually reads are not.
-      expect(screen.getByText('Bien')).toBeTruthy()
-      expect(screen.getByText('7 j')).toBeTruthy()
-      // …and the key still works, so it is still declared to assistive tech.
-      expect(btn.getAttribute('aria-keyshortcuts')).toBe('3')
-      expect(btn.getAttribute('aria-label')).toBe('Bien — prochaine révision dans 7 j')
+      render(<RatingBar {...BAR} />)
+      const buttons = screen.getAllByRole('button')
+      expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual([
+        'J’ai eu faux — noté Encore',
+        'J’ai eu juste — noté Bien',
+      ])
+      expect(buttons.map((b) => b.getAttribute('aria-keyshortcuts'))).toEqual(['1', '3'])
     })
   })
 })

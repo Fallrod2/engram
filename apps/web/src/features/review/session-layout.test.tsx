@@ -256,6 +256,20 @@ describe('T-023 — the rating zone reserves one constant box', () => {
     expect(heightClasses(barRoot())).toEqual(asking)
   })
 
+  it('gives the two verdicts that same box, at both breakpoints (T-047)', () => {
+    // Two buttons instead of four change what is INSIDE the reservation, never
+    // its size: the question stays at its y, the bar stays at its position, and
+    // the phone layout does not move because the plain card changed its
+    // question. The pixel proof is the Chromium measurement in the T-047 report
+    // (390×844 and 1280×800, ASKING → REVEALED → next card, plain and QCM); this
+    // is the structural fact it rests on.
+    const asking = heightClasses(renderBar(false))
+    cleanup()
+    renderBar(true)
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+    expect(heightClasses(barRoot())).toEqual(asking)
+  })
+
   it('reserves the same box for a touch pointer as for a keyboard', () => {
     // The touch branch swaps the hint for a ≥48px tap target; the RESERVATION
     // around it must not change, or the anchored geometry would hold on a
