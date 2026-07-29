@@ -1427,9 +1427,11 @@ export const dictEn: Dict = {
     providers: {
       label: 'Multi-provider AI',
       title: 'Your AI, your key.',
-      body: 'Card generation works with Anthropic, Mistral, OpenRouter, a local Ollama or any OpenAI-compatible endpoint. You bring your own key.',
+      body: 'Card generation runs on the provider of your choice: bring your own key, or run a model locally on your own machine.',
       local: 'local',
-      openaiCompat: 'OpenAI-compatible',
+      experimental: 'experimental',
+      codexNote:
+        'ChatGPT (subscription) rides your existing subscription, with no API key. That route is experimental: it depends on OpenAI’s goodwill and can be switched off on a given instance.',
     },
     footer: {
       tagline: 'engram — built to learn.',

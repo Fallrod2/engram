@@ -41,9 +41,21 @@ vi.mock('@/lib/supabase', () => ({
 }))
 
 import { ThemeProvider } from '@/lib/theme'
-import { LangProvider } from '@/lib/i18n'
+import { LangProvider, type TFunction, type TKey } from '@/lib/i18n'
+import { dictFr } from '@/lib/i18n/dict.fr'
+import { PROVIDER_ORDER, providerLabel } from '@/features/ai/providers'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import LandingPage from './landing-page'
+
+/**
+ * A `t` bound to the FR dictionary, outside React. Lets the provider-chip
+ * assertions below name providers through `providerLabel()` — the same function
+ * the page calls — instead of re-typing the labels a third time.
+ */
+const tFr: TFunction = (key: TKey) =>
+  key
+    .split('.')
+    .reduce<unknown>((acc, k) => (acc as Record<string, unknown>)?.[k], dictFr) as string
 
 /** The `/api/health` payload, with the demo switch under the test's control. */
 function health(demoLoginEnabled: boolean) {
@@ -217,6 +229,72 @@ describe('<LandingPage>', () => {
     const create = screen.getAllByRole('link', { name: /Create an account/ })
     expect(create.length).toBeGreaterThanOrEqual(2)
     for (const cta of create) expect(cta.getAttribute('href')).toBe('/signup')
+  })
+})
+
+/**
+ * Provider chips. The bug this guards (29/07/2026): the list was five hand-typed
+ * strings, `openai-codex` was added to the app and never to the landing, and no
+ * test noticed. The assertion below is deliberately written against
+ * `PROVIDER_ORDER` + `providerLabel()` rather than a literal list — a seventh
+ * provider must appear here for free, or not at all.
+ */
+describe('<LandingPage> — provider chips', () => {
+  /** The chips, in DOM order, as the visitor reads them. */
+  function chipTexts(): string[] {
+    return Array.from(document.querySelectorAll('li')) // ← narrowed by the filter below
+      .map((li) => li.textContent ?? '')
+      .filter((text) => PROVIDER_ORDER.some((id) => text.startsWith(providerLabel(tFr, id))))
+  }
+
+  it('renders one chip per supported provider, from the shared provider table', () => {
+    renderLanding()
+    const chips = chipTexts()
+    expect(chips).toHaveLength(PROVIDER_ORDER.length)
+    for (const id of PROVIDER_ORDER) {
+      expect(
+        chips.some((text) => text.startsWith(providerLabel(tFr, id))),
+        id,
+      ).toBe(true)
+    }
+  })
+
+  it('names ChatGPT (subscription) — the provider the old hard-coded list dropped', () => {
+    renderLanding()
+    expect(chipTexts()).toContain('ChatGPT (abonnement) · expérimental')
+  })
+
+  it('qualifies Ollama as local and nothing else as anything', () => {
+    renderLanding()
+    // Exactly two chips carry a nuance; the other four stand on their name.
+    expect(chipTexts().filter((text) => text.includes(' · '))).toEqual([
+      'Ollama · local',
+      'ChatGPT (abonnement) · expérimental',
+    ])
+  })
+
+  it('warns, in prose, that the subscription route may be off on this instance', () => {
+    // The chips are a capability list, not an availability list: ChatGPT is the
+    // one entry the visitor cannot enable by bringing a key, so the page says so
+    // instead of quietly promising it.
+    renderLanding()
+    expect(screen.getByText(/peut être désactivée sur une instance donnée/)).toBeTruthy()
+  })
+
+  it('translates the chips and the caveat to English', () => {
+    renderLanding()
+    fireEvent.click(screen.getByRole('button', { name: 'en' }))
+    const chips = Array.from(document.querySelectorAll('li')).map((li) => li.textContent ?? '')
+    expect(chips).toContain('ChatGPT (subscription) · experimental')
+    expect(chips).toContain('Ollama · local')
+    expect(screen.getByText(/can be switched off on a given instance/)).toBeTruthy()
+  })
+
+  it('says nothing that re-lists the providers in prose (no second inventory)', () => {
+    // The old body sentence enumerated five providers by name; that copy is what
+    // silently disagreed with the app. Guard it from coming back.
+    renderLanding()
+    expect(screen.queryByText(/Anthropic, Mistral, OpenRouter/)).toBeNull()
   })
 })
 

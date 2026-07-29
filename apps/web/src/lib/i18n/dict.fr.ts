@@ -1535,9 +1535,15 @@ export const dictFr = {
     providers: {
       label: 'IA multi-provider',
       title: 'Ton IA, ta clé.',
-      body: 'La génération de cartes fonctionne avec Anthropic, Mistral, OpenRouter, un Ollama en local ou n’importe quel endpoint compatible OpenAI. Tu apportes ta propre clé.',
+      // Volontairement SANS énumération : la liste des providers est rendue juste
+      // en dessous, depuis `PROVIDER_ORDER`. Une phrase qui les recite serait un
+      // second inventaire à tenir à jour à la main — c’est exactement ce qui a
+      // fait disparaître ChatGPT (abonnement) des puces.
+      body: 'La génération de cartes tourne sur le provider de ton choix : tu apportes ta clé, ou tu fais tourner un modèle en local sur ta machine.',
       local: 'local',
-      openaiCompat: 'Compatible OpenAI',
+      experimental: 'expérimental',
+      codexNote:
+        'ChatGPT (abonnement) passe par ton abonnement existant, sans clé API. C’est une voie expérimentale : elle dépend du bon vouloir d’OpenAI et peut être désactivée sur une instance donnée.',
     },
     footer: {
       tagline: 'engram — construit pour apprendre.',
