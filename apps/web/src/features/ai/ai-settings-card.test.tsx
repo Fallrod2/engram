@@ -53,6 +53,7 @@ const STATUSES: AiProviderStatus[] = [
     model: 'mistral-small-latest',
     active: false,
     ocrActive: true,
+    usable: false,
   },
 ]
 

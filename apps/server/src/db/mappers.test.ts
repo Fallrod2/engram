@@ -159,6 +159,7 @@ describe('row → DTO conforms to shared Zod schemas (pure, anti-drift)', () => 
       deckId: null,
       kind: 'cards',
       status: 'pending',
+      origin: 'live',
       model: 'claude-sonnet-4-6',
       provider: 'anthropic',
       items: [{ id: 'i1', front: 'q', back: 'a', status: 'pending' }],

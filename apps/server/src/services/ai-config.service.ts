@@ -365,6 +365,16 @@ function providerVisionCapable(provider: AiProviderId, model: string): boolean {
 async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatus[]> {
   // GET status is NOT demo-aliased (amendment §5): a user sees THEIR OWN config.
   // The env badge ("configuré (env)") therefore only ever appears for the admin.
+  //
+  // ⚠️ CONSEQUENCE FOR `usable` BELOW, and it is not cosmetic: for the DEMO
+  // account this surface reports what the demo owns (nothing), while
+  // `resolveActiveProvider` resolves through the admin alias and returns a
+  // WORKING config. The two therefore disagree for exactly one account. The
+  // front reads this one, so a demo visitor sees "no provider" and a disabled
+  // button — which matches the intent of the demo — but the server-side 503
+  // guard still does not fire for it. Reported, not silently reconciled here:
+  // closing it means adding a demo rule to `POST /api/generations`, which is a
+  // product decision (T-031 report).
   const allowEnv = envAllowedFor(userId)
   const settings = await readSettings(db, userId)
   const keyed = await keyedProviders(db, userId)
@@ -395,6 +405,11 @@ async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatu
       active: settings.activeProvider === provider,
       ocrActive: ocrProvider === provider,
       visionCapable: providerVisionCapable(provider, pc.model),
+      // The SAME predicate `resolveActiveProvider` gates the 503 with — not a
+      // second copy of the rule (T-031). The client disables "Générer" on this,
+      // so a drift here would show up as a button that either 503s on click or
+      // stays greyed out over a working config.
+      usable: isUsable(provider, pc.model, hasKey, pc.baseUrl, codexEnabled),
       // OAuth signals for the UI (audit C11): explicit link state + the
       // kill-switch so the client can show "unavailable on this instance".
       ...(isCodex ? { linked: keyed.has('openai-codex'), unavailable: !codexEnabled } : {}),

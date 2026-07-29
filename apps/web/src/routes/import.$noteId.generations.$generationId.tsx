@@ -35,6 +35,7 @@ import {
   ApiKeyMissingBanner,
   GenerationErrorState,
 } from '@/components/import/generation-error-state'
+import { GenerationReviewFrame } from '@/components/import/prerecorded-notice'
 import { useHotkeys } from '@/lib/use-hotkeys'
 import { useRovingList } from '@/lib/use-roving'
 import { noteDetailOptions } from '@/features/notes/queries'
@@ -125,40 +126,42 @@ function GenerationReviewPage() {
         ? t('generation.kindMixed')
         : t('generation.kindCards')
 
-  const header = (
-    <ReviewHeader
-      noteId={noteId}
-      noteTitle={note.title}
-      kindLabel={kindLabel}
-      deckName={deck?.name ?? null}
-      generation={generation}
-    />
-  )
+  // Every branch below goes through ONE frame, so the provenance notice cannot
+  // be forgotten by a branch (see `GenerationReviewFrame`).
+  const shell = {
+    origin: generation.origin,
+    header: (
+      <ReviewHeader
+        noteId={noteId}
+        noteTitle={note.title}
+        kindLabel={kindLabel}
+        deckName={deck?.name ?? null}
+        generation={generation}
+      />
+    ),
+  }
 
   if (generation.status === 'pending') {
     return (
-      <div className="mx-auto max-w-[900px]">
-        {header}
+      <GenerationReviewFrame {...shell}>
         <PendingView noteId={noteId} createdAt={generation.createdAt} />
-      </div>
+      </GenerationReviewFrame>
     )
   }
 
   if (generation.status === 'failed') {
     const apiKey = isApiKeyError(generation.error)
     return (
-      <div className="mx-auto max-w-[900px]">
-        {header}
+      <GenerationReviewFrame {...shell}>
         {apiKey ? <ApiKeyMissingBanner /> : <FailedView noteId={noteId} generation={generation} />}
-      </div>
+      </GenerationReviewFrame>
     )
   }
 
   // succeeded
   if (generation.items.length === 0) {
     return (
-      <div className="mx-auto max-w-[900px]">
-        {header}
+      <GenerationReviewFrame {...shell}>
         <EmptyState
           icon={Sparkles}
           title={t('generation.emptyTitle')}
@@ -171,16 +174,15 @@ function GenerationReviewPage() {
             />
           }
         />
-      </div>
+      </GenerationReviewFrame>
     )
   }
 
   const mode = generation.items.some((i) => i.cardId !== undefined) ? 'resolved' : 'draft'
   return (
-    <div className="mx-auto max-w-[900px]">
-      {header}
+    <GenerationReviewFrame {...shell}>
       <ReviewBoard key={mode} generation={generation} deck={deck} />
-    </div>
+    </GenerationReviewFrame>
   )
 }
 

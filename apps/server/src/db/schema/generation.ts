@@ -22,6 +22,14 @@ export const generation = pgTable(
     deckId: text('deck_id').references(() => deck.id, { onDelete: 'set null' }), // nullable
     kind: text('kind').notNull(), // 'cards' | 'quiz' | 'mixed'
     status: text('status').notNull().default('pending'), // 'pending' | 'succeeded' | 'failed'
+    /**
+     * Provenance of `items` — 'live' (a provider answered) or 'prerecorded' (the
+     * cards were written by hand and shipped with the demo, T-031). The DEFAULT
+     * is 'live' and every writer except the demo seed leaves it alone, so the
+     * staged rows are the ones that had to opt in — never the other way round.
+     * See `generationOriginSchema` in `@engram/shared` for the full contract.
+     */
+    origin: text('origin').notNull().default('live'),
     model: text('model').notNull(), // e.g. 'claude-sonnet-4-6'
     provider: text('provider'), // nullable: rows created before multi-provider are null
     items: jsonb('items')
@@ -40,6 +48,7 @@ export const generation = pgTable(
     index('generation_user_idx').on(t.userId),
     check('generation_kind_ck', sql`${t.kind} in ('cards','quiz','mixed')`),
     check('generation_status_ck', sql`${t.status} in ('pending','succeeded','failed')`),
+    check('generation_origin_ck', sql`${t.origin} in ('live','prerecorded')`),
     // Nullable (historical rows are null); otherwise one of the 5 providers.
     check(
       'generation_provider_ck',

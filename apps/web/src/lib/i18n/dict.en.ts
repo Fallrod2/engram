@@ -1104,6 +1104,11 @@ export const dictEn: Dict = {
     noProviderBody:
       'Configure a provider (Anthropic, OpenRouter, Ollama…) in Settings → Artificial intelligence.',
     noProviderCta: 'Settings',
+    noProviderHint: 'No AI provider configured.',
+    prerecordedTitle: 'Sample shipped with the demo',
+    prerecordedBody:
+      'These cards were written in advance and shipped with the demo account: no generation was run, and no credit was spent. The review below, however, is real — accepting, editing or rejecting genuinely puts the cards in the deck.',
+    prerecordedBadge: 'pre-written sample',
     // 'Mixed auto' generation mode (cloze feature). New strings only — the rest of
     // the import/generation flow keeps its inherited hardcoded FR (documented debt).
     mixedTab: 'Mixed (auto)',

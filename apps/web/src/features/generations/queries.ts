@@ -51,6 +51,18 @@ export function generationCountByNote(generations: Generation[] | undefined): Ma
 }
 
 /**
+ * Note ids carrying at least one PRE-RECORDED generation (T-031). The notes list
+ * marks them, so the staging is visible from the index and not only once the
+ * visitor is already inside the review screen. Same single list query as the
+ * count above — no extra request.
+ */
+export function notesWithPrerecorded(generations: Generation[] | undefined): Set<string> {
+  const s = new Set<string>()
+  for (const g of generations ?? []) if (g.origin === 'prerecorded') s.add(g.noteId)
+  return s
+}
+
+/**
  * A single generation, with **conditional polling** (spec §1.4): while its
  * status is `pending` we refetch every 1.5s; the interval stops the instant it
  * becomes `succeeded`/`failed`. Paused when the tab is hidden. `staleTime: 0`

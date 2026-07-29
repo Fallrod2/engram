@@ -1187,6 +1187,17 @@ export const dictFr = {
     noProviderBody:
       'Configure un provider (Anthropic, OpenRouter, Ollama…) dans Réglages → Intelligence artificielle.',
     noProviderCta: 'Réglages',
+    // Said BEFORE the click now, not after a 503 (T-031): the launch panel
+    // disables « Générer » and explains why, instead of letting the visitor pick
+    // a deck and discover the problem on the next screen.
+    noProviderHint: 'Aucun provider IA configuré.',
+    // Provenance of the demo's pre-recorded generation (T-031). Three facts, and
+    // none of them is optional: pré-écrites / rien lancé ni facturé / la revue
+    // est réelle. Ce n'est pas un avertissement — voir `prerecorded-notice.tsx`.
+    prerecordedTitle: 'Exemple livré avec la démo',
+    prerecordedBody:
+      'Ces cartes ont été écrites à l’avance et livrées avec le compte de démonstration : aucune génération n’a été lancée, aucun crédit consommé. La revue ci-dessous, elle, est réelle — accepter, éditer ou rejeter insère vraiment les cartes dans le deck.',
+    prerecordedBadge: 'exemple pré-écrit',
     // 'Mixte auto' generation mode (cloze feature). New strings only — the rest of
     // the import/generation flow keeps its inherited hardcoded FR (documented debt).
     mixedTab: 'Mixte (auto)',

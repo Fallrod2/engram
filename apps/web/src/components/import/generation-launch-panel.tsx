@@ -38,6 +38,7 @@ export function GenerationLaunchPanel({
   pending,
   onNewDeck,
   banner,
+  providerUnavailable = false,
 }: {
   kind: GenerationKind
   onKindChange: (kind: GenerationKind) => void
@@ -51,15 +52,25 @@ export function GenerationLaunchPanel({
   onNewDeck?: () => void
   /** e.g. `<ApiKeyMissingBanner />` when the key is missing. */
   banner?: ReactNode
+  /**
+   * No AI provider can run as configured (T-031). Disables the launch — the
+   * server's 503 stays the real guard, this is only the courtesy of saying so
+   * BEFORE the visitor picks a type, creates a target deck and clicks.
+   */
+  providerUnavailable?: boolean
 }) {
   const t = useT()
   const noDecks = deckGroups.every((g) => g.decks.length === 0)
-  const canLaunch = !!deckId && !contentEmpty && !pending
-  const hint = contentEmpty
-    ? t('generation.hintEmpty')
-    : !deckId
-      ? t('generation.hintNoDeck')
-      : null
+  const canLaunch = !!deckId && !contentEmpty && !pending && !providerUnavailable
+  // Ordered by which blocker the visitor should fix first: a missing provider
+  // makes the deck and the content irrelevant.
+  const hint = providerUnavailable
+    ? t('generation.noProviderHint')
+    : contentEmpty
+      ? t('generation.hintEmpty')
+      : !deckId
+        ? t('generation.hintNoDeck')
+        : null
 
   return (
     <div

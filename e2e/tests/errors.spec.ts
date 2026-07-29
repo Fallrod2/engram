@@ -45,6 +45,60 @@ test('no AI provider configured → 503 → provider banner in the launch panel'
   await expect(page.getByText('Aucun provider IA configuré')).toBeVisible()
 })
 
+/**
+ * The same situation, discovered BEFORE the click (T-031). The test above proves
+ * the app recovers from a 503; this one proves it no longer needs to — the
+ * visitor is told while the launch panel is still on screen, instead of choosing
+ * a type and creating a target deck for a run that cannot happen.
+ *
+ * The server env carries a placeholder key, so the read is stubbed rather than
+ * the environment changed: what matters is that the SCREEN reacts to
+ * `GET /api/ai/settings` saying "nothing usable".
+ */
+test('no AI provider configured → the launch is refused before the click', async ({ page }) => {
+  const uid = Date.now().toString(36)
+  const subject = `E2E pre ${uid}`
+  const deck = `E2E pre deck ${uid}`
+
+  await page.route('**/api/ai/settings', async (route) => {
+    const res = await route.fetch()
+    const body = (await res.json()) as {
+      settings: { activeProvider: string }
+      statuses: { provider: string; usable: boolean }[]
+    }
+    // Only the flag is rewritten — the rest of the payload stays the server's, so
+    // this cannot pass by accident on a shape the client no longer reads.
+    for (const s of body.statuses) s.usable = false
+    await route.fulfill({ json: body })
+  })
+
+  await page.goto('/subjects')
+  await createSubject(page, subject)
+  await openSubject(page, subject)
+  await createDeck(page, deck)
+
+  await page.goto('/import')
+  await page.getByRole('combobox', { name: 'Ranger les imports dans une matière' }).click()
+  await page.getByRole('option', { name: subject }).click()
+  await page.locator('input[type="file"]:not([capture])').setInputFiles({
+    name: 'upfront-note.md',
+    mimeType: 'text/markdown',
+    buffer: Buffer.from('Q :: R\n'),
+  })
+  await page.getByRole('link', { name: 'upfront-note' }).click()
+
+  // Told TWICE, and both matter: the banner explains and links to the settings,
+  // the inline hint says why the button next to it is dead. `exact` because the
+  // hint is the same sentence with a full stop.
+  await expect(page.getByText('Aucun provider IA configuré', { exact: true })).toBeVisible()
+  await expect(page.getByText('Aucun provider IA configuré.', { exact: true })).toBeVisible()
+  // Blocked — with a deck explicitly selected below, so the disabled state cannot
+  // be the pre-existing "choose a deck" one.
+  await page.getByRole('combobox', { name: 'Deck cible' }).click()
+  await page.getByRole('option', { name: deck }).click()
+  await expect(page.getByRole('button', { name: 'Générer' })).toBeDisabled()
+})
+
 test('unsupported upload type → toast', async ({ page }) => {
   await page.goto('/import')
   // Images (.png/.jpg/.webp) are now a supported PHOTO flow, so use a genuinely
