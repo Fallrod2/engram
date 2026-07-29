@@ -97,6 +97,11 @@ export const dictEn: Dict = {
       todayOnly_other: '{count} cards due today',
       none: 'no cards due',
     },
+    streak: {
+      aria_one: 'Streak of {count} day',
+      aria_other: 'Streak of {count} days',
+      title: 'Streak: {count}d',
+    },
   },
 
   admin: {
@@ -289,6 +294,13 @@ export const dictEn: Dict = {
     search: 'Search',
     settings: 'Settings',
     backToDashboardAria: '{title} — go to dashboard',
+  },
+
+  themeToggle: {
+    toLightAria: 'Switch to light theme',
+    toDarkAria: 'Switch to dark theme',
+    toLight: 'Light theme',
+    toDark: 'Dark theme',
   },
 
   tabbar: {
@@ -606,6 +618,14 @@ export const dictEn: Dict = {
       loadHint:
         'The bar shows how many reviews are scheduled that day, relative to the busiest day in view.',
     },
+    dayLoad_one: '{count} review scheduled',
+    dayLoad_other: '{count} reviews scheduled',
+    dayCellAria: '{day} — {load}, {exams}',
+    exams_one: '{count} exam',
+    exams_other: '{count} exams',
+    monthGridAria: 'Month calendar',
+    weekGridAria: 'Week calendar',
+    examActionsAria: 'Actions for exam {title}',
     deleteExamTitle: 'Delete “{title}”?',
     deleteExamDesc: 'Deletes this exam. The deadline disappears from the planner. Irreversible.',
     examEmptyTitle: 'No upcoming exams.',
@@ -784,6 +804,18 @@ export const dictEn: Dict = {
     themeSystem: 'System',
     themeDark: 'Dark',
     themeLight: 'Light',
+    reveal: {
+      title: 'Reveal animation',
+      desc: 'How the answer appears when you reveal a card.',
+      unfold: 'Unfold',
+      unfoldDesc: 'The answer unfolds below the question, which stays on screen.',
+      flip: 'Flip',
+      flipDesc: 'The card turns over: the answer takes the place of the question.',
+      none: 'None',
+      noneDesc: 'The answer appears at once, without movement.',
+      reducedNotice:
+        'Your system asks for reduced motion: the answer appears without movement, whichever option is selected above.',
+    },
     languageTitle: 'Language',
     languageDesc: 'Interface language.',
     language: 'Language',
@@ -811,6 +843,8 @@ export const dictEn: Dict = {
     version: 'Version',
     mode: 'Mode',
     modeValue: 'Localhost · single-user',
+    landing: 'Landing page',
+    landingAction: 'Open',
     accountTitle: 'Account',
     accountDesc: 'Session, password and sign-out.',
     signOut: 'Sign out',
@@ -1189,6 +1223,7 @@ export const dictEn: Dict = {
     nav: {
       signIn: 'Sign in',
       createAccount: 'Create an account',
+      openApp: 'Open the app',
       githubAria: 'Source code on GitHub',
       language: 'Language',
     },

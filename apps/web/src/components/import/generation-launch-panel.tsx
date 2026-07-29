@@ -110,7 +110,11 @@ export function GenerationLaunchPanel({
           </p>
         ) : (
           <Select value={deckId ?? ''} onValueChange={onDeckChange}>
-            <SelectTrigger aria-label={t('generation.targetDeck')}>
+            {/* `data-deck-select` is the stable hook the route's `g` shortcut
+                focuses. It used to query `[aria-label="Deck cible"]`, i.e. the
+                FRENCH label — so the shortcut silently did nothing as soon as
+                the UI was in English. A11y text must never double as a selector. */}
+            <SelectTrigger data-deck-select aria-label={t('generation.targetDeck')}>
               <SelectValue placeholder={t('generation.chooseDeck')} />
             </SelectTrigger>
             <SelectContent>

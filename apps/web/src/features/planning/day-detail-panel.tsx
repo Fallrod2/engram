@@ -146,7 +146,7 @@ export const DayDetailPanel = forwardRef<
                     variant="ghost"
                     size="icon"
                     className="size-6 shrink-0 text-text-muted opacity-0 transition-opacity group-focus-within/ex:opacity-100 group-hover/ex:opacity-100"
-                    aria-label={`Actions de l'examen ${exam.title}`}
+                    aria-label={t('planning.examActionsAria', { title: exam.title })}
                   >
                     <MoreHorizontal />
                   </Button>

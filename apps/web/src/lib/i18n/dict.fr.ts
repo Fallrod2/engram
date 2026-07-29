@@ -112,6 +112,15 @@ export const dictFr = {
       todayOnly_other: '{count} cartes pour aujourd’hui',
       none: 'aucune carte à réviser',
     },
+    // Streak pill (footer). The count is the WHOLE content of the pill, so its
+    // accessible name has to spell the unit out. FR puts 0 and 1 in the singular
+    // ("0 jour"), EN only 1 — hence the `_one`/`_other` pair rather than a hand
+    // rolled `s`. The mouse `title` uses the invariant symbol, so no plural.
+    streak: {
+      aria_one: 'Série de {count} jour',
+      aria_other: 'Série de {count} jours',
+      title: 'Série : {count} j',
+    },
   },
 
   admin: {
@@ -304,6 +313,18 @@ export const dictFr = {
     search: 'Rechercher',
     settings: 'Réglages',
     backToDashboardAria: '{title} — aller au tableau de bord',
+  },
+
+  // Theme toggle — shell footer AND landing header/footer, so it lives at the top
+  // level rather than under `sidebar`. Keys are named by DESTINATION, which is
+  // what both surfaces actually express: the accessible name states the action
+  // ("Passer en thème clair"), the tooltip names the theme you land on
+  // ("Thème clair"). Neither describes the CURRENT theme.
+  themeToggle: {
+    toLightAria: 'Passer en thème clair',
+    toDarkAria: 'Passer en thème sombre',
+    toLight: 'Thème clair',
+    toDark: 'Thème sombre',
   },
 
   tabbar: {
@@ -635,6 +656,19 @@ export const dictFr = {
       loadHint:
         'La barre indique le nombre de reviews prévues ce jour-là, relatif au maximum de la période.',
     },
+    // Accessible name of a calendar cell's load (`<DayLoad>`): at the zero tier
+    // the cell shows a bare `·`, so this string IS the information. Pluralised
+    // per locale — FR keeps 0 singular, EN does not.
+    dayLoad_one: '{count} review prévue',
+    dayLoad_other: '{count} reviews prévues',
+    // Accessible name of a calendar day cell (month + week views), composed in
+    // `day-cell-label.ts`. The date itself is already localized by `format.ts`.
+    dayCellAria: '{day} — {load}, {exams}',
+    exams_one: '{count} examen',
+    exams_other: '{count} examens',
+    monthGridAria: 'Calendrier mensuel',
+    weekGridAria: 'Calendrier hebdomadaire',
+    examActionsAria: 'Actions de l’examen {title}',
     deleteExamTitle: 'Supprimer « {title} » ?',
     deleteExamDesc: 'Supprime cet examen. L’échéance disparaît du planning. Irréversible.',
     examEmptyTitle: 'Aucun examen à venir.',
@@ -814,6 +848,22 @@ export const dictFr = {
     themeSystem: 'Système',
     themeDark: 'Sombre',
     themeLight: 'Clair',
+    // Animation de révélation en session (T-046). Les libellés seuls
+    // n'apprennent rien à personne : chaque option porte sa phrase, d'où la
+    // paire `x`/`xDesc`. `reducedNotice` n'apparaît que si le système demande
+    // de réduire les animations — il gagne sur les trois valeurs.
+    reveal: {
+      title: 'Animation de révélation',
+      desc: 'Comment la réponse apparaît quand tu révèles une carte.',
+      unfold: 'Déploiement',
+      unfoldDesc: 'La réponse se déplie sous la question, qui reste à l’écran.',
+      flip: 'Retournement',
+      flipDesc: 'La carte se retourne : la réponse prend la place de la question.',
+      none: 'Aucune',
+      noneDesc: 'La réponse apparaît d’un coup, sans mouvement.',
+      reducedNotice:
+        'Ton système demande de réduire les animations : la réponse apparaît sans mouvement, quel que soit le choix ci-dessus.',
+    },
     languageTitle: 'Langue',
     languageDesc: 'Langue de l’interface.',
     language: 'Langue',
@@ -841,6 +891,9 @@ export const dictFr = {
     version: 'Version',
     mode: 'Mode',
     modeValue: 'Localhost · mono-utilisateur',
+    /** Row + ⌘K entry leading back to the public landing (`/welcome`). */
+    landing: 'Page de présentation',
+    landingAction: 'Ouvrir',
     accountTitle: 'Compte',
     accountDesc: 'Session, mot de passe et déconnexion.',
     signOut: 'Se déconnecter',
@@ -1226,6 +1279,8 @@ export const dictFr = {
     nav: {
       signIn: 'Se connecter',
       createAccount: 'Créer un compte',
+      /** Shown instead of sign-in/sign-up when the visitor already has a session. */
+      openApp: 'Ouvrir l’app',
       githubAria: 'Code source sur GitHub',
       language: 'Langue',
     },

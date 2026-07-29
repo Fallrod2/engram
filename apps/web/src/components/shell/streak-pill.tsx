@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Flame } from 'lucide-react'
 import { motion, useAnimationControls, useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/utils'
+import { usePlural, useT } from '@/lib/i18n'
 import { localDayKey } from '@/lib/calendar'
 
 /** Anti-replay key: the last local day the once-a-day breath actually played. */
@@ -25,6 +26,8 @@ export function StreakPill({
   collapsed?: boolean
 }) {
   const active = current > 0
+  const t = useT()
+  const plural = usePlural()
   const reduce = useReducedMotion()
   const numberControls = useAnimationControls()
   const flashControls = useAnimationControls()
@@ -56,8 +59,14 @@ export function StreakPill({
         collapsed && 'px-0',
         active ? 'text-text' : 'text-text-faint',
       )}
-      aria-label={`Série de ${current} jour${current > 1 ? 's' : ''}`}
-      title={`Série : ${current} j`}
+      // Collapsed, the pill is a bare flame with no digits at all, so its
+      // accessible name is the ONLY place the streak is said out loud. It used to
+      // say it in hardcoded French with a hand-rolled `s`, which is wrong twice
+      // over: an English user heard French, and `count > 1` gets FR's 0 wrong
+      // ("0 jours"). `usePlural` applies the locale's own CLDR rule — FR keeps 0
+      // and 1 singular, EN only 1.
+      aria-label={t(`sidebar.streak.aria_${plural(current)}`, { count: current })}
+      title={t('sidebar.streak.title', { count: current })}
     >
       <motion.span
         aria-hidden
@@ -65,7 +74,10 @@ export function StreakPill({
         animate={flashControls}
         className="pointer-events-none absolute inset-0 rounded-full bg-accent-subtle"
       />
-      <Flame className={cn('relative size-3.5', active ? 'text-warning' : 'text-text-faint')} />
+      {/* `size-4`, like every other footer glyph (gear, shield, moon): the pill
+          carries the same `px-2` inset as the footer links, so an identically
+          sized icon puts the flame on the shared centre line instead of 1px off. */}
+      <Flame className={cn('relative size-4', active ? 'text-warning' : 'text-text-faint')} />
       {!collapsed && (
         <motion.span animate={numberControls} className="relative font-mono text-xs tabular-nums">
           {current}

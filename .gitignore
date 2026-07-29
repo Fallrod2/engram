@@ -45,3 +45,6 @@ NIGHT.md
 TODO.md
 NIGHT_LOG.md
 RAPPORT.md
+
+# Config MCP locale, propre à la machine
+.mcp.json

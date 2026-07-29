@@ -3,12 +3,14 @@ import type { HTMLAttributes } from 'react'
 import type { StudyPlanDay, StudyPlanResponse, Subject } from '@engram/shared'
 import { parseDayKey, weekDays, type DayCell as DayCellData } from '@/lib/calendar'
 import { formatLongDay, weekdayAbbrevs } from '@/lib/format'
+import { usePlural, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { DayLoad } from '@/components/day-load'
 import { ExamChip } from '@/components/exam-chip'
 import { SubjectCompositionBar } from '@/components/subject-composition-bar'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCalendarGrid } from './use-calendar-grid'
+import { dayCellLabel } from './day-cell-label'
 import { daySegments, indexDays, subjectsById, windowMax } from './plan-utils'
 
 /**
@@ -31,6 +33,7 @@ export function CalendarWeek({
   onSelect: (key: string) => void
   onActivate: () => void
 }) {
+  const t = useT()
   const weekdays = weekdayAbbrevs()
   const days = useMemo(() => weekDays(parseDayKey(dayKey), now), [dayKey, now])
   const daysIndex = useMemo(() => indexDays(plan), [plan])
@@ -48,7 +51,7 @@ export function CalendarWeek({
     <div
       ref={gridRef}
       role="grid"
-      aria-label="Calendrier hebdomadaire"
+      aria-label={t('planning.weekGridAria')}
       onKeyDown={onKeyDown}
       className="grid min-h-[24rem] grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border"
     >
@@ -91,6 +94,8 @@ function WeekColumn({
   cellProps: HTMLAttributes<HTMLDivElement> & { 'data-day-selected'?: 'true' }
   onSelect: () => void
 }) {
+  const t = useT()
+  const plural = usePlural()
   const total = day?.total ?? 0
   const exams = day?.exams ?? []
   const segments = daySegments(day, subjectsById)
@@ -100,7 +105,7 @@ function WeekColumn({
       {...cellProps}
       onClick={onSelect}
       aria-selected={selected}
-      aria-label={`${formatLongDay(cell.key)} — ${total} reviews prévues, ${exams.length} examens`}
+      aria-label={dayCellLabel(t, plural, formatLongDay(cell.key), total, exams.length)}
       className={cn(
         'relative flex cursor-pointer flex-col outline-none transition-colors duration-fast',
         selected ? 'bg-accent-subtle' : 'bg-bg hover:bg-surface-2',

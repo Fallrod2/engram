@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { dueCountTier } from '@/lib/due-count'
+import { usePlural, useT } from '@/lib/i18n'
 import { LoadMeter } from './load-meter'
 
 /**
@@ -22,6 +23,13 @@ export function DayLoad({
 }) {
   const tier = dueCountTier(value)
   const week = variant === 'week'
+  const t = useT()
+  const plural = usePlural()
+  // At the zero tier the cell renders a bare `·`, so this name IS the cell's
+  // content for a screen reader. It was hardcoded ("0 review prévue" /
+  // "N reviews prévues"), i.e. French in an English UI, with a hand-rolled
+  // plural that also got EN's zero wrong.
+  const label = t(`planning.dayLoad_${plural(value)}`, { count: value })
 
   if (tier === 'zero') {
     return (
@@ -31,7 +39,7 @@ export function DayLoad({
           week ? 'text-sm' : 'text-xs',
           className,
         )}
-        aria-label="0 review prévue"
+        aria-label={label}
       >
         ·
       </span>
@@ -40,10 +48,7 @@ export function DayLoad({
 
   const tone = tier === 'low' ? 'text-text-muted' : 'text-text'
   return (
-    <span
-      className={cn('flex items-center gap-1.5', className)}
-      aria-label={`${value} reviews prévues`}
-    >
+    <span className={cn('flex items-center gap-1.5', className)} aria-label={label}>
       <span className={cn('font-mono tabular-nums', week ? 'text-base' : 'text-xs', tone)}>
         {value}
       </span>
