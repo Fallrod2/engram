@@ -822,26 +822,24 @@ export const dictEn: Dict = {
 
   settings: {
     appearanceTitle: 'Appearance',
-    appearanceDesc: 'Interface theme. “System” follows your OS.',
+    appearanceDesc: 'Interface theme and animations. “System” follows your computer’s settings.',
     theme: 'Theme',
     themeSystem: 'System',
     themeDark: 'Dark',
     themeLight: 'Light',
-    reveal: {
-      title: 'Reveal animation',
-      desc: 'How the answer appears when you reveal a card.',
-      unfold: 'Unfold',
-      unfoldDesc: 'The answer unfolds below the question, which stays on screen.',
-      flip: 'Flip',
-      flipDesc: 'The card turns over: the answer takes the place of the question.',
-      none: 'None',
-      noneDesc: 'The answer appears at once, without movement.',
-      reducedNotice:
-        'Your system asks for reduced motion: the answer appears without movement, whichever option is selected above.',
+    motion: {
+      label: 'Always animate',
+      desc: 'Keep the animations even when my system asks for reduced motion.',
+      noticeReduced:
+        'Your system asks for reduced motion, so the app turned its animations off. Switch this on to keep them anyway.',
+      noticeOverridden:
+        'Your system asks for reduced motion; you chose to keep the animations. This choice only applies to engram.',
+      noticeSystemNeutral: 'Your system asks for no reduction: animations are already on.',
     },
     languageTitle: 'Language',
-    languageDesc: 'Interface language.',
+    languageDesc: 'Interface language. “System” follows your browser’s language.',
     language: 'Language',
+    langSystem: 'System',
     langFr: 'Français',
     langEn: 'English',
     dataTitle: 'Data',

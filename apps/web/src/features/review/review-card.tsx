@@ -1,10 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { motion } from 'motion/react'
 import { Check, X } from 'lucide-react'
 import type { ParsedQcm, QcmOption } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
-import type { RevealAnimation } from '@/lib/reveal-animation'
 import { Markdown } from '@/components/markdown'
 import { useTouchSession } from './pointer-labels'
 import { contentAlign } from './content-align'
@@ -13,12 +12,6 @@ import {
   ANSWER_RISE_TIMES,
   DURATION_BASE,
   EASE_OUT,
-  FLIP_DURATION,
-  FLIP_EASE,
-  FLIP_HALF_MS,
-  FLIP_KEYFRAMES,
-  FLIP_PERSPECTIVE,
-  FLIP_TIMES,
   LIFT_KEYFRAMES,
   LIFT_TIMES,
 } from './reveal-motion'
@@ -83,36 +76,27 @@ import {
 export const CARD_BOX = 'h-[440px]'
 
 /**
- * The flashcard. How the answer arrives is the user's choice (T-046,
- * `lib/reveal-animation.ts`); the `animation` prop is the ALREADY-RESOLVED value
- * — the session hands over `none` whenever the system asks for reduced motion,
- * so this component never has to arbitrate between a product setting and an
- * accessibility one.
+ * The flashcard. The answer arrives by UNFOLDING, and that is the only reveal
+ * the app has — the three-valued setting (unfold / 3D flip / none) shipped that
+ * morning was
+ * tried in real use and dropped by Alex on 29/07/2026. What remains of the
+ * arbitration is one boolean: `reduce`, the resolved motion preference
+ * (`lib/motion.ts` — the system's `prefers-reduced-motion`, unless the user has
+ * deliberately overridden it).
  *
- *   · `unfold` (default) — the historical vertical reveal, with a spine. The
- *     question is anchored at the top of a single scrolling column and NEVER
- *     moves; revealing mounts the answer underneath it, behind a structural rule
- *     that bleeds to the card edges. The card lifts 6px and settles back, and
- *     its resting elevation deepens (`shadow-sm` → `shadow-lg`) to mark the
- *     revealed state. The answer rises 12px with a 2px overshoot. Nothing the
- *     eye is already reading ends up anywhere else, and the answer is not sized
- *     by the question (the old verso overlaid the recto absolutely, which capped
- *     it to the recto's box and forced the question to be echoed a second time).
+ * The question is anchored at the top of a single scrolling column and NEVER
+ * moves; revealing mounts the answer underneath it, behind a structural rule
+ * that bleeds to the card edges. The card lifts 6px and settles back, and its
+ * resting elevation deepens (`shadow-sm` → `shadow-lg`) to mark the revealed
+ * state. The answer rises 12px with a 2px overshoot. Nothing the eye is already
+ * reading ends up anywhere else, and the answer is not sized by the question
+ * (the old verso overlaid the recto absolutely, which capped it to the recto's
+ * box and forced the question to be echoed a second time).
  *
- *   · `flip` — the card turns over and the answer TAKES THE PLACE of the
- *     question, which is gone. That loses the question/answer comparison, and
- *     that is Alex's call, made knowing the cost — do not quietly restore the
- *     question here. The turn is safe only because the card's height is a
- *     constant (`CARD_BOX`): two faces of different heights would make the whole
- *     screen jump at the hinge.
- *
- *     One exception, and it is not a compromise: on a QCM the marked options ARE
- *     the answer (green on the right one, red on the wrong pick — see
- *     `QcmOptions`). Turning them away would hide the verdict itself, so the
- *     back face of a QCM keeps question + options and adds the justification.
- *     The card still turns; what lands on the far side is the answered card.
- *
- *   · `none` — the answer simply mounts. Same DOM as `unfold`, no transition.
+ * Under `reduce`, the answer simply mounts: same DOM, same classes, no movement.
+ * The elevation change stays — it is a STATE, not a gesture, and the global
+ * `prefers-reduced-motion` block in `styles.css` shortens its transition to
+ * nothing without this component knowing anything about it.
  *
  * Everything animated is `transform`/`opacity`, i.e. composite only. No `height`
  * animation: interpolating `height:auto` costs a reflow per frame for no
@@ -145,7 +129,6 @@ export function ReviewCard({
   selectedChoice,
   revealed,
   reduce,
-  animation,
   onReveal,
   onSelect,
 }: {
@@ -156,12 +139,11 @@ export function ReviewCard({
   /** Index of the option the user picked, or null (revealed without answering). */
   selectedChoice: number | null
   revealed: boolean
-  reduce: boolean
   /**
-   * The reveal to play — already resolved against `prefers-reduced-motion` by
-   * the caller, so `none` here means "do not move", whatever the reason.
+   * Play no movement. Already resolved by the caller (`lib/motion.ts`), so this
+   * means "do not move", whatever the reason.
    */
-  animation: RevealAnimation
+  reduce: boolean
   /** Reveal the answer on tap/click (only wired while the answer is hidden). */
   onReveal?: () => void
   /** Answer the QCM by picking an option. */
@@ -191,77 +173,33 @@ export function ReviewCard({
   // ambiguous locator. On a fine pointer the card is the ONLY reveal affordance
   // (the hint next to it is plain text), so there the role has to stay.
   const named = interactive && !touch
-  const flipping = animation === 'flip'
 
-  /**
-   * Which face the flip is showing. `front` until the card is edge-on, `back`
-   * from the hinge on — so the swap happens at the one instant the card is zero
-   * pixels wide and nobody can see the substitution.
-   *
-   * Driven by a timeout rather than by a motion callback on purpose: the swap is
-   * a CONTENT change (React state), and motion's per-frame `onUpdate` would run
-   * `setState` on every frame of the turn just to catch one crossing. The
-   * timeout and the animation read the same constant (`FLIP_HALF_MS` is defined
-   * as half of `FLIP_DURATION`), so they cannot drift.
-   *
-   * Every other mode keeps this in lockstep with `revealed`, which makes the
-   * derivations below uniform: there is no "flip branch" in the render.
-   */
-  const [face, setFace] = useState<'front' | 'back'>(revealed ? 'back' : 'front')
-  useEffect(() => {
-    if (!flipping || !revealed) {
-      setFace(revealed ? 'back' : 'front')
-      return
-    }
-    setFace('front')
-    const id = window.setTimeout(() => setFace('back'), FLIP_HALF_MS)
-    return () => window.clearTimeout(id)
-  }, [flipping, revealed])
-
-  // The answer is on screen. Same thing as `revealed` everywhere except during
-  // the first half of a flip, where the card is still showing its front.
-  const turned = !flipping || face === 'back'
-  const answerShown = revealed && turned
-  // The flip is the only mode that takes the question away, and only on a plain
-  // card — a QCM's options carry the verdict and must survive the turn.
-  const hideQuestion = flipping && answerShown && qcm === null
   // A QCM whose back says nothing beyond the answer letter has no answer block
   // at all: the options already carry the verdict, and a structural rule that
   // announces an empty section is worse than no rule.
-  const showAnswer = answerShown && (qcm === null || qcm.explanation !== '')
+  const showAnswer = revealed && (qcm === null || qcm.explanation !== '')
 
   /**
-   * What the card itself does, per mode — one object rather than three ternaries
-   * on three props, because `exactOptionalPropertyTypes` refuses an explicit
-   * `undefined` on `style`/`animate`/`transition`: "absent" and "present and
-   * undefined" are not the same thing here, and `none` needs the former.
+   * The card's own gesture — an object rather than ternaries on three props,
+   * because `exactOptionalPropertyTypes` refuses an explicit `undefined` on
+   * `animate`/`transition`: "absent" and "present and undefined" are not the
+   * same thing here, and reduced motion needs the former.
    *
    * Keyframe arrays come from `reveal-motion.ts` as module constants: a fresh
    * array per render would restart the animation every time the session
    * re-renders (it does, on every interval prefetch).
    */
-  const cardMotion =
-    animation === 'unfold'
-      ? {
-          animate: { y: revealed ? LIFT_KEYFRAMES : 0 },
-          transition: { duration: DURATION_BASE, times: LIFT_TIMES, ease: EASE_OUT },
-        }
-      : flipping
-        ? {
-            // `transformPerspective` goes through motion (folded into the same
-            // `transform` string as the rotation) instead of a raw CSS
-            // `perspective` on an ancestor: no extra stacking context, and
-            // nothing to keep in sync with the animation.
-            style: { transformPerspective: FLIP_PERSPECTIVE },
-            animate: { rotateY: revealed ? FLIP_KEYFRAMES : 0 },
-            transition: { duration: FLIP_DURATION, times: FLIP_TIMES, ease: FLIP_EASE },
-          }
-        : {}
+  const cardMotion = reduce
+    ? {}
+    : {
+        animate: { y: revealed ? LIFT_KEYFRAMES : 0 },
+        transition: { duration: DURATION_BASE, times: LIFT_TIMES, ease: EASE_OUT },
+      }
 
   // Bring the start of the answer into view ONLY if it begins below the fold.
   // Common case (everything fits): no scroll at all, zero noise.
   useLayoutEffect(() => {
-    if (!answerShown) return
+    if (!revealed) return
     const sc = scrollRef.current
     if (!sc) return
     // A QCM without justification mounts no answer block — there is nothing to
@@ -272,7 +210,7 @@ export function ReviewCard({
     }
     // Hand the keyboard to the scroller: PageDown/arrows scroll the answer.
     sc.focus({ preventScroll: true })
-  }, [answerShown, reduce])
+  }, [revealed, reduce])
 
   return (
     <motion.article
@@ -311,16 +249,17 @@ export function ReviewCard({
         CARD_BOX,
         'border border-border bg-surface-2',
         interactive && 'cursor-pointer',
-        // Elevation, `unfold` only — the one part of that reveal that is a STATE
-        // and not a gesture: the lift comes back to zero, the revealed card
-        // stays raised. Written as a utility rather than a motion value because
-        // `--shadow-*` are CSS variables motion cannot interpolate, and because
-        // the global `prefers-reduced-motion` block in `styles.css` then kills
-        // the transition without this component knowing anything about it.
-        animation === 'unfold' && [
-          'transition-shadow duration-base ease-out',
-          revealed ? 'shadow-lg' : 'shadow-sm',
-        ],
+        // Elevation — the one part of the reveal that is a STATE and not a
+        // gesture: the lift comes back to zero, the revealed card stays raised.
+        // Written as a utility rather than a motion value because `--shadow-*`
+        // are CSS variables motion cannot interpolate, and because the global
+        // `prefers-reduced-motion` block in `styles.css` then shortens the
+        // transition to nothing without this component knowing anything about
+        // it. Which is why it does NOT depend on `reduce`: the classes are the
+        // same in both cases, so reduced motion changes what MOVES and never
+        // what is rendered.
+        'transition-shadow duration-base ease-out',
+        revealed ? 'shadow-lg' : 'shadow-sm',
       )}
       {...cardMotion}
     >
@@ -330,49 +269,36 @@ export function ReviewCard({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none"
       >
         <div className="px-5 py-6 sm:px-8 sm:py-8">
-          {/* Gone on the back face of a flip, and only there. Not hidden with
-              CSS: the question must leave the accessibility tree too, or a
-              screen reader would still walk a face that is no longer on screen. */}
-          {!hideQuestion && (
-            <div data-slot="question">
-              {qcm ? (
-                <>
-                  <Markdown
-                    source={qcm.question}
-                    variant="card"
-                    align={qcmAlign?.question ?? frontAlign}
-                  />
-                  <QcmOptions
-                    options={qcm.options}
-                    answerIndex={qcm.answerIndex}
-                    selectedChoice={selectedChoice}
-                    // The verdict lands WITH the far face, not before the card
-                    // has finished turning: marking the options while the front
-                    // is still on screen would answer the question 120ms early.
-                    // The options are locked by `revealed` all the same, via
-                    // `disabled` below — nothing is clickable mid-turn.
-                    revealed={answerShown}
-                    locked={revealed}
-                    onSelect={onSelect}
-                  />
-                </>
-              ) : (
-                <Markdown source={front} variant="card" align={frontAlign} />
-              )}
-            </div>
-          )}
+          {/* The question stays on screen once revealed — the answer is read
+              against it. */}
+          <div data-slot="question">
+            {qcm ? (
+              <>
+                <Markdown
+                  source={qcm.question}
+                  variant="card"
+                  align={qcmAlign?.question ?? frontAlign}
+                />
+                <QcmOptions
+                  options={qcm.options}
+                  answerIndex={qcm.answerIndex}
+                  selectedChoice={selectedChoice}
+                  revealed={revealed}
+                  onSelect={onSelect}
+                />
+              </>
+            ) : (
+              <Markdown source={front} variant="card" align={frontAlign} />
+            )}
+          </div>
           {showAnswer && (
             <motion.div
               ref={answerRef}
               data-slot="answer"
-              // The flip animates the whole card, so the answer riding in on it
-              // needs no entrance of its own — and `none` means none.
-              initial={animation === 'unfold' ? { opacity: 0 } : false}
-              animate={
-                animation === 'unfold'
-                  ? { opacity: 1, y: ANSWER_RISE_KEYFRAMES }
-                  : { opacity: 1, y: 0 }
-              }
+              // Reduced motion means none: mount at the final state, no
+              // entrance at all.
+              initial={reduce ? false : { opacity: 0 }}
+              animate={reduce ? { opacity: 1, y: 0 } : { opacity: 1, y: ANSWER_RISE_KEYFRAMES }}
               transition={{
                 duration: DURATION_BASE,
                 ease: EASE_OUT,
@@ -380,10 +306,8 @@ export function ReviewCard({
               }}
             >
               {/* Structural rule bleeding to the edges: read as a division of
-                  the card, not as an `<hr>` belonging to the content. It divides
-                  the question from the answer — with no question above it (the
-                  back face of a flip) it would divide nothing, so it goes. */}
-              {!hideQuestion && <hr className="-mx-5 my-6 border-border sm:-mx-8" />}
+                  the card, not as an `<hr>` belonging to the content. */}
+              <hr className="-mx-5 my-6 border-border sm:-mx-8" />
               <Markdown
                 source={qcm ? qcm.explanation : back}
                 variant="card"
@@ -425,21 +349,13 @@ function QcmOptions({
   answerIndex,
   selectedChoice,
   revealed,
-  locked,
   onSelect,
 }: {
   options: QcmOption[]
   answerIndex: number
   selectedChoice: number | null
-  /** The verdict is on screen — paint the marks. */
+  /** The verdict is on screen — paint the marks, and accept no further pick. */
   revealed: boolean
-  /**
-   * The card has been answered — accept no further pick. Identical to `revealed`
-   * in every mode but the flip, where the marks wait for the far face while the
-   * lock takes effect at once (T-046). Two props because they answer two
-   * different questions: what the user can DO, and what the user can SEE.
-   */
-  locked: boolean
   onSelect: (index: number) => void
 }) {
   const t = useT()
@@ -454,7 +370,7 @@ function QcmOptions({
           <button
             key={option.letter}
             type="button"
-            disabled={locked}
+            disabled={revealed}
             aria-keyshortcuts={option.letter}
             onClick={() => onSelect(index)}
             className={cn(

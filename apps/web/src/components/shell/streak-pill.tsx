@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Flame } from 'lucide-react'
-import { motion, useAnimationControls, useReducedMotion } from 'motion/react'
+import { motion, useAnimationControls } from 'motion/react'
+import { useReducedMotion } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { usePlural, useT } from '@/lib/i18n'
 import { localDayKey } from '@/lib/calendar'

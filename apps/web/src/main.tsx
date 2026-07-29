@@ -9,6 +9,7 @@ import '@fontsource-variable/jetbrains-mono'
 import './styles.css'
 
 import { ThemeProvider } from '@/lib/theme'
+import { initMotionPreference } from '@/lib/motion'
 import { LangProvider } from '@/lib/i18n'
 import { AuthProvider } from '@/lib/auth'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -17,6 +18,13 @@ import { createQueryClient } from '@/lib/query-client'
 import { configureAuth } from '@/lib/api'
 import { authStore } from '@/lib/auth-store'
 import { routeTree } from './routeTree.gen'
+
+// Stamp the motion override onto <html> BEFORE the first paint: the CSS half of
+// it (`@media (prefers-reduced-motion: reduce)` in styles.css) is scoped by that
+// attribute, and no component owns the document element. No stored override =
+// no attribute = the system preference applies, which is also the state of the
+// page for the few milliseconds before this line runs.
+initMotionPreference()
 
 // Router ⇄ Query are soldered: the QueryClient lives in the router context so
 // loaders can `ensureQueryData` the screen's primary data (spec §1.1/§1.2). The

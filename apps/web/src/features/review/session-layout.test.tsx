@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { REVEAL_ANIMATIONS, type RevealAnimation } from '@/lib/reveal-animation'
 import { CARD_BOX, ReviewCard } from './review-card'
 import { RatingBar } from './rating-bar'
 
@@ -75,30 +74,28 @@ import { RatingBar } from './rating-bar'
  * REVEALED and on the next card, and the LOADING skeleton mirrors the play
  * stack to the pixel (both read the same two exported constants).
  *
- * T-046 amendment — this file gained a THIRD axis, and lost nothing.
+ * Amendement du 29/07/2026 — the axis this file gained, and the axis it kept.
  *
- * The reveal is now a user setting with three values (`lib/reveal-animation.ts`),
- * one of which turns the card over. A flip is the one reveal that CANNOT survive
- * a card whose height depends on its content: two faces of different heights and
- * the whole screen jumps at the hinge. So the invariant this file pins is now
- * load-bearing for a second reason, and the cases below are parameterised over
- * the three modes instead of being written once against the default — "the same
- * declared box for a two-word card and a multi-block one" now has to hold in
- * `unfold`, in `flip` and in `none`, in both states.
+ * The morning of 29/07/2026 made the reveal a three-valued setting (unfold / 3D
+ * flip / none) and
+ * parameterised every case below over it, because a flip is the one reveal that
+ * CANNOT survive a card whose height depends on its content. The afternoon
+ * removed that setting: the app has one reveal again, and reduced motion is what turns it
+ * off. So the parameterisation now runs over what is left of the axis — whether
+ * the card animates at all — which still states the thing worth stating: the
+ * geometry does not depend on the motion preference.
  *
- * Nothing was loosened to make room for it: no assertion was deleted or
- * weakened, the equality against `[CARD_BOX]` is still exact, and the `min-h-`/
- * `max-h-`/`flex-1` refusals still apply. The only change is that each of them
- * runs three times.
+ * Nothing was loosened on the way through either change: the equality against
+ * `[CARD_BOX]` is still exact and the `min-h-`/`max-h-`/`flex-1` refusals still
+ * apply.
  *
- * What deliberately does NOT belong here: the flip's rotation, the unfold's lift
- * and its deepened shadow. All three are `transform`/`box-shadow` — they paint
- * differently, they lay out identically, and jsdom would only be able to read
- * back the inline styles motion happens to have written on the frame the
- * assertion ran. Their proof is the Chromium capture (three modes × two themes,
- * mid-animation frames included) plus the fact that the unfold's lift is
- * declared as keyframes RETURNING TO ZERO (`LIFT_KEYFRAMES` in
- * `reveal-motion.ts`), so its end state is its start state.
+ * What deliberately does NOT belong here: the lift and the deepened shadow. Both
+ * are `transform`/`box-shadow` — they paint differently, they lay out
+ * identically, and jsdom would only be able to read back the inline styles
+ * motion happens to have written on the frame the assertion ran. Their proof is
+ * the Chromium capture plus the fact that the lift is declared as keyframes
+ * RETURNING TO ZERO (`LIFT_KEYFRAMES` in `reveal-motion.ts`), so its end state
+ * is its start state.
  */
 
 // jsdom defines no `Element.scrollTo`; `ReviewCard` calls it on reveal.
@@ -122,15 +119,10 @@ function heightClasses(el: Element): string[] {
     .sort()
 }
 
-function renderCard(props: {
-  front: string
-  back: string
-  revealed: boolean
-  animation?: RevealAnimation
-}) {
-  const { animation = 'unfold', ...rest } = props
+function renderCard(props: { front: string; back: string; revealed: boolean; reduce?: boolean }) {
+  const { reduce = true, ...rest } = props
   const { container } = render(
-    <ReviewCard {...PLAIN} {...rest} reduce animation={animation} onReveal={() => {}} />,
+    <ReviewCard {...PLAIN} {...rest} reduce={reduce} onReveal={() => {}} />,
   )
   return container.querySelector('article')!
 }
@@ -151,12 +143,11 @@ describe('T-023/T-044 — the card is sized by one constant, never by its conten
     expect(CARD_BOX).toMatch(/^h-\[\d+px\]$/)
   })
 
-  // T-046: every case below runs once per reveal mode. The box is what makes a
-  // flip safe, so it has to be proven under the flip too — not only under the
-  // default the assertions were originally written against.
-  describe.each(REVEAL_ANIMATIONS)('reveal = %s', (animation) => {
+  // Both motion states: the box is a layout fact and must not depend on whether
+  // the card is allowed to move.
+  describe.each([false, true])('reduce = %s', (reduce) => {
     it('carries that box and nothing else that could resize it', () => {
-      const card = renderCard({ ...SHORT, revealed: false, animation })
+      const card = renderCard({ ...SHORT, revealed: false, reduce })
       expect(heightClasses(card)).toEqual([CARD_BOX])
       // `min-h-[180px] sm:min-h-[220px]` was the original floor: a two-word card
       // could not shrink under it and a long one could not grow past its region,
@@ -168,27 +159,26 @@ describe('T-023/T-044 — the card is sized by one constant, never by its conten
     })
 
     it('declares the same box for a two-word card and a multi-block one', () => {
-      const short = heightClasses(renderCard({ ...SHORT, revealed: true, animation }))
+      const short = heightClasses(renderCard({ ...SHORT, revealed: true, reduce }))
       cleanup()
-      const long = heightClasses(renderCard({ ...LONG, revealed: true, animation }))
+      const long = heightClasses(renderCard({ ...LONG, revealed: true, reduce }))
       expect(long).toEqual(short)
     })
 
     it('declares the same box before and after the reveal', () => {
-      const asking = heightClasses(renderCard({ ...SHORT, revealed: false, animation }))
+      const asking = heightClasses(renderCard({ ...SHORT, revealed: false, reduce }))
       cleanup()
-      const revealed = heightClasses(renderCard({ ...SHORT, revealed: true, animation }))
+      const revealed = heightClasses(renderCard({ ...SHORT, revealed: true, reduce }))
       expect(revealed).toEqual(asking)
     })
   })
 
-  it('declares the same box whichever reveal the user picked', () => {
-    // The cross-mode statement the per-mode cases cannot make: three settings,
-    // one geometry. A mode that bought its effect with a different box (a taller
-    // card to fit an un-anchored flip, say) would pass every case above and fail
-    // this one.
-    const boxes = REVEAL_ANIMATIONS.map((animation) => {
-      const classes = heightClasses(renderCard({ ...LONG, revealed: true, animation }))
+  it('declares the same box whether or not the card animates', () => {
+    // The cross-state statement the per-state cases cannot make: one geometry,
+    // whatever the motion preference. A reveal that bought its effect with a
+    // different box would pass every case above and fail this one.
+    const boxes = [false, true].map((reduce) => {
+      const classes = heightClasses(renderCard({ ...LONG, revealed: true, reduce }))
       cleanup()
       return classes
     })

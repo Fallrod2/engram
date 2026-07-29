@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { setLocale } from '@/lib/format'
 import { dictFr, type Dict } from './dict.fr'
 import { dictEn } from './dict.en'
@@ -11,6 +11,12 @@ import { dictEn } from './dict.en'
  * `format.ts` locale follow.
  */
 export type Lang = 'fr' | 'en'
+
+/**
+ * What the user chose — which includes choosing not to choose (29/07/2026).
+ * `'system'` is not a language, it is a *policy*: follow the browser/OS list.
+ */
+export type LangPreference = Lang | 'system'
 
 const STORAGE_KEY = 'engram-lang'
 const DICTS: Record<Lang, Dict> = { fr: dictFr, en: dictEn }
@@ -43,8 +49,11 @@ function interpolate(template: string, vars?: Vars): string {
 }
 
 interface LangContextValue {
+  /** The language actually rendered — `preference`, resolved. */
   lang: Lang
-  setLang: (lang: Lang) => void
+  /** What is stored: a language, or `'system'` (the default). */
+  preference: LangPreference
+  setLang: (lang: LangPreference) => void
   t: TFunction
 }
 
@@ -56,6 +65,7 @@ interface LangContextValue {
  */
 const DEFAULT_VALUE: LangContextValue = {
   lang: 'fr',
+  preference: 'fr',
   setLang: () => {},
   t: (key, vars) => interpolate(resolve(dictFr, key), vars),
 }
@@ -63,56 +73,106 @@ const DEFAULT_VALUE: LangContextValue = {
 const LangContext = createContext<LangContextValue>(DEFAULT_VALUE)
 
 /**
- * Initial language: an explicit stored choice wins; otherwise we fall back to the
- * browser's preferred language so an English-speaking visitor (e.g. arriving from
- * GitHub) lands on the EN copy without hunting for a toggle. Default `fr`
- * otherwise (the project's primary EPITA audience). Only the first, un-persisted
- * paint consults the navigator — once the user picks a language it is stored and
- * takes precedence forever.
+ * What is stored, if anything. No stored value = no choice = follow the system
+ * (29/07/2026).
+ *
+ * A stored `'fr'`/`'en'` is an explicit choice and outranks the system for good.
+ * Users who were here before this change carry one already — the provider used
+ * to persist its resolved language on mount, so the first paint wrote a key
+ * whether or not anyone had chosen. That write is gone (see `LangProvider`);
+ * what it wrote in the past cannot be told apart from a real choice, so it is
+ * honoured as one, and « Système » in Settings is the way back.
  */
-function readStoredLang(): Lang {
-  if (typeof localStorage !== 'undefined') {
+function readStoredPreference(): LangPreference {
+  if (typeof localStorage === 'undefined') return 'system'
+  try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === 'en' || raw === 'fr') return raw
+    return raw === 'en' || raw === 'fr' || raw === 'system' ? raw : 'system'
+  } catch {
+    return 'system'
   }
-  if (typeof navigator !== 'undefined') {
-    const langs = navigator.languages?.length ? navigator.languages : [navigator.language]
-    for (const l of langs) {
-      const primary = l?.toLowerCase().split('-')[0]
-      if (primary === 'fr') return 'fr'
-      if (primary === 'en') return 'en'
-    }
+}
+
+/**
+ * The system language, mapped onto the two we speak.
+ *
+ * REAL TAGS, NOT `navigator.language === 'fr'`. What a browser reports is a
+ * BCP-47 tag with a region and sometimes a script — `fr-CA`, `en-GB`,
+ * `zh-Hant-TW` — and `navigator.languages` is an ORDERED list of them, which is
+ * the only place a "French first, English second" user is visible at all. So we
+ * walk the list in order and compare PRIMARY SUBTAGS: `fr-CA` is French, and a
+ * Quebecker gets the French UI rather than the fallback.
+ *
+ * Fallback `en` and not `fr` (Alex, 29/07/2026): a Spanish or German system
+ * shares no language with FR copy, and English is the one both are far likelier
+ * to read. French remains the default of the FR-speaking world by the rule
+ * above, not by being the universal fallback.
+ */
+export function detectSystemLang(): Lang {
+  if (typeof navigator === 'undefined') return 'en'
+  const tags = navigator.languages?.length ? navigator.languages : [navigator.language]
+  for (const tag of tags) {
+    // `-` is the standard separator; `_` shows up in the wild (some Android
+    // builds, some embedded WebViews) and costs one character to accept.
+    const primary = tag?.toLowerCase().split(/[-_]/)[0]
+    if (primary === 'fr') return 'fr'
+    if (primary === 'en') return 'en'
   }
-  return 'fr'
+  return 'en'
 }
 
 export function LangProvider({ children }: { children: React.ReactNode }) {
-  // Lazy init also primes the format.ts locale so the FIRST render is already
-  // localized — otherwise the pure formatters (relative dates, countdown, month
-  // labels) would flash `fr-FR` output when `engram-lang=en` is persisted, since
-  // the module-variable mutation below doesn't itself trigger a re-render.
-  const [lang, setLangState] = useState<Lang>(() => {
-    const initial = readStoredLang()
-    setLocale(LOCALES[initial])
-    return initial
-  })
+  const [preference, setPreference] = useState<LangPreference>(readStoredPreference)
+  const [systemLang, setSystemLang] = useState<Lang>(detectSystemLang)
+  /** The language actually rendered: the preference, resolved. */
+  const active: Lang = preference === 'system' ? systemLang : preference
 
-  // Reflect subsequent changes onto `<html lang>` (a11y) and the format.ts
-  // locale, and persist. (The very first paint is handled by the lazy init.)
+  // The FIRST render has to be localized already, otherwise the pure formatters
+  // (relative dates, countdown, month labels) flash `fr-FR` output — they read a
+  // module variable, and mutating it in an effect re-renders nothing. Primed
+  // during the initial render, exactly as the previous lazy initializer did.
+  const primed = useRef(false)
+  if (!primed.current) {
+    primed.current = true
+    setLocale(LOCALES[active])
+  }
+
+  // Track the system list so `'system'` stays true after the fact: switching the
+  // OS language fires `languagechange` on the window, and the app follows
+  // without a reload — same promise as the theme.
   useEffect(() => {
-    document.documentElement.lang = lang
-    setLocale(LOCALES[lang])
-    localStorage.setItem(STORAGE_KEY, lang)
-  }, [lang])
+    const onChange = () => setSystemLang(detectSystemLang())
+    window.addEventListener('languagechange', onChange)
+    return () => window.removeEventListener('languagechange', onChange)
+  }, [])
 
-  const setLang = useCallback((next: Lang) => setLangState(next), [])
+  // Reflect changes onto `<html lang>` (a11y) and the format.ts locale. NOT
+  // persisted here: mounting is not choosing (29/07/2026). Writing on mount is what
+  // used to make "never picked a language" and "picked French" the same stored
+  // string, and there is no telling them apart afterwards.
+  useEffect(() => {
+    document.documentElement.lang = active
+    setLocale(LOCALES[active])
+  }, [active])
+
+  const setLang = useCallback((next: LangPreference) => {
+    setPreference(next)
+    try {
+      localStorage.setItem(STORAGE_KEY, next)
+    } catch {
+      // Rien à faire : le choix s'applique quand même pour cette page.
+    }
+  }, [])
 
   const t = useMemo<TFunction>(() => {
-    const dict = DICTS[lang]
+    const dict = DICTS[active]
     return (key, vars) => interpolate(resolve(dict, key), vars)
-  }, [lang])
+  }, [active])
 
-  const value = useMemo<LangContextValue>(() => ({ lang, setLang, t }), [lang, setLang, t])
+  const value = useMemo<LangContextValue>(
+    () => ({ lang: active, preference, setLang, t }),
+    [active, preference, setLang, t],
+  )
 
   return <LangContext value={value}>{children}</LangContext>
 }
@@ -126,10 +186,19 @@ export function useT(): TFunction {
   return useLangContext().t
 }
 
-/** The current language + a setter (spec §9.6, Settings language block). */
-export function useLang(): { lang: Lang; setLang: (lang: Lang) => void } {
-  const { lang, setLang } = useLangContext()
-  return { lang, setLang }
+/**
+ * The current language + a setter (spec §9.6, Settings language block).
+ *
+ * `lang` is what is on screen; `preference` is what was chosen, `'system'`
+ * included — the settings screen needs both to say which one is in force.
+ */
+export function useLang(): {
+  lang: Lang
+  preference: LangPreference
+  setLang: (lang: LangPreference) => void
+} {
+  const { lang, preference, setLang } = useLangContext()
+  return { lang, preference, setLang }
 }
 
 /** The two plural forms our dictionaries carry (`{key}_one` / `{key}_other`). */

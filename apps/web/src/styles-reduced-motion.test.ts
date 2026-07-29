@@ -36,6 +36,14 @@ import { beforeAll, describe, expect, it } from 'vitest'
  *
  * Le pendant côté composant est `components/ui/dialog-reduced-motion.test.tsx`,
  * qui rend exécutable la dépendance de Radix à `animationend`.
+ *
+ * ÉVOLUTION 29/07/2026 — CE QUE CE TEST NE COUVRE TOUJOURS PAS. Le bloc est désormais
+ * SCOPÉ (`:root:not([data-motion='full'])`) pour que l'utilisateur puisse
+ * réactiver les animations depuis l'app. Aucune assertion ci-dessous n'a bougé :
+ * elles portent sur les DÉCLARATIONS, et les formes qui figent un dialogue
+ * ouvert restent interdites à l'identique — le scope change qui est concerné, pas
+ * ce qui leur arrive. Le scope lui-même est figé ailleurs, dans
+ * `lib/motion-guard.test.ts`, avec la moitié JS de la même surcharge.
  */
 
 const STYLES = fileURLToPath(new URL('./styles.css', import.meta.url))

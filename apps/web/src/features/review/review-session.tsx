@@ -205,7 +205,6 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
                     selectedChoice={api.selectedChoice}
                     revealed={api.revealed}
                     reduce={api.reduce}
-                    animation={api.revealAnimation}
                     onReveal={api.reveal}
                     onSelect={api.selectChoice}
                   />

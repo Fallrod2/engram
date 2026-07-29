@@ -1,4 +1,5 @@
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useReducedMotion } from '@/lib/motion'
 import { AlertTriangle, Check, Minus } from 'lucide-react'
 import type { DemoSeedState } from '@engram/shared'
 import { useT } from '@/lib/i18n'
