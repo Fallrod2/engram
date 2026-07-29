@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { ReviewCard } from './review-card'
+import { REVEAL_ANIMATIONS, type RevealAnimation } from '@/lib/reveal-animation'
+import { CARD_BOX, ReviewCard } from './review-card'
 import { RatingBar } from './rating-bar'
 
 /**
@@ -22,16 +23,44 @@ import { RatingBar } from './rating-bar'
  * do is pin the three structural facts the browser geometry is derived from, so
  * that the fix cannot be undone by accident:
  *
- *   1. the card takes its height from its region (`flex-1`) and stands on NO
- *      minimum of its own — a floor is what made a short card a half-empty box
- *      and, worse, what let the content decide where the chrome sat;
+ *   1. the card's height is DECLARED, identical on every card and in every
+ *      state, and stands on no floor and no growth of its own;
  *   2. the rating zone occupies the SAME box before and after the reveal, so
  *      the context strip above it cannot move when the answer appears;
  *   3. that box is the same on a keyboard and on a touch device, so the two
  *      pointer types get the same anchored screen.
  *
  * The pixel-level proof stays a browser measurement (see the before/after
- * geometry captured for T-023); these are the invariants that make it hold.
+ * geometry captured for T-023 and T-044); these are the invariants that make it
+ * hold.
+ *
+ * T-044 amendment — what point 1 means changed, and the tests below changed with
+ * it, deliberately and without loosening anything.
+ *
+ * T-023 wrote point 1 as "the card takes its height from its REGION (`flex-1`)".
+ * That was the fix for a `min-h` floor, and it did hold the geometry — but it
+ * also handed the card's size to the window: measured at 1512×1300, the box came
+ * out 1097px tall around 195px of content, 82% empty. What the screen looks like
+ * matters as much as whether it moves, and a 900px hole inside a bordered
+ * surface reads worse than the small floating card the floor produced.
+ *
+ * So the card now takes its height from a single measured constant, `CARD_BOX`
+ * (440px — see its docstring for the corpus measurement behind the number), and
+ * the block around it is vertically centred instead of bottom-anchored, which is
+ * only safe BECAUSE nothing in the column varies any more.
+ *
+ * What these tests must keep forbidding is unchanged, and it is the thing that
+ * both regressions had in common:
+ *
+ *   · a card height that depends on its CONTENT — hence "the same declared box
+ *     for a two-word card and a multi-block one, in both states", now checked
+ *     against one constant instead of an empty set of `min-h` classes;
+ *   · a rating zone that changes size between states — untouched below.
+ *
+ * `flex-1` is no longer asserted (it is what made the window the author of the
+ * height) and a floor is still refused, now for both `min-h-` and `max-h-`: a
+ * `min-h` would put the content back in charge of a taller card, and a `max-h`
+ * would silently contradict `CARD_BOX`.
  *
  * T-029 amendment. The touch adaptation ADDS a constant row to the control
  * stack (`SessionContextBar`'s 44px action row) and REMOVES a constant one (the
@@ -45,6 +74,31 @@ import { RatingBar } from './rating-bar'
  * the card, the question and the control stack sit at the same y in ASKING, in
  * REVEALED and on the next card, and the LOADING skeleton mirrors the play
  * stack to the pixel (both read the same two exported constants).
+ *
+ * T-046 amendment — this file gained a THIRD axis, and lost nothing.
+ *
+ * The reveal is now a user setting with three values (`lib/reveal-animation.ts`),
+ * one of which turns the card over. A flip is the one reveal that CANNOT survive
+ * a card whose height depends on its content: two faces of different heights and
+ * the whole screen jumps at the hinge. So the invariant this file pins is now
+ * load-bearing for a second reason, and the cases below are parameterised over
+ * the three modes instead of being written once against the default — "the same
+ * declared box for a two-word card and a multi-block one" now has to hold in
+ * `unfold`, in `flip` and in `none`, in both states.
+ *
+ * Nothing was loosened to make room for it: no assertion was deleted or
+ * weakened, the equality against `[CARD_BOX]` is still exact, and the `min-h-`/
+ * `max-h-`/`flex-1` refusals still apply. The only change is that each of them
+ * runs three times.
+ *
+ * What deliberately does NOT belong here: the flip's rotation, the unfold's lift
+ * and its deepened shadow. All three are `transform`/`box-shadow` — they paint
+ * differently, they lay out identically, and jsdom would only be able to read
+ * back the inline styles motion happens to have written on the frame the
+ * assertion ran. Their proof is the Chromium capture (three modes × two themes,
+ * mid-animation frames included) plus the fact that the unfold's lift is
+ * declared as keyframes RETURNING TO ZERO (`LIFT_KEYFRAMES` in
+ * `reveal-motion.ts`), so its end state is its start state.
  */
 
 // jsdom defines no `Element.scrollTo`; `ReviewCard` calls it on reveal.
@@ -68,45 +122,87 @@ function heightClasses(el: Element): string[] {
     .sort()
 }
 
-function renderCard(props: { front: string; back: string; revealed: boolean }) {
-  const { container } = render(<ReviewCard {...PLAIN} {...props} reduce onReveal={() => {}} />)
+function renderCard(props: {
+  front: string
+  back: string
+  revealed: boolean
+  animation?: RevealAnimation
+}) {
+  const { animation = 'unfold', ...rest } = props
+  const { container } = render(
+    <ReviewCard {...PLAIN} {...rest} reduce animation={animation} onReveal={() => {}} />,
+  )
   return container.querySelector('article')!
 }
 
-describe('T-023 — the card is sized by its region, never by its content', () => {
+describe('T-023/T-044 — the card is sized by one constant, never by its content', () => {
   const SHORT = { front: 'a flaw', back: 'un défaut' }
   const LONG = {
     front: 'Invariant de boucle ?',
     back: ['## Définition', '', 'Un paragraphe.', '', '- un', '- deux', '- trois'].join('\n'),
   }
 
-  it('carries no height floor of its own — it grows into the region instead', () => {
-    const card = renderCard({ ...SHORT, revealed: false })
-    // `min-h-[180px] sm:min-h-[220px]` was the floor: a two-word card could not
-    // shrink under it (≈190px of empty box at 1512×797) and a long one could not
-    // grow past the region either, so the chrome ended up positioned by content.
-    expect(heightClasses(card).filter((c) => c.includes('min-h-'))).toEqual([])
-    expect(card.className.split(/\s+/)).toContain('flex-1')
+  it('is exactly one unconditional height — no floor, no ceiling, no breakpoint', () => {
+    // The constant is asserted in its own right because three separate things
+    // read it: the card, the LOADING skeleton, and this file. A responsive
+    // variant here would mean two boxes to keep in step instead of one, and a
+    // `min-h-`/`max-h-` next to it would put the content (or the window) back in
+    // charge of the height that `CARD_BOX` exists to own.
+    expect(CARD_BOX).toMatch(/^h-\[\d+px\]$/)
   })
 
-  it('declares the same box for a two-word card and a multi-block one', () => {
-    const short = heightClasses(renderCard({ ...SHORT, revealed: true }))
-    cleanup()
-    const long = heightClasses(renderCard({ ...LONG, revealed: true }))
-    expect(long).toEqual(short)
+  // T-046: every case below runs once per reveal mode. The box is what makes a
+  // flip safe, so it has to be proven under the flip too — not only under the
+  // default the assertions were originally written against.
+  describe.each(REVEAL_ANIMATIONS)('reveal = %s', (animation) => {
+    it('carries that box and nothing else that could resize it', () => {
+      const card = renderCard({ ...SHORT, revealed: false, animation })
+      expect(heightClasses(card)).toEqual([CARD_BOX])
+      // `min-h-[180px] sm:min-h-[220px]` was the original floor: a two-word card
+      // could not shrink under it and a long one could not grow past its region,
+      // so the chrome ended up positioned by content. `flex-1` replaced it and
+      // handed the height to the WINDOW instead (1097px of box at 1512×1300).
+      // Both are refused by the equality above; this states the second explicitly,
+      // because it is the one that reads as an improvement.
+      expect(card.className.split(/\s+/)).not.toContain('flex-1')
+    })
+
+    it('declares the same box for a two-word card and a multi-block one', () => {
+      const short = heightClasses(renderCard({ ...SHORT, revealed: true, animation }))
+      cleanup()
+      const long = heightClasses(renderCard({ ...LONG, revealed: true, animation }))
+      expect(long).toEqual(short)
+    })
+
+    it('declares the same box before and after the reveal', () => {
+      const asking = heightClasses(renderCard({ ...SHORT, revealed: false, animation }))
+      cleanup()
+      const revealed = heightClasses(renderCard({ ...SHORT, revealed: true, animation }))
+      expect(revealed).toEqual(asking)
+    })
   })
 
-  it('declares the same box before and after the reveal', () => {
-    const asking = heightClasses(renderCard({ ...SHORT, revealed: false }))
-    cleanup()
-    const revealed = heightClasses(renderCard({ ...SHORT, revealed: true }))
-    expect(revealed).toEqual(asking)
+  it('declares the same box whichever reveal the user picked', () => {
+    // The cross-mode statement the per-mode cases cannot make: three settings,
+    // one geometry. A mode that bought its effect with a different box (a taller
+    // card to fit an un-anchored flip, say) would pass every case above and fail
+    // this one.
+    const boxes = REVEAL_ANIMATIONS.map((animation) => {
+      const classes = heightClasses(renderCard({ ...LONG, revealed: true, animation }))
+      cleanup()
+      return classes
+    })
+    for (const box of boxes) expect(box).toEqual([CARD_BOX])
   })
 
   it('keeps the overflow inside the card rather than on the page', () => {
     const card = renderCard({ ...LONG, revealed: true })
-    // `overflow-hidden` on the card is also what allows it to shrink below its
-    // intrinsic size (automatic minimum size is 0 once overflow is not visible).
+    // `overflow-hidden` on the card carries two jobs, and T-044 leans on the
+    // second: it keeps a long verso scrolling INSIDE the card, and it zeroes the
+    // card's automatic minimum size, which is what lets `CARD_BOX` behave as a
+    // flex BASIS rather than a floor — on a viewport too short for 440px the
+    // card gives height back instead of pushing the rating buttons off screen.
+    // Measured at 1512×400: card 197px, rating grid ending 45px above the fold.
     expect(card.className.split(/\s+/)).toContain('overflow-hidden')
     const scroller = card.firstElementChild!
     const classes = scroller.className.split(/\s+/)

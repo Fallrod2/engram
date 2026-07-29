@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
+import { ArrowUpRight } from 'lucide-react'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { useLang, useT, type Lang } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { BackupCard } from '@/features/backup/backup-card'
 import { AiSettingsCard } from '@/features/ai/ai-settings-card'
+import { RevealAnimationCard } from '@/features/review/reveal-animation-card'
 import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 
@@ -75,6 +77,11 @@ function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Appearance-adjacent, hence its place right under the theme — but it
+          owns enough (three values, a sentence each, plus the reduced-motion
+          notice) to be its own card, and it lives with the feature it drives. */}
+      <RevealAnimationCard />
+
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.languageTitle')}</CardTitle>
@@ -117,6 +124,21 @@ function SettingsPage() {
           <div className="flex items-center justify-between">
             <span>{t('settings.mode')}</span>
             <span className="text-text">{t('settings.modeValue')}</span>
+          </div>
+          <Separator />
+          {/* The public landing lives at `/welcome` and renders whatever the
+              session says — signing in used to bury it for good, since `/` turns
+              into the dashboard and nothing linked to it. "À propos" is where a
+              user looks for "what is this product", so the way back sits here
+              (and in ⌘K). No sign-out round trip involved. */}
+          <div className="flex items-center justify-between gap-4">
+            <span>{t('settings.landing')}</span>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/welcome">
+                {t('settings.landingAction')}
+                <ArrowUpRight />
+              </Link>
+            </Button>
           </div>
         </CardContent>
       </Card>

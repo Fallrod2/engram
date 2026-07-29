@@ -12,6 +12,7 @@ import {
 } from '@engram/shared'
 import { ApiError, postReview, postUndoReview, updateCard, type ReviewScope } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
+import { useRevealAnimation, type RevealAnimation } from '@/lib/reveal-animation'
 import { isEditableTarget, isModalSurfaceOpen } from '@/lib/use-hotkeys'
 import {
   initialState,
@@ -72,6 +73,13 @@ export interface SessionApi {
   summary: SessionSummary | undefined
   canReviewAgain: boolean
   reduce: boolean
+  /**
+   * The reveal to play, ALREADY arbitrated: the user's stored choice, or `none`
+   * when the system asks for reduced motion. Consumers never see the raw
+   * preference, so there is exactly one place where the accessibility setting
+   * can be forgotten — and it is right below.
+   */
+  revealAnimation: RevealAnimation
   reveal: () => void
   /** Answer the current QCM by picking an option — reveals it, never grades it. */
   selectChoice: (index: number) => void
@@ -109,6 +117,15 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   const navigate = useNavigate()
   const router = useRouter()
   const reduce = !!useReducedMotion()
+  // The product setting (T-046) and the system one, arbitrated once, here.
+  // `prefers-reduced-motion` WINS — an accessibility preference expressed once
+  // for every application on the machine is not something an in-app dropdown
+  // gets to overrule, so a reduced-motion system plays `none` even when the
+  // stored choice says `flip`. The dropdown is not disabled for it (the choice
+  // is still the user's, and it applies again the day the system setting goes),
+  // but the settings screen says so in as many words.
+  const preferredReveal = useRevealAnimation()
+  const revealAnimation: RevealAnimation = reduce ? 'none' : preferredReveal
   const t = useT()
 
   const [initialNow] = useState(() => new Date().toISOString())
@@ -821,6 +838,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     summary,
     canReviewAgain,
     reduce,
+    revealAnimation,
     reveal,
     selectChoice,
     rate,

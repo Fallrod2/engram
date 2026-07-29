@@ -15,7 +15,7 @@ import { useReviewSession } from './use-review-session'
 import { SessionExitButton, SessionHeader } from './session-header'
 import { useTouchSession } from './pointer-labels'
 import { ProgressBar } from './progress-bar'
-import { ReviewCard } from './review-card'
+import { CARD_BOX, ReviewCard } from './review-card'
 import { RatingBar } from './rating-bar'
 import { CONTEXT_ACTION_ROW, CONTEXT_INFO_ROW, SessionContextBar } from './session-context-bar'
 import { SessionSummary } from './session-summary'
@@ -162,30 +162,39 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
           size — without it flexbox refuses and the rating bar is pushed out of
           the viewport. No `overflow-hidden`: the overflow scrolls INSIDE the
           card, so nothing is ever silently truncated (no `vh` anywhere).
-          T-023 — the block is ANCHORED, not centred. Centring it made every
-          fixed point on this screen depend on how much content happened to be
-          on it: measured at 1512×797, revealing a two-word card slid the
-          question 22.7px UP (the block grew by the 45.4px the rating bar gains
-          when the hint becomes four buttons, and centring split that in two),
-          and the rating bar sat at y=501 on a short card but y=688 on a long
-          one — 187px apart, under a keyboard whose whole point is that 1-4 can
-          be pressed without looking. Both are the same root cause, and both
-          disappear the moment the column stops being centred: the card region
-          takes ALL the slack (`flex-1`) and the control stack is pinned to the
-          bottom, so the card's top edge, the question, the context bar and the
-          ratings are at constant y for every card and every state. */}
+
+          T-023 anchored this block to the bottom, because centring it made every
+          fixed point on the screen depend on how much content happened to be on
+          it: at 1512×797 revealing a two-word card slid the question 22.7px UP
+          (the block grew by the 45.4px the rating bar gains when the hint
+          becomes four buttons, and centring split that in two), and the rating
+          bar sat at y=501 on a short card but y=688 on a long one.
+
+          T-044 centres it again — `justify-center` — and that is now safe, for a
+          reason that did not hold then: NOTHING in this column changes size any
+          more. The card is a constant `CARD_BOX`, the rating zone reserves one
+          constant box across all its branches (`RATING_ZONE`), and the context
+          strip is constant per pointer type. Centring a block of constant height
+          in a region of constant height puts every row at a constant y — which
+          is what the browser measurement says: at 1512×1300 the card top, the
+          question, the context strip and the rating grid hold the same y across
+          all 25 cards, in ASKING and in REVEALED alike. */}
       <div className="flex min-h-0 flex-1 flex-col items-center px-3 pb-4 sm:px-4 sm:pb-5">
-        <div className="flex min-h-0 w-full max-w-[680px] flex-1 flex-col gap-3">
-          {/* `flex-1` is what pins the geometry: this zone absorbs the whole
-              elastic height, so what varies with the content is how full the
-              card is — never where anything sits. `min-h-0` still lets it hand
-              its overflow to the card's own scroller. */}
-          <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 w-full max-w-[680px] flex-1 flex-col justify-center gap-3">
+          {/* No `flex-1` any more: the slot takes its height from the card
+              inside it (`CARD_BOX`), and the leftover space goes to
+              `justify-center` above. `min-h-0` is still what lets the card give
+              its height back on a short viewport — without it flexbox refuses to
+              shrink this wrapper and the rating bar leaves the screen. */}
+          <div className="flex min-h-0 flex-col">
             {current && (
               <AnimatePresence mode="wait">
                 <motion.div
                   key={current.id}
-                  className="flex min-h-0 flex-1 flex-col"
+                  // Auto basis, not `flex-1`: the card declares the height, and
+                  // every wrapper between it and the region only has to let it
+                  // through (`min-h-0` = shrinkable, no growth of its own).
+                  className="flex min-h-0 flex-col"
                   initial={api.reduce ? false : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={api.reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
@@ -198,6 +207,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
                     selectedChoice={api.selectedChoice}
                     revealed={api.revealed}
                     reduce={api.reduce}
+                    animation={api.revealAnimation}
                     onReveal={api.reveal}
                     onSelect={api.selectChoice}
                   />
@@ -283,16 +293,23 @@ function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
     <>
       <div className="h-0.5 w-full bg-surface-2" />
       <CloseButton onExit={onExit} />
-      {/* Mirrors PlayView's geometry exactly (same anchored region, same 680px
+      {/* Mirrors PlayView's geometry exactly (same centred region, same 680px
           column, same 12px gap, same 24px context strip, same rating row) so
           LOADING → ASKING swaps content in place instead of jumping. Since
           T-023 that mirroring is cheap to hold: the play geometry no longer
           depends on the card, so the skeleton only has to copy constants.
           Measured, it was 25px out — the cheat-sheet line was missing, so the
-          card skeleton stood 25px taller than the card that replaced it. */}
+          card skeleton stood 25px taller than the card that replaced it.
+          T-044 adds one more constant to copy, `CARD_BOX`, and the same
+          `justify-center`; both come from the play code, never from a number
+          retyped here. */}
       <div className="flex min-h-0 flex-1 flex-col items-center px-3 pb-4 sm:px-4 sm:pb-5">
-        <div className="flex min-h-0 w-full max-w-[680px] flex-1 flex-col gap-3">
-          <Skeleton className="min-h-0 w-full flex-1 rounded-lg" />
+        <div className="flex min-h-0 w-full max-w-[680px] flex-1 flex-col justify-center gap-3">
+          {/* `shrink` is explicit here where the card gets it from
+              `overflow-hidden`: a `Skeleton` is a plain block, so without a
+              stated minimum size of 0 it would refuse to give height back on a
+              short viewport and push the rating grid off screen. */}
+          <Skeleton className={cn(CARD_BOX, 'w-full min-h-0 shrink rounded-lg')} />
           <div className="flex shrink-0 flex-col gap-2">
             {/* Both heights come from `session-context-bar`, never from a number
                 retyped here: mirroring by hand is exactly what left this
