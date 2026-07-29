@@ -309,6 +309,76 @@ describe('resolveOcrProvider — mode custom (the OCR/generation split)', () => 
   })
 })
 
+/**
+ * `usable` (T-031). The front disables "Générer" and explains why BEFORE the
+ * click, reading this flag; the server keeps its 503 as the real guard. What
+ * must hold is that the two never disagree for a given user — the flag is the
+ * SAME predicate `resolveActiveProvider` gates on, not a second copy of it.
+ */
+describe('the status surface reports whether a provider can actually run', () => {
+  /** The invariant, stated once: `usable` on the active provider ⇔ a resolvable config. */
+  async function agree(userId: string): Promise<boolean> {
+    const { settings, statuses } = await getAiSettings(db, userId)
+    const active = statuses.find((s) => s.provider === settings.activeProvider)!
+    return active.usable === ((await resolveActiveProvider(db, userId)) !== null)
+  }
+
+  it('is false for a user with no key on a key-requiring provider', async () => {
+    const { statuses } = await getAiSettings(db, OTHER)
+    expect(statuses.find((s) => s.provider === 'anthropic')!.usable).toBe(false)
+    expect(await agree(OTHER)).toBe(true)
+  })
+
+  it('turns true once that user pastes their own key', async () => {
+    await setAiKey(db, OTHER, 'anthropic', 'other-own-key')
+    const { statuses } = await getAiSettings(db, OTHER)
+    expect(statuses.find((s) => s.provider === 'anthropic')!.usable).toBe(true)
+    expect(await agree(OTHER)).toBe(true)
+  })
+
+  it('is true for the admin on the env fallback alone', async () => {
+    process.env.ANTHROPIC_API_KEY = 'alex-env'
+    const { statuses } = await getAiSettings(db, ADMIN)
+    expect(statuses.find((s) => s.provider === 'anthropic')!.usable).toBe(true)
+    expect(await agree(ADMIN)).toBe(true)
+  })
+
+  it('is true for keyless ollama, and false once its model is blanked', async () => {
+    await updateAiSettings(db, OTHER, { activeProvider: 'ollama' })
+    const before = await getAiSettings(db, OTHER)
+    expect(before.statuses.find((s) => s.provider === 'ollama')!.usable).toBe(true)
+    expect(await agree(OTHER)).toBe(true)
+
+    await updateAiSettings(db, OTHER, { providers: { ollama: { model: '   ' } } })
+    const after = await getAiSettings(db, OTHER)
+    expect(after.statuses.find((s) => s.provider === 'ollama')!.usable).toBe(false)
+    expect(await agree(OTHER)).toBe(true)
+  })
+
+  it('is false for openai-compat with a key but no base URL', async () => {
+    await updateAiSettings(db, OTHER, {
+      activeProvider: 'openai-compat',
+      providers: { 'openai-compat': { model: 'gpt-4o-mini' } },
+    })
+    await setAiKey(db, OTHER, 'openai-compat', 'k')
+    const { statuses } = await getAiSettings(db, OTHER)
+    expect(statuses.find((s) => s.provider === 'openai-compat')!.usable).toBe(false)
+    expect(await agree(OTHER)).toBe(true)
+  })
+
+  it('is false for openai-codex while the instance kill-switch is off', async () => {
+    // `unavailable` already says "off on this instance"; `usable` must agree,
+    // otherwise the front would offer a button the 503 guard refuses.
+    delete process.env.ENGRAM_ENABLE_CODEX
+    await updateAiSettings(db, OTHER, { activeProvider: 'openai-codex' })
+    const { statuses } = await getAiSettings(db, OTHER)
+    const codex = statuses.find((s) => s.provider === 'openai-codex')!
+    expect(codex.unavailable).toBe(true)
+    expect(codex.usable).toBe(false)
+    expect(await agree(OTHER)).toBe(true)
+  })
+})
+
 describe('updateAiSettings — OCR slot merge', () => {
   it('a PATCH touching a single OCR field leaves the others intact', async () => {
     await updateAiSettings(db, ADMIN, {

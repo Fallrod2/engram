@@ -36,7 +36,11 @@ import {
   useUpdateNote,
   useUploadNote,
 } from '@/features/notes/queries'
-import { allGenerationsOptions, generationCountByNote } from '@/features/generations/queries'
+import {
+  allGenerationsOptions,
+  generationCountByNote,
+  notesWithPrerecorded,
+} from '@/features/generations/queries'
 import { NoteEditDialog } from '@/features/notes/note-edit-dialog'
 import { describeUploadError } from '@/features/generations/errors'
 
@@ -92,6 +96,7 @@ function ImportPage() {
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null)
 
   const genCounts = useMemo(() => generationCountByNote(generations), [generations])
+  const staged = useMemo(() => notesWithPrerecorded(generations), [generations])
 
   // Group notes by subject (ordered), then a terminal "Sans matière" group.
   const groups = useMemo<SubjectGroup[]>(() => {
@@ -272,6 +277,7 @@ function ImportPage() {
                       key={note.id}
                       note={note}
                       generationCount={genCounts.get(note.id) ?? 0}
+                      prerecorded={staged.has(note.id)}
                       rowProps={roving.getItemProps(flatNotes.indexOf(note))}
                       onEdit={setEditNote}
                       onDelete={setDeleteTarget}

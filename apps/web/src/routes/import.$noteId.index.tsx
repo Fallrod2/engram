@@ -26,6 +26,7 @@ import {
 import { GenerationLaunchPanel, type DeckGroup } from '@/components/import/generation-launch-panel'
 import { GenerationStatusBadge } from '@/components/import/generation-status-badge'
 import { ApiKeyMissingBanner } from '@/components/import/generation-error-state'
+import { PrerecordedBadge } from '@/components/import/prerecorded-notice'
 import { useHotkeys } from '@/lib/use-hotkeys'
 import { useRovingList } from '@/lib/use-roving'
 import { entityRowClass, EntityRow } from '@/components/entity-row'
@@ -36,6 +37,7 @@ import { noteDetailOptions, useDeleteNote, useUpdateNote } from '@/features/note
 import { NoteEditDialog } from '@/features/notes/note-edit-dialog'
 import { generationsByNoteOptions, useStartGeneration } from '@/features/generations/queries'
 import { classifyGenerationError } from '@/features/generations/errors'
+import { aiSettingsOptions } from '@/features/ai/queries'
 
 export const Route = createFileRoute('/import/$noteId/')({
   loader: ({ context, params }) =>
@@ -44,6 +46,11 @@ export const Route = createFileRoute('/import/$noteId/')({
       context.queryClient.ensureQueryData(subjectsListOptions()),
       context.queryClient.ensureQueryData(allDecksOptions()),
       context.queryClient.ensureQueryData(generationsByNoteOptions(params.noteId)),
+      // PREFETCH, not `ensureQueryData`: the AI config decides whether "Générer"
+      // is offered, so it should be known by first paint — but it must never be
+      // able to take the note screen down with it. `prefetchQuery` swallows its
+      // own failure, and the panel treats "unknown" as "not blocked".
+      context.queryClient.prefetchQuery(aiSettingsOptions()),
     ]),
   component: NotePage,
   pendingComponent: () => <NoteSkeleton />,
@@ -116,6 +123,21 @@ function NotePage() {
   const decks = useQuery(allDecksOptions()).data ?? []
   const generations = useQuery(generationsByNoteOptions(noteId)).data ?? []
 
+  /**
+   * "Can a generation even run?", answered BEFORE the click (T-031). It used to
+   * be answered by the 503 that came back AFTER it, by which point the visitor
+   * had already chosen a type and created a target deck for nothing.
+   *
+   * `usable` is computed server-side by the very predicate that gates the 503,
+   * so this cannot claim more than the server will honour. While the query is
+   * still loading (`data` undefined) nothing is blocked: an undecided answer must
+   * never disable the button — a slow request would look like a broken feature.
+   */
+  const aiSettings = useQuery(aiSettingsOptions()).data
+  const providerUnavailable =
+    aiSettings !== undefined &&
+    !aiSettings.statuses.some((s) => s.provider === aiSettings.settings.activeProvider && s.usable)
+
   const updateNote = useUpdateNote()
   const deleteNote = useDeleteNote()
   const startGen = useStartGeneration()
@@ -154,6 +176,11 @@ function NotePage() {
   })
 
   const contentEmpty = (note?.content.trim() ?? '') === ''
+
+  // ONE banner, two ways to reach it: read up front from `GET /api/ai/settings`,
+  // or learned the hard way from a 503 that raced the read. Same component — the
+  // visitor must not get two different explanations of one situation.
+  const showNoProviderBanner = providerUnavailable || apiKeyMissing
 
   function launch() {
     if (!note || !deckId) return
@@ -269,8 +296,9 @@ function NotePage() {
               contentEmpty={contentEmpty}
               onLaunch={launch}
               pending={startGen.isPending}
+              providerUnavailable={providerUnavailable}
               {...(note.subjectId ? { onNewDeck: () => setNewDeckOpen(true) } : {})}
-              {...(apiKeyMissing ? { banner: <ApiKeyMissingBanner /> } : {})}
+              {...(showNoProviderBanner ? { banner: <ApiKeyMissingBanner /> } : {})}
             />
           </div>
 
@@ -306,6 +334,8 @@ function NotePage() {
                                 → {gDeck.name}
                               </span>
                             )}
+                            {/* Staged provenance, visible from the list (T-031). */}
+                            {g.origin === 'prerecorded' && <PrerecordedBadge />}
                           </span>
                           <span className="text-2xs text-text-faint">
                             {formatRelativeTime(g.createdAt)}

@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EntityRow, RowActions, entityRowClass } from '@/components/entity-row'
+import { PrerecordedBadge } from '@/components/import/prerecorded-notice'
 
 /** Relative import date, e.g. `auj.`, `hier`, `il y a 3j`, or a short date. */
 function formatImportedAt(iso: string, now: Date = new Date()): string {
@@ -28,12 +29,19 @@ function formatImportedAt(iso: string, now: Date = new Date()): string {
 export function NoteRow({
   note,
   generationCount,
+  prerecorded = false,
   rowProps,
   onEdit,
   onDelete,
 }: {
   note: Note
   generationCount: number
+  /**
+   * This note carries a PRE-RECORDED generation (T-031) — the demo's sample.
+   * Marked from the index so nobody discovers the staging only after opening the
+   * review screen.
+   */
+  prerecorded?: boolean
   /** Roving-tabindex props from the list's `useRovingList`. */
   rowProps: React.HTMLAttributes<HTMLAnchorElement> & { tabIndex: number }
   onEdit: (note: Note) => void
@@ -53,6 +61,7 @@ export function NoteRow({
           {note.sourceType}
         </span>
         <span className="truncate font-medium text-text">{note.title}</span>
+        {prerecorded && <PrerecordedBadge />}
         <span className="ml-auto whitespace-nowrap font-mono text-xs tabular-nums text-text-faint">
           {t(`import.generationCount_${plural(generationCount)}`, { count: generationCount })}
           <span className="px-1 text-border-strong">·</span>

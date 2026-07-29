@@ -352,6 +352,18 @@ export const aiProviderStatusSchema = z.object({
    * a text-only provider (fix-codex-vision §B).
    */
   visionCapable: z.boolean().optional(),
+  /**
+   * Can this provider actually run a generation as configured — model present,
+   * key present when one is required, base URL present when one is required,
+   * not disabled on this instance?
+   *
+   * Computed by the SAME predicate the server guards `POST /api/generations`
+   * with, and shipped rather than re-derived client-side ON PURPOSE (T-031): the
+   * front needs to disable "Générer" and explain why BEFORE the click, and a
+   * second copy of that rule in the client would drift — silently offering a
+   * button that 503s, or hiding one that works.
+   */
+  usable: z.boolean(),
 })
 
 export const aiSettingsResponseSchema = z.object({
