@@ -290,8 +290,11 @@ describe('T-029 — one reveal command, named once', () => {
     selectedChoice: null,
     revealed: false,
     reduce: true,
+    // The reveal affordance is a naming question, not an animation one — any of
+    // the three modes would do here. The default is the honest one to pin.
+    animation: 'unfold',
     onSelect: () => {},
-  }
+  } as const
 
   it('keeps the card itself as the named reveal button on a keyboard', () => {
     const onReveal = vi.fn()

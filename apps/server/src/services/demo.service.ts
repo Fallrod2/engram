@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import {
   createEmptyCard,
   fsrs,
@@ -7,6 +7,7 @@ import {
   type Card as FsrsCard,
   type Grade,
 } from 'ts-fsrs'
+import type { DemoSeedStatusResponse } from '@engram/shared'
 import type { DB, Tx } from '../db/client'
 import {
   appSettings,
@@ -33,6 +34,16 @@ import { localMidnight } from '../lib/day'
 const DEMO_KEY = 'demo'
 /** Marker stored when a token carried no session_id (HS256 e2e / first pass). */
 export const DEMO_NO_SESSION = 'no-session'
+
+/**
+ * Constant key for the `pg_advisory_xact_lock` that serializes the demo reset,
+ * taken by `http/demo.ts` inside the seeding transaction.
+ *
+ * It lives HERE, next to `demoSeedStatus`, because that function probes the very
+ * same lock to answer "is a seed running right now". Two constants would drift
+ * and the status endpoint would quietly report `pending` forever.
+ */
+export const DEMO_LOCK_KEY = 918273
 
 const DAY_MS = 86_400_000
 /** Deterministic scheduler (fuzz off) so the seeded FSRS states are reproducible. */
@@ -61,6 +72,74 @@ async function writeDemoMarker(tx: Tx, userId: string, marker: string): Promise<
       target: [appSettings.userId, appSettings.key],
       set: { value: { sessionId: marker }, updatedAt: new Date() },
     })
+}
+
+/* -------------------------------------------------------------- seed status -- */
+
+/**
+ * Is a demo seed executing RIGHT NOW? Answered by looking for the advisory lock
+ * that `http/demo.ts` takes inside the seeding transaction, in `pg_locks`.
+ *
+ * WHY A LOCK PROBE AND NOT A PROGRESS TABLE. The seed writes its whole dataset
+ * AND its session marker in one transaction, so from any other connection its
+ * work is strictly invisible until it commits: there is nothing to read. The
+ * advisory lock is the one piece of the running transaction that IS visible
+ * cluster-wide while it runs — `pg_locks` is a shared view — so it is the only
+ * honest in-flight signal available without adding a second writer.
+ *
+ * `pg_advisory_xact_lock(<bigint>)` registers as `classid = 0`,
+ * `objid = <key>`, `objsubid = 1`; the two-int overload uses `objsubid = 2`, so
+ * the predicate is pinned to the exact shape `http/demo.ts` takes. Any failure
+ * (a Postgres flavour without the view, a permission quirk) degrades to `false`
+ * — a polled probe must never turn a working demo into a 500.
+ */
+async function isSeedRunning(db: DB | Tx): Promise<boolean> {
+  try {
+    const res = await db.execute(sql`
+      select exists (
+        select 1 from pg_locks
+        where locktype = 'advisory'
+          and classid = 0
+          and objid = ${DEMO_LOCK_KEY}
+          and objsubid = 1
+          and granted
+      ) as running`)
+    // Normalize across drivers: postgres-js returns an array, PGlite `{ rows }`.
+    const rows = Array.isArray(res) ? res : ((res as { rows?: unknown[] }).rows ?? [])
+    return (rows[0] as { running?: boolean } | undefined)?.running === true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Project the demo account's seeding state FOR ONE SESSION (two round-trips: the
+ * marker row, then the lock probe). The order of the tests IS the correctness
+ * argument:
+ *
+ *  1. the marker committed for THIS session → `ready`. That marker is the only
+ *     authority on "the data is there", because it commits with the data.
+ *  2. else, the seed lock held → `seeding`. Note the lock is global to the demo
+ *     reset, not per session: a seed for a *different* session still reads as
+ *     `seeding`, which is true and is what the caller should wait on anyway.
+ *  3. else `pending` — nothing committed for this session and nothing running.
+ *
+ * Deliberately no sub-steps: see `demoSeedStateSchema` in `@engram/shared`.
+ */
+export async function demoSeedStatus(
+  db: DB | Tx,
+  userId: string,
+  marker: string,
+): Promise<DemoSeedStatusResponse> {
+  const [row] = await db
+    .select({ value: appSettings.value, updatedAt: appSettings.updatedAt })
+    .from(appSettings)
+    .where(and(eq(appSettings.userId, userId), eq(appSettings.key, DEMO_KEY)))
+  const stored = (row?.value as { sessionId?: unknown } | undefined)?.sessionId
+  if (typeof stored === 'string' && stored === marker) {
+    return { state: 'ready', readyAt: row!.updatedAt.toISOString() }
+  }
+  return { state: (await isSeedRunning(db)) ? 'seeding' : 'pending', readyAt: null }
 }
 
 /** Delete every user-owned row for `userId` (child → parent, scoped). */
@@ -351,82 +430,124 @@ export function demoCardSpecs(): DemoCardSpec[] {
  * Wipe the demo user's data and reseed the demo dataset in ONE call (the caller
  * wraps it in a transaction + advisory lock). Idempotent by construction: it
  * always wipes first, so replays converge to the same state.
+ *
+ * WHY EVERY INSERT IS BATCHED (perf). This runs on Vercel against a Supabase
+ * database in another datacentre: the cost is dominated by ROUND-TRIPS, not by
+ * the work the database does. The row-at-a-time version emitted 101 statements
+ * (25 `INSERT … RETURNING` for the cards, each followed by up to 4 more for its
+ * review logs) and took ~15 s in production at ~80 ms/round-trip. This one emits
+ * 15 — 7 scoped DELETEs plus one multi-row INSERT per table. `demo.service.spec.ts`
+ * pins that count ("emits a bounded number of statements"), so a `for` loop that
+ * sneaks an insert back in fails the suite instead of silently costing seconds.
+ *
+ * TWO CONSEQUENCES OF BATCHING, both load-bearing:
+ *
+ *  1. NO `returning()` ANY MORE. Primary keys are `text` columns whose default is
+ *     a client-side `crypto.randomUUID()` (`db/schema/columns.ts`), so the ids are
+ *     minted HERE and the children reference them without a round-trip.
+ *  2. `created_at` IS SET EXPLICITLY on the cards. It used to be distinct by
+ *     accident — one insert per card, ~80 ms apart. In a single statement every
+ *     row would get the same instant, and `dueQueue` (order by `due`, then
+ *     `created_at`) would lose the tie-break that puts a QCM in front of the
+ *     visitor (see `DEMO_QCM_CARDS`). The order is now stated, not hoped for:
+ *     strictly increasing, 1 ms apart, in `demoCardSpecs()` order.
+ *
+ * The seed publishes NO intermediate progress. It commits once, so from another
+ * connection there is nothing partial to observe; `demoSeedStatus` reports the
+ * honest binary (running / committed) instead of inventing phases.
  */
 export async function seedDemo(tx: Tx, userId: string, marker: string): Promise<void> {
+  // ONE clock for the whole seed: the FSRS replay below derives every due date
+  // from it, so a seed is a pure function of (`now`, specs) rather than of how
+  // long the statements happened to take.
+  const now = new Date()
+
   await wipeUserData(tx, userId)
 
-  const [subjTL] = await tx
-    .insert(subject)
-    .values({
+  const subjTLId = crypto.randomUUID()
+  const subjENId = crypto.randomUUID()
+  await tx.insert(subject).values([
+    {
+      id: subjTLId,
       userId,
       name: 'Théorie des langages',
       color: '#6366f1',
       icon: 'book-open',
       position: 0,
-    })
-    .returning()
-  const [subjEN] = await tx
-    .insert(subject)
-    .values({ userId, name: 'Anglais', color: '#22c55e', icon: 'languages', position: 1 })
-    .returning()
-
-  const [deckAuto] = await tx
-    .insert(deck)
-    .values({
+    },
+    {
+      id: subjENId,
       userId,
-      subjectId: subjTL!.id,
+      name: 'Anglais',
+      color: '#22c55e',
+      icon: 'languages',
+      position: 1,
+    },
+  ])
+
+  const deckAutoId = crypto.randomUUID()
+  const deckGramId = crypto.randomUUID()
+  const deckVocId = crypto.randomUUID()
+  await tx.insert(deck).values([
+    {
+      id: deckAutoId,
+      userId,
+      subjectId: subjTLId,
       name: 'Automates',
       description: 'AFD, AFN, Kleene',
       position: 0,
-    })
-    .returning()
-  const [deckGram] = await tx
-    .insert(deck)
-    .values({ userId, subjectId: subjTL!.id, name: 'Grammaires', position: 1 })
-    .returning()
-  const [deckVoc] = await tx
-    .insert(deck)
-    .values({ userId, subjectId: subjEN!.id, name: 'Vocabulaire', position: 0 })
-    .returning()
+    },
+    { id: deckGramId, userId, subjectId: subjTLId, name: 'Grammaires', position: 1 },
+    { id: deckVocId, userId, subjectId: subjENId, name: 'Vocabulaire', position: 0 },
+  ])
 
   // Pool index → deck. Same order as POOL_AUTOMATA / POOL_GRAMMARS / POOL_VOCAB.
-  const deckOfPool = [deckAuto!.id, deckGram!.id, deckVoc!.id]
-  const specs = demoCardSpecs().map((s) => ({ ...s, deckId: deckOfPool[s.pool]! }))
+  const deckOfPool = [deckAutoId, deckGramId, deckVocId]
+  const specs = demoCardSpecs()
 
-  for (const s of specs) {
+  const cardRows: (typeof card.$inferInsert)[] = []
+  const logRows: (typeof reviewLog.$inferInsert)[] = []
+  specs.forEach((s, i) => {
     // Simulate the past reviews with ts-fsrs to get a coherent final state + logs.
-    let fsrsCard: FsrsCard = createEmptyCard(new Date())
-    const logs: ReturnType<typeof fsrsLogToRow>[] = []
+    const cardId = crypto.randomUUID()
+    let fsrsCard: FsrsCard = createEmptyCard(now)
     for (const r of s.reviews) {
-      const when = new Date(Date.now() - r.daysAgo * DAY_MS)
+      const when = new Date(now.getTime() - r.daysAgo * DAY_MS)
       const rec = sched.next(fsrsCard, when, r.rating)
       fsrsCard = rec.card
       // durationMs: a plausible 3–12 s so study-time analytics is non-empty.
-      logs.push(fsrsLogToRow('', rec.log, 3000 + ((r.daysAgo * 971) % 9000)))
-    }
-    const [cardRow] = await tx
-      .insert(card)
-      .values({
+      logRows.push({
+        ...fsrsLogToRow('', rec.log, 3000 + ((r.daysAgo * 971) % 9000)),
+        cardId,
         userId,
-        deckId: s.deckId,
-        front: s.front,
-        back: s.back,
-        ...fsrsCardToColumns(fsrsCard),
       })
-      .returning()
-    for (const l of logs) {
-      await tx.insert(reviewLog).values({ ...l, cardId: cardRow!.id, userId })
     }
-  }
+    cardRows.push({
+      id: cardId,
+      userId,
+      deckId: deckOfPool[s.pool]!,
+      front: s.front,
+      back: s.back,
+      // Strictly increasing in spec order, and all in the past — this IS the
+      // due-queue tie-break (see the header note), not incidental bookkeeping.
+      createdAt: new Date(now.getTime() - specs.length + i),
+      ...fsrsCardToColumns(fsrsCard),
+    })
+  })
+
+  await tx.insert(card).values(cardRows)
+  await tx.insert(reviewLog).values(logRows)
 
   // One exam at J+10 (local midnight) linked to the TL subject.
-  const now = new Date()
+  const examId = crypto.randomUUID()
   const examDate = localMidnight(now.getFullYear(), now.getMonth(), now.getDate() + 10)
-  const [examRow] = await tx
+  await tx
     .insert(exam)
-    .values({ userId, title: 'Partiel — Théorie des langages', date: examDate })
-    .returning()
-  await tx.insert(examSubject).values({ examId: examRow!.id, subjectId: subjTL!.id })
+    .values({ id: examId, userId, title: 'Partiel — Théorie des langages', date: examDate })
+  await tx.insert(examSubject).values({ examId, subjectId: subjTLId })
 
+  // LAST, and in the SAME transaction as everything above: the marker is what
+  // makes a session "seeded", so it must become visible at the same instant as
+  // the data it describes. No reader can ever observe a half-seeded account.
   await writeDemoMarker(tx, userId, marker)
 }

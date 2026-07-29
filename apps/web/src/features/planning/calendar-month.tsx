@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { StudyPlanResponse, Subject } from '@engram/shared'
 import { monthMatrix, parseDayKey } from '@/lib/calendar'
 import { weekdayAbbrevs } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { DayCell } from './day-cell'
 import { useCalendarGrid } from './use-calendar-grid'
 import { indexDays, subjectsById, windowMax } from './plan-utils'
@@ -26,6 +27,7 @@ export function CalendarMonth({
   onSelect: (key: string) => void
   onActivate: () => void
 }) {
+  const t = useT()
   const weekdays = weekdayAbbrevs()
   const matrix = useMemo(() => monthMatrix(parseDayKey(dayKey), now), [dayKey, now])
   const daysIndex = useMemo(() => indexDays(plan), [plan])
@@ -55,7 +57,7 @@ export function CalendarMonth({
       <div
         ref={gridRef}
         role="grid"
-        aria-label="Calendrier mensuel"
+        aria-label={t('planning.monthGridAria')}
         onKeyDown={onKeyDown}
         className="grid grid-cols-7 gap-px bg-border"
       >

@@ -1,11 +1,22 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ParsedQcm } from '@engram/shared'
 import { ReviewCard } from './review-card'
+import { FLIP_HALF_MS } from './reveal-motion'
 
-/** What a plain (non-QCM) card passes for the multiple-choice props. */
-const PLAIN = { qcm: null, selectedChoice: null, onSelect: () => {} } as const
+/**
+ * What a plain (non-QCM) card passes for the multiple-choice props, plus the
+ * default reveal — every assertion written before T-046 was written about the
+ * unfold, so that is what they keep testing. The other two modes get their own
+ * block at the bottom of the file.
+ */
+const PLAIN = {
+  qcm: null,
+  selectedChoice: null,
+  animation: 'unfold',
+  onSelect: () => {},
+} as const
 
 // jsdom implements no layout engine and does not define `Element.scrollTo`.
 // Every offset/client metric reads 0, so the "answer starts below the fold"
@@ -52,6 +63,13 @@ function structure(el: Element): string {
   clone.removeAttribute('style')
   clone.querySelectorAll('[style]').forEach((n) => n.removeAttribute('style'))
   return clone.outerHTML
+}
+
+/** Same, but of what is INSIDE the node — the card's own classes excluded. */
+function contents(el: Element): string {
+  const clone = el.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('[style]').forEach((n) => n.removeAttribute('style'))
+  return clone.innerHTML
 }
 
 describe('<ReviewCard>', () => {
@@ -212,6 +230,7 @@ describe('<ReviewCard>', () => {
           selectedChoice={selectedChoice}
           revealed={revealed}
           reduce={false}
+          animation="unfold"
           onSelect={rest.onSelect ?? (() => {})}
           onReveal={rest.onReveal ?? (() => {})}
         />,
@@ -323,6 +342,253 @@ describe('<ReviewCard>', () => {
       // The verdict still reads on the options themselves.
       expect(screen.getByRole('button', { name: /Bonne réponse/ })).toBeTruthy()
       expect(screen.getByRole('button', { name: /Ta réponse, incorrecte/ })).toBeTruthy()
+    })
+  })
+})
+
+/**
+ * T-046 — the two reveals that are not the default.
+ *
+ * A test cannot say whether an animation is *nice*; it can say whether it is
+ * wired, and above all what it does to the DOM — which is the part that has
+ * consequences for the screen reader and for the reader who has just lost the
+ * question. That is what this block is about.
+ */
+describe('<ReviewCard> — reveal animations', () => {
+  const PROPS = { qcm: null, selectedChoice: null, onSelect: () => {} } as const
+
+  describe('flip', () => {
+    beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }))
+    afterEach(() => vi.useRealTimers())
+
+    /** Run out the half-turn, so the far face is on screen. */
+    function hinge() {
+      act(() => {
+        vi.advanceTimersByTime(FLIP_HALF_MS)
+      })
+    }
+
+    it('keeps the question up while the card is still turning away', () => {
+      const { container, rerender } = render(
+        <ReviewCard
+          {...PROPS}
+          front="Ma question"
+          back="La réponse"
+          revealed={false}
+          reduce={false}
+          animation="flip"
+        />,
+      )
+      rerender(
+        <ReviewCard
+          {...PROPS}
+          front="Ma question"
+          back="La réponse"
+          revealed
+          reduce={false}
+          animation="flip"
+        />,
+      )
+      // First half of the turn: the front is still the face pointed at the user,
+      // so it must still be the face rendered. Swapping at t=0 would show the
+      // answer through the front of the card.
+      expect(container.querySelector('[data-slot="question"]')).toBeTruthy()
+      expect(screen.queryByText('La réponse')).toBeNull()
+    })
+
+    it('replaces the question with the answer at the hinge', () => {
+      const { container, rerender } = render(
+        <ReviewCard
+          {...PROPS}
+          front="Ma question"
+          back="La réponse"
+          revealed={false}
+          reduce={false}
+          animation="flip"
+        />,
+      )
+      rerender(
+        <ReviewCard
+          {...PROPS}
+          front="Ma question"
+          back="La réponse"
+          revealed
+          reduce={false}
+          animation="flip"
+        />,
+      )
+      hinge()
+      expect(screen.getByText('La réponse')).toBeTruthy()
+      // The question is GONE, and gone from the DOM rather than merely hidden:
+      // a face that has turned away must leave the accessibility tree too. This
+      // is Alex's explicit call, made knowing it costs the question/answer
+      // comparison — a future "fix" that brings the question back is a change of
+      // product decision, not a bug fix.
+      expect(container.querySelector('[data-slot="question"]')).toBeNull()
+      expect(screen.queryByText('Ma question')).toBeNull()
+    })
+
+    it('drops the divider with the question it used to divide', () => {
+      const { container, rerender } = render(
+        <ReviewCard
+          {...PROPS}
+          front="Q"
+          back="A"
+          revealed={false}
+          reduce={false}
+          animation="flip"
+        />,
+      )
+      rerender(
+        <ReviewCard {...PROPS} front="Q" back="A" revealed reduce={false} animation="flip" />,
+      )
+      hinge()
+      expect(container.querySelector('hr')).toBeNull()
+    })
+
+    it('puts the question back when the next card arrives', () => {
+      // The reducer re-renders the same component at ASKING for the next card
+      // (`AnimatePresence` keys on the card id, but a re-key is not guaranteed
+      // in every path). A face stuck on `back` would show an empty card.
+      const { container, rerender } = render(
+        <ReviewCard {...PROPS} front="Q1" back="A1" revealed reduce={false} animation="flip" />,
+      )
+      hinge()
+      expect(container.querySelector('[data-slot="question"]')).toBeNull()
+      rerender(
+        <ReviewCard
+          {...PROPS}
+          front="Q2"
+          back="A2"
+          revealed={false}
+          reduce={false}
+          animation="flip"
+        />,
+      )
+      expect(screen.getByText('Q2')).toBeTruthy()
+      expect(screen.queryByText('A2')).toBeNull()
+    })
+
+    it('keeps a QCM’s options on the far face — they ARE the verdict', () => {
+      const qcm: ParsedQcm = {
+        question: 'Capitale du Pérou ?',
+        options: [
+          { letter: 'A', text: 'Cusco' },
+          { letter: 'B', text: 'Lima' },
+        ],
+        answerIndex: 1,
+        explanation: 'Depuis 1535.',
+      }
+      const props = {
+        front: 'x',
+        back: 'y',
+        qcm,
+        selectedChoice: 0,
+        onSelect: () => {},
+        reduce: false,
+        animation: 'flip',
+      } as const
+      const { rerender } = render(<ReviewCard {...props} revealed={false} />)
+      rerender(<ReviewCard {...props} revealed />)
+      hinge()
+      // Turning the marked options away would hide the answer itself, so the
+      // flip on a QCM lands on question + marked options + justification.
+      expect(screen.getByText('Capitale du Pérou ?')).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Bonne réponse/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Ta réponse, incorrecte/ })).toBeTruthy()
+      expect(screen.getByText('Depuis 1535.')).toBeTruthy()
+    })
+
+    it('locks a QCM’s options the instant it is revealed, before the marks land', () => {
+      const qcm: ParsedQcm = {
+        question: 'Q ?',
+        options: [
+          { letter: 'A', text: 'un' },
+          { letter: 'B', text: 'deux' },
+        ],
+        answerIndex: 1,
+        explanation: 'parce que',
+      }
+      const onSelect = vi.fn()
+      const props = {
+        front: 'x',
+        back: 'y',
+        qcm,
+        selectedChoice: 0,
+        onSelect,
+        reduce: false,
+        animation: 'flip',
+      } as const
+      const { rerender } = render(<ReviewCard {...props} revealed={false} />)
+      rerender(<ReviewCard {...props} revealed />)
+      // Mid-turn: the verdict is not painted yet (that would answer the question
+      // 120ms early), but a click must not be accepted either.
+      for (const option of screen.getAllByRole('button')) {
+        expect((option as HTMLButtonElement).disabled).toBe(true)
+        fireEvent.click(option)
+      }
+      expect(onSelect).not.toHaveBeenCalled()
+      expect(screen.queryByRole('button', { name: /Bonne réponse/ })).toBeNull()
+    })
+  })
+
+  describe('none', () => {
+    it('mounts the same content as the unfold — only the movement is gone', () => {
+      const props = { ...PROPS, front: 'Ma question', back: 'La réponse', revealed: true } as const
+      const unfold = render(<ReviewCard {...props} reduce={false} animation="unfold" />)
+      const unfoldHtml = contents(unfold.container.querySelector('article') as HTMLElement)
+      cleanup()
+      const none = render(<ReviewCard {...props} reduce={false} animation="none" />)
+      const noneHtml = contents(none.container.querySelector('article') as HTMLElement)
+      // Same nodes, same order, same text. This is what makes `none` the safe
+      // target for reduced motion: switching to it changes nothing a screen
+      // reader can observe, only what the eye sees moving.
+      //
+      // Compared INSIDE the card and not on the card itself, because the card's
+      // own class list is the one place the two legitimately differ — the unfold
+      // deepens the elevation (`shadow-lg`) and `none` does not move at all.
+      expect(noneHtml).toBe(unfoldHtml)
+      expect(screen.getByText('Ma question')).toBeTruthy()
+      expect(screen.getByText('La réponse')).toBeTruthy()
+    })
+
+    it('carries no shadow transition — the elevation belongs to the unfold', () => {
+      const { container } = render(
+        <ReviewCard {...PROPS} front="Q" back="A" revealed reduce={false} animation="none" />,
+      )
+      const classes = (container.querySelector('article') as HTMLElement).className.split(/\s+/)
+      expect(classes).not.toContain('transition-shadow')
+      expect(classes).not.toContain('shadow-lg')
+    })
+  })
+
+  describe('unfold', () => {
+    it('deepens the card’s resting elevation once revealed', () => {
+      // The lift comes back to zero (see `reveal-motion.ts`); the elevation is
+      // the part that STAYS, and it is the only signal left that the card is in
+      // its revealed state once the gesture is over.
+      const asking = render(
+        <ReviewCard
+          {...PROPS}
+          front="Q"
+          back="A"
+          revealed={false}
+          reduce={false}
+          animation="unfold"
+        />,
+      )
+      const askingClasses = (asking.container.querySelector('article') as HTMLElement).className
+      expect(askingClasses.split(/\s+/)).toContain('shadow-sm')
+      cleanup()
+      const revealed = render(
+        <ReviewCard {...PROPS} front="Q" back="A" revealed reduce={false} animation="unfold" />,
+      )
+      const revealedClasses = (revealed.container.querySelector('article') as HTMLElement).className
+      expect(revealedClasses.split(/\s+/)).toContain('shadow-lg')
+      // Through the design system's own duration token, so the global
+      // `prefers-reduced-motion` rule in `styles.css` neutralises it for free.
+      expect(revealedClasses.split(/\s+/)).toContain('transition-shadow')
+      expect(revealedClasses.split(/\s+/)).toContain('duration-base')
     })
   })
 })

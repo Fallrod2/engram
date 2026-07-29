@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import { LangProvider } from '@/lib/i18n'
 import { DayLoad } from './day-load'
 import { LoadMeter } from './load-meter'
 
@@ -39,6 +40,58 @@ describe('<DayLoad> tiers (spec §7.1)', () => {
     const number = screen.getByLabelText('35 reviews prévues').firstElementChild as HTMLElement
     expect(number.className).toContain('text-text')
     expect(number.className).not.toContain('text-text-muted')
+  })
+})
+
+/**
+ * At the zero tier the cell is a bare `·`, so the accessible name is the only
+ * thing a screen reader gets. It used to be hardcoded French with a hand-rolled
+ * plural — the same defect as `<StreakPill>` / `<ThemeToggle>`, and the one the
+ * source guard (`a11y-strings.test.ts`) now prevents from coming back.
+ */
+describe('<DayLoad> accessible name is localized and pluralised', () => {
+  // jsdom's Storage is not fully implemented here — same in-memory shim the
+  // other shell tests install. `<LangProvider>` reads the language from it.
+  beforeEach(() => {
+    const store = new Map<string, string>()
+    const mock: Storage = {
+      get length() {
+        return store.size
+      },
+      clear: () => store.clear(),
+      getItem: (k) => store.get(k) ?? null,
+      key: (i) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k) => void store.delete(k),
+      setItem: (k, v) => void store.set(k, String(v)),
+    }
+    Object.defineProperty(globalThis, 'localStorage', { value: mock, configurable: true })
+  })
+
+  function renderLoad(value: number, lang: 'fr' | 'en') {
+    localStorage.setItem('engram-lang', lang)
+    return render(
+      <LangProvider>
+        <DayLoad value={value} max={40} />
+      </LangProvider>,
+    )
+  }
+
+  it('keeps the French zero singular', () => {
+    renderLoad(0, 'fr')
+    expect(screen.getByLabelText('0 review prévue')).toBeTruthy()
+  })
+
+  it('says it in English when the UI is English — including a plural zero', () => {
+    const zero = renderLoad(0, 'en')
+    expect(screen.getByLabelText('0 reviews scheduled')).toBeTruthy()
+    zero.unmount()
+
+    const one = renderLoad(1, 'en')
+    expect(screen.getByLabelText('1 review scheduled')).toBeTruthy()
+    one.unmount()
+
+    renderLoad(12, 'en')
+    expect(screen.getByLabelText('12 reviews scheduled')).toBeTruthy()
   })
 })
 

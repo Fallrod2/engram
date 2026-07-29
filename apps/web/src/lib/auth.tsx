@@ -116,6 +116,20 @@ export function useAuth(): AuthContextValue {
   return ctx
 }
 
+/** Snapshot for `useAuthStatus` — a plain string, so it is referentially stable. */
+const statusSnapshot = () => authStore.getState().status
+
+/**
+ * Session status alone, read straight from the store and WITHOUT requiring
+ * `<AuthProvider>` above the caller. The landing page uses it: it renders bare
+ * (outside the app shell) and is mounted provider-free in its own unit tests,
+ * but still has to know whether the visitor already has a session — otherwise it
+ * offers "Se connecter / Créer un compte" to someone who is signed in.
+ */
+export function useAuthStatus(): AuthState['status'] {
+  return useSyncExternalStore(authStore.subscribe, statusSnapshot, statusSnapshot)
+}
+
 /**
  * Subscribe to the onboarding link state (invite/recovery). Reactive so the root
  * layout and the `/set-password` screen re-render when the flow starts or clears.

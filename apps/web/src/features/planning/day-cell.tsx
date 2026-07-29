@@ -2,9 +2,11 @@ import type { HTMLAttributes } from 'react'
 import type { StudyPlanDay, Subject } from '@engram/shared'
 import type { DayCell as DayCellData } from '@/lib/calendar'
 import { formatLongDay } from '@/lib/format'
+import { usePlural, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { DayLoad } from '@/components/day-load'
 import { ExamChip } from '@/components/exam-chip'
+import { dayCellLabel } from './day-cell-label'
 
 const MAX_CHIPS = 2
 
@@ -33,13 +35,15 @@ export function DayCell({
   cellProps: HTMLAttributes<HTMLDivElement> & { 'data-day-selected'?: 'true' }
   onSelect: () => void
 }) {
+  const t = useT()
+  const plural = usePlural()
   const total = day?.total ?? 0
   const exams = day?.exams ?? []
   const shownExams = exams.slice(0, MAX_CHIPS)
   const overflow = exams.length - shownExams.length
   // Legible summary for the otherwise cryptic "5 —" load indicator, on hover
   // (native tooltip) and for assistive tech (fix-mobile-shell §load-legend).
-  const label = `${formatLongDay(cell.key)} — ${total} reviews prévues, ${exams.length} examens`
+  const label = dayCellLabel(t, plural, formatLongDay(cell.key), total, exams.length)
 
   return (
     <div

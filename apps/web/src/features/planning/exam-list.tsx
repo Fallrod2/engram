@@ -171,6 +171,7 @@ function ExamRow({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const t = useT()
   const subjects = exam.subjectIds
     .map((id) => subjectsById.get(id))
     .filter((s): s is Subject => !!s)
@@ -213,7 +214,7 @@ function ExamRow({
             variant="ghost"
             size="icon"
             className="size-6 shrink-0 text-text-muted opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100"
-            aria-label={`Actions de l'examen ${exam.title}`}
+            aria-label={t('planning.examActionsAria', { title: exam.title })}
           >
             <MoreHorizontal />
           </Button>

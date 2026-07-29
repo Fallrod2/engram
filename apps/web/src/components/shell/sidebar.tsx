@@ -333,9 +333,15 @@ export function Sidebar() {
             />
           )}
         </div>
-        {/* Streak + theme get their own row once expanded, still trailing-aligned. */}
+        {/* Streak + theme get their own row once expanded, LEADING-aligned. They
+            used to be pushed right (`justify-end`) while the links above them
+            started at the left inset, so the footer read as a checkerboard. The
+            row now starts in the same column as "Réglages": the flame carries the
+            links' own `px-2`, so its 16px glyph shares the exact centre line as
+            the gear above it. Nothing here can overflow — a 14px pill plus a 32px
+            icon button is a third of the 240px bar. */}
         {!collapsed && (
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex items-center gap-1">
             <StreakPill
               current={streak?.current ?? 0}
               includesToday={streak?.includesToday ?? false}

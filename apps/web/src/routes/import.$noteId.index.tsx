@@ -195,7 +195,7 @@ function NotePage() {
     },
     g: (e) => {
       e.preventDefault()
-      const el = document.querySelector<HTMLElement>('#launch-panel [aria-label="Deck cible"]')
+      const el = document.querySelector<HTMLElement>('#launch-panel [data-deck-select]')
       el?.scrollIntoView({ block: 'center' })
       el?.focus()
     },
