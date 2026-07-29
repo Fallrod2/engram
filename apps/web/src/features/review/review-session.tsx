@@ -18,7 +18,7 @@ import { SessionExitButton, SessionHeader } from './session-header'
 import { useTouchSession } from './pointer-labels'
 import { ProgressBar } from './progress-bar'
 import { CARD_BOX, ReviewCard } from './review-card'
-import { RatingBar } from './rating-bar'
+import { RATING_ZONE, RatingBar, VERDICT_BOX } from './rating-bar'
 import { CONTEXT_ACTION_ROW, CONTEXT_INFO_ROW, SessionContextBar } from './session-context-bar'
 import { SessionSummary } from './session-summary'
 import { ExitConfirm } from './exit-confirm'
@@ -383,10 +383,17 @@ function LoadingView({ onExit, t }: { onExit: () => void; t: TFunction }) {
                 skeleton 25px off the play screen before T-023. */}
             <Skeleton className={cn(CONTEXT_INFO_ROW, 'w-full rounded-sm')} />
             {touch && <Skeleton className={cn(CONTEXT_ACTION_ROW, 'w-full rounded-sm')} />}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 rounded-md" />
-              ))}
+            {/* The rating zone, mirrored from its OWN constants (T-047): the
+                reserved box and the shape the verdict pair fills it with. The
+                grid used to be retyped here as four `h-16` cells — which was
+                only right by coincidence, since the reservation and the control
+                inside it are two different decisions. */}
+            <div className={RATING_ZONE}>
+              <div className="grid h-full w-full grid-cols-2 gap-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className={cn(VERDICT_BOX, 'rounded-md')} />
+                ))}
+              </div>
             </div>
             {/* Not a skeleton: it is the very line PlayView renders, held
                 invisible. A shimmering placeholder for a static cheat-sheet

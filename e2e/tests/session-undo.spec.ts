@@ -86,7 +86,11 @@ test('U takes back the last rating and the review stops being counted', async ({
   const question = card.locator('[data-slot="question"]')
   const answer = card.locator('[data-slot="answer"]')
   const revealHint = page.getByText('pour révéler')
-  const goodButton = page.getByRole('button', { name: /^Bien/ })
+  // T-047 — the revealed plain card offers the two verdicts; `J'ai eu juste` is
+  // the one that records grade 3. The `3` and `2` keystrokes below are unchanged
+  // and deliberately so: the four levels stay live without being on screen, and
+  // step 5 grading with a bare `2` is now the e2e proof of it.
+  const goodButton = page.getByRole('button', { name: /^J’ai eu juste/ })
   const undoButton = page.getByRole('button', { name: 'Annuler la dernière note (U)' })
   const counter = progressCounter(page)
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowUpRight } from 'lucide-react'
 import { useTheme, type ThemePreference } from '@/lib/theme'
@@ -29,6 +30,10 @@ import { AiSettingsCard } from '@/features/ai/ai-settings-card'
 import { RevealAnimationCard } from '@/features/review/reveal-animation-card'
 import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
+import { appVersionLabel } from '@/lib/build-info'
+import { fetchHealth } from '@/lib/api'
+import { qk } from '@/lib/query-keys'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -116,15 +121,14 @@ function SettingsPage() {
           <CardDescription>{t('settings.aboutDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm text-text-muted">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <span>{t('settings.version')}</span>
-            <span className="font-mono text-xs tabular-nums text-text">0.0.0</span>
+            <span className="truncate font-mono text-xs tabular-nums text-text">
+              {appVersionLabel()}
+            </span>
           </div>
           <Separator />
-          <div className="flex items-center justify-between">
-            <span>{t('settings.mode')}</span>
-            <span className="text-text">{t('settings.modeValue')}</span>
-          </div>
+          <ModeRow />
           <Separator />
           {/* The public landing lives at `/welcome` and renders whatever the
               session says — signing in used to bury it for good, since `/` turns
@@ -142,6 +146,54 @@ function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+/**
+ * "Mode" row of the About card.
+ *
+ * It used to be the constant `Localhost · mono-utilisateur`, which stopped being
+ * true the day the app shipped to the public web with Supabase auth — a tester
+ * called it out as the thing that "sape la confiance en trois secondes". The row
+ * now ASKS the server: `GET /api/health` reports `authEnforced`, the very flag
+ * the `/api/*` gate resolves per request (`apps/server/src/http/auth.ts`), so the
+ * line cannot disagree with the deployment it describes.
+ *
+ * The two states are the two real ones, and each names both halves of what a
+ * reader wants to know:
+ *   gate ON  → every request carries a verified JWT and rows are scoped by
+ *              `user_id` ⇒ "Authentification activée · multi-utilisateur"
+ *   gate OFF → the server assumes one default identity (`ENGRAM_DEV_USER_ID`)
+ *              ⇒ "Authentification désactivée · mono-utilisateur", which is
+ *              exactly what a developer running the stack locally has.
+ *
+ * A server that cannot answer gets the shared "unavailable" wording, never a
+ * guess: claiming "multi-user" while the probe is down would be the same class
+ * of lie this row was fixed for.
+ */
+function ModeRow() {
+  const t = useT()
+  const { data, isPending, isError } = useQuery({
+    queryKey: qk.health,
+    queryFn: ({ signal }) => fetchHealth(signal),
+    staleTime: 60_000,
+  })
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span>{t('settings.mode')}</span>
+      {isPending ? (
+        <Skeleton className="h-4 w-56" aria-label={t('settings.mode')} />
+      ) : (
+        <span className="text-right text-text">
+          {isError
+            ? t('common.unavailable')
+            : data.authEnforced
+              ? t('settings.modeMultiUser')
+              : t('settings.modeSingleUser')}
+        </span>
+      )}
     </div>
   )
 }

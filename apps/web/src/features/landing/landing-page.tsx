@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useLang, useT } from '@/lib/i18n'
 import { useTheme } from '@/lib/theme'
 import { fetchHealth } from '@/lib/api'
+import { siteHost } from '@/lib/build-info'
 import { qk } from '@/lib/query-keys'
 import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuthStatus } from '@/lib/auth'
@@ -727,16 +728,27 @@ function SectionLabel({ children, className }: { children: ReactNode; className?
   )
 }
 
-/** A restrained browser bezel around a product screenshot. */
+/**
+ * A restrained browser bezel around a product screenshot.
+ *
+ * The chrome label used to be the literal string `engram · localhost` — printed
+ * on a public deployment, where it read as "this is a screenshot of somebody's
+ * laptop". It now shows the host the page is really served from (`siteHost()`):
+ * `engram.alexabriel.com` in production, `localhost:5173` for a developer. No
+ * configuration, and no way for it to drift out of date. When the host is
+ * unknowable (no `window`, e.g. a unit test) the label collapses to the wordmark
+ * alone rather than guessing.
+ */
 function BrowserFrame({ children }: { children: ReactNode }) {
+  const host = siteHost()
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface-2 shadow-lg">
       <div className="flex h-8 items-center gap-1.5 border-b border-border px-3">
         <span className="size-2.5 rounded-full bg-border-strong" aria-hidden />
         <span className="size-2.5 rounded-full bg-border-strong" aria-hidden />
         <span className="size-2.5 rounded-full bg-border-strong" aria-hidden />
-        <span className="ml-3 hidden font-mono text-2xs text-text-faint sm:inline">
-          engram · localhost
+        <span className="ml-3 hidden truncate font-mono text-2xs text-text-faint sm:inline">
+          {host ? `engram · ${host}` : 'engram'}
         </span>
       </div>
       {children}
@@ -756,7 +768,10 @@ const SHOT_SIZE: Record<ShotBase, { width: number; height: number }> = {
   // deviceScaleFactor 2). Only the ratio matters — it reserves the correct box so
   // the shot decodes without layout shift.
   dashboard: { width: 2880, height: 1560 },
-  review: { width: 2160, height: 1680 },
+  // 1560, not 1680: the review capture's viewport shrank to 1080×780 when the
+  // session became a fixed-height block, and a stale height here is exactly the
+  // layout shift this table exists to prevent.
+  review: { width: 2160, height: 1560 },
   analytics: { width: 2880, height: 1960 },
 }
 
