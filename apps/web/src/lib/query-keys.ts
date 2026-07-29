@@ -84,19 +84,42 @@ export const qk = {
   analytics: {
     // Everything under `analytics` — a session's end invalidates this prefix.
     all: ['analytics'] as const,
-    // Streaks are NOT window-scoped (a running fact), so no window in the key.
+    // Streaks are NOT window-scoped (a running fact), so no window in the key —
+    // and NOT subject-scoped either: the endpoint takes no `subjectId` at all
+    // (a streak is a habit of the person). See `streaksQuerySchema`.
     streaks: ['analytics', 'streaks'] as const,
+    /**
+     * `subjectId` is part of every key below because it is part of the REQUEST:
+     * "all subjects" and "this subject" are two different answers, and sharing a
+     * key would serve one for the other. `undefined` (all) keys distinctly from
+     * any id, so the unfiltered screen keeps its own cache entry.
+     */
     // The heatmap is a CALENDAR (a whole year), never a windowed aggregate.
-    heatmap: (year: number) => ['analytics', 'heatmap', year] as const,
+    heatmap: (year: number, subjectId?: string) =>
+      ['analytics', 'heatmap', year, { subjectId }] as const,
     // The three windowed series/rates. `w` is the AnalyticsWindow preset.
-    volume: (w: string) => ['analytics', 'volume', w] as const,
-    studyTime: (w: string) => ['analytics', 'study-time', w] as const,
-    retention: (w: string) => ['analytics', 'retention', w] as const,
+    volume: (w: string, subjectId?: string) => ['analytics', 'volume', w, { subjectId }] as const,
+    studyTime: (w: string, subjectId?: string) =>
+      ['analytics', 'study-time', w, { subjectId }] as const,
+    retention: (w: string, subjectId?: string) =>
+      ['analytics', 'retention', w, { subjectId }] as const,
+    // Success rate per deck over the window — only ever read per subject (the
+    // Subject screen), where it ranks THAT subject's decks.
+    deckSuccess: (w: string, subjectId?: string) =>
+      ['analytics', 'deck-success', w, { subjectId }] as const,
     // Deltas vs the previous equivalent period (tiles). Null for `all`.
-    deltas: (w: string) => ['analytics', 'deltas', w] as const,
+    deltas: (w: string, subjectId?: string) => ['analytics', 'deltas', w, { subjectId }] as const,
     // Hardest cards per subject. NOT window-scoped (FSRS difficulty is a current
     // state, not a period aggregate) — only the per-subject `limit` keys it.
-    hardestCards: (limit: number) => ['analytics', 'hardest-cards', limit] as const,
+    hardestCards: (limit: number, subjectId?: string) =>
+      ['analytics', 'hardest-cards', limit, { subjectId }] as const,
+    /**
+     * Exam readiness. NOT window-scoped: it is a FORECAST of memory at a future
+     * instant, not an aggregate over a past period, so no window belongs in the
+     * key. `now` is not in it either — the client freezes one `now` per screen
+     * and the projection moves by minutes, not by keystrokes.
+     */
+    examReadiness: (subjectId?: string) => ['analytics', 'exam-readiness', { subjectId }] as const,
   },
   review: {
     /**

@@ -228,12 +228,20 @@ export function fetchDemoSeedStatus(
  * drops never-reviewed cards (`difficulty = 0` = unknown, not easy) and anything
  * under the `minReps` it echoes back. Not window-scoped: difficulty is a current
  * state, not an aggregate over a period.
+ *
+ * With `subjectId` the ranking narrows to that one subject, and `limit` — a
+ * per-subject bound — becomes the total, which is what the Subject screen wants.
  */
 export function fetchHardestCards(
   limit: number,
   signal?: AbortSignal,
+  subjectId?: string,
 ): Promise<HardestCardsResponse> {
-  return api.get(`/analytics/hardest-cards${qs({ limit })}`, hardestCardsResponseSchema, signal)
+  return api.get(
+    `/analytics/hardest-cards${qs({ limit, subjectId })}`,
+    hardestCardsResponseSchema,
+    signal,
+  )
 }
 
 /** Review-session scope filters (at most one is set in practice). */

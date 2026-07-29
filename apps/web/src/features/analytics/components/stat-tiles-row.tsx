@@ -18,6 +18,13 @@ import { cn } from '@/lib/utils'
  * The four KPI tiles (spec §3): streak (unscoped) · study time · reviews ·
  * success — the numbers read in two seconds. Deltas compare against the
  * previous equivalent period and are hidden for `all` (no previous).
+ *
+ * `subjectScoped` says the other three tiles have been narrowed to one subject.
+ * The streak has NOT — the endpoint takes no subject and never will, because a
+ * streak measures showing up, which belongs to the person and not to one of
+ * their subjects. So the tile says so, in words, right where it is read: three
+ * scoped figures next to one global figure with nothing to distinguish them
+ * would simply be a wrong number.
  */
 export function StatTilesRow({
   streaks,
@@ -27,6 +34,7 @@ export function StatTilesRow({
   deltas,
   windowLabel,
   reduce,
+  subjectScoped = false,
 }: {
   streaks: StreaksResponse
   spark: number[]
@@ -35,6 +43,7 @@ export function StatTilesRow({
   deltas: AnalyticsDeltas | null
   windowLabel: string
   reduce: boolean
+  subjectScoped?: boolean
 }) {
   const t = useT()
   const plural = usePlural()
@@ -53,8 +62,17 @@ export function StatTilesRow({
           </>
         }
         meta={
-          <span className="font-mono tabular-nums">
+          <span
+            className="font-mono tabular-nums"
+            {...(subjectScoped ? { title: t('analytics.streakScopeNote') } : {})}
+          >
             {t('analytics.streakRecord', { count: streaks.longest })}
+            {subjectScoped && (
+              <>
+                <span className="mx-1.5 text-border-strong">·</span>
+                <span className="font-sans">{t('analytics.subjectScopeAll')}</span>
+              </>
+            )}
           </span>
         }
         trend={

@@ -42,6 +42,7 @@ import {
   useUpdateDeck,
 } from '@/features/decks/queries'
 import { dueCountsOptions, byDeckMap, bySubjectMap } from '@/features/due-counts/queries'
+import { SubjectAnalytics } from '@/features/analytics/components/subject-analytics'
 import { SubjectFormDialog } from '@/features/subjects/subject-form-dialog'
 import { DeckFormDialog } from '@/features/decks/deck-form-dialog'
 
@@ -153,6 +154,27 @@ function DecksPage() {
 
   if (!subject) return null
 
+  // Statistics of THIS subject: readiness, per-deck success, hardest cards. Its
+  // three requests are its own — they are fired by the section on mount and
+  // never block the deck list, which the route loader already has.
+  const analyticsSection = (
+    <SubjectAnalytics
+      subject={subject}
+      decks={sorted}
+      noCardsAction={
+        <>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus />
+            {t('decks.new')}
+          </Button>
+          <Button variant="secondary" size="sm" asChild>
+            <Link to="/import">{t('nav.items.import')}</Link>
+          </Button>
+        </>
+      }
+    />
+  )
+
   return (
     <div>
       <PageHeader
@@ -234,6 +256,13 @@ function DecksPage() {
         <span className="mx-1.5 text-border-strong">·</span>
         {t(`listMeta.due_${plural(subjectDue)}`, { count: subjectDue })}
       </p>
+
+      {/* A subject with no deck shows its statistics FIRST. The empty state is a
+          tall illustration, and pushing the readiness panel under it is exactly
+          how "you have an exam in three weeks and zero cards" ended up below the
+          fold — the case this section exists to shout about. With decks, the list
+          leads and the statistics follow it. */}
+      {sorted.length === 0 && analyticsSection}
 
       {sorted.length === 0 ? (
         <EmptyState
@@ -333,6 +362,8 @@ function DecksPage() {
           </ul>
         </div>
       )}
+
+      {sorted.length > 0 && analyticsSection}
 
       <DeckFormDialog
         open={createOpen}

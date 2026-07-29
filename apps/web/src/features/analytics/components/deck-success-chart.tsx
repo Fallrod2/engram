@@ -2,7 +2,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   LabelList,
   ResponsiveContainer,
   Tooltip,
@@ -10,97 +9,71 @@ import {
   YAxis,
   type TooltipProps,
 } from 'recharts'
-import type { RetentionResponse, Subject } from '@engram/shared'
-import { SubjectDot } from '@/components/subject-dot'
+import type { Deck, DeckSuccessResponse, Subject } from '@engram/shared'
 import { useT, usePlural, type PluralCategory, type TFunction } from '@/lib/i18n'
 import { chartInk, subjectColorValue } from '../chart-theme'
 import { formatPercent } from '../metrics'
 import { ChartCard } from './chart-card'
 import { ChartEmpty } from './chart-empty'
-import { ChartTableView, type ChartColumn } from './chart-table-view'
+import { ChartTableView } from './chart-table-view'
 import { TooltipRow, TooltipShell } from './chart-tooltip'
 
-const Y_WIDTH = 152
+/**
+ * Success rate per deck, INSIDE one subject — the drill-down of the deck list
+ * the Subject screen already shows, and the reason this chart lives here and not
+ * on the Analytics screen: across every subject at once, a ranking of deck names
+ * compares things that have nothing to do with each other.
+ *
+ * One series, one hue (the subject's own pigment) — so no legend, per the
+ * dataviz rule; identity comes from the deck names on the axis and the direct
+ * labels. A deck under the server's `minSample` keeps its row with a dash rather
+ * than a percentage computed from four reviews.
+ */
+
+const Y_WIDTH = 148
 const ROW_H = 34
 
 interface Row {
-  subjectId: string
+  deckId: string
   name: string
-  color: string
-  retention: number | null
-  reviews: number
+  successRate: number | null
+  reviewed: number
 }
 
-function buildTableColumns(t: TFunction): ChartColumn<Row>[] {
-  return [
-    { key: 'name', header: t('analytics.colSubject'), render: (r) => r.name },
-    {
-      key: 'reviews',
-      header: t('analytics.colMatureReviews'),
-      align: 'right',
-      mono: true,
-      render: (r) => r.reviews,
-    },
-    {
-      key: 'retention',
-      header: t('analytics.colRetention'),
-      align: 'right',
-      mono: true,
-      render: (r) => (r.retention === null ? '—' : formatPercent(r.retention)),
-    },
-  ]
-}
-
-/**
- * `highlightSubjectId` is the screen's subject filter, applied WITHOUT narrowing
- * the query. Every other chart on the screen answers "this subject only"; this
- * one is the comparison itself, and a comparison of one bar against nothing is
- * not a smaller version of it, it is a different (and useless) chart. So the
- * selected subject is brought forward and the others stay, dimmed — the caption
- * says as much, so nobody reads the extra bars as a filter that failed to apply.
- */
-export function RetentionBySubjectChart({
+export function DeckSuccessChart({
   data,
-  subjects,
+  decks,
+  subject,
   windowLabel,
   isFetching,
   error,
   onRetry,
-  highlightSubjectId,
 }: {
-  data: RetentionResponse | undefined
-  subjects: Subject[]
+  data: DeckSuccessResponse | undefined
+  decks: Deck[]
+  subject: Subject
   windowLabel: string
   isFetching: boolean
   error: boolean
   onRetry: () => void
-  highlightSubjectId?: string
 }) {
   const t = useT()
   const plural = usePlural()
-  const tableColumns = buildTableColumns(t)
-  const byId = new Map(subjects.map((s) => [s.id, s]))
-  const rows: Row[] = (data?.subjects ?? []).flatMap((r) => {
-    const s = byId.get(r.subjectId)
-    if (!s) return []
-    return [
-      {
-        subjectId: r.subjectId,
-        name: s.name,
-        color: s.color,
-        retention: r.retention,
-        reviews: r.maturedReviewed,
-      },
-    ]
+  const byId = new Map(decks.map((d) => [d.id, d]))
+  const rows: Row[] = (data?.decks ?? []).flatMap((d) => {
+    const deck = byId.get(d.deckId)
+    if (!deck) return []
+    return [{ deckId: d.deckId, name: deck.name, successRate: d.successRate, reviewed: d.reviewed }]
   })
 
-  const rated = rows.filter((r) => r.retention !== null).sort((a, b) => b.retention! - a.retention!)
+  const rated = rows
+    .filter((r) => r.successRate !== null)
+    .sort((a, b) => b.successRate! - a.successRate!)
   const unrated = rows
-    .filter((r) => r.retention === null)
+    .filter((r) => r.successRate === null)
     .sort((a, b) => a.name.localeCompare(b.name))
   const allEmpty = data !== undefined && rated.length === 0
-  const highlighted = highlightSubjectId ? byId.get(highlightSubjectId) : undefined
-  const colorById = new Map(rows.map((r) => [r.subjectId, r.color]))
+  const color = subjectColorValue(subject.color)
 
   let body: React.ReactNode
   let table: React.ReactNode
@@ -108,17 +81,19 @@ export function RetentionBySubjectChart({
     body = (
       <ChartEmpty
         variant="error"
-        title={t('analytics.retentionError')}
+        title={t('analytics.deckSuccessError')}
         onRetry={onRetry}
-        height={180}
+        height={160}
       />
     )
   } else if (allEmpty) {
     body = (
       <ChartEmpty
-        title={t('analytics.retentionEmpty')}
-        hint={t('analytics.retentionHint')}
-        height={180}
+        title={t('analytics.deckSuccessEmpty')}
+        hint={t(`analytics.deckSuccessHint_${plural(data?.minSample ?? 0)}`, {
+          count: data?.minSample ?? 0,
+        })}
+        height={160}
       />
     )
   } else {
@@ -144,33 +119,29 @@ export function RetentionBySubjectChart({
             />
             <YAxis
               type="category"
-              dataKey="subjectId"
+              dataKey="deckId"
               width={Y_WIDTH}
               tickLine={false}
               axisLine={false}
               interval={0}
-              tick={<SubjectTick lookup={rows} />}
+              tick={<DeckTick lookup={rated} />}
             />
             <Tooltip
               cursor={{ fill: chartInk.surface, opacity: 0.4 }}
-              content={(props: TooltipProps<number, string>) => renderTooltip(props, t, plural)}
+              content={(props: TooltipProps<number, string>) =>
+                renderTooltip(props, t, plural, color)
+              }
               isAnimationActive={false}
             />
             <Bar
-              dataKey="retention"
+              dataKey="successRate"
+              fill={color}
               maxBarSize={24}
               radius={[0, 4, 4, 0]}
               isAnimationActive={false}
             >
-              {rated.map((r) => (
-                <Cell
-                  key={r.subjectId}
-                  fill={subjectColorValue(colorById.get(r.subjectId) ?? r.color)}
-                  fillOpacity={highlightSubjectId && highlightSubjectId !== r.subjectId ? 0.3 : 1}
-                />
-              ))}
               <LabelList
-                dataKey="retention"
+                dataKey="successRate"
                 position="right"
                 formatter={(v: number) => formatPercent(v)}
                 fill="var(--color-text)"
@@ -181,17 +152,10 @@ export function RetentionBySubjectChart({
           </BarChart>
         </ResponsiveContainer>
 
-        {highlighted && (
-          <p className="mt-3 text-xs text-text-faint">
-            {t('analytics.retentionScopeNote', { name: highlighted.name })}
-          </p>
-        )}
-
         {unrated.length > 0 && (
           <ul className="mt-3 flex flex-col gap-1.5 border-t border-border pt-3">
             {unrated.map((r) => (
-              <li key={r.subjectId} className="flex items-center gap-2 opacity-70">
-                <SubjectDot color={r.color} />
+              <li key={r.deckId} className="flex items-center gap-2 opacity-70">
                 <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{r.name}</span>
                 <span className="font-mono text-xs text-text-faint">—</span>
                 <span className="text-xs text-text-faint">{t('analytics.notEnoughData')}</span>
@@ -203,17 +167,33 @@ export function RetentionBySubjectChart({
     )
     table = (
       <ChartTableView
-        columns={tableColumns}
+        columns={[
+          { key: 'name', header: t('analytics.colDeck'), render: (r: Row) => r.name },
+          {
+            key: 'reviewed',
+            header: t('analytics.colReviews'),
+            align: 'right',
+            mono: true,
+            render: (r) => r.reviewed,
+          },
+          {
+            key: 'rate',
+            header: t('analytics.colSuccess'),
+            align: 'right',
+            mono: true,
+            render: (r) => (r.successRate === null ? '—' : formatPercent(r.successRate)),
+          },
+        ]}
         rows={[...rated, ...unrated]}
-        rowKey={(r) => r.subjectId}
-        caption={t('analytics.retentionCaption')}
+        rowKey={(r) => r.deckId}
+        caption={t('analytics.deckSuccessCaption')}
       />
     )
   }
 
   return (
     <ChartCard
-      title={t('analytics.retentionTitle')}
+      title={t('analytics.deckSuccessTitle')}
       subtitle={windowLabel}
       isFetching={isFetching}
       showToggle={!allEmpty && !(error && !data)}
@@ -224,22 +204,16 @@ export function RetentionBySubjectChart({
   )
 }
 
-/** Custom Y tick: SubjectDot color + name, so identity is carried off-color. */
-function SubjectTick(props: {
-  x?: number
-  y?: number
-  payload?: { value?: string }
-  lookup: Row[]
-}) {
+/** Custom Y tick: the deck name in text ink (identity is never colour-only). */
+function DeckTick(props: { x?: number; y?: number; payload?: { value?: string }; lookup: Row[] }) {
   const { x = 0, y = 0, payload, lookup } = props
-  const row = lookup.find((r) => r.subjectId === payload?.value)
+  const row = lookup.find((r) => r.deckId === payload?.value)
   if (!row) return null
-  const name = row.name.length > 20 ? `${row.name.slice(0, 19)}…` : row.name
+  const name = row.name.length > 22 ? `${row.name.slice(0, 21)}…` : row.name
   return (
     <g transform={`translate(${x},${y})`}>
-      <circle cx={-Y_WIDTH + 6} cy={0} r={4} fill={subjectColorValue(row.color)} />
       <text
-        x={-Y_WIDTH + 18}
+        x={-Y_WIDTH + 6}
         y={0}
         dy="0.32em"
         textAnchor="start"
@@ -257,20 +231,16 @@ function renderTooltip(
   { active, payload }: TooltipProps<number, string>,
   t: TFunction,
   plural: (n: number) => PluralCategory,
+  color: string,
 ) {
   if (!active || !payload || payload.length === 0) return null
   const row = payload[0]?.payload as Row | undefined
-  if (!row || row.retention === null) return null
+  if (!row || row.successRate === null) return null
   return (
     <TooltipShell
-      date={t(`analytics.matureReviews_${plural(row.reviews)}`, { count: row.reviews })}
+      date={t(`analytics.reviewsCount_${plural(row.reviewed)}`, { count: row.reviewed })}
     >
-      <TooltipRow
-        colorVar={subjectColorValue(row.color)}
-        label={row.name}
-        value={formatPercent(row.retention)}
-        strong
-      />
+      <TooltipRow colorVar={color} label={row.name} value={formatPercent(row.successRate)} strong />
     </TooltipShell>
   )
 }
