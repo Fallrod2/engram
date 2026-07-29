@@ -118,6 +118,41 @@ describe('backup import — round trip', () => {
     expect(after.tables.subject).toHaveLength(1)
     expect(after.tables.subject[0]!.name).toBe('Théorie des langages')
   })
+
+  /**
+   * Provenance survives a restore (T-031). A dump that dropped `origin` would
+   * come back as `live` (the column default), i.e. the restore would relabel a
+   * hand-written generation as a real one — the precise claim the disclosure
+   * banner exists to prevent, quietly reintroduced by a round trip.
+   */
+  it('a pre-recorded generation does not come back as a real one', async () => {
+    await seedEverything()
+    await db.update(generation).set({ origin: 'prerecorded', model: 'none — hand-written' })
+
+    const dump = backupSchema.parse(await exportBackup(db, U))
+    expect(dump.tables.generation[0]!.origin).toBe('prerecorded')
+
+    await resetDb(db)
+    expect((await postJson('/api/backup/import', dump)).status).toBe(200)
+
+    const [restored] = await db.select().from(generation)
+    expect(restored!.origin).toBe('prerecorded')
+  })
+
+  it("a dump written BEFORE the field existed imports as 'live'", async () => {
+    // Backward compatibility for the files Alex already has on disk: `origin` is
+    // optional in the schema, and its absence means the run predates the field —
+    // when every generation really was a live one.
+    await seedEverything()
+    const dump = backupSchema.parse(await exportBackup(db, U))
+    delete dump.tables.generation[0]!.origin
+
+    await resetDb(db)
+    expect((await postJson('/api/backup/import', dump)).status).toBe(200)
+
+    const [restored] = await db.select().from(generation)
+    expect(restored!.origin).toBe('live')
+  })
 })
 
 describe('backup import — guards & atomicity', () => {
