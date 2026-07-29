@@ -1244,6 +1244,48 @@ export const dictEn: Dict = {
       note: 'Free, self-hosted, open source.',
       shotAlt: 'engram dashboard: cards due today, review streak and recent activity.',
     },
+    demoBoot: {
+      eyebrow: 'Demo account',
+      title: 'Opening the demo',
+      description:
+        'The server opens a session, installs a full set of cards, then signs this browser in. This window closes as soon as it is ready.',
+      progressLabel: 'Opening the demo',
+      steps: {
+        session: 'Opening the session',
+        prepare: 'Preparing the data',
+        install: 'Signing this browser in',
+      },
+      stepStatus: {
+        done: 'done',
+        active: 'in progress',
+        todo: 'waiting',
+        failed: 'failed',
+        skipped: 'not waited for',
+      },
+      server: {
+        pending: 'The server has not started yet.',
+        seeding: 'The server is installing the demo cards.',
+        ready: 'Data ready.',
+      },
+      ready: 'Everything is ready.',
+      error: {
+        sessionTitle: 'The demo could not be opened',
+        sessionBody:
+          'The server could not open a demo session. Nothing was installed in your browser.',
+        installTitle: 'Signing in did not go through',
+        installBody:
+          'Your browser refused the session the server returned. You are not signed in — nothing was left half done.',
+        prepareTitle: 'Preparing the data failed',
+        prepareBody:
+          'The server never confirmed that the demo data was ready. This browser was not signed in.',
+        timeoutTitle: 'The demo is taking too long',
+        timeoutBody:
+          'After {seconds} seconds the server still has not confirmed that the demo data is ready. This browser has not been signed in yet.',
+        enterAnyway: 'Enter anyway',
+        enterAnywayHint:
+          'Entering now signs this browser in without waiting: the cards will appear as soon as the server is done.',
+      },
+    },
     rhythm: {
       label: 'The rhythm of memory',
       today: 'Today',

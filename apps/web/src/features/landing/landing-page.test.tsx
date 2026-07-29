@@ -21,12 +21,20 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
-const { fetchHealth, createDemoSession, setSession } = vi.hoisted(() => ({
-  fetchHealth: vi.fn(),
-  createDemoSession: vi.fn(),
-  setSession: vi.fn(),
+const { fetchHealth, createDemoSession, setSession, primeDemoAccount, fetchDemoSeedStatus } =
+  vi.hoisted(() => ({
+    fetchHealth: vi.fn(),
+    createDemoSession: vi.fn(),
+    setSession: vi.fn(),
+    primeDemoAccount: vi.fn(),
+    fetchDemoSeedStatus: vi.fn(),
+  }))
+vi.mock('@/lib/api', () => ({
+  fetchHealth,
+  createDemoSession,
+  primeDemoAccount,
+  fetchDemoSeedStatus,
 }))
-vi.mock('@/lib/api', () => ({ fetchHealth, createDemoSession }))
 vi.mock('@/lib/supabase', () => ({
   supabase: { auth: { setSession } },
   AUTH_ENABLED_WEB: true,
@@ -101,6 +109,13 @@ beforeEach(() => {
   navigate.mockReset()
   createDemoSession.mockReset()
   setSession.mockReset()
+  // The demo boot now WAITS for the server to finish seeding before it navigates
+  // (`GET /api/me` is what the demo middleware seeds on). Default both calls to a
+  // ready account so the tests that are not about the wait stay unchanged.
+  primeDemoAccount.mockReset()
+  primeDemoAccount.mockResolvedValue({ userId: 'demo', isAdmin: false })
+  fetchDemoSeedStatus.mockReset()
+  fetchDemoSeedStatus.mockResolvedValue({ state: 'ready', readyAt: new Date().toISOString() })
   // Default for the tests that do not care: no demo configured server-side.
   fetchHealth.mockReset()
   fetchHealth.mockResolvedValue(health(false))

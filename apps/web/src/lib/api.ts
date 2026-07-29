@@ -2,18 +2,22 @@ import { z } from 'zod'
 import {
   apiErrorSchema,
   cardSchema,
+  demoSeedStatusResponseSchema,
   demoSessionResponseSchema,
   hardestCardsResponseSchema,
   healthResponseSchema,
+  meResponseSchema,
   reviewPreviewSchema,
   reviewQueueResponseSchema,
   reviewResultSchema,
   undoReviewResponseSchema,
   type ApiErrorCode,
   type Card,
+  type DemoSeedStatusResponse,
   type DemoSessionResponse,
   type HardestCardsResponse,
   type HealthResponse,
+  type MeResponse,
   type ReviewCard,
   type ReviewPreview,
   type ReviewQueueResponse,
@@ -68,10 +72,19 @@ interface RequestOptions<T> {
   /** Schema for the success body. Omit for `204 No Content`. */
   schema?: z.ZodType<T>
   signal?: AbortSignal
+  /**
+   * Bearer token to use INSTEAD of the ambient one from the auth store. Set by
+   * exactly one caller — the demo boot sequence, which fires its first two
+   * authenticated requests in the moment right after `supabase.auth.setSession`,
+   * before the store has necessarily observed the `SIGNED_IN` event. Passing the
+   * token we were just handed removes that race entirely instead of polling the
+   * store until it catches up. Everything else must keep using the ambient token.
+   */
+  accessToken?: string
 }
 
 async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T> {
-  const { method = 'GET', body, schema, signal } = opts
+  const { method = 'GET', body, schema, signal, accessToken } = opts
   const init: RequestInit = { method }
   // Headers are built UNCONDITIONALLY (audit §9): a GET/DELETE/upload used to
   // leave `init.headers` undefined, so a merged `Authorization` would be lost and
@@ -84,7 +97,7 @@ async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T
     init.body = JSON.stringify(body)
     headers['Content-Type'] = 'application/json'
   }
-  Object.assign(headers, authHeader())
+  Object.assign(headers, accessToken ? { Authorization: `Bearer ${accessToken}` } : authHeader())
   init.headers = headers
   if (signal) init.signal = signal
   const res = await fetch(`/api${path}`, init)
@@ -171,6 +184,42 @@ export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse>
  */
 export function createDemoSession(): Promise<DemoSessionResponse> {
   return api.post('/demo/session', undefined, demoSessionResponseSchema)
+}
+
+/**
+ * FIRE the demo seed and wait for it (`GET /api/me` with the freshly minted
+ * token). Not a probe — a normal authenticated request, and that is the whole
+ * point: the server's demo middleware seeds the account on the first
+ * authenticated request that is NOT `GET /api/demo/status`, and it awaits the
+ * seeding transaction before handing the request to the router. So this call
+ * RESOLVING is the authoritative "the dataset is committed" signal; nothing
+ * about it is inferred.
+ *
+ * `/api/me` is picked because the app needs it anyway — the caller writes the
+ * answer straight into the query cache, so the wait costs no extra round trip.
+ */
+export function primeDemoAccount(accessToken: string, signal?: AbortSignal): Promise<MeResponse> {
+  return request('/me', { schema: meResponseSchema, accessToken, ...(signal ? { signal } : {}) })
+}
+
+/**
+ * Read how far the demo seed has got, for the caller's own session
+ * (`GET /api/demo/status`). Purely informational: `primeDemoAccount` is what
+ * waits, this is what lets the waiting screen say something TRUE meanwhile —
+ * `pending` (the seed has not started: we are still paying the cold start or the
+ * network), `seeding` (the server holds the seed's advisory lock right now),
+ * `ready` (committed). The server exempts this route from the seeding
+ * middleware, so polling it neither triggers a seed nor queues behind one.
+ */
+export function fetchDemoSeedStatus(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<DemoSeedStatusResponse> {
+  return request('/demo/status', {
+    schema: demoSeedStatusResponseSchema,
+    accessToken,
+    ...(signal ? { signal } : {}),
+  })
 }
 
 /**

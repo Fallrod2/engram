@@ -1305,6 +1305,57 @@ export const dictFr = {
       shotAlt:
         'Tableau de bord d’engram : cartes à réviser du jour, série de révision et activité récente.',
     },
+    /**
+     * The "opening the demo" window. Every line describes something that is
+     * really happening: the three steps ARE the three calls the browser makes,
+     * and `server.*` are the three states `GET /api/demo/status` can return —
+     * `seeding` in particular is the server seeing its own seed lock held, not a
+     * guess. Nothing here was invented to fill the wait.
+     */
+    demoBoot: {
+      eyebrow: 'Compte de démonstration',
+      title: 'Ouverture de la démo',
+      description:
+        'Le serveur ouvre une session, installe un jeu de cartes complet, puis connecte ce navigateur. Cette fenêtre se ferme dès que c’est prêt.',
+      /** Accessible name of the indeterminate bar — the duration is unknown. */
+      progressLabel: 'Ouverture de la démo en cours',
+      steps: {
+        session: 'Ouverture de la session',
+        prepare: 'Préparation des données',
+        install: 'Connexion de ce navigateur',
+      },
+      stepStatus: {
+        done: 'terminé',
+        active: 'en cours',
+        todo: 'en attente',
+        failed: 'échec',
+        /** Used when the visitor chose not to wait — never a green check. */
+        skipped: 'non attendu',
+      },
+      server: {
+        pending: 'Le serveur n’a pas encore commencé.',
+        seeding: 'Le serveur installe les cartes de démonstration.',
+        ready: 'Données prêtes.',
+      },
+      ready: 'Tout est prêt.',
+      error: {
+        sessionTitle: 'La démo n’a pas pu s’ouvrir',
+        sessionBody:
+          'Le serveur n’a pas pu ouvrir de session de démonstration. Rien n’a été installé dans ton navigateur.',
+        installTitle: 'La connexion n’a pas abouti',
+        installBody:
+          'Le navigateur a refusé la session renvoyée par le serveur. Tu n’es pas connecté — rien n’est resté à moitié fait.',
+        prepareTitle: 'La préparation des données a échoué',
+        prepareBody:
+          'Le serveur n’a pas confirmé que les données de démonstration étaient prêtes. Ce navigateur n’a pas été connecté.',
+        timeoutTitle: 'La démo met trop de temps',
+        timeoutBody:
+          'Au bout de {seconds} secondes, le serveur n’a toujours pas confirmé que les données de démonstration étaient prêtes. Ce navigateur n’a pas encore été connecté.',
+        enterAnyway: 'Entrer quand même',
+        enterAnywayHint:
+          'Entrer maintenant connecte ce navigateur sans attendre : les cartes apparaîtront dès que le serveur aura fini.',
+      },
+    },
     rhythm: {
       label: 'Le rythme de la mémoire',
       today: 'Aujourd’hui',
