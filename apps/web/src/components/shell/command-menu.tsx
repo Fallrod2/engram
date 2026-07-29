@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChartColumn,
   GraduationCap,
+  House,
   Keyboard,
   Layers,
   LayoutDashboard,
@@ -90,6 +91,16 @@ const NAV_ACTIONS: NavAction[] = [
     to: '/settings',
     icon: Settings,
     keywords: 'settings reglages preferences options',
+  },
+  // The public landing (`/welcome`) is reachable while signed in — it renders
+  // bare, outside the shell, and `requireAuth` exempts it. Before this entry
+  // (and the twin row in Réglages → À propos) nothing in the app linked to it,
+  // so having an account made the product's own presentation page unreachable.
+  {
+    label: 'settings.landing',
+    to: '/welcome',
+    icon: House,
+    keywords: 'landing accueil presentation vitrine home welcome marketing',
   },
 ]
 

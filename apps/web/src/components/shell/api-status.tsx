@@ -44,9 +44,12 @@ export function ApiStatus({ collapsed = false }: { collapsed?: boolean }) {
     )
   }
 
+  // Expanded, the row joins the footer's single column: the same `px-2` inset as
+  // the nav-shaped links, and the dot centred in a 16px slot so it sits on the
+  // gear/flame centre line instead of hanging 8px further left.
   return (
-    <div className="flex items-center gap-2" role="status" aria-label={label}>
-      {dot}
+    <div className="flex items-center gap-2 px-2" role="status" aria-label={label}>
+      <span className="flex size-4 shrink-0 items-center justify-center">{dot}</span>
       <span className="truncate text-2xs text-text-faint">{label}</span>
     </div>
   )

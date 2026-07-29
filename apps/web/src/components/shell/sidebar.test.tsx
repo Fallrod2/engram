@@ -444,6 +444,17 @@ describe('<Sidebar> footer layout', () => {
     expect(linkGroup?.parentElement).toBe(footer(container))
   })
 
+  it('leading-aligns that row with the links above it, never pushed right', () => {
+    // The complaint: "Réglages" started at the left inset while the streak and
+    // the theme toggle were flushed right on their own line, so the footer read
+    // as a checkerboard instead of one column.
+    renderSidebar()
+    const themeRow = screen.getByTestId('theme-toggle').parentElement
+    expect(themeRow?.className).not.toContain('justify-end')
+    expect(themeRow?.className).not.toContain('ml-auto')
+    expect(themeRow?.className).not.toContain('items-end')
+  })
+
   it('keeps the collapsed footer a single centred icon column', () => {
     collapsed = true
     const { container } = renderSidebar()

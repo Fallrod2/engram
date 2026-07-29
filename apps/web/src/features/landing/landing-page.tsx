@@ -9,6 +9,7 @@ import { useTheme } from '@/lib/theme'
 import { createDemoSession, fetchHealth } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
 import { supabase, AUTH_ENABLED_WEB } from '@/lib/supabase'
+import { useAuthStatus } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
@@ -26,6 +27,32 @@ import { ThemeToggle } from '@/components/shell/theme-toggle'
  */
 
 const GITHUB_URL = 'https://github.com/Fallrod2/engram'
+
+/**
+ * The landing is reachable WITH a session (Réglages → À propos, ⌘K, or a direct
+ * `/welcome`), so it must not keep selling an account to someone who already has
+ * one: every sign-in / sign-up CTA becomes a single way back into the app. Read
+ * from the store rather than `useAuth()` so the page keeps rendering outside
+ * `<AuthProvider>` (bare route, unit tests). `loading` is treated as signed OUT —
+ * the anonymous CTAs are the safe default, and the swap happens as soon as the
+ * session resolves.
+ */
+function useSignedIn(): boolean {
+  return useAuthStatus() === 'authenticated'
+}
+
+/** The one CTA a signed-in visitor needs: back to the app. */
+function OpenAppButton({ size = 'default' }: { size?: 'default' | 'lg' }) {
+  const t = useT()
+  return (
+    <Button asChild size={size}>
+      <Link to="/">
+        {t('landing.nav.openApp')}
+        <ArrowRight />
+      </Link>
+    </Button>
+  )
+}
 
 export default function LandingPage() {
   const t = useT()
@@ -103,6 +130,7 @@ function Wordmark() {
 
 function LandingHeader() {
   const t = useT()
+  const signedIn = useSignedIn()
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -135,14 +163,20 @@ function LandingHeader() {
             <GithubMark className="size-4" />
           </a>
           <ThemeToggle />
-          {/* Sign-in stays available; the primary conversion action is the
-              account CTA (repeated at the foot of the page too). */}
-          <Button asChild variant="ghost" size="default" className="hidden sm:inline-flex">
-            <Link to="/login">{t('landing.nav.signIn')}</Link>
-          </Button>
-          <Button asChild size="default">
-            <Link to="/signup">{t('landing.nav.createAccount')}</Link>
-          </Button>
+          {signedIn ? (
+            <OpenAppButton />
+          ) : (
+            <>
+              {/* Sign-in stays available; the primary conversion action is the
+                  account CTA (repeated at the foot of the page too). */}
+              <Button asChild variant="ghost" size="default" className="hidden sm:inline-flex">
+                <Link to="/login">{t('landing.nav.signIn')}</Link>
+              </Button>
+              <Button asChild size="default">
+                <Link to="/signup">{t('landing.nav.createAccount')}</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>
@@ -182,6 +216,7 @@ function LangToggle() {
 
 function Hero() {
   const t = useT()
+  const signedIn = useSignedIn()
   const reduce = useReducedMotion()
   // Owned by the hero, not by <DemoCta>, so the message renders UNDER the whole
   // CTA row: a message inside the row would widen its column and shove the
@@ -230,15 +265,23 @@ function Hero() {
 
           <motion.div {...rise(0.18)} className="mt-8 flex flex-col items-center gap-3">
             <div className="flex flex-col items-center gap-3 sm:flex-row">
-              <Button asChild size="lg" className="min-w-40">
-                <Link to="/signup">
-                  {t('landing.hero.cta')}
-                  <ArrowRight />
-                </Link>
-              </Button>
-              {/* Second CTA — rendered only when the SERVER says a demo login is
-                  configured (landing spec §2). See <DemoCta>. */}
-              <DemoCta onFailedChange={setDemoFailed} />
+              {signedIn ? (
+                // Already signed in: no account to create and no demo session to
+                // open — the hero's action is simply "go back to the app".
+                <OpenAppButton size="lg" />
+              ) : (
+                <>
+                  <Button asChild size="lg" className="min-w-40">
+                    <Link to="/signup">
+                      {t('landing.hero.cta')}
+                      <ArrowRight />
+                    </Link>
+                  </Button>
+                  {/* Second CTA — rendered only when the SERVER says a demo login
+                      is configured (landing spec §2). See <DemoCta>. */}
+                  <DemoCta onFailedChange={setDemoFailed} />
+                </>
+              )}
             </div>
             {demoFailed && (
               <p role="alert" className="max-w-sm text-pretty text-xs text-danger">
@@ -596,6 +639,7 @@ function Providers() {
 
 function FinalCta() {
   const t = useT()
+  const signedIn = useSignedIn()
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
       <div className="relative overflow-hidden rounded-lg border border-border bg-surface-1 px-6 py-12 text-center sm:px-10 sm:py-16">
@@ -612,15 +656,21 @@ function FinalCta() {
           {t('landing.finalCta.body')}
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg" className="min-w-44">
-            <Link to="/signup">
-              {t('landing.nav.createAccount')}
-              <ArrowRight />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link to="/login">{t('landing.nav.signIn')}</Link>
-          </Button>
+          {signedIn ? (
+            <OpenAppButton size="lg" />
+          ) : (
+            <>
+              <Button asChild size="lg" className="min-w-44">
+                <Link to="/signup">
+                  {t('landing.nav.createAccount')}
+                  <ArrowRight />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link to="/login">{t('landing.nav.signIn')}</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </section>
