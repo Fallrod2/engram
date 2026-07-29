@@ -874,30 +874,29 @@ export const dictFr = {
 
   settings: {
     appearanceTitle: 'Apparence',
-    appearanceDesc: 'Thème de l’interface. « Système » suit ton OS.',
+    appearanceDesc:
+      'Thème et animations de l’interface. « Système » suit les réglages de ton ordinateur.',
     theme: 'Thème',
     themeSystem: 'Système',
     themeDark: 'Sombre',
     themeLight: 'Clair',
-    // Animation de révélation en session (T-046). Les libellés seuls
-    // n'apprennent rien à personne : chaque option porte sa phrase, d'où la
-    // paire `x`/`xDesc`. `reducedNotice` n'apparaît que si le système demande
-    // de réduire les animations — il gagne sur les trois valeurs.
-    reveal: {
-      title: 'Animation de révélation',
-      desc: 'Comment la réponse apparaît quand tu révèles une carte.',
-      unfold: 'Déploiement',
-      unfoldDesc: 'La réponse se déplie sous la question, qui reste à l’écran.',
-      flip: 'Retournement',
-      flipDesc: 'La carte se retourne : la réponse prend la place de la question.',
-      none: 'Aucune',
-      noneDesc: 'La réponse apparaît d’un coup, sans mouvement.',
-      reducedNotice:
-        'Ton système demande de réduire les animations : la réponse apparaît sans mouvement, quel que soit le choix ci-dessus.',
+    // Surcharge in-app de `prefers-reduced-motion` (29/07/2026). L'interrupteur ne
+    // dit à lui seul ni ce que demande le système, ni ce que l'app en a fait :
+    // les trois `notice*` sont là pour ça, une par état réel.
+    motion: {
+      label: 'Toujours animer',
+      desc: 'Garder les animations même quand mon système demande de les réduire.',
+      noticeReduced:
+        'Ton système demande de réduire les animations : l’app les a coupées. Active cet interrupteur pour les garder quand même.',
+      noticeOverridden:
+        'Ton système demande de réduire les animations ; tu as choisi de les garder. Ce choix ne vaut que dans engram.',
+      noticeSystemNeutral:
+        'Ton système ne demande aucune réduction : les animations sont déjà actives.',
     },
     languageTitle: 'Langue',
-    languageDesc: 'Langue de l’interface.',
+    languageDesc: 'Langue de l’interface. « Système » suit la langue de ton navigateur.',
     language: 'Langue',
+    langSystem: 'Système',
     langFr: 'Français',
     langEn: 'English',
     dataTitle: 'Données',
@@ -1422,10 +1421,10 @@ export const dictFr = {
         title: 'La session de révision',
         caption: 'Le seul écran où tu passes du temps — pensé pour y rester au clavier.',
         // Décrit la STRUCTURE de la capture, pas le nombre de boutons : T-047 a
-        // remplacé les quatre notes par deux verdicts sur une carte classique, et
-        // T-046 a rendu la révélation configurable (« retournée » n'est vrai que
-        // pour le flip). Une alt qui compte les boutons redevient fausse au
-        // prochain arbitrage produit.
+        // remplacé les quatre notes par deux verdicts sur une carte classique.
+        // Une alt qui compte les boutons redevient fausse au prochain arbitrage
+        // produit — la révélation elle-même a changé deux fois le 29/07/2026
+        // (rendue configurable le matin, ramenée au seul déploiement l'après-midi).
         alt: 'Session de révision engram : une carte révélée, la réponse sous la question, et la barre de notation en dessous.',
       },
       analytics: {

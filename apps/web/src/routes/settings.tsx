@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowUpRight } from 'lucide-react'
 import { useTheme, type ThemePreference } from '@/lib/theme'
-import { useLang, useT, type Lang } from '@/lib/i18n'
+import { useLang, useT, type LangPreference } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -27,7 +27,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { BackupCard } from '@/features/backup/backup-card'
 import { AiSettingsCard } from '@/features/ai/ai-settings-card'
-import { RevealAnimationCard } from '@/features/review/reveal-animation-card'
+import { MotionRow } from '@/features/settings/motion-row'
 import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { appVersionLabel } from '@/lib/build-info'
@@ -48,14 +48,24 @@ const THEME_KEYS: Record<
   light: 'settings.themeLight',
 }
 
-const LANG_KEYS: Record<Lang, 'settings.langFr' | 'settings.langEn'> = {
+/**
+ * `system` first, and it IS the default (29/07/2026): no stored choice means the app
+ * follows the browser/OS language list. Picking a language here is an explicit
+ * choice that outranks the system for good — and picking « Système » again is
+ * the way back, which is why the value has to be in the list at all.
+ */
+const LANG_KEYS: Record<
+  LangPreference,
+  'settings.langSystem' | 'settings.langFr' | 'settings.langEn'
+> = {
+  system: 'settings.langSystem',
   fr: 'settings.langFr',
   en: 'settings.langEn',
 }
 
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
-  const { lang, setLang } = useLang()
+  const { preference: langPreference, setLang } = useLang()
   const t = useT()
 
   return (
@@ -65,27 +75,30 @@ function SettingsPage() {
           <CardTitle>{t('settings.appearanceTitle')}</CardTitle>
           <CardDescription>{t('settings.appearanceDesc')}</CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-between gap-4">
-          <Label htmlFor="theme-select">{t('settings.theme')}</Label>
-          <Select value={theme} onValueChange={(v) => setTheme(v as ThemePreference)}>
-            <SelectTrigger id="theme-select" className="w-40">
-              <SelectValue placeholder={t('settings.theme')} />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(THEME_KEYS) as ThemePreference[]).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {t(THEME_KEYS[key])}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Theme and motion in ONE card, not two: both are "how the app looks
+            and behaves on this machine", and both default to following the
+            system. Splitting them would have made the second card's only job
+            to hold a single switch. */}
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="theme-select">{t('settings.theme')}</Label>
+            <Select value={theme} onValueChange={(v) => setTheme(v as ThemePreference)}>
+              <SelectTrigger id="theme-select" className="w-40">
+                <SelectValue placeholder={t('settings.theme')} />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(THEME_KEYS) as ThemePreference[]).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {t(THEME_KEYS[key])}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Separator />
+          <MotionRow />
         </CardContent>
       </Card>
-
-      {/* Appearance-adjacent, hence its place right under the theme — but it
-          owns enough (three values, a sentence each, plus the reduced-motion
-          notice) to be its own card, and it lives with the feature it drives. */}
-      <RevealAnimationCard />
 
       <Card>
         <CardHeader>
@@ -94,12 +107,12 @@ function SettingsPage() {
         </CardHeader>
         <CardContent className="flex items-center justify-between gap-4">
           <Label htmlFor="lang-select">{t('settings.language')}</Label>
-          <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
+          <Select value={langPreference} onValueChange={(v) => setLang(v as LangPreference)}>
             <SelectTrigger id="lang-select" className="w-40">
               <SelectValue placeholder={t('settings.language')} />
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(LANG_KEYS) as Lang[]).map((key) => (
+              {(Object.keys(LANG_KEYS) as LangPreference[]).map((key) => (
                 <SelectItem key={key} value={key}>
                   {t(LANG_KEYS[key])}
                 </SelectItem>

@@ -6,8 +6,25 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
  * - `theme` is the *preference*: `'dark' | 'light' | 'system'`.
  * - The resolved appearance is written as `data-theme` on `<html>` (only when
  *   an explicit dark/light is chosen); `'system'` removes the attribute so the
- *   CSS `prefers-color-scheme` fallback (see `styles.css`) takes over.
- * - Preference is persisted in `localStorage` under `engram-theme`.
+ *   CSS `prefers-color-scheme` fallback (see `styles.css`) takes over. That
+ *   fallback is pure CSS, so an OS that flips to dark at sunset flips the app
+ *   with it — no reload, no listener, nothing to miss.
+ * - Preference is persisted in `localStorage` under `engram-theme`, and ONLY on
+ *   an explicit choice (29/07/2026).
+ *
+ * NO STORED VALUE = NO CHOICE = FOLLOW THE SYSTEM (29/07/2026). The default used to
+ * be `dark`, and the provider persisted whatever it had resolved on mount — so
+ * the very first paint wrote `engram-theme=dark` for everyone, choice or not.
+ * Two things follow, and both are deliberate:
+ *
+ *   · Writing moved out of the mount effect and into `setTheme`. From now on a
+ *     stored value means somebody picked it, which is the whole premise of
+ *     "an explicit choice is never overwritten".
+ *   · Users who were here BEFORE this change already carry that auto-written
+ *     `dark`, and it is indistinguishable from a real choice. They keep dark —
+ *     the safe direction: the alternative is repainting an app someone may well
+ *     have chosen to keep dark, to fix a preference they never expressed. One
+ *     visit to Settings → « Système » puts them on the system default for good.
  */
 export type ThemePreference = 'dark' | 'light' | 'system'
 export type ResolvedTheme = 'dark' | 'light'
@@ -27,10 +44,17 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 function readStoredTheme(): ThemePreference {
-  // Défaut projet (CLAUDE.md) : dark tant qu'aucune préférence n'est stockée.
-  if (typeof localStorage === 'undefined') return 'dark'
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return raw === 'dark' || raw === 'light' || raw === 'system' ? raw : 'dark'
+  // Aucune préférence stockée = aucun choix exprimé = on suit le système. Le
+  // défaut projet reste sombre : `:root` est sombre dans `styles.css`, et le
+  // clair n'arrive que sous `prefers-color-scheme: light`.
+  if (typeof localStorage === 'undefined') return 'system'
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw === 'dark' || raw === 'light' || raw === 'system' ? raw : 'system'
+  } catch {
+    // Safari en navigation privée : `localStorage` existe et lève à l'accès.
+    return 'system'
+  }
 }
 
 function systemPrefersDark(): boolean {
@@ -59,19 +83,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  // Reflect the preference onto <html> and persist it ('system' included:
-  // sans clé stockée le défaut redeviendrait 'dark').
+  // Reflect the preference onto <html>. NOT persisted here: mounting is not
+  // choosing, and a write on mount is exactly what made "no choice" and "chose
+  // dark" the same stored string. Persistence belongs to `setTheme`.
   useEffect(() => {
     applyTheme(theme)
-    localStorage.setItem(STORAGE_KEY, theme)
   }, [theme])
 
   const resolved: ResolvedTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme
 
-  const setTheme = useCallback((next: ThemePreference) => setThemeState(next), [])
+  const setTheme = useCallback((next: ThemePreference) => {
+    setThemeState(next)
+    // `'system'` is stored like the rest: it is a choice — "go back to following
+    // my OS" — and erasing the key instead would work today only because the
+    // default happens to agree with it.
+    try {
+      localStorage.setItem(STORAGE_KEY, next)
+    } catch {
+      // Rien à faire : le choix s'applique quand même pour cette page.
+    }
+  }, [])
+  // Goes through `setTheme`, so the flip is persisted like any other explicit
+  // choice — it IS one, made from the shell instead of from Settings.
   const toggle = useCallback(
-    () => setThemeState(resolved === 'dark' ? 'light' : 'dark'),
-    [resolved],
+    () => setTheme(resolved === 'dark' ? 'light' : 'dark'),
+    [resolved, setTheme],
   )
 
   const value = useMemo<ThemeContextValue>(

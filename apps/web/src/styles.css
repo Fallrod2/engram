@@ -396,8 +396,17 @@
   }
 }
 
-/* prefers-reduced-motion : coupe toutes les durées (le flip Phase 2 devient
-   cross-fade géré côté composant, la respiration du streak est supprimée).
+/* prefers-reduced-motion : écourte toutes les durées (la révélation de carte
+   perd son mouvement, la respiration du streak est supprimée).
+
+   ⚠️ SURCHARGEABLE DEPUIS L'APP (29/07/2026). Une media query ne se désactive pas
+   depuis JS : c'est pourquoi les sélecteurs ci-dessous sont portés par
+   `:root:not([data-motion='full'])`. `lib/motion.ts` pose `data-motion="full"`
+   sur <html> quand l'utilisateur demande explicitement les animations, et le
+   bloc cesse alors de s'appliquer — l'autre moitié de la surcharge étant le hook
+   `useReducedMotion` du même module, côté `motion`. Sans attribut (le cas par
+   défaut, et le cas AVANT que le moindre script n'ait tourné) la préférence
+   système gagne, exactement comme avant. `motion-guard.test.ts` fige ce couplage.
 
    ⚠️ CE BLOC EST COUPLÉ À RADIX. `Presence` (@radix-ui/react-presence, sous
    dialog / alert-dialog / sheet / select / popover / dropdown / tooltip) démonte
@@ -418,9 +427,10 @@
    la diffère jamais. Le `0.01ms` (et non `0`) est la forme canonique justement
    parce qu'elle laisse les événements JS partir. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion='full']),
+  :root:not([data-motion='full']) *,
+  :root:not([data-motion='full']) *::before,
+  :root:not([data-motion='full']) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

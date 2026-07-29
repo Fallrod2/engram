@@ -1,4 +1,5 @@
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
+import { useReducedMotion } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { dueBarWidth, dueCountTier } from '@/lib/due-count'
 import { SUBJECT_BG_CLASS, pigmentSlotForHex } from '@/lib/pigments'

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useReducedMotion } from 'motion/react'
+import { useReducedMotion } from '@/lib/motion'
 import { toast } from 'sonner'
 import {
   parseQcm,
@@ -13,7 +13,6 @@ import {
 } from '@engram/shared'
 import { ApiError, postReview, postUndoReview, updateCard, type ReviewScope } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
-import { useRevealAnimation, type RevealAnimation } from '@/lib/reveal-animation'
 import { isEditableTarget, isModalSurfaceOpen } from '@/lib/use-hotkeys'
 import {
   initialState,
@@ -90,14 +89,13 @@ export interface SessionApi {
    * the budget rather than guess.
    */
   newCards: QueueNewCards | undefined
-  reduce: boolean
   /**
-   * The reveal to play, ALREADY arbitrated: the user's stored choice, or `none`
-   * when the system asks for reduced motion. Consumers never see the raw
-   * preference, so there is exactly one place where the accessibility setting
-   * can be forgotten — and it is right below.
+   * Play no movement — the motion preference, ALREADY arbitrated (`lib/motion.ts`
+   * folds the in-app override into the system's `prefers-reduced-motion`).
+   * Consumers never see the raw signals, so there is exactly one place where the
+   * accessibility preference can be forgotten, and it is this hook.
    */
-  revealAnimation: RevealAnimation
+  reduce: boolean
   reveal: () => void
   /** Answer the current QCM by picking an option — reveals it, never grades it. */
   selectChoice: (index: number) => void
@@ -134,16 +132,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const router = useRouter()
-  const reduce = !!useReducedMotion()
-  // The product setting (T-046) and the system one, arbitrated once, here.
-  // `prefers-reduced-motion` WINS — an accessibility preference expressed once
-  // for every application on the machine is not something an in-app dropdown
-  // gets to overrule, so a reduced-motion system plays `none` even when the
-  // stored choice says `flip`. The dropdown is not disabled for it (the choice
-  // is still the user's, and it applies again the day the system setting goes),
-  // but the settings screen says so in as many words.
-  const preferredReveal = useRevealAnimation()
-  const revealAnimation: RevealAnimation = reduce ? 'none' : preferredReveal
+  // `prefers-reduced-motion`, unless the user has deliberately overridden it in
+  // Settings (`lib/motion.ts`). Arbitrated once, there.
+  const reduce = useReducedMotion()
   const t = useT()
 
   const [initialNow] = useState(() => new Date().toISOString())
@@ -863,7 +854,6 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     canReviewAgain,
     newCards: queue.data?.newCards,
     reduce,
-    revealAnimation,
     reveal,
     selectChoice,
     rate,

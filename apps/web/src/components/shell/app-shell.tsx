@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useRouterState } from '@tanstack/react-router'
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
+import { useReducedMotion } from '@/lib/motion'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { MobileTabBar } from './mobile-tab-bar'

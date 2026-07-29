@@ -58,12 +58,19 @@ function health(demoLoginEnabled: boolean) {
   }
 }
 
-function installMatchMedia() {
+/**
+ * `systemDark` is not decoration (29/07/2026): with no stored `engram-theme` the app
+ * now FOLLOWS the system, so what this mock answers to
+ * `(prefers-color-scheme: dark)` is what decides which screenshot the landing
+ * shows. Default `true` — the project's dark-first look, and the state the
+ * assertions below were written against.
+ */
+function installMatchMedia(systemDark = true) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     configurable: true,
     value: (query: string) => ({
-      matches: false,
+      matches: systemDark && query.includes('prefers-color-scheme: dark'),
       media: query,
       onchange: null,
       addEventListener: () => {},
@@ -171,9 +178,19 @@ describe('<LandingPage>', () => {
 
   it('the product screenshots carry alt text (a11y)', () => {
     renderLanding()
-    // Dark theme + FR default → the dark FR WebP, with the localized alt.
+    // Dark system + FR default → the dark FR WebP, with the localized alt.
     const shot = screen.getByAltText(/Tableau de bord d’engram/)
     expect(shot.getAttribute('src')).toBe('/landing/dashboard-dark-fr.webp')
+  })
+
+  it('follows a light system when no theme has been chosen (29/07/2026)', () => {
+    // No stored `engram-theme` = no choice = the OS decides, and the landing
+    // shows the screenshot of the app the visitor is actually looking at.
+    installMatchMedia(false)
+    renderLanding()
+    expect(screen.getByAltText(/Tableau de bord d’engram/).getAttribute('src')).toBe(
+      '/landing/dashboard-light-fr.webp',
+    )
   })
 
   it('defaults to English when the browser language is English and nothing is stored', () => {

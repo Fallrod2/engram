@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { useReducedMotion } from 'motion/react'
+import { useReducedMotion } from '@/lib/motion'
 import { z } from 'zod'
 import { GraduationCap } from 'lucide-react'
 import type { HeatmapResponse } from '@engram/shared'
