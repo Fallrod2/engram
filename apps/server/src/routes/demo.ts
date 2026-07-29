@@ -1,9 +1,17 @@
 import { Hono } from 'hono'
-import { apiErrorSchema, demoSessionResponseSchema } from '@engram/shared'
+import {
+  apiErrorSchema,
+  demoSeedStatusResponseSchema,
+  demoSessionResponseSchema,
+} from '@engram/shared'
 import { ok } from '../http/respond'
-import { DemoUnavailableError, UpstreamError } from '../http/errors'
+import { DemoUnavailableError, ForbiddenError, UpstreamError } from '../http/errors'
+import { requireUserId } from '../http/identity'
 import { resolveAuthConfig } from '../auth/config'
 import { resolveDemoAuthClient } from '../auth/demo-client'
+import { db } from '../db/client'
+import { isDemoProfile } from '../services/profile.service'
+import { DEMO_NO_SESSION, demoSeedStatus } from '../services/demo.service'
 
 /**
  * `POST /api/demo/session` — the ONLY public (unauthenticated) write route of the
@@ -127,4 +135,33 @@ demoRouter.post('/session', async (c) => {
     // only needs to know the demo is unavailable right now.
     throw new UpstreamError('La démo est momentanément indisponible.')
   }
+})
+
+/**
+ * `GET /api/demo/status` — how far along the demo account's dataset is, for the
+ * CALLER'S OWN session. The landing's "opening the demo" window polls it instead
+ * of guessing from a spinner (that guess is what made a tester believe the app
+ * was empty).
+ *
+ * Scoping, in order:
+ *  1. AUTHENTICATED. Unlike `POST /session`, this is NOT in `PUBLIC_ROUTES` — an
+ *     anonymous caller gets 401 from the gate before reaching here.
+ *  2. DEMO ONLY. Anyone else gets 403, so this is not a general "is the server
+ *     busy" oracle, and it can neither read nor affect another account.
+ *  3. READ-ONLY AND SESSION-SCOPED. It answers about the caller's own
+ *     `session_id` and returns no id, no email and no marker.
+ *
+ * It is also the single route `createDemoMiddleware` skips: polling it must never
+ * trigger a seed, and must never queue behind the one it is watching.
+ */
+demoRouter.get('/status', async (c) => {
+  const userId = requireUserId(c)
+  if (!isDemoProfile(c.get('userProfile'), userId, resolveAuthConfig(process.env))) {
+    throw new ForbiddenError('demo account only')
+  }
+  // Same marker derivation as the reset middleware — the two must agree or the
+  // probe would report `pending` on an account the middleware considers seeded.
+  const sessionId = c.get('authClaims')?.session_id
+  const marker = typeof sessionId === 'string' ? sessionId : DEMO_NO_SESSION
+  return ok(c, demoSeedStatusResponseSchema, await demoSeedStatus(db, userId, marker))
 })
