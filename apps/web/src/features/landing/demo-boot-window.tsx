@@ -93,16 +93,27 @@ export function DemoBootWindow(props: {
         : ''
 
   /**
-   * UNMOUNT rather than let Radix animate out. Under `prefers-reduced-motion` the
-   * global rule in `styles.css` clamps every animation to 0.01 ms, and Radix's
-   * `Presence` misses the `animationend` it is waiting on — so a closed dialog
-   * stays mounted, visible and on top of the page. Verified in Chrome with the OS
-   * preference on: after Escape the window sat there at `data-state="closed"`,
-   * `opacity: 1`, 277 px tall. That is a defect of the shared `<Dialog>` and it
-   * affects every dialog in the app (raise it separately) — but THIS window is
-   * the one that must be closable no matter what, so it does not depend on the
-   * exit animation at all. Mounting with `open` already true still plays the
-   * enter transition.
+   * UNMOUNT rather than lean on Radix's exit animation — a simplicity choice, not
+   * a workaround. Closing this window is either followed immediately by a
+   * navigation (nothing to animate into) or by a dismissal the visitor asked for,
+   * so there is no exit worth staging; returning `null` makes "closed" mean
+   * "gone" with nothing to reason about. Mounting with `open` already true still
+   * plays the enter transition.
+   *
+   * NOT a defect being routed around. `Presence` only unmounts a closed overlay
+   * after `animationend`, and the shared `<Dialog>` is fine as things stand: the
+   * `prefers-reduced-motion` block in `styles.css` clamps animations to `0.01ms`,
+   * which still fires `animationstart`/`animationend` — that IS why the canonical
+   * value is `0.01ms` and not `0`. Measured in Chrome with the OS preference on,
+   * across the app's real dialogs: they unmount every time. (An earlier note here
+   * claimed otherwise; it was reading the DOM in the same frame as the Escape,
+   * which shows `data-state="closed"` a moment before the unmount.)
+   *
+   * The failure class it feared is only reachable if that rule is ever rewritten
+   * to SUSPEND or DEFER the animation — `animation-play-state: paused` (only
+   * `animationstart` arrives) or a non-zero `animation-delay` (only
+   * `animationcancel` arrives). `styles-reduced-motion.test.ts` now forbids both,
+   * so that is a guarded edge, not a live bug.
    */
   if (!open) return null
 

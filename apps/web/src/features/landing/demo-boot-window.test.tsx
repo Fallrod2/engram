@@ -62,11 +62,16 @@ function renderWindow(state: DemoBootState, h = handlers(), lang: 'fr' | 'en' = 
 }
 
 /**
- * Closing must actually remove it. Radix's exit animation cannot be trusted here:
- * with `prefers-reduced-motion` on, the global 0.01 ms clamp in `styles.css` makes
- * `Presence` miss its `animationend` and the closed dialog stays on screen
- * (observed in Chrome). A boot window that cannot be dismissed is the exact
- * failure this whole feature is meant to avoid.
+ * Closing must actually remove it — a boot window that cannot be dismissed is the
+ * exact failure this whole feature exists to avoid, so "closed" is pinned to mean
+ * "not in the tree" rather than left to an exit transition.
+ *
+ * This is NOT compensating for a broken `<Dialog>`. Radix's exit path is sound
+ * under `prefers-reduced-motion`: the `0.01ms` clamp in `styles.css` still fires
+ * `animationend`, and the app's dialogs unmount — measured in Chrome, and pinned
+ * by `styles-reduced-motion.test.ts`, which also forbids the two rewrites that
+ * WOULD strand a closed overlay (`animation-play-state: paused`, a non-zero
+ * `animation-delay`). This window simply does not depend on any of it.
  */
 it('renders nothing at all when closed', () => {
   render(

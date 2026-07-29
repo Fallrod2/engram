@@ -397,7 +397,26 @@
 }
 
 /* prefers-reduced-motion : coupe toutes les durées (le flip Phase 2 devient
-   cross-fade géré côté composant, la respiration du streak est supprimée). */
+   cross-fade géré côté composant, la respiration du streak est supprimée).
+
+   ⚠️ CE BLOC EST COUPLÉ À RADIX. `Presence` (@radix-ui/react-presence, sous
+   dialog / alert-dialog / sheet / select / popover / dropdown / tooltip) démonte
+   un overlay fermé UNIQUEMENT quand il reçoit `animationend` sur le nœud. Une
+   règle qui empêche l'animation de sortie de se TERMINER laisse donc la boîte
+   montée, visible, `data-state="closed"`, opacité 1 — et l'utilisateur n'a plus
+   que le rechargement de page. Le défaut frapperait exactement les gens qui ont
+   demandé moins de mouvement.
+
+   Mesuré dans Chrome (T-051 ; `styles-reduced-motion.test.ts` fige la mesure,
+   `components/ui/dialog-reduced-motion.test.tsx` en montre la conséquence) :
+     · `animation-duration: 0.01ms` (ci-dessous) → animationend ARRIVE, démonte ✓
+     · `animation-duration: 0s`                  → animationend arrive, démonte ✓
+     · `animation: none` / `animation-name: none`→ Presence court-circuite  ✓
+     · `animation-play-state: paused`            → animationend JAMAIS, bloqué ✗
+     · `animation-delay: <non nul>`              → animationend JAMAIS, bloqué ✗
+   Autrement dit : on écourte l'animation, on ne la met jamais en pause et on ne
+   la diffère jamais. Le `0.01ms` (et non `0`) est la forme canonique justement
+   parce qu'elle laisse les événements JS partir. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
