@@ -28,8 +28,20 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  hideClose,
+  closeLabel = 'Fermer',
   ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) {
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  /**
+   * Drop the corner ✕. For the rare dialog that must not be dismissible at that
+   * instant (the demo boot window while it is working): leaving a ✕ that the
+   * dialog then refuses to honour is worse than showing none. Such a dialog owes
+   * the user a state where it IS dismissible — it must never be a dead end.
+   */
+  hideClose?: boolean
+  /** Accessible name of the ✕, for the callers that are localized. */
+  closeLabel?: string
+}) {
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -44,12 +56,14 @@ function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close
-          className="absolute right-4 top-4 rounded-sm text-text-faint transition-colors duration-fast hover:text-text disabled:pointer-events-none"
-          aria-label="Fermer"
-        >
-          <X className="size-4" />
-        </DialogPrimitive.Close>
+        {!hideClose && (
+          <DialogPrimitive.Close
+            className="absolute right-4 top-4 rounded-sm text-text-faint transition-colors duration-fast hover:text-text disabled:pointer-events-none"
+            aria-label={closeLabel}
+          >
+            <X className="size-4" />
+          </DialogPrimitive.Close>
+        )}
       </DialogPrimitive.Content>
     </DialogPortal>
   )

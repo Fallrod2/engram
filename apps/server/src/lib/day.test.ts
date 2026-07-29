@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { localDayDiff, localDayKey, localMidnight, localWeekStart } from './day'
+import { localDayBounds, localDayDiff, localDayKey, localMidnight, localWeekStart } from './day'
 
 /**
  * Locks WS-B spec §1.9: day bucketing is LOCAL, never UTC. These assertions use
@@ -35,6 +35,38 @@ describe('localMidnight', () => {
     expect(d.getHours()).toBe(0)
     expect(d.getMinutes()).toBe(0)
     expect(localDayKey(d)).toBe('2026-07-20')
+  })
+})
+
+describe('localDayBounds', () => {
+  it('brackets the local day, start inclusive and end exclusive', () => {
+    const { start, end } = localDayBounds(new Date(2026, 6, 20, 13, 45, 12, 500))
+    expect(localDayKey(start)).toBe('2026-07-20')
+    expect(start.getHours()).toBe(0)
+    expect(localDayKey(end)).toBe('2026-07-21')
+    expect(end.getHours()).toBe(0)
+    // An instant AT the start belongs to the day; one at the end does not.
+    expect(start.getTime()).toBeLessThanOrEqual(start.getTime())
+    expect(localDayBounds(start).start.getTime()).toBe(start.getTime())
+    expect(localDayBounds(end).start.getTime()).toBe(end.getTime())
+  })
+
+  it('is stable at a midnight instant (the boundary itself)', () => {
+    const midnight = localMidnight(2026, 6, 20)
+    const b = localDayBounds(midnight)
+    expect(b.start.getTime()).toBe(midnight.getTime())
+    expect(b.end.getTime()).toBe(localMidnight(2026, 6, 21).getTime())
+    // 1 ms earlier is the PREVIOUS day — the two windows partition the timeline.
+    const before = localDayBounds(new Date(midnight.getTime() - 1))
+    expect(before.end.getTime()).toBe(midnight.getTime())
+    expect(localDayKey(before.start)).toBe('2026-07-19')
+  })
+
+  it('rolls over month and year ends without a special case', () => {
+    expect(localDayKey(localDayBounds(new Date(2026, 6, 31, 22, 0)).end)).toBe('2026-08-01')
+    expect(localDayKey(localDayBounds(new Date(2026, 11, 31, 22, 0)).end)).toBe('2027-01-01')
+    // Leap day.
+    expect(localDayKey(localDayBounds(new Date(2028, 1, 28, 12, 0)).end)).toBe('2028-02-29')
   })
 })
 

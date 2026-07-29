@@ -7,6 +7,7 @@ import {
   parseQcm,
   type Card,
   type ParsedQcm,
+  type QueueNewCards,
   type ReviewPreview,
   type ReviewQueueResponse,
 } from '@engram/shared'
@@ -72,6 +73,22 @@ export interface SessionApi {
   undoing: boolean
   summary: SessionSummary | undefined
   canReviewAgain: boolean
+  /**
+   * The daily new-card budget the server applied when it drew THIS lot — how
+   * many never-seen cards it held back, and against which limit.
+   *
+   * Read straight off the frozen queue rather than carried through the reducer:
+   * the query is `staleTime: Infinity` on a key built from `sessionNow`, so it
+   * holds the numbers as of the draw for as long as the session lasts, which is
+   * exactly the value the empty state and the summary must quote. A
+   * REVIEW_AGAIN bumps `sessionNow`, refetches, and the numbers follow the new
+   * lot on their own.
+   *
+   * `undefined` when the server sent none (an older function mid-rollout — the
+   * field is optional in the contract); consumers must then say nothing about
+   * the budget rather than guess.
+   */
+  newCards: QueueNewCards | undefined
   reduce: boolean
   /**
    * The reveal to play, ALREADY arbitrated: the user's stored choice, or `none`
@@ -837,6 +854,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     undoing: state.undoing,
     summary,
     canReviewAgain,
+    newCards: queue.data?.newCards,
     reduce,
     revealAnimation,
     reveal,

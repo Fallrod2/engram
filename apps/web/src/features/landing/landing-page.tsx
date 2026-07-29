@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, Keyboard, LineChart, ScanLine } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLang, useT } from '@/lib/i18n'
 import { useTheme } from '@/lib/theme'
-import { createDemoSession, fetchHealth } from '@/lib/api'
+import { fetchHealth } from '@/lib/api'
 import { qk } from '@/lib/query-keys'
-import { supabase, AUTH_ENABLED_WEB } from '@/lib/supabase'
+import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuthStatus } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
+import { DemoBootWindow } from './demo-boot-window'
+import { useDemoBoot } from './use-demo-boot'
 
 /**
  * Public landing page (landing spec §2). Rendered OUTSIDE the app shell for a
@@ -323,11 +325,29 @@ function Hero() {
  *  3. WHILE THE PROBE IS IN FLIGHT we hold the button's footprint with a skeleton
  *     rather than popping the CTA in (or spinning): the hero must not reflow under
  *     the reader. Probe failed, or no demo → nothing is rendered at all.
+ *  4. THE WAIT IS OWNED BY `useDemoBoot`: open a session, wait for the server to
+ *     finish seeding, and only THEN sign the browser in — that order is what keeps
+ *     this page (and the boot window) mounted, because `routes/index.tsx` swaps
+ *     the landing for the dashboard as soon as the auth status flips. Past 500 ms
+ *     a window appears saying which step is running; see `use-demo-boot.ts` for
+ *     why 500 ms and why it is often never shown at all. A boot that never crosses
+ *     that threshold behaves EXACTLY as before: a pending button, then the app.
  */
 function DemoCta({ onFailedChange }: { onFailedChange: (failed: boolean) => void }) {
   const t = useT()
   const navigate = useNavigate()
-  const [pending, setPending] = useState(false)
+  const qc = useQueryClient()
+
+  const boot = useDemoBoot({
+    onEnter: () => void navigate({ to: '/' }),
+    onFailedChange,
+    // The boot already paid for `GET /api/me`; hand it to the cache so the app
+    // shell does not immediately ask again.
+    onPrimed: (me) => qc.setQueryData(qk.me, me),
+  })
+  // Deliberately stays true through `ready`: the landing is about to unmount and
+  // the button must not become clickable again in between.
+  const pending = boot.state.phase === 'working' || boot.state.phase === 'ready'
 
   const health = useQuery({
     queryKey: qk.health,
@@ -349,39 +369,19 @@ function DemoCta({ onFailedChange }: { onFailedChange: (failed: boolean) => void
   }
   if (!AUTH_ENABLED_WEB || !health.data?.demoLoginEnabled) return null
 
-  const start = async () => {
-    onFailedChange(false)
-    setPending(true)
-    try {
-      const session = await createDemoSession()
-      // `AUTH_ENABLED_WEB` above already implies a client; narrow for TypeScript.
-      if (!supabase) throw new Error('no supabase client')
-      const { error } = await supabase.auth.setSession({
-        access_token: session.accessToken,
-        refresh_token: session.refreshToken,
-      })
-      if (error) throw error
-      // Deliberately stay `pending` on the success path: the landing is about to
-      // unmount and the button must not become clickable again in between.
-      await navigate({ to: '/' })
-    } catch {
-      // Server-side detail (503 not configured, 429 rate-limited, 502 upstream)
-      // is not actionable for a visitor — one honest "try again in a moment".
-      onFailedChange(true)
-      setPending(false)
-    }
-  }
-
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="lg"
-      disabled={pending}
-      onClick={() => void start()}
-    >
-      {pending ? t('landing.hero.demoCtaPending') : t('landing.hero.demoCta')}
-    </Button>
+    <>
+      <Button type="button" variant="outline" size="lg" disabled={pending} onClick={boot.start}>
+        {pending ? t('landing.hero.demoCtaPending') : t('landing.hero.demoCta')}
+      </Button>
+      <DemoBootWindow
+        open={boot.windowOpen}
+        state={boot.state}
+        onRetry={boot.retry}
+        onDismiss={boot.dismiss}
+        onEnterAnyway={boot.enterAnyway}
+      />
+    </>
   )
 }
 

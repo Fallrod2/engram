@@ -18,6 +18,7 @@ import { notesRouter } from './routes/notes'
 import { generationsRouter } from './routes/generations'
 import { examsRouter } from './routes/exams'
 import { studyPlanRouter } from './routes/study-plan'
+import { studySettingsRouter } from './routes/study-settings'
 import { analyticsRouter } from './routes/analytics'
 import { backupRouter } from './routes/backup'
 import { aiRouter } from './routes/ai'
@@ -85,6 +86,7 @@ app.route('/api/notes', notesRouter) // upload/import + CRUD
 app.route('/api/generations', generationsRouter) // AI card generation + review
 app.route('/api/exams', examsRouter) // exam deadlines CRUD
 app.route('/api/study-plan', studyPlanRouter) // projected load + "today" suggestions
+app.route('/api/study-settings', studySettingsRouter) // daily pacing: new-card limit + goal
 app.route('/api/analytics', analyticsRouter) // heatmap, streaks, study-time, volume, retention, deck-success
 app.route('/api/backup', backupRouter) // full-database JSON export + restore
 app.route('/api/ai', aiRouter) // multi-provider AI config (settings, keys, test, models)

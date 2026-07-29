@@ -22,8 +22,8 @@ reviewRouter.get('/queue', zValidator('query', reviewQueueQuerySchema), async (c
     ...(q.deckId ? { deckId: q.deckId } : {}),
     ...(q.subjectId ? { subjectId: q.subjectId } : {}),
   }
-  const { total, cards } = await dueQueue(db, requireUserId(c), filter)
-  return ok(c, reviewQueueResponseSchema, { now: now.toISOString(), total, cards })
+  const { total, cards, newCards } = await dueQueue(db, requireUserId(c), filter)
+  return ok(c, reviewQueueResponseSchema, { now: now.toISOString(), total, cards, newCards })
 })
 
 reviewRouter.get('/counts', zValidator('query', reviewCountsQuerySchema), async (c) => {

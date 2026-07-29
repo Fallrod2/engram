@@ -525,6 +525,20 @@ export const dictFr = {
     analyticsMeta: '0 review enregistrée',
     sessionTitle: 'Rien à réviser — tout est à jour.',
     sessionMeta: '0 carte à réviser',
+    // La file est vide PARCE QUE le budget de nouvelles cartes du jour est épuisé.
+    // Surtout pas « tout est à jour » : des cartes attendent en silence.
+    sessionHeldTitle_one: '1 nouvelle carte est gardée pour demain.',
+    sessionHeldTitle_other: '{count} nouvelles cartes sont gardées pour demain.',
+    sessionHeldMeta: '{introduced}/{limit} nouvelles cartes introduites aujourd’hui',
+    sessionHeldHint:
+      'Ta limite quotidienne s’applique à toutes les matières : elle évite que les révisions des prochains jours s’accumulent. Rien n’est perdu, ces cartes arrivent demain.',
+    // Cas distinct : la limite est à 0, l’utilisateur a mis les nouveautés en pause.
+    // Ce n’est pas une limite atteinte, c’est un choix — le message le dit ainsi.
+    sessionPausedTitle: 'Les nouvelles cartes sont en pause.',
+    sessionPausedMeta_one: '1 carte jamais vue en attente · limite 0/jour',
+    sessionPausedMeta_other: '{count} cartes jamais vues en attente · limite 0/jour',
+    sessionPausedHint:
+      'Ta limite de nouvelles cartes est réglée sur 0, donc la file n’en introduit aucune. Les cartes dues, elles, restent toujours proposées.',
     sessionErrorTitle: 'File indisponible.',
     sessionErrorMeta: 'Impossible de charger la session',
   },
@@ -622,6 +636,14 @@ export const dictFr = {
       avgPerCard: 'Moy./carte',
       success: 'Réussite',
       reviewAgain: 'Réviser encore',
+      // Cas mixte : la session n’était PAS vide, mais des cartes neuves ont
+      // quand même été retenues — sinon l’utilisateur repart en croyant avoir
+      // tout vu. Ligne affichée uniquement quand il y a réellement des retenues.
+      held_one: '1 nouvelle carte est gardée pour demain (limite de {limit}/jour).',
+      held_other: '{count} nouvelles cartes sont gardées pour demain (limite de {limit}/jour).',
+      heldPaused_one: '1 carte jamais vue attend : tes nouvelles cartes sont en pause.',
+      heldPaused_other:
+        '{count} cartes jamais vues attendent : tes nouvelles cartes sont en pause.',
     },
   },
 
@@ -1304,6 +1326,57 @@ export const dictFr = {
       note: 'Gratuit, self-hosted, open source.',
       shotAlt:
         'Tableau de bord d’engram : cartes à réviser du jour, série de révision et activité récente.',
+    },
+    /**
+     * The "opening the demo" window. Every line describes something that is
+     * really happening: the three steps ARE the three calls the browser makes,
+     * and `server.*` are the three states `GET /api/demo/status` can return —
+     * `seeding` in particular is the server seeing its own seed lock held, not a
+     * guess. Nothing here was invented to fill the wait.
+     */
+    demoBoot: {
+      eyebrow: 'Compte de démonstration',
+      title: 'Ouverture de la démo',
+      description:
+        'Le serveur ouvre une session, installe un jeu de cartes complet, puis connecte ce navigateur. Cette fenêtre se ferme dès que c’est prêt.',
+      /** Accessible name of the indeterminate bar — the duration is unknown. */
+      progressLabel: 'Ouverture de la démo en cours',
+      steps: {
+        session: 'Ouverture de la session',
+        prepare: 'Préparation des données',
+        install: 'Connexion de ce navigateur',
+      },
+      stepStatus: {
+        done: 'terminé',
+        active: 'en cours',
+        todo: 'en attente',
+        failed: 'échec',
+        /** Used when the visitor chose not to wait — never a green check. */
+        skipped: 'non attendu',
+      },
+      server: {
+        pending: 'Le serveur n’a pas encore commencé.',
+        seeding: 'Le serveur installe les cartes de démonstration.',
+        ready: 'Données prêtes.',
+      },
+      ready: 'Tout est prêt.',
+      error: {
+        sessionTitle: 'La démo n’a pas pu s’ouvrir',
+        sessionBody:
+          'Le serveur n’a pas pu ouvrir de session de démonstration. Rien n’a été installé dans ton navigateur.',
+        installTitle: 'La connexion n’a pas abouti',
+        installBody:
+          'Le navigateur a refusé la session renvoyée par le serveur. Tu n’es pas connecté — rien n’est resté à moitié fait.',
+        prepareTitle: 'La préparation des données a échoué',
+        prepareBody:
+          'Le serveur n’a pas confirmé que les données de démonstration étaient prêtes. Ce navigateur n’a pas été connecté.',
+        timeoutTitle: 'La démo met trop de temps',
+        timeoutBody:
+          'Au bout de {seconds} secondes, le serveur n’a toujours pas confirmé que les données de démonstration étaient prêtes. Ce navigateur n’a pas encore été connecté.',
+        enterAnyway: 'Entrer quand même',
+        enterAnywayHint:
+          'Entrer maintenant connecte ce navigateur sans attendre : les cartes apparaîtront dès que le serveur aura fini.',
+      },
     },
     rhythm: {
       label: 'Le rythme de la mémoire',

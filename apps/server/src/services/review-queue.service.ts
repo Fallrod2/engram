@@ -1,9 +1,11 @@
-import { and, asc, count, eq, lte } from 'drizzle-orm'
-import type { Card, DueCounts } from '@engram/shared'
+import { and, asc, eq, lte, ne, sql, type SQL } from 'drizzle-orm'
+import { State } from 'ts-fsrs'
+import type { Card, DueCounts, QueueNewCards } from '@engram/shared'
 import type { DB } from '../db/client'
 import { card, deck, subject } from '../db/schema'
 import { cardToDto } from '../db/dto'
 import { localMidnight } from '../lib/day'
+import { newCardBudget } from './study-settings.service'
 
 export interface QueueFilter {
   deckId?: string
@@ -12,27 +14,18 @@ export interface QueueFilter {
   now: Date
 }
 
-/** Cards due at `now` (subject not archived), optionally filtered, plus the unpaged total. */
-export async function dueQueue(
-  db: DB,
-  userId: string,
-  f: QueueFilter,
-): Promise<{ total: number; cards: Card[] }> {
-  const where = and(
-    eq(card.userId, userId),
-    lte(card.due, f.now),
-    eq(subject.archived, false),
-    f.deckId ? eq(card.deckId, f.deckId) : undefined,
-    f.subjectId ? eq(subject.id, f.subjectId) : undefined,
-  )
-  const [totalRow] = await db
-    .select({ n: count() })
-    .from(card)
-    .innerJoin(deck, eq(deck.id, card.deckId))
-    .innerJoin(subject, eq(subject.id, deck.subjectId))
-    .where(where)
-  const total = totalRow?.n ?? 0
+export interface DueQueueResult {
+  /** Unpaged size of the queue AS OFFERED: due cards + the new cards still allowed. */
+  total: number
+  cards: Card[]
+  newCards: QueueNewCards
+}
 
+type CardRow = typeof card.$inferSelect
+
+/** One page of the queue, restricted to `extra` (new vs already-seen). */
+async function selectPage(db: DB, where: SQL | undefined, limit: number): Promise<CardRow[]> {
+  if (limit <= 0) return []
   const rows = await db
     .select()
     .from(card)
@@ -40,9 +33,93 @@ export async function dueQueue(
     .innerJoin(subject, eq(subject.id, deck.subjectId))
     .where(where)
     .orderBy(asc(card.due), asc(card.createdAt))
-    .limit(f.limit)
+    .limit(limit)
+  return rows.map((r) => r.card)
+}
 
-  return { total, cards: rows.map((r) => cardToDto(r.card)) }
+/**
+ * Cards due at `now` (subject not archived), optionally filtered, capped by the
+ * caller's DAILY NEW-CARD BUDGET.
+ *
+ * THE CAP APPLIES TO NEVER-SEEN CARDS ONLY (`State.New`). A card that is DUE is
+ * handed out whatever the limit is, including when the limit is 0: a due card
+ * that goes unreviewed does not politely wait, it accumulates and its schedule
+ * degrades — throttling it would be an actively harmful bug, not a stricter
+ * setting. The budget only decides how many cards ENTER the rotation today.
+ *
+ * This is also the ONLY place the limit is enforced. `reviewCard` deliberately
+ * does not check it: the limit paces the hand-out, it is not an authorization,
+ * and rejecting a grade the user already gave would throw away their answer and
+ * leave the card in a state its own log contradicts.
+ *
+ * Two queries instead of one because the two populations have independent caps
+ * (`f.limit` for the page, the daily budget for the new ones); they are merged
+ * back into the single global order `due ASC, created_at ASC`. On an exact tie
+ * the already-seen card wins — clearing the backlog before opening a new front
+ * is the right default, and `Array.prototype.sort` is stable, so putting the due
+ * rows first in the concatenation is what states it.
+ */
+export async function dueQueue(db: DB, userId: string, f: QueueFilter): Promise<DueQueueResult> {
+  const where = and(
+    eq(card.userId, userId),
+    lte(card.due, f.now),
+    eq(subject.archived, false),
+    f.deckId ? eq(card.deckId, f.deckId) : undefined,
+    f.subjectId ? eq(subject.id, f.subjectId) : undefined,
+  )
+
+  const [split, budget] = await Promise.all([
+    dueSplitCounts(db, where),
+    newCardBudget(db, userId, f.now),
+  ])
+
+  const allowedNew = Math.min(budget.remaining, split.newCount)
+  const withheld = split.newCount - allowedNew
+
+  const seenRows = await selectPage(db, and(where, ne(card.state, State.New)), f.limit)
+  const newRows = await selectPage(
+    db,
+    and(where, eq(card.state, State.New)),
+    Math.min(allowedNew, f.limit),
+  )
+
+  const merged = [...seenRows, ...newRows]
+    .sort(
+      (a, b) => a.due.getTime() - b.due.getTime() || a.createdAt.getTime() - b.createdAt.getTime(),
+    )
+    .slice(0, f.limit)
+
+  return {
+    total: split.seenCount + allowedNew,
+    cards: merged.map(cardToDto),
+    newCards: {
+      limit: budget.limit,
+      introduced: budget.introduced,
+      remaining: budget.remaining,
+      withheld,
+    },
+  }
+}
+
+/**
+ * The eligible population split in one pass: never-seen vs already-seen. A
+ * single grouped scan (`FILTER`) rather than two `count()` round-trips — the
+ * predicate is identical, only the bucket differs.
+ */
+async function dueSplitCounts(
+  db: DB,
+  where: SQL | undefined,
+): Promise<{ newCount: number; seenCount: number }> {
+  const [row] = await db
+    .select({
+      newCount: sql<number>`count(*) filter (where ${card.state} = ${State.New})`.mapWith(Number),
+      seenCount: sql<number>`count(*) filter (where ${card.state} <> ${State.New})`.mapWith(Number),
+    })
+    .from(card)
+    .innerJoin(deck, eq(deck.id, card.deckId))
+    .innerJoin(subject, eq(subject.id, deck.subjectId))
+    .where(where)
+  return { newCount: row?.newCount ?? 0, seenCount: row?.seenCount ?? 0 }
 }
 
 interface DueSplit {

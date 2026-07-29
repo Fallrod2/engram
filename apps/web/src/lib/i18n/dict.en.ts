@@ -498,6 +498,20 @@ export const dictEn: Dict = {
     analyticsMeta: '0 review recorded',
     sessionTitle: 'Nothing to review — all caught up.',
     sessionMeta: '0 card due',
+    // The queue is empty BECAUSE the day's new-card budget is spent. Never
+    // "all caught up" here: cards are waiting in silence.
+    sessionHeldTitle_one: '1 new card is held back for tomorrow.',
+    sessionHeldTitle_other: '{count} new cards are held back for tomorrow.',
+    sessionHeldMeta: '{introduced}/{limit} new cards introduced today',
+    sessionHeldHint:
+      'Your daily limit spans every subject: it keeps the next few days from piling up. Nothing is lost — these cards come back tomorrow.',
+    // Distinct case: the limit is 0, new cards are paused on purpose. Not a
+    // limit that was hit — a choice, and the copy says so.
+    sessionPausedTitle: 'New cards are paused.',
+    sessionPausedMeta_one: '1 never-seen card waiting · limit 0/day',
+    sessionPausedMeta_other: '{count} never-seen cards waiting · limit 0/day',
+    sessionPausedHint:
+      'Your new-card limit is set to 0, so the queue introduces none. Cards that are due are still always offered.',
     sessionErrorTitle: 'Queue unavailable.',
     sessionErrorMeta: 'Could not load the session',
   },
@@ -584,6 +598,13 @@ export const dictEn: Dict = {
       avgPerCard: 'Avg/card',
       success: 'Success',
       reviewAgain: 'Review again',
+      // Mixed case: the session was NOT empty, yet new cards were still held
+      // back — otherwise the user leaves believing they have seen everything.
+      // Rendered only when something is actually held back.
+      held_one: '1 new card is held back for tomorrow (limit of {limit}/day).',
+      held_other: '{count} new cards are held back for tomorrow (limit of {limit}/day).',
+      heldPaused_one: '1 never-seen card is waiting: your new cards are paused.',
+      heldPaused_other: '{count} never-seen cards are waiting: your new cards are paused.',
     },
   },
 
@@ -1243,6 +1264,48 @@ export const dictEn: Dict = {
       demoError: 'The demo is unavailable right now. Try again in a moment.',
       note: 'Free, self-hosted, open source.',
       shotAlt: 'engram dashboard: cards due today, review streak and recent activity.',
+    },
+    demoBoot: {
+      eyebrow: 'Demo account',
+      title: 'Opening the demo',
+      description:
+        'The server opens a session, installs a full set of cards, then signs this browser in. This window closes as soon as it is ready.',
+      progressLabel: 'Opening the demo',
+      steps: {
+        session: 'Opening the session',
+        prepare: 'Preparing the data',
+        install: 'Signing this browser in',
+      },
+      stepStatus: {
+        done: 'done',
+        active: 'in progress',
+        todo: 'waiting',
+        failed: 'failed',
+        skipped: 'not waited for',
+      },
+      server: {
+        pending: 'The server has not started yet.',
+        seeding: 'The server is installing the demo cards.',
+        ready: 'Data ready.',
+      },
+      ready: 'Everything is ready.',
+      error: {
+        sessionTitle: 'The demo could not be opened',
+        sessionBody:
+          'The server could not open a demo session. Nothing was installed in your browser.',
+        installTitle: 'Signing in did not go through',
+        installBody:
+          'Your browser refused the session the server returned. You are not signed in — nothing was left half done.',
+        prepareTitle: 'Preparing the data failed',
+        prepareBody:
+          'The server never confirmed that the demo data was ready. This browser was not signed in.',
+        timeoutTitle: 'The demo is taking too long',
+        timeoutBody:
+          'After {seconds} seconds the server still has not confirmed that the demo data is ready. This browser has not been signed in yet.',
+        enterAnyway: 'Enter anyway',
+        enterAnywayHint:
+          'Entering now signs this browser in without waiting: the cards will appear as soon as the server is done.',
+      },
     },
     rhythm: {
       label: 'The rhythm of memory',

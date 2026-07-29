@@ -162,9 +162,14 @@ export async function seedDeck(
 
 /**
  * Seed a card. Defaults to a pristine `createEmptyCard()` — so `difficulty`,
- * `reps` and `lapses` are all 0, i.e. the NEVER-REVIEWED state. Override them to
- * pose a card FSRS has already graded (the difficulty ranking reads exactly
- * these three columns).
+ * `reps` and `lapses` are all 0 AND `state` is `New(0)`, i.e. the NEVER-REVIEWED
+ * state. Override them to pose a card FSRS has already graded (the difficulty
+ * ranking reads exactly those three columns).
+ *
+ * `state` matters beyond the ranking: the review queue treats `New(0)` as "never
+ * seen" and meters it against the daily new-card budget, so a test that wants an
+ * ALREADY-SEEN due card — the population the budget must never touch — has to
+ * say so with `state: State.Review`.
  */
 export async function seedCard(
   db: DB,
@@ -177,6 +182,7 @@ export async function seedCard(
     difficulty?: number
     reps?: number
     lapses?: number
+    state?: number
   } = {},
 ) {
   const cols = fsrsCardToColumns(createEmptyCard(new Date()))
@@ -192,6 +198,7 @@ export async function seedCard(
       ...(o.difficulty !== undefined ? { difficulty: o.difficulty } : {}),
       ...(o.reps !== undefined ? { reps: o.reps } : {}),
       ...(o.lapses !== undefined ? { lapses: o.lapses } : {}),
+      ...(o.state !== undefined ? { state: o.state } : {}),
     })
     .returning()
   return row!
