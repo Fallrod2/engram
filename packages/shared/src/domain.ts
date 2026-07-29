@@ -682,10 +682,106 @@ export const uploadNoteMetaSchema = z.object({
   subjectId: z.string().min(1).optional(),
 })
 export type UploadNoteMeta = z.infer<typeof uploadNoteMetaSchema>
+
+// --- Study pacing: new-card limit + daily goal -----------------------------
+
+/**
+ * TWO NUMBERS OF DIFFERENT NATURES. Never conflate them:
+ *
+ *  - `newCardsPerDay` is a HARD CONSTRAINT, and it constrains exactly ONE thing:
+ *    the introduction of cards that have never been seen (FSRS `State.New`).
+ *    Without it, importing a 300-card course makes every following day explode,
+ *    because each new card comes back three to five times in its first week —
+ *    this is the single guard-rail against giving up on day three. It NEVER
+ *    holds back a card that is DUE: a due card that is not reviewed does not
+ *    wait, it piles up and its schedule degrades. `0` = introduce nothing today
+ *    (a legitimate pause); the max is the practical "no limit".
+ *
+ *  - `dailyGoal` is INDICATIVE ONLY — display and motivation. It constrains
+ *    nothing whatsoever: someone who wants to review past their goal must be
+ *    able to. No server code path may ever read it to filter or cap anything.
+ */
+export const STUDY_NEW_CARDS_PER_DAY_DEFAULT = 20
+export const STUDY_DAILY_GOAL_DEFAULT = 30
+/** Practical ceilings (Anki's convention): high enough to mean "unlimited". */
+export const STUDY_PACE_MAX = 9999
+
+export const studySettingsSchema = z.object({
+  newCardsPerDay: z.number().int().min(0).max(STUDY_PACE_MAX),
+  dailyGoal: z.number().int().min(1).max(STUDY_PACE_MAX),
+})
+
+/** `PATCH /api/study-settings` — every field optional, an empty body is a no-op. */
+export const updateStudySettingsSchema = studySettingsSchema.partial()
+
+export const studySettingsQuerySchema = z.object({ now: iso.optional() })
+
+/**
+ * Where the caller stands TODAY (local calendar day, `apps/server/src/lib/day.ts`).
+ *
+ * `newCardsIntroduced` counts the distinct cards that LEFT the `New` state today,
+ * read from `review_log` rows whose `state` (the state BEFORE the review) is
+ * `New` and whose `review` instant falls in today's local day. That is the only
+ * definition verifiable in the database: revealing a card and quitting without
+ * grading writes no row (so it does not count), and an undo hard-deletes its row
+ * (so the counter walks back by construction, with no compensating code).
+ *
+ * `reviewsDone` is every review logged today — it is what `dailyGoal` is compared
+ * against, and it caps nothing.
+ */
+export const studyPaceTodaySchema = z.object({
+  day: localDaySchema,
+  newCardsIntroduced: z.number().int().nonnegative(),
+  /** `max(0, newCardsPerDay − newCardsIntroduced)`. */
+  newCardsRemaining: z.number().int().nonnegative(),
+  reviewsDone: z.number().int().nonnegative(),
+})
+
+export const studySettingsResponseSchema = z.object({
+  settings: studySettingsSchema,
+  today: studyPaceTodaySchema,
+})
+
+export type StudySettings = z.infer<typeof studySettingsSchema>
+export type UpdateStudySettings = z.infer<typeof updateStudySettingsSchema>
+export type StudySettingsQuery = z.infer<typeof studySettingsQuerySchema>
+export type StudyPaceToday = z.infer<typeof studyPaceTodaySchema>
+export type StudySettingsResponse = z.infer<typeof studySettingsResponseSchema>
+
+/**
+ * The new-card budget as the review queue applied it. A limit the user cannot
+ * see is a limit they cannot understand, so the queue says so out loud —
+ * `withheld` is the number the UI needs ("12 nouvelles cartes gardées pour
+ * demain"), not a debug field.
+ */
+export const queueNewCardsSchema = z.object({
+  /** The `newCardsPerDay` setting in force for this caller. */
+  limit: z.number().int().nonnegative(),
+  introduced: z.number().int().nonnegative(),
+  remaining: z.number().int().nonnegative(),
+  /** Never-seen cards eligible right now but held back by the budget. */
+  withheld: z.number().int().nonnegative(),
+})
+export type QueueNewCards = z.infer<typeof queueNewCardsSchema>
+
+/**
+ * `total` is the unpaged size of the queue AS OFFERED — due cards (unbounded)
+ * plus the new cards the daily budget still allows. Cards in `newCards.withheld`
+ * are deliberately NOT in it: the session progress bar must count what the user
+ * will actually be handed, not what the raw `due <= now` predicate matches.
+ *
+ * `newCards` is OPTIONAL in the contract even though the server always sends it.
+ * `apps/web` parses THIS schema in the browser (`lib/api.ts`), and the bundle and
+ * the serverless function are deployed as two independent artefacts: during a
+ * Vercel rollout a freshly loaded bundle can hit a function that has not swapped
+ * yet. A required additive field would make that parse throw and blank the review
+ * screen for the length of the rollout. Clients read it defensively.
+ */
 export const reviewQueueResponseSchema = z.object({
   now: iso,
   total: z.number().int().nonnegative(),
   cards: z.array(cardSchema),
+  newCards: queueNewCardsSchema.optional(),
 })
 export const reviewResultSchema = z.object({ card: cardSchema, log: reviewLogSchema })
 /**

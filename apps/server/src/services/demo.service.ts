@@ -22,6 +22,7 @@ import {
 } from '../db/schema'
 import { fsrsCardToColumns, fsrsLogToRow } from '../db/mappers'
 import { localMidnight } from '../lib/day'
+import { STUDY_KEY } from './study-settings.service'
 
 /**
  * Demo account seeding (spec §4). A compact, credible FR dataset seeded on every
@@ -463,6 +464,16 @@ export async function seedDemo(tx: Tx, userId: string, marker: string): Promise<
   const now = new Date()
 
   await wipeUserData(tx, userId)
+
+  // The demo account is SHARED by every visitor, so its pacing must be reset with
+  // its data — otherwise one visitor setting `newCardsPerDay: 0` in the settings
+  // screen would hand the next visitor a queue with no new cards, for good. NOT
+  // folded into `wipeUserData`: that helper is also the GDPR delete path, where
+  // `admin.service.ts` already drops the whole `app_settings` row set, and the
+  // demo must keep its OTHER keys (the session marker it rewrites below).
+  await tx
+    .delete(appSettings)
+    .where(and(eq(appSettings.userId, userId), eq(appSettings.key, STUDY_KEY)))
 
   const subjTLId = crypto.randomUUID()
   const subjENId = crypto.randomUUID()

@@ -22,6 +22,28 @@ export function localMidnight(year: number, monthIndex: number, day: number): Da
 }
 
 /**
+ * The half-open instant window `[start, end)` of `d`'s LOCAL calendar day.
+ *
+ * This is the SAME convention as `dueCounts`' `todayMidnight` and the analytics
+ * buckets: the two bounds are computed from local `Date` components in JS and
+ * then compared as instants — the cut is never expressed as SQL date truncation
+ * (which would silently use UTC, or the database's timezone, and misfile every
+ * review of the first and last hours of the day).
+ *
+ * Half-open on purpose: an instant exactly at midnight belongs to the day that
+ * STARTS there, never to the one that ends there — so the two adjacent windows
+ * partition the timeline with no overlap and no gap. `monthIndex`/`day` overflow
+ * is handled by `Date` itself, so the 31st of a month and the 31st of December
+ * need no special case.
+ */
+export function localDayBounds(d: Date): { start: Date; end: Date } {
+  return {
+    start: localMidnight(d.getFullYear(), d.getMonth(), d.getDate()),
+    end: localMidnight(d.getFullYear(), d.getMonth(), d.getDate() + 1),
+  }
+}
+
+/**
  * Whole local calendar days from `a` to `b` (b − a). Both instants are reduced
  * to their local midnight so a partial DST day (23h/25h) still counts as one
  * day — `Math.round` absorbs the ±1h. E.g. `daysUntil = localDayDiff(now, exam)`.

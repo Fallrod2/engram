@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { eq, sql } from 'drizzle-orm'
+import { State } from 'ts-fsrs'
+import { STUDY_DAILY_GOAL_DEFAULT, STUDY_NEW_CARDS_PER_DAY_DEFAULT } from '@engram/shared'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
 import { card, deck, exam, examSubject, reviewLog, subject } from '../db/schema'
@@ -13,6 +15,7 @@ import {
   wipeUserData,
 } from './demo.service'
 import { dueQueue } from './review-queue.service'
+import { readStudySettings, updateStudySettings } from './study-settings.service'
 import { createSubject as makeSubject } from './subjects.service'
 import { createDeck } from './decks.service'
 import { createCard } from './cards.service'
@@ -91,6 +94,42 @@ describe('seedDemo', () => {
     expect(await readDemoMarker(db, DEMO)).toBe('sess-abc')
   })
 
+  /**
+   * The new-card limit must not be able to break the shop window. Two distinct
+   * risks, and the seed has to answer both.
+   */
+  it('leaves the visitor every new card of the dataset under the default limit', async () => {
+    await runSeed('no-session')
+    const res = await dueQueue(db, DEMO, { limit: 100, now: new Date() })
+    // No seeded review lands on today (every replayed review is >= 2 days old),
+    // so the visitor arrives with a full budget…
+    expect(res.newCards).toBeDefined()
+    expect(res.newCards.introduced).toBe(0)
+    expect(res.newCards.limit).toBe(STUDY_NEW_CARDS_PER_DAY_DEFAULT)
+    // …and the dataset's never-seen cards all fit inside it: nothing is withheld,
+    // a visitor never lands on a queue that silently hides part of the demo.
+    expect(res.newCards.withheld).toBe(0)
+    const newCards = (await db.select().from(card).where(eq(card.userId, DEMO))).filter(
+      (c) => c.state === State.New,
+    )
+    expect(newCards.length).toBeGreaterThan(0)
+    expect(newCards.length).toBeLessThanOrEqual(STUDY_NEW_CARDS_PER_DAY_DEFAULT)
+  })
+
+  it('resets the pacing a previous visitor may have changed', async () => {
+    // The demo account is SHARED. Without this reset, one visitor setting the
+    // limit to 0 would hand every following visitor a queue with no new card.
+    await runSeed('sess-1')
+    await updateStudySettings(db, DEMO, { newCardsPerDay: 0, dailyGoal: 1 }, new Date())
+    await runSeed('sess-2')
+    expect(await readStudySettings(db, DEMO)).toEqual({
+      newCardsPerDay: STUDY_NEW_CARDS_PER_DAY_DEFAULT,
+      dailyGoal: STUDY_DAILY_GOAL_DEFAULT,
+    })
+    // …and the session marker written by the same transaction survived it.
+    expect(await readDemoMarker(db, DEMO)).toBe('sess-2')
+  })
+
   it('is idempotent under the same marker (no doubling)', async () => {
     await runSeed('sess-1')
     await runSeed('sess-1')
@@ -118,9 +157,14 @@ describe('seedDemo round-trip budget', () => {
    * in another datacentre, so what costs is the NUMBER of statements, not the
    * work each one does: it used to emit 101 and take ~15 s in production.
    *
-   * The bound is asserted, not the exact figure, so adding a column or a wipe
-   * target does not fail the suite — but re-introducing a per-row `for` loop
-   * (25 cards → 25 inserts, 60 logs → 60 more) blows straight through it.
+   * The figure is pinned EXACTLY rather than bounded, so every added round-trip
+   * is a deliberate edit to this line and not a silent drift — re-introducing a
+   * per-row `for` loop (25 cards → 25 inserts, 60 logs → 60 more) blows straight
+   * through it, but so does one careless extra SELECT.
+   *
+   * 15 → 16 when the seed started resetting the shared account's study pacing
+   * (one scoped DELETE on `app_settings`): a preference a previous visitor left
+   * behind must not follow the next one. Fixed cost, independent of the dataset.
    *
    * drizzle-orm/pglite calls `client.query()` exactly once per executed
    * statement, so this counts real round-trips. `seedDemo` is driven WITHOUT
@@ -133,7 +177,7 @@ describe('seedDemo round-trip budget', () => {
     await seedDemo(db as never, DEMO, 'budget')
     const emitted = spy.mock.calls.length - before
     spy.mockRestore()
-    expect(emitted).toBe(15)
+    expect(emitted).toBe(16)
   })
 
   it('still writes the whole dataset in that budget', async () => {

@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { eq } from 'drizzle-orm'
+import { State } from 'ts-fsrs'
+import { STUDY_NEW_CARDS_PER_DAY_DEFAULT } from '@engram/shared'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
 import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
-import { seedCard, seedDeck, seedSubject } from '../test-support/harness'
+import { reviewLog } from '../db/schema'
+import { seedCard, seedDeck, seedReviewLog, seedSubject } from '../test-support/harness'
 import { localMidnight } from '../lib/day'
+import { updateStudySettings } from './study-settings.service'
 import { dueCounts, dueQueue } from './review-queue.service'
+
+const OTHER = '00000000-0000-4000-8000-0000000000ff'
 
 let t: TestDb
 let db: DB
@@ -89,7 +96,198 @@ describe('dueQueue', () => {
 
   it('queue_empty_deck', async () => {
     await seedDeck(db, (await seedSubject(db)).id)
-    expect(await dueQueue(db, U, { limit: 50, now: NOW })).toEqual({ total: 0, cards: [] })
+    expect(await dueQueue(db, U, { limit: 50, now: NOW })).toEqual({
+      total: 0,
+      cards: [],
+      newCards: {
+        limit: STUDY_NEW_CARDS_PER_DAY_DEFAULT,
+        introduced: 0,
+        remaining: 20,
+        withheld: 0,
+      },
+    })
+  })
+})
+
+/**
+ * The daily new-card budget. Two properties are load-bearing and are asserted
+ * separately because confusing them would be the grave defect:
+ *
+ *   1. a NEVER-SEEN card (`State.New`) is metered — beyond the budget the queue
+ *      stops introducing, and says how many it held back;
+ *   2. a DUE card is NEVER metered, whatever the limit, including 0. A due card
+ *      that goes unreviewed does not wait: it piles up and its schedule rots.
+ */
+describe('dueQueue new-card budget', () => {
+  /** Seed `n` never-seen cards, all due, in one deck. */
+  async function seedNew(n: number, deckId: string) {
+    for (let i = 0; i < n; i++) await seedCard(db, deckId, { due: ago((i + 1) * HOUR) })
+  }
+  /** Seed `n` already-seen due cards (state Review — reps > 0 in real life). */
+  async function seedSeen(n: number, deckId: string) {
+    for (let i = 0; i < n; i++) {
+      await seedCard(db, deckId, { due: ago((i + 1) * HOUR), state: State.Review, reps: 3 })
+    }
+  }
+  async function aDeck() {
+    return (await seedDeck(db, (await seedSubject(db)).id)).id
+  }
+  /** Mark `n` distinct cards as introduced today (a log whose PREVIOUS state was New). */
+  async function introduceToday(n: number, deckId: string) {
+    for (let i = 0; i < n; i++) {
+      const c = await seedCard(db, deckId, { due: ahead(365 * 24 * HOUR), state: State.Review })
+      await seedReviewLog(db, c.id, { state: State.New, review: NOW })
+    }
+  }
+
+  it('budget_default_caps_the_new_cards_and_reports_the_withheld', async () => {
+    const d = await aDeck()
+    await seedNew(25, d)
+    const res = await dueQueue(db, U, { limit: 500, now: NOW })
+    expect(res.cards).toHaveLength(STUDY_NEW_CARDS_PER_DAY_DEFAULT)
+    // `total` is the queue AS OFFERED, not the raw `due <= now` match: the
+    // session progress bar must not promise 25 cards and deliver 20.
+    expect(res.total).toBe(20)
+    expect(res.newCards).toEqual({ limit: 20, introduced: 0, remaining: 20, withheld: 5 })
+  })
+
+  it('budget_exactly_reached_introduces_nothing_more', async () => {
+    const d = await aDeck()
+    await updateStudySettings(db, U, { newCardsPerDay: 3 }, NOW)
+    await introduceToday(3, d) // exactly the limit, not one over
+    await seedNew(4, d)
+    const res = await dueQueue(db, U, { limit: 50, now: NOW })
+    expect(res.cards).toHaveLength(0)
+    expect(res.total).toBe(0)
+    expect(res.newCards).toEqual({ limit: 3, introduced: 3, remaining: 0, withheld: 4 })
+
+    // One below the limit → exactly one card comes through.
+    await updateStudySettings(db, U, { newCardsPerDay: 4 }, NOW)
+    const res2 = await dueQueue(db, U, { limit: 50, now: NOW })
+    expect(res2.cards).toHaveLength(1)
+    expect(res2.newCards).toEqual({ limit: 4, introduced: 3, remaining: 1, withheld: 3 })
+  })
+
+  it('budget_zero_pauses_new_cards_entirely', async () => {
+    const d = await aDeck()
+    await updateStudySettings(db, U, { newCardsPerDay: 0 }, NOW)
+    await seedNew(5, d)
+    const res = await dueQueue(db, U, { limit: 50, now: NOW })
+    expect(res.cards).toEqual([])
+    expect(res.total).toBe(0)
+    expect(res.newCards).toEqual({ limit: 0, introduced: 0, remaining: 0, withheld: 5 })
+  })
+
+  it('budget_never_withholds_a_due_card_whatever_the_limit', async () => {
+    // THE regression guard. Limit 0, plus a card the user already met and that
+    // FSRS scheduled for today: it must be handed out, every time.
+    const d = await aDeck()
+    await updateStudySettings(db, U, { newCardsPerDay: 0 }, NOW)
+    await seedSeen(6, d)
+    await seedNew(4, d)
+    const res = await dueQueue(db, U, { limit: 50, now: NOW })
+    expect(res.cards).toHaveLength(6)
+    expect(res.total).toBe(6)
+    expect(res.cards.every((c) => c.fsrs.state !== State.New)).toBe(true)
+    expect(res.newCards.withheld).toBe(4)
+
+    // Same with an overdue backlog far larger than any plausible limit.
+    await seedSeen(40, d)
+    const res2 = await dueQueue(db, U, { limit: 500, now: NOW })
+    expect(res2.total).toBe(46)
+    expect(res2.cards).toHaveLength(46)
+  })
+
+  it('budget_undoing_an_introduction_gives_the_slot_back', async () => {
+    const d = await aDeck()
+    await updateStudySettings(db, U, { newCardsPerDay: 1 }, NOW)
+    const spent = await seedCard(db, d, { due: ahead(365 * 24 * HOUR), state: State.Review })
+    const log = await seedReviewLog(db, spent.id, { state: State.New, review: NOW })
+    await seedNew(2, d)
+
+    expect((await dueQueue(db, U, { limit: 50, now: NOW })).newCards).toEqual({
+      limit: 1,
+      introduced: 1,
+      remaining: 0,
+      withheld: 2,
+    })
+
+    // `undoReview` hard-deletes the compensated log row. Nothing else runs, and
+    // the budget is restored — that is exactly why the counter reads review_log.
+    await db.delete(reviewLog).where(eq(reviewLog.id, log.id))
+    const after = await dueQueue(db, U, { limit: 50, now: NOW })
+    expect(after.newCards).toEqual({ limit: 1, introduced: 0, remaining: 1, withheld: 1 })
+    expect(after.cards).toHaveLength(1)
+  })
+
+  it('budget_ignores_introductions_made_before_local_midnight', async () => {
+    const d = await aDeck()
+    const midnight = localMidnight(NOW.getFullYear(), NOW.getMonth(), NOW.getDate())
+    await updateStudySettings(db, U, { newCardsPerDay: 2 }, NOW)
+    const old = await seedCard(db, d, { due: ahead(365 * 24 * HOUR), state: State.Review })
+    // 1 ms before today's local midnight → yesterday's budget, not today's.
+    await seedReviewLog(db, old.id, { state: State.New, review: new Date(midnight.getTime() - 1) })
+    await seedNew(5, d)
+    const res = await dueQueue(db, U, { limit: 50, now: NOW })
+    expect(res.newCards.introduced).toBe(0)
+    expect(res.cards).toHaveLength(2)
+  })
+
+  it('budget_is_global_not_per_deck', async () => {
+    // Filtering by deck must not hand out a fresh allowance: the point is the
+    // total load the next days carry, and that total ignores deck boundaries.
+    const s = await seedSubject(db)
+    const d1 = (await seedDeck(db, s.id)).id
+    const d2 = (await seedDeck(db, s.id)).id
+    await updateStudySettings(db, U, { newCardsPerDay: 2 }, NOW)
+    await seedNew(3, d1)
+    await seedNew(3, d2)
+    expect((await dueQueue(db, U, { limit: 50, now: NOW, deckId: d1 })).cards).toHaveLength(2)
+    expect((await dueQueue(db, U, { limit: 50, now: NOW, deckId: d2 })).cards).toHaveLength(2)
+    expect((await dueQueue(db, U, { limit: 50, now: NOW })).cards).toHaveLength(2)
+  })
+
+  it('budget_reads_the_callers_own_settings', async () => {
+    const d = await aDeck()
+    await updateStudySettings(db, OTHER, { newCardsPerDay: 0 }, NOW)
+    await seedNew(3, d)
+    // U never chose → defaults, unaffected by the other account's zero.
+    expect((await dueQueue(db, U, { limit: 50, now: NOW })).cards).toHaveLength(3)
+  })
+
+  it('budget_keeps_the_global_due_order_across_the_two_populations', async () => {
+    const d = await aDeck()
+    await updateStudySettings(db, U, { newCardsPerDay: 10 }, NOW)
+    await seedCard(db, d, { due: ago(2 * HOUR), front: 'new-old' })
+    await seedCard(db, d, { due: ago(3 * HOUR), front: 'seen-oldest', state: State.Review })
+    await seedCard(db, d, { due: ago(HOUR), front: 'seen-recent', state: State.Review })
+    const fronts = (await dueQueue(db, U, { limit: 50, now: NOW })).cards.map((c) => c.front)
+    // Merged back into ONE order (due ASC), not "all due cards, then all new".
+    expect(fronts).toEqual(['seen-oldest', 'new-old', 'seen-recent'])
+  })
+
+  it('budget_does_not_hide_new_cards_behind_the_page_limit_accounting', async () => {
+    const d = await aDeck()
+    await seedNew(5, d)
+    const res = await dueQueue(db, U, { limit: 2, now: NOW })
+    // `limit` pages the response; the budget is untouched by it, so the unpaged
+    // `total` still announces the 5 cards the day allows.
+    expect(res.cards).toHaveLength(2)
+    expect(res.total).toBe(5)
+    expect(res.newCards.withheld).toBe(0)
+  })
+
+  it('budget_ignores_the_daily_goal_entirely', async () => {
+    // The goal is indicative. Changing it must not move a single card.
+    const d = await aDeck()
+    await seedNew(4, d)
+    await seedSeen(2, d)
+    await updateStudySettings(db, U, { dailyGoal: 1 }, NOW)
+    const low = await dueQueue(db, U, { limit: 50, now: NOW })
+    await updateStudySettings(db, U, { dailyGoal: 999 }, NOW)
+    const high = await dueQueue(db, U, { limit: 50, now: NOW })
+    expect(low.total).toBe(6)
+    expect(high).toEqual(low)
   })
 })
 
