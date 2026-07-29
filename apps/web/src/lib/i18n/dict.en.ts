@@ -588,8 +588,10 @@ export const dictEn: Dict = {
       good: 'Good',
       easy: 'Easy',
     },
-    ratingAriaNext: '{label} — next review in {interval}',
-    ratingAriaRate: '{label} — rate this card',
+    verdictWrong: 'I got it wrong',
+    verdictRight: 'I got it right',
+    gradeAriaNext: '{label} — recorded as {grade}, next review in {interval}',
+    gradeAriaRate: '{label} — recorded as {grade}',
     summary: {
       done: 'Session complete',
       cardsViewed_one: 'card seen',
@@ -863,7 +865,8 @@ export const dictEn: Dict = {
     aboutDesc: 'Self-hosted review dashboard (FSRS).',
     version: 'Version',
     mode: 'Mode',
-    modeValue: 'Localhost · single-user',
+    modeMultiUser: 'Authentication on · multi-user',
+    modeSingleUser: 'Authentication off · single-user',
     landing: 'Landing page',
     landingAction: 'Open',
     accountTitle: 'Account',
@@ -1334,7 +1337,7 @@ export const dictEn: Dict = {
       review: {
         title: 'The review session',
         caption: 'The one screen you actually live in — built to keep you on the keyboard.',
-        alt: 'engram review session: a flipped card with the four grades Again, Hard, Good, Easy.',
+        alt: 'engram review session: a revealed card, the answer under the question, and the rating bar below it.',
       },
       analytics: {
         title: 'Your progress, made clear',

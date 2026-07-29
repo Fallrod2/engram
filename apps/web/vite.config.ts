@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -17,10 +18,42 @@ const apiTarget = process.env.VITE_API_TARGET ?? 'http://localhost:3001'
 const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
 const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? ''
 
+/**
+ * Revision of the code being built — the source "Réglages → À propos" prints as
+ * the version (see `src/lib/build-info.ts` for why it is not `package.json`).
+ * Vercel injects `VERCEL_GIT_COMMIT_SHA` and does not always leave a usable
+ * `.git` behind, so it wins; locally git answers. Neither available (a source
+ * tarball) ⇒ empty, and About degrades to the build date rather than inventing
+ * a number. Never throws: a version string must not be able to fail a build.
+ */
+function commitSha(): string {
+  const fromCi = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA
+  if (fromCi) return fromCi.slice(0, 7)
+  try {
+    return execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
+      cwd: fileURLToPath(new URL('.', import.meta.url)),
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim()
+  } catch {
+    return ''
+  }
+}
+
+// Host the landing's fake browser chrome is labelled with. Normally EMPTY: the
+// page reads its own `window.location.host`, which is already the truth in prod
+// and in dev alike. Set only by the capture script, whose runtime host (:5176)
+// is not the host `og.png` advertises. See `src/lib/build-info.ts#siteHost`.
+const siteHost = process.env.VITE_SITE_HOST ?? ''
+
 export default defineConfig({
   define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnon),
+    'import.meta.env.VITE_APP_COMMIT': JSON.stringify(commitSha()),
+    'import.meta.env.VITE_APP_BUILT_AT': JSON.stringify(new Date().toISOString()),
+    'import.meta.env.VITE_SITE_HOST': JSON.stringify(siteHost),
   },
   plugins: [
     // Router codegen must run before the React plugin.

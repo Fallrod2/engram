@@ -9,6 +9,10 @@ export default defineConfig({
     alias: {
       // Mirror apps/web's `@/*` path alias so components resolve in tests.
       '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
+      // `scripts/` is outside every workspace, so Bun leaves it no
+      // `node_modules/@engram/shared` link. Tests there (landing-seed) import
+      // the shared Zod schemas at RUNTIME, not just as types, hence the alias.
+      '@engram/shared': fileURLToPath(new URL('./packages/shared/src/index.ts', import.meta.url)),
     },
   },
   test: {
@@ -22,6 +26,11 @@ export default defineConfig({
       'apps/**/*.test.tsx',
       'packages/**/*.test.ts',
       'e2e/**/*.test.ts',
+      // `scripts/landing-seed.ts` builds the dataset every landing capture is
+      // taken from. Its invariants (the 12+5 backlog split, the QCM Markdown
+      // contract, a year of heatmap history) are only ever observed in a PNG on
+      // the public site, so they are asserted here instead.
+      'scripts/**/*.test.ts',
     ],
   },
 })

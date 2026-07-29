@@ -626,8 +626,17 @@ export const dictFr = {
       good: 'Bien',
       easy: 'Facile',
     },
-    ratingAriaNext: '{label} — prochaine révision dans {interval}',
-    ratingAriaRate: '{label} — noter cette carte',
+    // T-047 : le geste courant est binaire — « j'ai eu juste » ou « j'ai eu
+    // faux » — et l'app en déduit la note FSRS, exactement comme sur un QCM.
+    // Les quatre niveaux restent accessibles aux touches 1-4, sans être affichés.
+    verdictWrong: 'J’ai eu faux',
+    verdictRight: 'J’ai eu juste',
+    // Le nom accessible dit les trois mêmes choses que le bouton, dans le même
+    // ordre : ce que l'utilisateur déclare, la note ÉCRITE pour lui, et quand la
+    // carte revient. Le raccourci n'y est jamais (il est dans
+    // `aria-keyshortcuts`, et un téléphone n'a pas de touche à promettre).
+    gradeAriaNext: '{label} — noté {grade}, prochaine révision dans {interval}',
+    gradeAriaRate: '{label} — noté {grade}',
     summary: {
       done: 'Session terminée',
       cardsViewed_one: 'carte vue',
@@ -912,7 +921,14 @@ export const dictFr = {
     aboutDesc: 'Dashboard de révision self-hosted (FSRS).',
     version: 'Version',
     mode: 'Mode',
-    modeValue: 'Localhost · mono-utilisateur',
+    /**
+     * The two REAL deployment modes, chosen from `GET /api/health.authEnforced`
+     * (see `ModeRow` in routes/settings.tsx). Replaces the constant
+     * "Localhost · mono-utilisateur", which the public multi-user deployment had
+     * made false.
+     */
+    modeMultiUser: 'Authentification activée · multi-utilisateur',
+    modeSingleUser: 'Authentification désactivée · mono-utilisateur',
     /** Row + ⌘K entry leading back to the public landing (`/welcome`). */
     landing: 'Page de présentation',
     landingAction: 'Ouvrir',
@@ -1405,7 +1421,12 @@ export const dictFr = {
       review: {
         title: 'La session de révision',
         caption: 'Le seul écran où tu passes du temps — pensé pour y rester au clavier.',
-        alt: 'Session de révision engram : une carte retournée avec les quatre notes Encore, Difficile, Bien, Facile.',
+        // Décrit la STRUCTURE de la capture, pas le nombre de boutons : T-047 a
+        // remplacé les quatre notes par deux verdicts sur une carte classique, et
+        // T-046 a rendu la révélation configurable (« retournée » n'est vrai que
+        // pour le flip). Une alt qui compte les boutons redevient fausse au
+        // prochain arbitrage produit.
+        alt: 'Session de révision engram : une carte révélée, la réponse sous la question, et la barre de notation en dessous.',
       },
       analytics: {
         title: 'Ta progression, en clair',
