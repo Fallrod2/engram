@@ -1,4 +1,5 @@
-import { RotateCcw, Undo2 } from 'lucide-react'
+import { Hourglass, RotateCcw, Undo2 } from 'lucide-react'
+import type { QueueNewCards } from '@engram/shared'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import { cn } from '@/lib/utils'
@@ -6,6 +7,7 @@ import { useT, usePlural } from '@/lib/i18n'
 import { useShortcutName, useTouchSession } from './pointer-labels'
 import { RATINGS } from './labels'
 import type { SessionSummary as Summary } from './summary'
+import { withheldNote } from './new-card-budget'
 import { formatDurationClock, formatSeconds } from './interval-format'
 
 /** Distribution segment fill per rating token (literal classes for Tailwind). */
@@ -29,6 +31,7 @@ const SEG_TEXT: Record<(typeof RATINGS)[number]['token'], string> = {
  */
 export function SessionSummary({
   summary,
+  newCards,
   canReviewAgain,
   canUndo,
   undoing,
@@ -37,6 +40,16 @@ export function SessionSummary({
   onUndo,
 }: {
   summary: Summary
+  /**
+   * The daily new-card budget as applied to this lot. Drives ONE conditional
+   * line — the mixed case, where the session was not empty yet cards were still
+   * held back, and the user would otherwise walk away thinking they are done.
+   *
+   * Optional because `undefined` is already a legal value of it (an older
+   * function mid-rollout sends no budget), and because a summary rendered
+   * without it is a valid summary: it simply says nothing about the budget.
+   */
+  newCards?: QueueNewCards | undefined
   canReviewAgain: boolean
   /** The rating that ended the session is still undoable — offer it here too. */
   canUndo: boolean
@@ -54,6 +67,9 @@ export function SessionSummary({
   const name = useShortcutName()
   const tap = cn(touch && 'h-11 px-4')
   const { viewed, byGrade, totalMs, avgMs, successRate } = summary
+  // `null` in the common case — the summary must not carry a permanent line
+  // reading "0 cards held back".
+  const held = withheldNote(newCards)
 
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col items-center gap-7 px-6 text-center">
@@ -99,6 +115,23 @@ export function SessionSummary({
         <Stat label={t('session.summary.avgPerCard')} value={formatSeconds(avgMs)} />
         <Stat label={t('session.summary.success')} value={`${successRate} %`} />
       </div>
+
+      {/* Why the session stopped where it did — only when it actually did. */}
+      {held && (
+        <p className="flex items-start gap-2 text-left text-sm leading-relaxed text-text-muted">
+          <Hourglass className="mt-0.5 size-4 shrink-0 text-text-faint" aria-hidden />
+          <span>
+            {held.paused
+              ? t(`session.summary.heldPaused_${plural(held.withheld)}`, {
+                  count: held.withheld,
+                })
+              : t(`session.summary.held_${plural(held.withheld)}`, {
+                  count: held.withheld,
+                  limit: held.limit,
+                })}
+          </span>
+        </p>
+      )}
 
       <div className="flex flex-col items-center gap-2">
         <Button autoFocus onClick={onExit} className={tap}>

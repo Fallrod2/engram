@@ -1081,3 +1081,84 @@ describe('useReviewSession — a coarse pointer takes nothing away from the keyb
     expect(result.current.counts[3]).toBe(0)
   })
 })
+
+/**
+ * The budget has to REACH the screen. It was computed server-side, exposed on
+ * the queue response — and then read by nobody, which is what let the empty
+ * state congratulate a user whose cards were merely being withheld.
+ */
+describe('useReviewSession — the daily new-card budget reaches the consumer', () => {
+  const budget = { limit: 20, introduced: 20, remaining: 0, withheld: 6 }
+
+  it('surfaces `newCards` from the queue response', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 1,
+      cards: [makeCard('c1')],
+      newCards: budget,
+    })
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+    expect(result.current.newCards).toEqual(budget)
+  })
+
+  it('still carries it in EMPTY — the case the empty state has to explain', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 0,
+      cards: [],
+      newCards: budget,
+    })
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('EMPTY'))
+    expect(result.current.newCards).toEqual(budget)
+  })
+
+  it('still carries it in SUMMARY, so the mixed case can be explained', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 1,
+      cards: [makeCard('c1')],
+      newCards: budget,
+    })
+    postReview.mockResolvedValue(reviewResult('c1', 'log-1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.reveal())
+    act(() => result.current.rate(3))
+    await waitFor(() => expect(result.current.phase).toBe('SUMMARY'))
+    // The frozen queue still holds the draw-time numbers — the ones that explain
+    // why THIS lot stopped where it did.
+    expect(result.current.newCards).toEqual(budget)
+  })
+
+  it('is undefined when the server sent none (older function mid-rollout)', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 0,
+      cards: [],
+    })
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('EMPTY'))
+    expect(result.current.newCards).toBeUndefined()
+  })
+
+  it('survives the card-edit cache patch (which rewrites the frozen entry)', async () => {
+    fetchReviewQueue.mockResolvedValue({
+      now: '2026-07-12T10:00:00.000Z',
+      total: 1,
+      cards: [makeCard('c1')],
+      newCards: budget,
+    })
+    updateCard.mockResolvedValue(makeCard('c1'))
+    const { result } = renderHook(() => useReviewSession({}), { wrapper })
+    await waitFor(() => expect(result.current.phase).toBe('ASKING'))
+
+    act(() => result.current.submitEdit({ front: 'edited', back: 'edited back' }))
+    await act(async () => {})
+    // `patchQueueCache` spreads `...old`; if it ever stopped doing so, the
+    // budget would vanish mid-session and the summary would go silent.
+    expect(result.current.newCards).toEqual(budget)
+  })
+})

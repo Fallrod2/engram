@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { QueueNewCards } from '@engram/shared'
 import type { RatingResult } from './session-reducer'
 import { computeSummary } from './summary'
 import { SessionSummary } from './session-summary'
@@ -115,5 +116,76 @@ describe('computeSummary + <SessionSummary> (§16.2 item 14)', () => {
     expect((pending as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(pending)
     expect(onUndo).toHaveBeenCalledTimes(1) // still one: the click was refused
+  })
+})
+
+/**
+ * The MIXED case: the session was not empty — the user reviewed cards and
+ * reached this summary — yet the daily budget still held new cards back. Without
+ * a word here they walk away believing they have seen everything there was.
+ *
+ * The line is strictly conditional: the common case is `withheld === 0`, and a
+ * permanent "0 cards held back" row would be noise on every single session.
+ */
+describe('<SessionSummary> — new cards held back by the daily budget', () => {
+  const base = {
+    summary: computeSummary(RESULTS),
+    canReviewAgain: false,
+    canUndo: false,
+    undoing: false,
+    onExit: () => {},
+    onReviewAgain: () => {},
+    onUndo: () => {},
+  }
+  const budget = (o: Partial<QueueNewCards> = {}): QueueNewCards => ({
+    limit: 20,
+    introduced: 0,
+    remaining: 20,
+    withheld: 0,
+    ...o,
+  })
+
+  it('says nothing when nothing was held back (the common case)', () => {
+    render(<SessionSummary {...base} newCards={budget({ withheld: 0 })} />)
+    expect(screen.queryByText(/gardée/)).toBeNull()
+  })
+
+  it('says nothing when the server sent no budget at all', () => {
+    render(<SessionSummary {...base} newCards={undefined} />)
+    expect(screen.queryByText(/gardée/)).toBeNull()
+  })
+
+  it('explains why the session stopped there, with the limit', () => {
+    render(
+      <SessionSummary
+        {...base}
+        newCards={budget({ limit: 20, introduced: 20, remaining: 0, withheld: 5 })}
+      />,
+    )
+    expect(
+      screen.getByText('5 nouvelles cartes sont gardées pour demain (limite de 20/jour).'),
+    ).toBeTruthy()
+    // The stats are untouched — the note is additive, not a replacement.
+    expect(screen.getByText('4')).toBeTruthy()
+  })
+
+  it('uses the singular for exactly one', () => {
+    render(
+      <SessionSummary
+        {...base}
+        newCards={budget({ limit: 3, introduced: 3, remaining: 0, withheld: 1 })}
+      />,
+    )
+    expect(
+      screen.getByText('1 nouvelle carte est gardée pour demain (limite de 3/jour).'),
+    ).toBeTruthy()
+  })
+
+  it('uses the paused wording when the limit is 0, never "limite de 0/jour"', () => {
+    render(<SessionSummary {...base} newCards={budget({ limit: 0, remaining: 0, withheld: 2 })} />)
+    expect(
+      screen.getByText('2 cartes jamais vues attendent : tes nouvelles cartes sont en pause.'),
+    ).toBeTruthy()
+    expect(screen.queryByText(/limite de 0/)).toBeNull()
   })
 })

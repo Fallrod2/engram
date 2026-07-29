@@ -1,17 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { CloudOff } from 'lucide-react'
+import { CloudOff, Hourglass } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import { RewardIllustration } from '@/components/illustrations'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { useT, type TFunction } from '@/lib/i18n'
+import { useT, usePlural, type TFunction } from '@/lib/i18n'
 import { useShell } from '@/components/shell/shell-context'
+import type { QueueNewCards } from '@engram/shared'
 import type { ReviewScope } from '@/lib/api'
 import { CardEditDialog } from '@/features/cards/card-edit-dialog'
 import { useReviewSession } from './use-review-session'
+import { emptyReason } from './new-card-budget'
 import { SessionExitButton, SessionHeader } from './session-header'
 import { useTouchSession } from './pointer-labels'
 import { ProgressBar } from './progress-bar'
@@ -111,12 +113,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
   if (api.phase === 'EMPTY') {
     return (
       <TerminalView onExit={api.requestExit}>
-        <EmptyState
-          illustration={<RewardIllustration />}
-          title={t('empty.sessionTitle')}
-          meta={t('empty.sessionMeta')}
-          action={<Button onClick={api.requestExit}>{t('common.backToDashboard')}</Button>}
-        />
+        <EmptyQueueView newCards={api.newCards} onExit={api.requestExit} />
       </TerminalView>
     )
   }
@@ -127,6 +124,7 @@ function PhaseView({ api }: { api: ReturnType<typeof useReviewSession> }) {
         {api.summary && (
           <SessionSummary
             summary={api.summary}
+            newCards={api.newCards}
             canReviewAgain={api.canReviewAgain}
             canUndo={api.canUndo}
             undoing={api.undoing}
@@ -284,6 +282,75 @@ function TerminalView({ children, onExit }: { children: React.ReactNode; onExit:
       <CloseButton onExit={onExit} />
       <div className="flex flex-1 items-center justify-center">{children}</div>
     </>
+  )
+}
+
+/**
+ * The empty queue, told truthfully. `total === 0` has three distinct causes and
+ * they must not share one message (see `new-card-budget.ts`):
+ *
+ *  - nothing at all → the congratulation, which is earned;
+ *  - the daily new-card budget is spent → N never-seen cards are waiting, and
+ *    saying "tout est à jour" here is a lie;
+ *  - the user paused new cards (limit 0) → also not "up to date", but not a
+ *    limit they hit either: a choice they made, phrased as such.
+ *
+ * The tone is deliberate: the limit is a protection the user gave themselves, so
+ * the copy explains what it buys them ("la charge des prochains jours") and
+ * never scolds. The illustration is kept only for the earned case — rewarding
+ * someone for a queue that is empty by policy is the defect being fixed.
+ *
+ * Exported for its test: like `ReviewCard`/`RatingBar` in `session-layout.test`,
+ * the copy is asserted on the component itself rather than through the portal,
+ * the shell context and a mocked hook.
+ */
+export function EmptyQueueView({
+  newCards,
+  onExit,
+}: {
+  newCards: QueueNewCards | undefined
+  onExit: () => void
+}) {
+  const t = useT()
+  const plural = usePlural()
+  const reason = emptyReason(newCards)
+  const back = <Button onClick={onExit}>{t('common.backToDashboard')}</Button>
+
+  if (reason.kind === 'nothing') {
+    return (
+      <EmptyState
+        illustration={<RewardIllustration />}
+        title={t('empty.sessionTitle')}
+        meta={t('empty.sessionMeta')}
+        action={back}
+      />
+    )
+  }
+
+  const held = reason.withheld
+  const title =
+    reason.kind === 'paused'
+      ? t('empty.sessionPausedTitle')
+      : t(`empty.sessionHeldTitle_${plural(held)}`, { count: held })
+  const meta =
+    reason.kind === 'paused'
+      ? t(`empty.sessionPausedMeta_${plural(held)}`, { count: held })
+      : t('empty.sessionHeldMeta', { introduced: reason.introduced, limit: reason.limit })
+
+  return (
+    <EmptyState
+      icon={Hourglass}
+      title={title}
+      meta={meta}
+      action={
+        <div className="flex flex-col items-center gap-3">
+          <p className="max-w-[46ch] text-pretty text-sm leading-relaxed text-text-muted">
+            {reason.kind === 'paused' ? t('empty.sessionPausedHint') : t('empty.sessionHeldHint')}
+          </p>
+          {back}
+        </div>
+      }
+    />
   )
 }
 

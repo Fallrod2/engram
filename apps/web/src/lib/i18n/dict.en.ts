@@ -498,6 +498,20 @@ export const dictEn: Dict = {
     analyticsMeta: '0 review recorded',
     sessionTitle: 'Nothing to review — all caught up.',
     sessionMeta: '0 card due',
+    // The queue is empty BECAUSE the day's new-card budget is spent. Never
+    // "all caught up" here: cards are waiting in silence.
+    sessionHeldTitle_one: '1 new card is held back for tomorrow.',
+    sessionHeldTitle_other: '{count} new cards are held back for tomorrow.',
+    sessionHeldMeta: '{introduced}/{limit} new cards introduced today',
+    sessionHeldHint:
+      'Your daily limit spans every subject: it keeps the next few days from piling up. Nothing is lost — these cards come back tomorrow.',
+    // Distinct case: the limit is 0, new cards are paused on purpose. Not a
+    // limit that was hit — a choice, and the copy says so.
+    sessionPausedTitle: 'New cards are paused.',
+    sessionPausedMeta_one: '1 never-seen card waiting · limit 0/day',
+    sessionPausedMeta_other: '{count} never-seen cards waiting · limit 0/day',
+    sessionPausedHint:
+      'Your new-card limit is set to 0, so the queue introduces none. Cards that are due are still always offered.',
     sessionErrorTitle: 'Queue unavailable.',
     sessionErrorMeta: 'Could not load the session',
   },
@@ -584,6 +598,13 @@ export const dictEn: Dict = {
       avgPerCard: 'Avg/card',
       success: 'Success',
       reviewAgain: 'Review again',
+      // Mixed case: the session was NOT empty, yet new cards were still held
+      // back — otherwise the user leaves believing they have seen everything.
+      // Rendered only when something is actually held back.
+      held_one: '1 new card is held back for tomorrow (limit of {limit}/day).',
+      held_other: '{count} new cards are held back for tomorrow (limit of {limit}/day).',
+      heldPaused_one: '1 never-seen card is waiting: your new cards are paused.',
+      heldPaused_other: '{count} never-seen cards are waiting: your new cards are paused.',
     },
   },
 
