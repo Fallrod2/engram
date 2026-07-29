@@ -748,6 +748,66 @@ export type StudySettingsQuery = z.infer<typeof studySettingsQuerySchema>
 export type StudyPaceToday = z.infer<typeof studyPaceTodaySchema>
 export type StudySettingsResponse = z.infer<typeof studySettingsResponseSchema>
 
+// --- First-run journey (onboarding) ----------------------------------------
+
+/**
+ * WHY THE JOURNEY IS NOT PENDING. Every value is a *reason*, not a flag, because
+ * the four cases have to be told apart in review and in tests — and because
+ * `pending: false` alone hides which rule fired.
+ *
+ *  - `new-account`     — nothing has been decided yet AND the account holds no
+ *                        content. This is the ONLY value with `pending: true`.
+ *  - `completed`       — the account went through the journey (or left it), and
+ *                        said so explicitly. `completedAt` carries the instant.
+ *  - `existing-account`— no marker, but the account already owns subjects, cards
+ *                        or notes. It PREDATES the journey, so it never gets
+ *                        redirected into it. This is the backfill, computed
+ *                        rather than written: see `onboarding.service.ts`.
+ *  - `demo`            — the shared demo account. Never offered the journey: a
+ *                        visitor must land in the product, and nothing they do
+ *                        may be visible to the next visitor.
+ *  - `disabled`        — the deployment turned the journey off
+ *                        (`ENGRAM_ONBOARDING_DISABLED=1`, used by the e2e suite,
+ *                        which runs on a brand-new database and would otherwise
+ *                        be redirected out of every screen it tests).
+ */
+export const onboardingReasonSchema = z.enum([
+  'new-account',
+  'completed',
+  'existing-account',
+  'demo',
+  'disabled',
+])
+
+/**
+ * `GET /api/onboarding` — should the app open the first-run journey by itself?
+ *
+ * The marker is SERVER-SIDE on purpose (Alex, 29/07/2026): in `localStorage` the
+ * journey would come back on every new browser, which is exactly the nagging it
+ * is meant to avoid. It lives under the `'onboarding'` key of `app_settings`,
+ * the per-user k/v store that already holds the AI config, the demo marker and
+ * the study pacing.
+ */
+export const onboardingStatusSchema = z.object({
+  /** `true` ⇒ the app redirects to the journey once, on the next navigation. */
+  pending: z.boolean(),
+  reason: onboardingReasonSchema,
+  /** ISO instant of the explicit completion, `null` when there is no marker. */
+  completedAt: iso.nullable(),
+})
+
+/**
+ * `PATCH /api/onboarding`. `completed: false` exists so the journey can be
+ * re-armed (a test, or a future "show me this again on my next login"); the
+ * settings screen does NOT use it — reopening is a plain link to the route, and
+ * an already-completed marker must survive a second pass.
+ */
+export const updateOnboardingSchema = z.object({ completed: z.boolean() })
+
+export type OnboardingReason = z.infer<typeof onboardingReasonSchema>
+export type OnboardingStatus = z.infer<typeof onboardingStatusSchema>
+export type UpdateOnboarding = z.infer<typeof updateOnboardingSchema>
+
 /**
  * The new-card budget as the review queue applied it. A limit the user cannot
  * see is a limit they cannot understand, so the queue says so out loud —

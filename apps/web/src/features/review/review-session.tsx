@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { CloudOff, Hourglass } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -346,7 +347,16 @@ export function EmptyQueueView({
           <p className="max-w-[46ch] text-pretty text-sm leading-relaxed text-text-muted">
             {reason.kind === 'paused' ? t('empty.sessionPausedHint') : t('empty.sessionHeldHint')}
           </p>
-          {back}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {back}
+            {/* The way to act on what this screen just explained (T-049). It was
+                left out before because no such control existed anywhere; the
+                shared pace control now lives in Settings, so naming the limit
+                without offering to change it would be the odd choice. */}
+            <Button variant="outline" asChild>
+              <Link to="/settings">{t('settings.pace.adjust')}</Link>
+            </Button>
+          </div>
         </div>
       }
     />

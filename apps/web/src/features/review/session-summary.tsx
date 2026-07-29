@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Hourglass, RotateCcw, Undo2 } from 'lucide-react'
 import type { QueueNewCards } from '@engram/shared'
 import { Button } from '@/components/ui/button'
@@ -116,9 +117,13 @@ export function SessionSummary({
         <Stat label={t('session.summary.success')} value={`${successRate} %`} />
       </div>
 
-      {/* Why the session stopped where it did — only when it actually did. */}
+      {/* Why the session stopped where it did — only when it actually did.
+          The link is the part T-049 adds: a previous pass refused to write
+          "change your limit" because the control existed NOWHERE. It exists
+          now (Settings → « Rythme de révision »), so the sentence that names a
+          limit also hands over the way to change it. */}
       {held && (
-        <p className="flex items-start gap-2 text-left text-sm leading-relaxed text-text-muted">
+        <div className="flex items-start gap-2 text-left text-sm leading-relaxed text-text-muted">
           <Hourglass className="mt-0.5 size-4 shrink-0 text-text-faint" aria-hidden />
           <span>
             {held.paused
@@ -128,9 +133,12 @@ export function SessionSummary({
               : t(`session.summary.held_${plural(held.withheld)}`, {
                   count: held.withheld,
                   limit: held.limit,
-                })}
+                })}{' '}
+            <Link to="/settings" className="font-medium text-accent hover:underline">
+              {t('settings.pace.adjust')}
+            </Link>
           </span>
-        </p>
+        </div>
       )}
 
       <div className="flex flex-col items-center gap-2">

@@ -508,6 +508,57 @@ export const dictFr = {
     createSubject: 'Créer une matière',
     importNotes: 'Importer des notes',
     loadExample: 'Charger un exemple',
+
+    /**
+     * Le parcours de mise en route (T-049). Distinct des clés ci-dessus, qui
+     * appartiennent au panneau d'accueil du tableau de bord : les deux coexistent
+     * et ne répondent pas à la même question (réglages vs premier contenu).
+     */
+    journey: {
+      title: 'Mise en route',
+      stepOf: 'Étape {current} sur {total}',
+      progressLabel: 'Progression de la mise en route',
+      quit: 'Quitter',
+      quitAria: 'Quitter la mise en route',
+      back: 'Retour',
+      next: 'Continuer',
+      skipStep: 'Passer cette étape',
+      skipLast: 'Terminer sans IA',
+      doneToast: 'Mise en route terminée.',
+      saveMarkerError: 'Impossible d’enregistrer la fin du parcours — il pourra réapparaître.',
+      reopenHint: 'Tu peux rouvrir ce parcours à tout moment depuis Réglages → À propos.',
+
+      appearance: {
+        title: 'La langue et le thème',
+        body: 'engram suit ton système par défaut. Change-les si tu préfères : l’effet est immédiat.',
+        systemNote:
+          'Tant que tu ne choisis rien, rien n’est enregistré : l’app suit ton navigateur et ton système, et te suit s’ils changent.',
+      },
+      pace: {
+        title: 'Ton rythme de révision',
+        body: 'Combien de cartes jamais vues engram t’introduit chaque jour. C’est le seul réglage ici qui change ce que la session te donnera.',
+      },
+      ai: {
+        title: 'Connecter une IA',
+        body: 'Avec une clé de provider, engram fabrique des cartes et des QCM à partir de tes notes. Sans, tu peux passer cette étape — c’est prévu.',
+        provider: 'Provider',
+        key: 'Clé API',
+        keyPlaceholder: 'Colle ta clé…',
+        keyServerSide:
+          'La clé part directement au serveur, où elle est stockée. Elle n’est jamais réaffichée dans le navigateur.',
+        save: 'Enregistrer et terminer',
+        saving: 'Enregistrement…',
+        saveError: 'La clé n’a pas pu être enregistrée.',
+        consequencesTitle: 'Si tu passes, voici ce qui reste indisponible',
+        consequenceCards: 'la génération de cartes et de QCM à partir d’une note,',
+        consequencePdf: 'l’exploitation du texte des PDF que tu importes,',
+        consequenceOcr: 'la lecture (OCR) des photos de notes.',
+        consequencesRest:
+          'Tout le reste fonctionne : créer des matières et des decks, écrire tes cartes, réviser, planifier, suivre tes stats. Tu pourras brancher une clé plus tard depuis Réglages.',
+        demoNotice:
+          'Compte de démonstration : sa configuration IA est fournie et partagée entre les visiteurs, elle ne peut pas être modifiée ici.',
+      },
+    },
   },
 
   empty: {
@@ -893,6 +944,34 @@ export const dictFr = {
       noticeSystemNeutral:
         'Ton système ne demande aucune réduction : les animations sont déjà actives.',
     },
+    /**
+     * Rythme de révision (T-049). Le composant est partagé avec l'étape 2 du
+     * parcours de mise en route, donc ces chaînes servent aux deux écrans — et
+     * c'est voulu : les deux doivent dire la même chose de ces deux nombres.
+     */
+    pace: {
+      title: 'Rythme de révision',
+      desc: 'Combien de nouvelles cartes engram introduit chaque jour, et l’objectif que tu te donnes.',
+      newCardsLabel: 'Nouvelles cartes par jour',
+      newCardsHint: 'Limite ferme. Une carte déjà due n’est jamais retenue.',
+      goalLabel: 'Objectif quotidien',
+      goalHint: 'Indicatif : rien ne t’empêche d’aller au-delà.',
+      presetsLabel: 'Valeurs rapides',
+      projection:
+        'Une carte neuve n’est pas une révision : elle revient trois à cinq fois dans sa première semaine. À ce rythme, compte {min} à {max} révisions par jour une fois le régime installé.',
+      projectionPaused:
+        'Aucune nouvelle carte ne sera introduite. Les cartes déjà commencées continuent d’arriver normalement.',
+      todayNew: '{introduced} / {limit} nouvelles cartes introduites aujourd’hui',
+      todayGoal: '{done} / {goal} révisions aujourd’hui',
+      why: 'C’est ce nombre qui décide si l’app reste tenable après un gros import : sans lui, 300 cartes importées un dimanche deviennent plus de mille révisions dans la semaine, et on abandonne au troisième jour. Rien n’est perdu — les cartes en trop arrivent les jours suivants.',
+      unavailable: 'Réglage du rythme indisponible pour l’instant.',
+      error: 'Le rythme n’a pas pu être enregistré.',
+      /** Lien depuis l'écran de session vers ce réglage. */
+      adjust: 'Modifier ma limite',
+    },
+    /** Ré-entrée dans le parcours de mise en route, depuis « À propos ». */
+    onboarding: 'Mise en route',
+    onboardingAction: 'Revoir',
     languageTitle: 'Langue',
     languageDesc: 'Langue de l’interface. « Système » suit la langue de ton navigateur.',
     language: 'Langue',

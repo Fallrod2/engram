@@ -1,7 +1,24 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { QueueNewCards } from '@engram/shared'
+
+/**
+ * Plain anchor instead of the router's `Link`, so this file keeps asserting the
+ * COPY on the component itself — no RouterProvider, no portal, no shell context.
+ * Same stub as `not-found.test.tsx`. The view gained a link to Settings when the
+ * study-pace control was built (T-049); without this, `useLinkProps` reaches for
+ * a router that is deliberately not mounted here.
+ */
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 import { LangProvider } from '@/lib/i18n'
 import { EmptyQueueView } from './review-session'
 

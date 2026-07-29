@@ -16,6 +16,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as PlanningRouteImport } from './routes/planning'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -62,6 +63,11 @@ const ReviewRoute = ReviewRouteImport.update({
 const PlanningRoute = PlanningRouteImport.update({
   id: '/planning',
   path: '/planning',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
   '/set-password': typeof SetPasswordRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/planning'
     | '/review'
     | '/set-password'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/planning'
     | '/review'
     | '/set-password'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/planning'
     | '/review'
     | '/set-password'
@@ -263,6 +275,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
   PlanningRoute: typeof PlanningRoute
   ReviewRoute: typeof ReviewRoute
   SetPasswordRoute: typeof SetPasswordRoute
@@ -328,6 +341,13 @@ declare module '@tanstack/react-router' {
       path: '/planning'
       fullPath: '/planning'
       preLoaderRoute: typeof PlanningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -423,6 +443,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
   PlanningRoute: PlanningRoute,
   ReviewRoute: ReviewRoute,
   SetPasswordRoute: SetPasswordRoute,
