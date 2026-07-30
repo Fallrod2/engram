@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Rating, State } from 'ts-fsrs'
-import { fsrsRatingSchema, fsrsStateSchema, fsrsGradeSchema } from '@engram/shared'
+import {
+  fsrsRatingSchema,
+  fsrsStateSchema,
+  fsrsGradeSchema,
+  fsrsStateNameSchema,
+  FSRS_STATE_BY_NAME,
+} from '@engram/shared'
 
 /**
  * Guard the Zod FSRS literals against the real ts-fsrs enum values. If a
@@ -35,5 +41,24 @@ describe('FSRS enum conformity (ts-fsrs 5.4.1)', () => {
       expect(fsrsGradeSchema.safeParse(v).success).toBe(true)
     }
     expect(fsrsGradeSchema.safeParse(0).success).toBe(false)
+  })
+
+  /**
+   * `?state=review` in the search API resolves through `FSRS_STATE_BY_NAME`.
+   * If ts-fsrs ever renumbers `State`, this breaks here rather than silently
+   * filtering the wrong bucket in production.
+   */
+  it('state NAMES map to the ts-fsrs State integers', () => {
+    expect(FSRS_STATE_BY_NAME.new).toBe(State.New)
+    expect(FSRS_STATE_BY_NAME.learning).toBe(State.Learning)
+    expect(FSRS_STATE_BY_NAME.review).toBe(State.Review)
+    expect(FSRS_STATE_BY_NAME.relearning).toBe(State.Relearning)
+  })
+
+  it('every state name has a mapping, and no extra one', () => {
+    const names = fsrsStateNameSchema.options
+    expect(Object.keys(FSRS_STATE_BY_NAME).sort()).toEqual([...names].sort())
+    // The four integers are exactly the four the DB CHECK constraint allows.
+    expect(Object.values(FSRS_STATE_BY_NAME).sort()).toEqual([0, 1, 2, 3])
   })
 })
