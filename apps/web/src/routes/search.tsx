@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Layers, Search as SearchIcon, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search as SearchIcon, X } from 'lucide-react'
 import type { CardSearchHit } from '@engram/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { ConfirmDelete } from '@/components/confirm-delete'
-import { CardsIllustration, SubjectsIllustration } from '@/components/illustrations'
 import { useHotkeys } from '@/lib/use-hotkeys'
 import { usePlural, useT } from '@/lib/i18n'
 import { subjectsListOptions } from '@/features/subjects/queries'
@@ -43,6 +40,8 @@ import {
   type Selection,
   type SelectionResult,
 } from '@/features/search/selection'
+import { BulkDeleteConfirm } from '@/features/search/components/bulk-delete-confirm'
+import { SearchEmpty } from '@/features/search/components/search-empty'
 import { SearchFilters, type FilterPatch } from '@/features/search/components/search-filters'
 import { SearchResultsTable } from '@/features/search/components/search-results-table'
 import { SearchResultsSkeleton } from '@/features/search/components/search-skeleton'
@@ -196,8 +195,6 @@ function SearchPage() {
 
   const selectedIds = selection.ids
   const selectedHits = selectedIds.map((id) => known.get(id)).filter((h) => h !== undefined)
-  const reviewedCount = selectedHits.filter((h) => h.card.fsrs.reps > 0).length
-  const reviewedReps = selectedHits.reduce((sum, h) => sum + h.card.fsrs.reps, 0)
 
   const confirmDelete = () => {
     const ids = [...selectedIds]
@@ -311,58 +308,13 @@ function SearchPage() {
 
       {resultsQuery.isError ? (
         <ErrorState kind="cards" onRetry={() => void resultsQuery.refetch()} />
-      ) : emptyKind === 'noCards' ? (
-        /* THIRD empty state. Not "no results" — this account has nothing to
-           search yet, and blaming the query for that would be a lie. */
-        <EmptyState
-          illustration={<SubjectsIllustration />}
-          title={t('search.empty.noCardsTitle')}
-          meta={t('search.empty.noCardsMeta')}
-          action={
-            <Button asChild>
-              <Link to="/subjects">
-                <Layers />
-                {t('search.empty.noCardsAction')}
-              </Link>
-            </Button>
-          }
-        />
-      ) : emptyKind === 'idle' ? (
-        /* FIRST empty state: nothing asked yet. An invitation with two real
-           starting points, not a blank page waiting to be deserved. */
-        <EmptyState
-          icon={SearchIcon}
-          title={t('search.empty.idleTitle')}
-          meta={t(`search.empty.idleMeta_${plural(corpusSize)}`, { count: corpusSize })}
-          action={
-            <div className="flex flex-col items-center gap-3">
-              <p className="max-w-sm text-sm text-text-muted">{t('search.empty.idleHint')}</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="secondary" size="sm" onClick={() => patch({ overdue: true })}>
-                  {t('search.quick.overdue')}
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => patch({ state: 'new' })}>
-                  {t('search.quick.newCards')}
-                </Button>
-              </div>
-            </div>
-          }
-        />
-      ) : emptyKind === 'noResults' ? (
-        /* SECOND empty state: a real question, answered with none. */
-        <EmptyState
-          illustration={<CardsIllustration />}
-          title={t('search.empty.noResultsTitle')}
-          meta={t('search.empty.noResultsMeta')}
-          {...(hasFilters(search)
-            ? {
-                action: (
-                  <Button variant="secondary" onClick={resetFilters}>
-                    {t('search.filters.clear')}
-                  </Button>
-                ),
-              }
-            : {})}
+      ) : emptyKind !== null ? (
+        <SearchEmpty
+          kind={emptyKind}
+          corpusSize={corpusSize}
+          filtersActive={hasFilters(search)}
+          onResetFilters={resetFilters}
+          onQuickFilter={(next) => patch(next)}
         />
       ) : data === undefined ? (
         <SearchResultsSkeleton label={t('search.loading')} />
@@ -429,36 +381,11 @@ function SearchPage() {
         />
       )}
 
-      <ConfirmDelete
+      <BulkDeleteConfirm
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={t(`search.bulk.deleteTitle_${plural(selectedIds.length)}`, {
-          count: selectedIds.length,
-        })}
-        /* A count and a consequence, never "are you sure?". This destroys FSRS
-           progress that took weeks of reviews to build, so the sentence says how
-           many cards, how much history, and that none of it comes back. */
-        description={
-          <span className="flex flex-col gap-1.5">
-            <span>
-              {t(`search.bulk.deleteBody_${plural(selectedIds.length)}`, {
-                count: selectedIds.length,
-              })}
-            </span>
-            {reviewedCount > 0 && (
-              <span className="text-text">
-                {t(`search.bulk.deleteHistory_${plural(reviewedCount)}`, {
-                  count: reviewedCount,
-                  reps: reviewedReps,
-                })}
-              </span>
-            )}
-            <span className="text-text-faint">{t('search.bulk.deleteIrreversible')}</span>
-          </span>
-        }
-        confirmLabel={t(`search.bulk.deleteConfirm_${plural(selectedIds.length)}`, {
-          count: selectedIds.length,
-        })}
+        count={selectedIds.length}
+        hits={selectedHits}
         onConfirm={confirmDelete}
       />
 
