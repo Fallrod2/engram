@@ -143,11 +143,15 @@ describe("migration 0011 backfills pre-existing rows to 'live'", () => {
       }),
     ) as { entries: { tag: string }[] }
     const tags = journal.entries.map((e) => e.tag)
-    // Premise guard: 0011 must be the LAST entry, otherwise "everything before it"
-    // below would silently skip a later migration and the test would go vacuous.
-    expect(tags.at(-1)).toBe('0011_generation_origin')
+    // Premise guard: replay strictly what precedes 0011, located BY NAME rather
+    // than as "all but the last". The original form assumed 0011 was the final
+    // migration, so the first one added after it (0012) both broke this test and
+    // would have made it re-apply 0011 twice. Anchoring on the index keeps the
+    // "pre-0011 world" honest however many migrations land later.
+    const idx = tags.indexOf('0011_generation_origin')
+    expect(idx).toBeGreaterThan(0)
 
-    for (const tag of tags.slice(0, -1)) await applyFile(tag)
+    for (const tag of tags.slice(0, idx)) await applyFile(tag)
 
     // The world as it was at 0010: no `origin` column at all.
     const columnCount = async (): Promise<number> => {

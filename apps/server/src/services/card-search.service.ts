@@ -58,7 +58,7 @@ export async function searchCards(
   const where = and(
     eq(card.userId, userId),
     eq(subject.userId, userId), // defence in depth, see the note above
-    needle ? or(foldedLike(card.front, needle), foldedLike(card.back, needle)) : undefined,
+    needle ? or(foldedLike(card.frontFold, needle), foldedLike(card.backFold, needle)) : undefined,
     f.deckId ? eq(card.deckId, f.deckId) : undefined,
     f.subjectId ? eq(subject.id, f.subjectId) : undefined,
     f.state ? eq(card.state, FSRS_STATE_BY_NAME[f.state]) : undefined,
@@ -77,7 +77,7 @@ export async function searchCards(
   // zero, not as the number 0, and errors with 42P10.
   const orderBy = needle
     ? [
-        sql`case when ${foldedLike(card.front, needle)} then 0 else 1 end`,
+        sql`case when ${foldedLike(card.frontFold, needle)} then 0 else 1 end`,
         asc(card.createdAt),
         asc(card.id),
       ]
@@ -85,7 +85,28 @@ export async function searchCards(
 
   const rows = await db
     .select({
-      card,
+      // Explicit column list rather than the whole `card` row: `front_fold` /
+      // `back_fold` duplicate the card's entire text, and there is no reason to
+      // pull them back over the wire — they exist to be matched in the database,
+      // not to be read.
+      card: {
+        id: card.id,
+        deckId: card.deckId,
+        front: card.front,
+        back: card.back,
+        due: card.due,
+        stability: card.stability,
+        difficulty: card.difficulty,
+        elapsedDays: card.elapsedDays,
+        scheduledDays: card.scheduledDays,
+        learningSteps: card.learningSteps,
+        reps: card.reps,
+        lapses: card.lapses,
+        state: card.state,
+        lastReview: card.lastReview,
+        createdAt: card.createdAt,
+        updatedAt: card.updatedAt,
+      },
       deckId: deck.id,
       deckName: deck.name,
       subjectId: subject.id,

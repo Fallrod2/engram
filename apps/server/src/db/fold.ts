@@ -78,17 +78,21 @@ export function escapeLike(needle: string): string {
 }
 
 /**
- * `fold(expr) LIKE '%' || fold(needle) || '%'` — a substring match that ignores
- * case and accents.
+ * `<already-folded column> LIKE '%' || fold(needle) || '%'` — a substring match
+ * that ignores case and accents.
+ *
+ * ASYMMETRIC ON PURPOSE. `foldedColumn` must be a column that is ALREADY folded
+ * (`card.front_fold` / `card.back_fold`, maintained by Postgres as STORED
+ * generated columns — see migration 0012); only the NEEDLE is folded here, and
+ * being row-independent it is evaluated once per execution rather than once per
+ * row. Folding the column here instead measured 744 ms against 2.4 ms on a
+ * 5 000-card corpus, because `translate` is O(len(text) × len(table)) and the
+ * table is 260 characters wide.
  *
  * Substring, not prefix and not full-text: this backs an incremental search box,
- * where typing « kle » must already surface « Kleene ». Core Postgres has no
- * index that accelerates a leading-wildcard LIKE (`pg_trgm` would, and is just
- * as unavailable in a bare PGlite as `unaccent`), so this is deliberately a
- * filter over the caller's own rows — see `cards.service.ts` for the measured
- * cost that makes that acceptable.
+ * where typing « kle » must already surface « Kleene ».
  */
-export function foldedLike(expr: SQLWrapper, needle: string): SQL<boolean> {
+export function foldedLike(foldedColumn: SQLWrapper, needle: string): SQL<boolean> {
   const pattern = escapeLike(needle)
-  return sql<boolean>`${foldSql(expr)} like '%' || ${foldSql(sql`${pattern}`)} || '%' escape '\\'`
+  return sql<boolean>`${foldedColumn} like '%' || ${foldSql(sql`${pattern}`)} || '%' escape '\\'`
 }

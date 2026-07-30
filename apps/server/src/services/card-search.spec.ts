@@ -4,6 +4,7 @@ import { State } from 'ts-fsrs'
 import { createTestDb, type TestDb } from '../db/test-db'
 import type { DB } from '../db/client'
 import { card } from '../db/schema'
+import { foldSql } from '../db/fold'
 import { seedCard, seedDeck, seedReviewLog, seedSubject } from '../test-support/harness'
 import { ConflictError, NotFoundError } from '../http/errors'
 import { bulkDeleteCards, bulkMoveCards, searchCards } from './card-search.service'
@@ -43,6 +44,72 @@ async function graph(userId: string, subjectName = 'Théorie des langages', deck
   const d = await seedDeck(db, s.id, { userId, name: deckName })
   return { subject: s, deck: d }
 }
+
+// --- The frozen DDL vs the live expression ---------------------------------
+
+describe('fold columns', () => {
+  /**
+   * THE ANTI-DRIFT GUARD. `card.front_fold` / `back_fold` are STORED generated
+   * columns whose expression is frozen into migration 0012, while `foldSql()` in
+   * `db/fold.ts` builds the same expression at query time for the NEEDLE. If the
+   * two ever disagree — someone edits FOLD_FROM without a migration — search
+   * would fail only for the characters that moved, silently. This compares them
+   * on a corpus chosen to hit every branch.
+   */
+  const TRICKY = [
+    'Théorème de Kleene',
+    'ÉTOILE de Kleene',
+    'Le cœur du problème',
+    'Straße & Œuvre',
+    'Ærøskøbing',
+    'Đà Nẵng — Łódź',
+    'ĲsselmeerıİȷÞþ',
+    'MiXeD CaSe 123 !@#',
+    'ǅungla Ǳ ǈ',
+    'àáâãäåçèéêëìíîïñòóôõöùúûüýÿ',
+    'ĀĂĄĆĈĊČĎĐĒĔĖĘĚĜĞĠĢĤĦĨĪĬĮİĴĶĹĻĽŁŃŅŇŌŎŐŔŖŘŚŜŞŠŢŤŦŨŪŬŮŰŲŴŶŸŹŻŽ',
+  ]
+
+  it('the stored column matches the live foldSql expression, character for character', async () => {
+    const { deck } = await graph(A)
+    for (const s of TRICKY) await seedCard(db, deck.id, { userId: A, front: s, back: s })
+
+    const rows = await db
+      .select({
+        front: card.front,
+        stored: card.frontFold,
+        live: foldSql(card.front),
+        storedBack: card.backFold,
+        liveBack: foldSql(card.back),
+      })
+      .from(card)
+
+    expect(rows).toHaveLength(TRICKY.length)
+    for (const r of rows) {
+      expect(`${r.front} => ${r.stored}`).toBe(`${r.front} => ${r.live}`)
+      expect(r.storedBack).toBe(r.liveBack)
+    }
+  })
+
+  it('the stored fold is lowercase and free of the mapped diacritics', async () => {
+    const { deck } = await graph(A)
+    await seedCard(db, deck.id, { userId: A, front: 'Théorème ÉTOILE Ça', back: 'Straße' })
+    const [row] = await db.select({ f: card.frontFold, b: card.backFold }).from(card)
+    expect(row!.f).toBe('theoreme etoile ca')
+    expect(row!.b).toBe('strasse')
+  })
+
+  it('is maintained by the database on UPDATE, not by the application', async () => {
+    const { deck } = await graph(A)
+    const c = await seedCard(db, deck.id, { userId: A, front: 'avant', back: 'x' })
+    await db.update(card).set({ front: 'Après ÇA' }).where(eq(card.id, c.id))
+    const [row] = await db.select({ f: card.frontFold }).from(card).where(eq(card.id, c.id))
+    expect(row!.f).toBe('apres ca')
+    // …and the search sees the new text immediately.
+    expect((await find(db, A, 'apres ca')).total).toBe(1)
+    expect((await find(db, A, 'avant')).total).toBe(0)
+  })
+})
 
 // --- Matching --------------------------------------------------------------
 

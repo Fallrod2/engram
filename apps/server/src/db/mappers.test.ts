@@ -31,8 +31,15 @@ import {
 
 const now = new Date('2026-07-12T10:00:00.000Z')
 
-function makeCardRow(overrides: Partial<InferSelectModel<typeof card>> = {}) {
-  const base: InferSelectModel<typeof card> = {
+/**
+ * `front_fold` / `back_fold` are excluded: they are STORED generated columns
+ * (migration 0012) that Postgres computes and neither mapper reads, so a
+ * hand-built fixture has nothing meaningful to put in them.
+ */
+type FixtureCardRow = Omit<InferSelectModel<typeof card>, 'frontFold' | 'backFold'>
+
+function makeCardRow(overrides: Partial<FixtureCardRow> = {}) {
+  const base: FixtureCardRow = {
     id: 'card-1',
     userId: U,
     deckId: 'deck-1',

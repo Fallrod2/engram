@@ -36,7 +36,33 @@ export function deckToDto(row: InferSelectModel<typeof deck>): Deck {
   }
 }
 
-export function cardToDto(row: InferSelectModel<typeof card>): Card {
+/**
+ * Exactly the card columns the DTO reads. Narrower than the full row on
+ * purpose: the search query skips `front_fold` / `back_fold` (a database-side
+ * search index, migration 0012) and `user_id`, and must still be able to build
+ * a DTO. A full row remains assignable, so no existing caller changes.
+ */
+export type CardDtoRow = Pick<
+  InferSelectModel<typeof card>,
+  | 'id'
+  | 'deckId'
+  | 'front'
+  | 'back'
+  | 'due'
+  | 'stability'
+  | 'difficulty'
+  | 'elapsedDays'
+  | 'scheduledDays'
+  | 'learningSteps'
+  | 'reps'
+  | 'lapses'
+  | 'state'
+  | 'lastReview'
+  | 'createdAt'
+  | 'updatedAt'
+>
+
+export function cardToDto(row: CardDtoRow): Card {
   return {
     id: row.id,
     deckId: row.deckId,
