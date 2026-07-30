@@ -901,8 +901,6 @@ export const dictEn: Dict = {
     range: '{from}–{to} of {total}',
     results_one: '{count} card',
     results_other: '{count} cards',
-    archivedHidden_one: '{count} card from an archived subject hidden on this page',
-    archivedHidden_other: '{count} cards from archived subjects hidden on this page',
     archivedBadge: 'Archived',
     prevPage: 'Previous page',
     nextPage: 'Next page',

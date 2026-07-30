@@ -98,17 +98,35 @@ describe('toApiQuery', () => {
     expect(SEARCH_PAGE_SIZE).toBe(CARD_SEARCH_LIMIT_DEFAULT)
   })
 
-  it('never sends overdue=false — the server reads a falsy value as no filter', () => {
+  /**
+   * The server distinguishes `overdue=false` ("not late yet") from an absent
+   * `overdue` ("no due filter"). The chip does not: it has two positions, so it
+   * only ever writes the `true` half. This pins the INTERFACE decision — a
+   * future tri-state chip would change this test on purpose, not by accident.
+   */
+  it('never sends overdue=false — the chip is binary, though the server is not', () => {
     expect(toApiQuery(s({ overdue: undefined }))).not.toHaveProperty('overdue')
+    expect(toApiQuery(s({ overdue: false }))).not.toHaveProperty('overdue')
     expect(toApiQuery(s({ overdue: true }))).toHaveProperty('overdue', true)
   })
 
-  it('never sends hideArchived: the API has no such parameter (applied on the page)', () => {
+  /**
+   * The whole point of the fix: `hideArchived` reaches the SERVER, so `total`
+   * and the page describe one population. Filtering the received page instead
+   * made a page of 25 render 17 under a count that said otherwise.
+   */
+  it('sends hideArchived so the exclusion happens before the count', () => {
     expect(toApiQuery(s({ hideArchived: true }))).toEqual({
       q: '',
+      hideArchived: true,
       limit: SEARCH_PAGE_SIZE,
       offset: 0,
     })
+  })
+
+  it('omits hideArchived when off — `false` only restates the server default', () => {
+    expect(toApiQuery(s({ hideArchived: undefined }))).not.toHaveProperty('hideArchived')
+    expect(toApiQuery(s({ hideArchived: false }))).not.toHaveProperty('hideArchived')
   })
 
   it('renames the URL keys onto the contract keys', () => {

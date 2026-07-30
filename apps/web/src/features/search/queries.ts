@@ -25,6 +25,7 @@ function paramsOf(q: ApiQuery): Record<string, string | number | boolean | undef
     deckId: q.deckId,
     state: q.state,
     overdue: q.overdue,
+    hideArchived: q.hideArchived,
     limit: q.limit,
     offset: q.offset,
   }

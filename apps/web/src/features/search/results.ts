@@ -1,4 +1,4 @@
-import type { CardSearchHit, SearchCardsResponse } from '@engram/shared'
+import type { SearchCardsResponse } from '@engram/shared'
 
 /**
  * Reading a search response honestly: which answer belongs to what is on
@@ -59,21 +59,13 @@ export function searchEmptyKind(input: {
 }
 
 /**
- * Hide hits whose subject is archived.
+ * `[first, last]` 1-based row numbers of a page, for "13–24 of 57".
  *
- * CLIENT-SIDE, AND SAID SO. `GET /api/cards/search` has no `archived`
- * parameter, so this cannot be pushed into the query: the page is fetched
- * whole and thinned here, which means `total` still counts the hidden rows and
- * a page of 25 can render 22. The screen therefore never silently drops them —
- * it prints how many it hid, right under the list. Filtering quietly would
- * produce a pagination that visibly does not add up, which is worse than the
- * honest line. (Flagged as a contract gap, not patched around.)
+ * `shown` is the length of the page the SERVER returned, and that is the whole
+ * arithmetic: every filter — `hideArchived` included — is a WHERE predicate
+ * applied before `count()`, so the rows on screen and `total` describe one
+ * population. Nothing is dropped between the response and the table.
  */
-export function withoutArchived(hits: readonly CardSearchHit[]): CardSearchHit[] {
-  return hits.filter((h) => !h.subject.archived)
-}
-
-/** `[first, last]` 1-based row numbers of a page, for "13–24 of 57". */
 export function pageBounds(offset: number, shown: number): { from: number; to: number } {
   return { from: shown === 0 ? 0 : offset + 1, to: offset + shown }
 }

@@ -29,7 +29,7 @@ import {
   useBulkMoveCards,
   useUpdateCardFromSearch,
 } from '@/features/search/queries'
-import { isFreshFor, pageBounds, searchEmptyKind, withoutArchived } from '@/features/search/results'
+import { isFreshFor, pageBounds, searchEmptyKind } from '@/features/search/results'
 import {
   EMPTY_SELECTION,
   SELECTION_MAX,
@@ -142,15 +142,12 @@ function SearchPage() {
   const fresh = isFreshFor(needle, data)
   const stale = searching && data !== undefined && !fresh
 
-  const rawHits = data?.hits ?? []
-  const hits = search.hideArchived ? withoutArchived(rawHits) : rawHits
-  const hiddenArchived = rawHits.length - hits.length
+  const hits = data?.hits ?? []
   const total = fresh ? data?.total : undefined
   const pages = pageCount(total ?? 0)
-  // Bounds count the SERVER's rows, not the ones left after the client-side
-  // archived filter: "1–25 of 57" describes the page the server sent, and the
-  // line below says how many of those 25 are hidden.
-  const bounds = pageBounds(apiQuery.offset, rawHits.length)
+  // Every filter is a server-side predicate, so the page is rendered exactly as
+  // received: "1–25 of 57" counts the same rows the table draws.
+  const bounds = pageBounds(apiQuery.offset, hits.length)
 
   const emptyKind = searchEmptyKind({ searching, total, corpusTotal: corpusQuery.data })
 
@@ -159,13 +156,13 @@ function SearchPage() {
   const pageIds = useMemo(() => hits.map((h) => h.card.id), [hits])
 
   useEffect(() => {
-    if (rawHits.length === 0) return
+    if (hits.length === 0) return
     setKnown((prev) => {
       const next = new Map(prev)
-      for (const hit of rawHits) next.set(hit.card.id, hit)
+      for (const hit of hits) next.set(hit.card.id, hit)
       return next
     })
-  }, [rawHits])
+  }, [hits])
 
   const applySelection = useCallback(
     (result: SelectionResult) => {
@@ -317,18 +314,11 @@ function SearchPage() {
         <SearchResultsSkeleton label={t('search.loading')} />
       ) : (
         <>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <p className="font-mono text-xs tabular-nums text-text-muted" role="status">
-              {pages > 1
-                ? t('search.range', { from: bounds.from, to: bounds.to, total: total ?? 0 })
-                : t(`search.results_${plural(total ?? 0)}`, { count: total ?? 0 })}
-            </p>
-            {hiddenArchived > 0 && (
-              <p className="text-xs text-text-faint">
-                {t(`search.archivedHidden_${plural(hiddenArchived)}`, { count: hiddenArchived })}
-              </p>
-            )}
-          </div>
+          <p className="font-mono text-xs tabular-nums text-text-muted" role="status">
+            {pages > 1
+              ? t('search.range', { from: bounds.from, to: bounds.to, total: total ?? 0 })
+              : t(`search.results_${plural(total ?? 0)}`, { count: total ?? 0 })}
+          </p>
 
           <SearchResultsTable
             hits={hits}

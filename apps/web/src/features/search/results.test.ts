@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { CardSearchHit, SearchCardsResponse } from '@engram/shared'
-import { isFreshFor, pageBounds, searchEmptyKind, withoutArchived } from './results'
+import { isFreshFor, pageBounds, searchEmptyKind } from './results'
 
-function hit(id: string, archived: boolean): CardSearchHit {
+function hit(id: string): CardSearchHit {
   return {
     card: {
       id,
@@ -25,12 +25,12 @@ function hit(id: string, archived: boolean): CardSearchHit {
       updatedAt: '2026-07-01T00:00:00.000Z',
     },
     deck: { id: 'deck1', name: 'Automates' },
-    subject: { id: 'sub1', name: 'TL', color: '#7999f5', icon: 'brain', archived },
+    subject: { id: 'sub1', name: 'TL', color: '#7999f5', icon: 'brain', archived: false },
   }
 }
 
 function response(query: string): SearchCardsResponse {
-  return { total: 1, query, limit: 25, offset: 0, hits: [hit('c1', false)] }
+  return { total: 1, query, limit: 25, offset: 0, hits: [hit('c1')] }
 }
 
 /**
@@ -94,18 +94,16 @@ describe('searchEmptyKind', () => {
   })
 })
 
-describe('withoutArchived', () => {
-  it('keeps cards whose subject is live and drops the archived ones', () => {
-    const hits = [hit('a', false), hit('b', true), hit('c', false)]
-    expect(withoutArchived(hits).map((h) => h.card.id)).toEqual(['a', 'c'])
-  })
-
-  it('does not mutate the page it was handed', () => {
-    const hits = [hit('a', true)]
-    withoutArchived(hits)
-    expect(hits).toHaveLength(1)
-  })
-})
+/**
+ * NOTE — there is no `withoutArchived` here any more, and its two tests were
+ * DELETED rather than adapted. Hiding archived subjects used to be done on the
+ * received page, which made `total` count rows the table did not draw; it is now
+ * `hideArchived` on `GET /api/cards/search`, a WHERE predicate applied before
+ * `count()`. The behaviour is owned by the server and pinned there
+ * (`card-search.service.spec.ts`, including the "`total` stays honest across
+ * pages" case); the web's remaining share of it is sending the parameter, which
+ * `params.test.ts` pins on `toApiQuery`.
+ */
 
 describe('pageBounds', () => {
   it('numbers the rows from 1 within the whole match set', () => {

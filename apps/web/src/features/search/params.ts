@@ -31,7 +31,8 @@ export const searchRouteSchema = z.object({
   /**
    * Hide cards filed under an ARCHIVED subject. Off by default: archiving means
    * "out of rotation", not "deleted", and a card you cannot find reads as data
-   * loss. See `SearchResults` for why this one is applied client-side.
+   * loss. Sent to the server as a WHERE predicate, so `total` and the page count
+   * the same population and a full page is genuinely full.
    */
   hideArchived: z.boolean().optional().catch(undefined),
   /** 1-based page. `offset` is derived — a page number survives a limit change. */
@@ -54,9 +55,9 @@ export function needleOf(q: string): string {
 }
 
 /**
- * Is any CORPUS filter set? `hideArchived` counts: the user expressed an intent
- * about what to see, even though that one is applied to the page rather than to
- * the query. `page` and `edit` do not — they are positions, not filters.
+ * Is any CORPUS filter set? `hideArchived` counts like the rest — it narrows the
+ * queried population, not just the rendering. `page` and `edit` do not: they are
+ * positions, not filters.
  */
 export function hasFilters(s: SearchRouteSearch): boolean {
   return Boolean(s.subject || s.deck || s.state || s.overdue || s.hideArchived)
@@ -80,9 +81,22 @@ export function activeFilterCount(s: SearchRouteSearch): number {
 }
 
 /**
- * URL state → the query the API takes. `overdue: false` is NEVER sent: the
- * server reads a falsy `overdue` as "no predicate" anyway, so sending it would
- * only add a parameter that changes nothing to every link.
+ * URL state → the query the API takes.
+ *
+ * NEITHER `overdue: false` NOR `hideArchived: false` is ever sent, but for two
+ * different reasons, and the difference matters to whoever reads this next:
+ *
+ *  - `hideArchived=false` is an explicit restatement of the server's default
+ *    (archived subjects included), so sending it would add a parameter that
+ *    changes nothing to every shareable link.
+ *  - `overdue=false` DOES mean something to the server — "not late yet", the
+ *    complement of the backlog. We never send it because the SCREEN chose a
+ *    two-position chip: absent or `true`. A tri-state chip in a filter row has
+ *    no readable "off" (is grey "no filter" or "not overdue"?) and cycles
+ *    through a state nobody aimed for. This is an INTERFACE decision, not a
+ *    limit of the contract — see `overdue` in `packages/shared/src/search.ts`.
+ *    Turning it into a third position needs a control that can show three
+ *    states, not just a change here.
  */
 export function toApiQuery(
   s: SearchRouteSearch,
@@ -94,6 +108,7 @@ export function toApiQuery(
     ...(s.deck ? { deckId: s.deck } : {}),
     ...(s.state ? { state: s.state } : {}),
     ...(s.overdue ? { overdue: true } : {}),
+    ...(s.hideArchived ? { hideArchived: true } : {}),
     limit,
     offset: (s.page - 1) * limit,
   }

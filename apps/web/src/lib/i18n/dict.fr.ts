@@ -969,11 +969,6 @@ export const dictFr = {
     range: '{from}–{to} sur {total}',
     results_one: '{count} carte',
     results_other: '{count} cartes',
-    // Masquage des matières archivées : il est fait sur la page reçue, pas dans
-    // la requête (l'API n'a pas ce filtre), donc le compte du serveur inclut
-    // encore ces lignes. On le dit plutôt que de laisser la pagination mentir.
-    archivedHidden_one: '{count} carte d’une matière archivée masquée sur cette page',
-    archivedHidden_other: '{count} cartes de matières archivées masquées sur cette page',
     archivedBadge: 'Archivée',
     prevPage: 'Page précédente',
     nextPage: 'Page suivante',
