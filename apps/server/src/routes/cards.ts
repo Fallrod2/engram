@@ -53,7 +53,12 @@ cardsRouter.get('/search', zValidator('query', searchCardsQuerySchema), async (c
       ...(q.subjectId ? { subjectId: q.subjectId } : {}),
       ...(q.deckId ? { deckId: q.deckId } : {}),
       ...(q.state ? { state: q.state } : {}),
+      // Both are forwarded on `!== undefined`, never on truthiness: `false` is
+      // meaningful for `overdue` (the non-backlog half) and explicit for
+      // `hideArchived` (archived kept), so dropping it would resurrect exactly
+      // the bug where the schema advertised a filter the server ignored.
       ...(q.overdue !== undefined ? { overdue: q.overdue } : {}),
+      ...(q.hideArchived !== undefined ? { hideArchived: q.hideArchived } : {}),
     }),
   )
 })

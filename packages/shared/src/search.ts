@@ -64,8 +64,34 @@ export const searchCardsQuerySchema = z.object({
   subjectId: z.string().min(1).optional(),
   deckId: z.string().min(1).optional(),
   state: fsrsStateNameSchema.optional(),
-  /** Only cards whose due instant is before LOCAL midnight today (the backlog). */
+  /**
+   * TRI-STATE, and every state does something — the parameter is named after a
+   * PROPERTY OF THE CARD, so `false` reads as "cards that are not overdue" and
+   * that is exactly what it now selects:
+   *
+   *   absent  → no due filter at all
+   *   `true`  → only the backlog: `due <  local midnight today`
+   *   `false` → only what is not late yet: `due >= local midnight today`
+   *
+   * It previously accepted `false` and silently ignored it, which made the
+   * schema promise a filter it did not apply. The two halves partition the
+   * corpus exactly (the cut is half-open, midnight belongs to today).
+   */
   overdue: boolParam.optional(),
+  /**
+   * Exclude cards whose subject is archived. Named as an IMPERATIVE, so unlike
+   * `overdue` its `false` is not a third case — it is an explicit restatement of
+   * the default, and it does what it says:
+   *
+   *   absent / `false` → archived subjects INCLUDED (the default)
+   *   `true`           → archived subjects excluded
+   *
+   * Archived cards are findable BY DEFAULT on purpose: archiving a subject means
+   * "out of the review rotation", not "deleted", and a card you can no longer
+   * find is indistinguishable from one that is gone. Hiding them is the user's
+   * explicit choice, never the server's assumption.
+   */
+  hideArchived: boolParam.optional(),
   limit: z.coerce.number().int().min(1).max(CARD_SEARCH_LIMIT_MAX).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 })

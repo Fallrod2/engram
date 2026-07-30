@@ -254,7 +254,7 @@ describe('searchCards — filters', () => {
     expect((await find(db, A, 'terme', { state: 'relearning' })).total).toBe(1)
   })
 
-  it('overdue uses the project cut: due < LOCAL midnight today', async () => {
+  it('overdue is TRI-STATE and every state filters something', async () => {
     const { deck } = await graph(A)
     await seedCard(db, deck.id, { userId: A, front: 'terme', due: at(-1) }) // yesterday
     await seedCard(db, deck.id, { userId: A, front: 'terme', due: at(0, 0) }) // exactly midnight
@@ -263,8 +263,112 @@ describe('searchCards — filters', () => {
 
     // Half-open: midnight itself belongs to TODAY, not to the backlog.
     expect((await find(db, A, 'terme', { overdue: true })).total).toBe(1)
-    expect((await find(db, A, 'terme', { overdue: false })).total).toBe(4)
+    // `false` used to be a silent no-op returning all 4 — it now selects the
+    // complement, which is the whole point of the fix.
+    expect((await find(db, A, 'terme', { overdue: false })).total).toBe(3)
     expect((await find(db, A, 'terme')).total).toBe(4)
+    // The two halves partition the corpus exactly: no card in both, none lost.
+    const late = await find(db, A, 'terme', { overdue: true })
+    const notLate = await find(db, A, 'terme', { overdue: false })
+    const ids = [...late.hits, ...notLate.hits].map((h) => h.card.id)
+    expect(new Set(ids).size).toBe(4)
+  })
+
+  it('overdue=false is not the same request as omitting overdue', async () => {
+    const { deck } = await graph(A)
+    await seedCard(db, deck.id, { userId: A, front: 'terme', due: at(-3) })
+    await seedCard(db, deck.id, { userId: A, front: 'terme', due: at(+2) })
+    expect((await find(db, A, 'terme')).total).toBe(2)
+    expect((await find(db, A, 'terme', { overdue: false })).total).toBe(1)
+    expect((await find(db, A, 'terme', { overdue: false })).hits[0]!.card.fsrs.due).toBe(
+      at(+2).toISOString(),
+    )
+  })
+
+  /**
+   * The regression this filter exists to kill: without it the client had to drop
+   * archived rows from a page it had already been handed, so a page of 25 showed
+   * 17 lines under a `total` that counted all 25. `total` and the page must
+   * always describe the SAME population.
+   */
+  it('hideArchived: absent → archived cards are INCLUDED (archived ≠ deleted)', async () => {
+    const live = await graph(A, 'Théorie', 'Deck vivant')
+    const archived = await seedSubject(db, { userId: A, name: 'Archivée', archived: true })
+    const archivedDeck = await seedDeck(db, archived.id, { userId: A, name: 'Deck archivé' })
+    await seedCard(db, live.deck.id, { userId: A, front: 'terme' })
+    await seedCard(db, archivedDeck.id, { userId: A, front: 'terme' })
+
+    const res = await find(db, A, 'terme')
+    expect(res.total).toBe(2)
+    expect(res.hits).toHaveLength(2)
+    expect(res.hits.some((h) => h.subject.archived)).toBe(true)
+  })
+
+  it('hideArchived=true → excluded, and `total` counts the SAME population', async () => {
+    const live = await graph(A, 'Théorie', 'Deck vivant')
+    const archived = await seedSubject(db, { userId: A, name: 'Archivée', archived: true })
+    const archivedDeck = await seedDeck(db, archived.id, { userId: A, name: 'Deck archivé' })
+    await seedCard(db, live.deck.id, { userId: A, front: 'terme' })
+    for (let i = 0; i < 4; i++) await seedCard(db, archivedDeck.id, { userId: A, front: 'terme' })
+
+    const res = await find(db, A, 'terme', { hideArchived: true })
+    // THE ASSERTION THAT MATTERS: total is the filtered count, not the raw one.
+    expect(res.total).toBe(1)
+    expect(res.hits).toHaveLength(res.total)
+    expect(res.hits.every((h) => !h.subject.archived)).toBe(true)
+  })
+
+  it('hideArchived=false is an explicit restatement of the default, not a no-op', async () => {
+    const live = await graph(A, 'Théorie', 'Deck vivant')
+    const archived = await seedSubject(db, { userId: A, name: 'Archivée', archived: true })
+    const archivedDeck = await seedDeck(db, archived.id, { userId: A, name: 'Deck archivé' })
+    await seedCard(db, live.deck.id, { userId: A, front: 'terme' })
+    await seedCard(db, archivedDeck.id, { userId: A, front: 'terme' })
+
+    const off = await find(db, A, 'terme', { hideArchived: false })
+    const absent = await find(db, A, 'terme')
+    expect(off.total).toBe(2)
+    expect(off.total).toBe(absent.total)
+    expect(off.hits.map((h) => h.card.id)).toEqual(absent.hits.map((h) => h.card.id))
+  })
+
+  it('hideArchived keeps `total` honest ACROSS pages', async () => {
+    const live = await graph(A, 'Théorie', 'Deck vivant')
+    const archived = await seedSubject(db, { userId: A, name: 'Archivée', archived: true })
+    const archivedDeck = await seedDeck(db, archived.id, { userId: A, name: 'Deck archivé' })
+    // Interleaved so a client-side filter would thin every page unevenly.
+    for (let i = 0; i < 10; i++) {
+      await seedCard(db, live.deck.id, { userId: A, front: `terme vivant ${i}` })
+      await seedCard(db, archivedDeck.id, { userId: A, front: `terme archivé ${i}` })
+    }
+    const page1 = await find(db, A, 'terme', { hideArchived: true, limit: 4, offset: 0 })
+    const page2 = await find(db, A, 'terme', { hideArchived: true, limit: 4, offset: 4 })
+    const page3 = await find(db, A, 'terme', { hideArchived: true, limit: 4, offset: 8 })
+
+    expect(page1.total).toBe(10)
+    // Every full page is FULL — nothing was removed after the fact.
+    expect([page1.hits.length, page2.hits.length, page3.hits.length]).toEqual([4, 4, 2])
+    const ids = [...page1.hits, ...page2.hits, ...page3.hits].map((h) => h.card.id)
+    expect(new Set(ids).size).toBe(10)
+  })
+
+  it('hideArchived composes with the other filters', async () => {
+    const live = await graph(A, 'Théorie', 'Deck vivant')
+    const archived = await seedSubject(db, { userId: A, name: 'Archivée', archived: true })
+    const archivedDeck = await seedDeck(db, archived.id, { userId: A, name: 'Deck archivé' })
+    await seedCard(db, live.deck.id, { userId: A, front: 'Kleene', due: at(-1) })
+    await seedCard(db, archivedDeck.id, { userId: A, front: 'Kleene', due: at(-1) })
+    await seedCard(db, live.deck.id, { userId: A, front: 'Kleene', due: at(+1) })
+
+    const res = await find(db, A, 'kleene', { hideArchived: true, overdue: true })
+    expect(res.total).toBe(1)
+    expect(res.hits[0]!.subject.archived).toBe(false)
+
+    // Asking for an archived subject BY ID while hiding archived is coherent: nothing.
+    expect(
+      (await find(db, A, 'kleene', { subjectId: archived.id, hideArchived: true })).total,
+    ).toBe(0)
+    expect((await find(db, A, 'kleene', { subjectId: archived.id })).total).toBe(1)
   })
 
   it('combines the text needle with the filters', async () => {
@@ -504,5 +608,42 @@ describe('bulkMoveCards', () => {
       requested: 2,
       affected: 1,
     })
+  })
+
+  /**
+   * A move MUTATES the row, so `updated_at` must move with it — otherwise the
+   * column means "last edited" on one path and "last touched" on another.
+   *
+   * It is bumped by the column's `$onUpdate` hook (`db/schema/columns.ts`), the
+   * SAME mechanism `updateCard` relies on — not by an explicit `set`, which
+   * would make the bulk path the only one stating it by hand and would drift the
+   * day the hook changes. Because that mechanism is invisible at the call site,
+   * it is pinned HERE rather than assumed.
+   */
+  it('bumps updated_at, by the same mechanism as a single-card edit', async () => {
+    const g = await graph(A)
+    const dest = await seedDeck(db, g.subject.id, { userId: A, name: 'Destination' })
+    const c = await seedCard(db, g.deck.id, { userId: A })
+    const before = c.updatedAt
+
+    await new Promise((r) => setTimeout(r, 20))
+    await bulkMoveCards(db, A, [c.id], dest.id)
+
+    const [after] = await db.select().from(card).where(eq(card.id, c.id))
+    expect(after!.updatedAt.getTime()).toBeGreaterThan(before.getTime())
+    // …and only `updated_at` moved: `created_at` is not a mutation timestamp.
+    expect(after!.createdAt.getTime()).toBe(c.createdAt.getTime())
+  })
+
+  it('leaves updated_at alone on a REFUSED move', async () => {
+    const g = await graph(A)
+    const archived = await seedSubject(db, { userId: A, name: 'Archivée', archived: true })
+    const dest = await seedDeck(db, archived.id, { userId: A, name: 'Dest' })
+    const c = await seedCard(db, g.deck.id, { userId: A })
+
+    await new Promise((r) => setTimeout(r, 20))
+    await expect(bulkMoveCards(db, A, [c.id], dest.id)).rejects.toBeInstanceOf(ConflictError)
+    const [after] = await db.select().from(card).where(eq(card.id, c.id))
+    expect(after!.updatedAt.getTime()).toBe(c.updatedAt.getTime())
   })
 })

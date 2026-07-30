@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lt, or, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, lt, or, sql } from 'drizzle-orm'
 import {
   FSRS_STATE_BY_NAME,
   type BulkCardResult,
@@ -18,7 +18,10 @@ export interface CardSearchFilter {
   subjectId?: string
   deckId?: string
   state?: FsrsStateName
+  /** Tri-state: `undefined` no filter, `true` the backlog, `false` the rest. */
   overdue?: boolean
+  /** `true` excludes archived subjects; `undefined`/`false` include them. */
+  hideArchived?: boolean
   limit: number
   offset: number
   /** Injected so tests pin the local-midnight cut of `overdue`. */
@@ -40,6 +43,19 @@ export interface CardSearchFilter {
  * computed in JS from local `Date` components and compared as an instant —
  * never `date_trunc` in SQL, which would silently apply UTC or the database's
  * timezone and misfile every card due in the first or last hours of the day.
+ * It is TRI-STATE: absent filters nothing, `true` keeps the backlog, `false`
+ * keeps everything else. The two halves partition the corpus exactly, because
+ * the cut is half-open — an instant exactly at midnight belongs to the day that
+ * STARTS there, the same convention `localDayBounds` states.
+ *
+ * HIDEARCHIVED is a filter, not a default. Cards under an archived subject are
+ * returned unless the caller asks otherwise: archiving means "out of the review
+ * rotation", not "deleted", and a card that can no longer be FOUND is
+ * indistinguishable from one that no longer exists. Because the predicate lives
+ * in the WHERE clause it is applied before `count()`, so `total` and the page
+ * always describe the same population — the client must never have to filter a
+ * page it has already been handed, which would make `total` a number the list
+ * cannot contain.
  *
  * ORDERING is deterministic, or pagination would shuffle rows between pages:
  * front-matches first (the front is the question — that is the result the user
@@ -62,7 +78,14 @@ export async function searchCards(
     f.deckId ? eq(card.deckId, f.deckId) : undefined,
     f.subjectId ? eq(subject.id, f.subjectId) : undefined,
     f.state ? eq(card.state, FSRS_STATE_BY_NAME[f.state]) : undefined,
-    f.overdue ? lt(card.due, midnight) : undefined,
+    // Explicit `undefined` check, NOT a truthiness test: `false` is a filter of
+    // its own here ("not late yet"), not an absent one.
+    f.overdue === undefined
+      ? undefined
+      : f.overdue
+        ? lt(card.due, midnight)
+        : gte(card.due, midnight),
+    f.hideArchived ? eq(subject.archived, false) : undefined,
   )
 
   const [totalRow] = await db

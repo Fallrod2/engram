@@ -122,11 +122,45 @@ describe('GET /api/cards/search', () => {
       await (await app.request('/api/cards/search?q=terme&overdue=true')).json(),
     )
     expect(on.total).toBe(1)
+    // `false` is the COMPLEMENT, not "no filter" — it used to return both.
     const off = searchCardsResponseSchema.parse(
       await (await app.request('/api/cards/search?q=terme&overdue=false')).json(),
     )
-    expect(off.total).toBe(2)
+    expect(off.total).toBe(1)
+    expect(off.hits[0]!.card.id).not.toBe(on.hits[0]!.card.id)
+    const absent = searchCardsResponseSchema.parse(
+      await (await app.request('/api/cards/search?q=terme')).json(),
+    )
+    expect(absent.total).toBe(2)
     expect((await app.request('/api/cards/search?q=terme&overdue=1')).status).toBe(400)
+  })
+
+  it('hideArchived: absent/false include archived, true excludes and total follows', async () => {
+    const live = await graph('Théorie', 'Deck vivant')
+    const archived = await seedSubject(db, { name: 'Archivée', archived: true })
+    const archivedDeck = await seedDeck(db, archived.id, { name: 'Deck archivé' })
+    await seedCard(db, live.deck.id, { front: 'terme' })
+    await seedCard(db, archivedDeck.id, { front: 'terme' })
+    await seedCard(db, archivedDeck.id, { front: 'terme' })
+
+    const get = async (qs: string) =>
+      searchCardsResponseSchema.parse(await (await app.request(`/api/cards/search?${qs}`)).json())
+
+    const absent = await get('q=terme')
+    expect(absent.total).toBe(3)
+    expect(absent.hits).toHaveLength(3)
+
+    const off = await get('q=terme&hideArchived=false')
+    expect(off.total).toBe(3)
+
+    const on = await get('q=terme&hideArchived=true')
+    // The number the list can actually contain — this is what used to lie.
+    expect(on.total).toBe(1)
+    expect(on.hits).toHaveLength(1)
+    expect(on.hits[0]!.subject.archived).toBe(false)
+
+    expect((await app.request('/api/cards/search?q=terme&hideArchived=1')).status).toBe(400)
+    expect((await app.request('/api/cards/search?q=terme&hideArchived=yes')).status).toBe(400)
   })
 
   it('filters by deckId and subjectId', async () => {
