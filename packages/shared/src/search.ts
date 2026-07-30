@@ -37,6 +37,12 @@ export const FSRS_STATE_BY_NAME: Readonly<Record<FsrsStateName, 0 | 1 | 2 | 3>> 
 export const CARD_SEARCH_LIMIT_MAX = 100
 /** Applied when the caller omits `limit`. */
 export const CARD_SEARCH_LIMIT_DEFAULT = 25
+/**
+ * Ceiling on the needle. Past a couple of hundred characters this is not a
+ * search, it is someone pasting a document into the box (or probing); the
+ * pattern would be scanned against every row of the corpus for nothing.
+ */
+export const CARD_SEARCH_QUERY_MAX = 200
 
 /** `'true'`/`'false'` query string → boolean (same convention as `domain.ts`). */
 const boolParam = z.enum(['true', 'false']).transform((v) => v === 'true')
@@ -54,7 +60,7 @@ const boolParam = z.enum(['true', 'false']).transform((v) => v === 'true')
  * (see `foldedLike` server-side): « theorie » finds « Théorie ».
  */
 export const searchCardsQuerySchema = z.object({
-  q: z.string(),
+  q: z.string().max(CARD_SEARCH_QUERY_MAX),
   subjectId: z.string().min(1).optional(),
   deckId: z.string().min(1).optional(),
   state: fsrsStateNameSchema.optional(),

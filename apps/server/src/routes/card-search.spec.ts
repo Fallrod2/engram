@@ -6,6 +6,7 @@ import {
   CARD_BULK_MAX,
   CARD_SEARCH_LIMIT_DEFAULT,
   CARD_SEARCH_LIMIT_MAX,
+  CARD_SEARCH_QUERY_MAX,
 } from '@engram/shared'
 import { app } from '../app'
 import { db } from '../db/client'
@@ -142,6 +143,13 @@ describe('GET /api/cards/search', () => {
       await (await app.request(`/api/cards/search?q=terme&subjectId=${g2.subject.id}`)).json(),
     )
     expect(bySubject.total).toBe(1)
+  })
+
+  it('refuses a needle longer than the cap', async () => {
+    const long = 'a'.repeat(CARD_SEARCH_QUERY_MAX + 1)
+    expect((await app.request(`/api/cards/search?q=${long}`)).status).toBe(400)
+    const at = 'a'.repeat(CARD_SEARCH_QUERY_MAX)
+    expect((await app.request(`/api/cards/search?q=${at}`)).status).toBe(200)
   })
 
   it('url-encoded accented needles survive the round-trip', async () => {

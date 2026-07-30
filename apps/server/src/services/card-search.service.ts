@@ -178,7 +178,13 @@ async function assertOwnedCards(tx: DB | Tx, userId: string, ids: string[]): Pro
   }
 }
 
-/** Delete a batch of the caller's cards atomically (review logs cascade). */
+/**
+ * Delete a batch of the caller's cards atomically (review logs cascade).
+ *
+ * An EMPTY batch is a no-op returning `{0, 0}`, not an error: the size floor is
+ * a contract concern and it is enforced at the edge by `bulkCardIdsSchema`
+ * (400), so re-throwing here would only duplicate it for internal callers.
+ */
 export async function bulkDeleteCards(
   db: DB,
   userId: string,

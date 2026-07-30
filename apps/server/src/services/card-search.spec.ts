@@ -384,6 +384,13 @@ describe('bulkDeleteCards', () => {
     expect(new Set(left.map((r) => r.id))).toEqual(new Set([mine.id, theirs.id]))
   })
 
+  it('an empty batch is a no-op (the size floor is enforced at the API edge)', async () => {
+    const { deck } = await graph(A)
+    await seedCard(db, deck.id, { userId: A })
+    expect(await bulkDeleteCards(db, A, [])).toEqual({ requested: 0, affected: 0 })
+    expect((await db.select().from(card)).length).toBe(1)
+  })
+
   it('an unknown id aborts the whole batch', async () => {
     const { deck } = await graph(A)
     const c = await seedCard(db, deck.id, { userId: A })
