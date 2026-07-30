@@ -11,6 +11,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectLabel,
   SelectTrigger,
@@ -86,8 +87,13 @@ export function MoveCardsDialog({
                 <SelectValue placeholder={t('search.moveDialog.placeholder')} />
               </SelectTrigger>
               <SelectContent>
+                {/* `SelectGroup`, not a plain div: Radix's `SelectLabel` reads
+                    its group from context and throws without one — which took
+                    the whole dialog down through the error boundary. The group
+                    is also what associates the heading with its options for a
+                    screen reader. */}
                 {bySubject.map(({ subject, decks: group }) => (
-                  <div key={subject.id}>
+                  <SelectGroup key={subject.id}>
                     <SelectLabel>
                       <span className="flex items-center gap-1.5">
                         <SubjectDot color={subject.color} muted={subject.archived} />
@@ -104,7 +110,7 @@ export function MoveCardsDialog({
                         {d.name}
                       </SelectItem>
                     ))}
-                  </div>
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

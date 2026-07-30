@@ -246,12 +246,9 @@ function SearchPage() {
       e.preventDefault()
       setDeleteOpen(true)
     },
-    // Escape belongs to whatever surface is open first (Radix closes it). With
-    // none open it releases the selection — the only state on this screen that
-    // silently changes what the destructive buttons would do.
-    escape: () => {
-      if (selectedIds.length > 0) clearSelection()
-    },
+    // NOTE: Escape is deliberately NOT here. It clears the selection, and a
+    // window-level Escape cannot be told apart from the one cancelling the
+    // delete dialog — see `search-results-table.tsx`, where it lives instead.
   })
 
   // --- Render --------------------------------------------------------------
@@ -340,6 +337,7 @@ function SearchPage() {
             onToggle={(id) => applySelection(toggleOne(selection, id))}
             onExtend={(id) => applySelection(extendTo(selection, pageIds, id))}
             onTogglePage={() => applySelection(togglePage(selection, pageIds))}
+            onClearSelection={clearSelection}
             onOpen={(hit) => patch({ edit: hit.card.id }, { push: true })}
           />
 

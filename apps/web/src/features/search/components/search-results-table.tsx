@@ -34,8 +34,7 @@ import {
  *   - `Shift`+arrow/`j`/`k` MOVES the cursor and extends the range in one go,
  *     the way every file manager behaves — so a run of forty cards is one held
  *     key, not forty deliberate presses.
- * `Shift`+click does the same with the mouse. Escape (owned by the screen)
- * empties the selection.
+ * `Shift`+click does the same with the mouse, and `Escape` releases everything.
  */
 export function SearchResultsTable({
   hits,
@@ -44,6 +43,7 @@ export function SearchResultsTable({
   onExtend,
   onTogglePage,
   onOpen,
+  onClearSelection,
   /** Dimmed while a newer request is in flight — see `isFreshFor`. */
   stale,
 }: {
@@ -53,6 +53,7 @@ export function SearchResultsTable({
   onExtend: (cardId: string) => void
   onTogglePage: () => void
   onOpen: (hit: CardSearchHit) => void
+  onClearSelection: () => void
   stale: boolean
 }) {
   const t = useT()
@@ -72,6 +73,20 @@ export function SearchResultsTable({
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const key = e.key
+      /**
+       * Escape releases the selection — HANDLED HERE, on the list, and not as a
+       * window-level hotkey. A window listener cannot tell "Escape while
+       * browsing the list" from "Escape cancelling the delete dialog": Radix
+       * closes the dialog on the same key and React has already flushed that
+       * close by the time a window listener runs, so any "is a modal open?"
+       * check reads false and the selection the user just refused to delete is
+       * thrown away with it. Scoping the key to the list removes the ambiguity
+       * by construction — a dialog traps focus, so the table never sees it.
+       */
+      if (key === 'Escape') {
+        onClearSelection()
+        return
+      }
       if (key === ' ' || key === 'Spacebar') {
         const id = pageIds[active]
         if (id) {
@@ -94,7 +109,7 @@ export function SearchResultsTable({
       }
       roving.onKeyDown(e)
     },
-    [active, focusIndex, onExtend, onToggle, pageIds, roving],
+    [active, focusIndex, onClearSelection, onExtend, onToggle, pageIds, roving],
   )
 
   const allSelected = isPageFullySelected(selection, pageIds)
@@ -143,9 +158,25 @@ export function SearchResultsTable({
                   }
                   onOpen(hit)
                 }}
-                className={cn('cursor-pointer', selected && 'bg-accent-subtle/40')}
+                /* A selected row must read as selected in BOTH themes. The
+                   table's own `data-[active]` (the roving cursor) already
+                   paints `surface-2`, so selection needs a different channel
+                   entirely, not a paler version of the same one: an accent
+                   tint AND a 2px accent edge. At 40% opacity the tint alone
+                   was invisible on the light background. */
+                className={cn(
+                  'relative cursor-pointer',
+                  selected &&
+                    'bg-accent-subtle data-[active]:bg-accent-subtle hover:bg-accent-subtle',
+                )}
               >
                 <TableCell onClick={(e) => e.stopPropagation()}>
+                  {selected && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 w-0.5 rounded-full bg-accent"
+                    />
+                  )}
                   <Checkbox
                     checked={selected}
                     onCheckedChange={() => onToggle(hit.card.id)}
