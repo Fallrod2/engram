@@ -9,6 +9,7 @@ import {
   Keyboard,
   Layers,
   LayoutDashboard,
+  ListFilter,
   Moon,
   Settings,
   SquarePen,
@@ -26,6 +27,8 @@ import { allDecksOptions } from '@/features/decks/queries'
 import { dueCountsOptions, bySubjectMap } from '@/features/due-counts/queries'
 import { SubjectDot } from '@/components/subject-dot'
 import { useShell } from './shell-context'
+import { paletteFilter } from './command-filter'
+import { CardResultsGroup, CardResultsSkeleton, useCardPaletteResults } from './command-cards'
 import {
   CommandDialog,
   CommandEmpty,
@@ -85,6 +88,12 @@ const NAV_ACTIONS: NavAction[] = [
     to: '/import',
     icon: Upload,
     keywords: 'import upload notes pdf markdown',
+  },
+  {
+    label: 'nav.items.search',
+    to: '/search',
+    icon: ListFilter,
+    keywords: 'search recherche cartes cards filtres filters trouver find',
   },
   {
     label: 'pageTitle.settings',
@@ -170,6 +179,30 @@ export function CommandMenu() {
     .filter(({ due }) => due > 0)
   const cardDecks = cardSubjectId ? decks.filter((d) => d.subjectId === cardSubjectId) : []
 
+  // Full-text card search (T-030). Only on the root page: the sub-pages are
+  // pickers over already-loaded lists, and firing a content search from "choose
+  // a deck" would answer a question nobody asked.
+  const cardResults = useCardPaletteResults(search, commandOpen && page === 'root')
+
+  /**
+   * A palette hit must land somewhere ACTIONABLE. `/search?edit=<id>` opens the
+   * card's editor straight away and puts the needle back in the box, so closing
+   * the dialog leaves the user on a screen where the card is still in reach —
+   * and because the whole thing is in the URL, Back closes the editor rather
+   * than leaving the app.
+   */
+  const openCard = (cardId: string) => {
+    close()
+    void navigate({
+      to: '/search',
+      search: { q: cardResults.needle, page: 1, edit: cardId },
+    })
+  }
+  const seeAllCards = () => {
+    close()
+    void navigate({ to: '/search', search: { q: cardResults.needle, page: 1 } })
+  }
+
   const stepHint =
     page === 'deck:subject'
       ? t('cmd.step.deckSubject')
@@ -180,7 +213,7 @@ export function CommandMenu() {
           : null
 
   return (
-    <CommandDialog open={commandOpen} onOpenChange={onOpenChange}>
+    <CommandDialog open={commandOpen} onOpenChange={onOpenChange} filter={paletteFilter}>
       <CommandInput
         placeholder={page === 'root' ? t('cmd.placeholder') : t('cmd.filterPlaceholder')}
         value={search}
@@ -195,7 +228,10 @@ export function CommandMenu() {
         </div>
       )}
       <CommandList>
-        <CommandEmpty>{t('cmd.empty')}</CommandEmpty>
+        {/* "No results" is an ASSERTION. It is withheld while a card search is
+            still in flight — saying it then is exactly the lie the user report
+            called out (⌘K answering "Aucun résultat" for a card that exists). */}
+        {!cardResults.pending && <CommandEmpty>{t('cmd.empty')}</CommandEmpty>}
 
         {page === 'root' && (
           <>
@@ -320,6 +356,19 @@ export function CommandMenu() {
                 {!coarse && <CommandShortcut>?</CommandShortcut>}
               </CommandItem>
             </CommandGroup>
+
+            {/* Cards come LAST, always. They arrive a few hundred milliseconds
+                after the palette opened, and nothing that was already on screen
+                may move to make room for them (see `command-filter.ts`). */}
+            {cardResults.pending ? (
+              <CardResultsSkeleton />
+            ) : (
+              <CardResultsGroup
+                results={cardResults}
+                onSelectCard={(hit) => openCard(hit.card.id)}
+                onSeeAll={seeAllCards}
+              />
+            )}
           </>
         )}
 

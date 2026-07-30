@@ -4,6 +4,7 @@ import {
   GraduationCap,
   Layers,
   LayoutDashboard,
+  ListFilter,
   Upload,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -46,6 +47,10 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'tools',
     label: 'nav.groups.tools',
     items: [
+      // A row of its own rather than a second reading of the ⌘K box above: the
+      // palette is a shortcut (jump, act, 8 rows), this is the screen where you
+      // filter, page and reorganise. `ListFilter` says so at a glance.
+      { label: 'nav.items.search', to: '/search', icon: ListFilter },
       { label: 'nav.items.planning', to: '/planning', icon: CalendarDays },
       { label: 'nav.items.analytics', to: '/analytics', icon: ChartColumn },
       { label: 'nav.items.import', to: '/import', icon: Upload },

@@ -8,6 +8,7 @@ const TITLES: Record<string, TKey> = {
   '/planning': 'pageTitle.planning',
   '/analytics': 'pageTitle.analytics',
   '/import': 'pageTitle.import',
+  '/search': 'pageTitle.search',
   '/settings': 'pageTitle.settings',
 }
 

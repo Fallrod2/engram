@@ -14,6 +14,7 @@ import { Route as SuspendedRouteImport } from './routes/suspended'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetPasswordRouteImport } from './routes/set-password'
+import { Route as SearchRouteImport } from './routes/search'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as PlanningRouteImport } from './routes/planning'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -53,6 +54,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SetPasswordRoute = SetPasswordRouteImport.update({
   id: '/set-password',
   path: '/set-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
+  '/search': typeof SearchRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
+  '/search': typeof SearchRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
@@ -187,6 +195,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/planning': typeof PlanningRoute
   '/review': typeof ReviewRoute
+  '/search': typeof SearchRoute
   '/set-password': typeof SetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/planning'
     | '/review'
+    | '/search'
     | '/set-password'
     | '/settings'
     | '/signup'
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/planning'
     | '/review'
+    | '/search'
     | '/set-password'
     | '/settings'
     | '/signup'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/planning'
     | '/review'
+    | '/search'
     | '/set-password'
     | '/settings'
     | '/signup'
@@ -278,6 +290,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PlanningRoute: typeof PlanningRoute
   ReviewRoute: typeof ReviewRoute
+  SearchRoute: typeof SearchRoute
   SetPasswordRoute: typeof SetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
@@ -327,6 +340,13 @@ declare module '@tanstack/react-router' {
       path: '/set-password'
       fullPath: '/set-password'
       preLoaderRoute: typeof SetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -446,6 +466,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PlanningRoute: PlanningRoute,
   ReviewRoute: ReviewRoute,
+  SearchRoute: SearchRoute,
   SetPasswordRoute: SetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,

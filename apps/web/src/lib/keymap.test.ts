@@ -11,7 +11,7 @@ import {
   type ContextId,
 } from './keymap'
 
-const KNOWN_ROUTES = ['/', '/review', '/subjects', '/planning', '/analytics', '/import']
+const KNOWN_ROUTES = ['/', '/review', '/subjects', '/planning', '/analytics', '/import', '/search']
 
 describe('nav chords', () => {
   it('has distinct single-letter second keys, none of them "g"', () => {
@@ -75,6 +75,7 @@ describe('contextForPathname', () => {
     ['/import/note1', 'import.note'],
     ['/import/note1/generations/gen1', 'import.generation'],
     ['/planning', 'planning'],
+    ['/search', 'search'],
   ] as const)('resolves %s → %s', (pathname, expected) => {
     expect(contextForPathname(pathname)).toBe(expected)
   })

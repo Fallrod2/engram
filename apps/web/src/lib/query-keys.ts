@@ -40,6 +40,30 @@ export const qk = {
     listByDeck: (deckId: string) => ['cards', 'list', { deckId }] as const,
     detail: (cardId: string) => ['cards', 'detail', cardId] as const,
   },
+  /**
+   * Content search (`GET /api/cards/search`, T-030).
+   *
+   * NOT under `cards`: the deck list and a search answer the same table but not
+   * the same question, and folding them under one prefix would make a card
+   * create in one deck invalidate every cached search page — including the ⌘K
+   * results the user is looking at while they type. Each write invalidates
+   * `cardSearch.all` explicitly instead.
+   *
+   * The WHOLE request shape is in the key, needle included, because that is
+   * precisely what makes a late response harmless: it lands in its own entry
+   * instead of over the current one.
+   */
+  cardSearch: {
+    all: ['card-search'] as const,
+    results: (params: Record<string, string | number | boolean | undefined>) =>
+      ['card-search', 'results', params] as const,
+    /**
+     * Size of the WHOLE corpus, from the same endpoint with no needle and
+     * `limit=1`. One cheap row, and it is the only thing that tells "no card
+     * matches this search" apart from "this account has no cards".
+     */
+    corpusSize: ['card-search', 'corpus-size'] as const,
+  },
   dueCounts: {
     all: ['due-counts'] as const,
   },

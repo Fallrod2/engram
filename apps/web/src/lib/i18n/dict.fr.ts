@@ -65,6 +65,7 @@ export const dictFr = {
       planning: 'Planning',
       analytics: 'Analytics',
       import: 'Import',
+      search: 'Recherche de cartes',
     },
     aria: {
       mainNav: 'Navigation principale',
@@ -79,6 +80,7 @@ export const dictFr = {
     planning: 'Planning',
     analytics: 'Analytics',
     import: 'Import',
+    search: 'Recherche de cartes',
     settings: 'Réglages',
     fallback: 'engram',
   },
@@ -358,6 +360,7 @@ export const dictFr = {
       preferences: 'Préférences',
       subjects: 'Matières',
       decks: 'Decks',
+      cards: 'Cartes',
     },
     actions: {
       newSubject: 'Nouvelle matière…',
@@ -379,6 +382,15 @@ export const dictFr = {
     },
     noSubjects: "Aucune matière — crée-en une d'abord.",
     noDecks: 'Aucun deck dans cette matière.',
+    // Résultats de cartes (T-030). `searching` remplace « Aucun résultat »
+    // pendant que la requête est en vol : l'app ne doit jamais affirmer qu'elle
+    // n'a rien trouvé alors qu'elle n'a pas fini de chercher.
+    cards: {
+      searching: 'Recherche dans les cartes…',
+      seeAll_one: 'Voir le résultat dans la recherche',
+      seeAll_other: 'Voir les {count} résultats dans la recherche',
+      archived: 'archivée',
+    },
   },
 
   shortcuts: {
@@ -398,6 +410,7 @@ export const dictFr = {
       planning: 'Aller au Planning',
       analytics: 'Aller aux Analytics',
       import: 'Aller à l’Import',
+      search: 'Aller à la Recherche de cartes',
     },
     contextLabels: {
       subjectsIndex: 'Matières',
@@ -408,6 +421,7 @@ export const dictFr = {
       importGeneration: 'Révision des cartes générées',
       planning: 'Planning',
       session: 'Session de révision',
+      search: 'Recherche de cartes',
     },
     keys: {
       newSubject: 'Nouvelle matière',
@@ -448,6 +462,13 @@ export const dictFr = {
       exitSession: 'Quitter la session',
       confirmExit: 'Confirmer la sortie',
       restartSession: 'Recommencer une session',
+      focusSearch: 'Aller au champ de recherche',
+      toggleSelect: 'Sélectionner / désélectionner la ligne',
+      extendSelect: 'Étendre la sélection',
+      selectPage: 'Sélectionner toute la page',
+      clearSelect: 'Vider la sélection',
+      moveSelected: 'Déplacer la sélection',
+      deleteSelected: 'Supprimer la sélection',
     },
   },
 
@@ -926,6 +947,112 @@ export const dictFr = {
     deleteLead: 'Supprime définitivement ce deck, ses',
     deleteTail: ' et leur historique. Irréversible.',
   },
+  // Recherche de cartes (T-030) : la palette ⌘K plein texte et l'écran dédié.
+  search: {
+    placeholder: 'Rechercher dans le recto et le verso…',
+    fieldAria: 'Rechercher dans les cartes',
+    clear: 'Effacer la recherche',
+    loading: 'Recherche en cours',
+    filters: {
+      subject: 'Matière',
+      subjectAll: 'Toutes les matières',
+      deck: 'Deck',
+      deckAll: 'Tous les decks',
+      state: 'État',
+      stateAll: 'Tous les états',
+      overdue: 'En retard',
+      hideArchived: 'Masquer les archivées',
+      clear: 'Réinitialiser les filtres',
+    },
+    // La ligne de comptage. `range` sert dès qu'il y a plusieurs pages : dire
+    // « 57 résultats » au-dessus de 25 lignes laisse croire à une troncature.
+    range: '{from}–{to} sur {total}',
+    results_one: '{count} carte',
+    results_other: '{count} cartes',
+    // Masquage des matières archivées : il est fait sur la page reçue, pas dans
+    // la requête (l'API n'a pas ce filtre), donc le compte du serveur inclut
+    // encore ces lignes. On le dit plutôt que de laisser la pagination mentir.
+    archivedHidden_one: '{count} carte d’une matière archivée masquée sur cette page',
+    archivedHidden_other: '{count} cartes de matières archivées masquées sur cette page',
+    archivedBadge: 'Archivée',
+    prevPage: 'Page précédente',
+    nextPage: 'Page suivante',
+    pageOf: 'Page {page} sur {pages}',
+    colFront: 'Recto',
+    colBack: 'Verso',
+    colDeck: 'Deck',
+    colDue: 'À réviser',
+    selectRow: 'Sélectionner cette carte',
+    selectPage: 'Sélectionner toutes les cartes de la page',
+    openCard: 'Ouvrir la carte',
+    // Trois vides distincts. Le troisième ne dit surtout pas « aucun résultat » :
+    // un compte vide n'a pas échoué à trouver, il n'a rien à trouver.
+    empty: {
+      idleTitle: 'Cherche dans toutes tes cartes',
+      idleMeta_one: '{count} carte indexée · recto et verso',
+      idleMeta_other: '{count} cartes indexées · recto et verso',
+      idleHint: 'Les accents et la casse sont ignorés. Un filtre seul fonctionne aussi.',
+      noResultsTitle: 'Aucune carte ne correspond',
+      noResultsMeta: 'Essaie moins de mots, ou retire un filtre.',
+      noCardsTitle: 'Tu n’as pas encore de carte',
+      noCardsMeta: 'Crée un deck ou importe des notes pour commencer.',
+      noCardsAction: 'Voir mes matières',
+    },
+    quick: {
+      overdue: 'Cartes en retard',
+      newCards: 'Cartes jamais vues',
+    },
+    selection: {
+      count_one: '{count} carte sélectionnée',
+      count_other: '{count} cartes sélectionnées',
+      clear: 'Tout désélectionner',
+      capped_one:
+        'Limite atteinte : {count} carte n’a pas pu être ajoutée (maximum {max} par lot).',
+      capped_other:
+        'Limite atteinte : {count} cartes n’ont pas pu être ajoutées (maximum {max} par lot).',
+    },
+    bulk: {
+      move: 'Déplacer',
+      delete: 'Supprimer',
+      deleting: 'Suppression…',
+      moving: 'Déplacement…',
+      deleteTitle_one: 'Supprimer 1 carte ?',
+      deleteTitle_other: 'Supprimer {count} cartes ?',
+      deleteBody_one: 'Cette carte sera supprimée avec tout son historique de révision.',
+      deleteBody_other:
+        'Ces {count} cartes seront supprimées avec tout leur historique de révision.',
+      deleteHistory_one:
+        '{count} d’entre elles a déjà été révisée ({reps} révisions enregistrées) : cette progression FSRS est perdue.',
+      deleteHistory_other:
+        '{count} d’entre elles ont déjà été révisées ({reps} révisions enregistrées) : cette progression FSRS est perdue.',
+      deleteIrreversible: 'Cette action est irréversible.',
+      deleteConfirm_one: 'Supprimer la carte',
+      deleteConfirm_other: 'Supprimer {count} cartes',
+      deleted_one: '{count} carte supprimée',
+      deleted_other: '{count} cartes supprimées',
+      deletedDeduped: '{affected} cartes supprimées ({requested} demandées, doublons ignorés)',
+      moved_one: '{count} carte déplacée',
+      moved_other: '{count} cartes déplacées',
+      movedDeduped: '{affected} cartes déplacées ({requested} demandées, doublons ignorés)',
+      errorGone:
+        'Une des cartes n’existe plus. Rien n’a été modifié — actualise la recherche et réessaie.',
+      errorArchived: 'Impossible : le deck de destination est sous une matière archivée.',
+      errorTooMany: 'Lot trop grand pour le serveur. Réduis la sélection.',
+      errorGeneric: 'L’opération a échoué. Rien n’a été modifié.',
+    },
+    moveDialog: {
+      title_one: 'Déplacer 1 carte',
+      title_other: 'Déplacer {count} cartes',
+      description:
+        'L’historique suit la carte : les révisions passées seront rattachées au deck de destination, et l’état FSRS est conservé.',
+      destination: 'Deck de destination',
+      placeholder: 'Choisir un deck…',
+      archivedSuffix: '(archivée)',
+      noDecks: 'Aucun deck disponible.',
+      confirm: 'Déplacer',
+    },
+  },
+
   cards: {
     add: 'Ajouter une carte',
     menuActions: 'Actions de la carte',

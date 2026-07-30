@@ -1,8 +1,13 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-/** Text input — surface-2 field, hairline border, mono not forced. */
-function Input({ className, type, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+/**
+ * Text input — surface-2 field, hairline border, mono not forced.
+ *
+ * Props include `ref` (React 19 passes it as a normal prop): the search screen
+ * needs to focus its field from a keyboard shortcut.
+ */
+function Input({ className, type, ...props }: React.ComponentPropsWithRef<'input'>) {
   return (
     <input
       type={type}
