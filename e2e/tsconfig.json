@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // Specs run in Node, but the bodies of `page.evaluate()` / `page.addInitScript()`
+    // are serialised and executed in the browser, so they legitimately reference
+    // `window`, `document` and friends. They are typechecked here like any other
+    // code, hence the DOM lib alongside the Node types.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  // The whole directory: the point of this project is that nothing dropped into
+  // `e2e/` can escape the gate. Anything added here is typechecked by default.
+  "include": ["."]
+}

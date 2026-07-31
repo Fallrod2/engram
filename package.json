@@ -10,8 +10,9 @@
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "dev": "bun run --filter './apps/*' dev",
-    "typecheck": "bun run --filter '*' typecheck && bun run typecheck:api",
+    "typecheck": "bun run --filter '*' typecheck && bun run typecheck:api && bun run typecheck:e2e",
     "typecheck:api": "tsc -p api/tsconfig.json",
+    "typecheck:e2e": "tsc -p e2e/tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
