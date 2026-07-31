@@ -81,6 +81,7 @@ export const dictFr = {
     analytics: 'Analytics',
     import: 'Import',
     search: 'Recherche de cartes',
+    admin: 'Administration',
     settings: 'Réglages',
     fallback: 'engram',
   },
@@ -305,6 +306,7 @@ export const dictFr = {
       mgmtUnavailable: 'Configure Supabase pour créer des comptes.',
     },
     suspended: {
+      meta: 'Compte suspendu — engram',
       title: 'Compte suspendu',
       body: 'Ton compte a été suspendu. Contacte l’administrateur pour le réactiver.',
       signOut: 'Se déconnecter',

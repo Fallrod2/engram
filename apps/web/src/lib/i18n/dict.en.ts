@@ -75,6 +75,7 @@ export const dictEn: Dict = {
     analytics: 'Analytics',
     import: 'Import',
     search: 'Card search',
+    admin: 'Administration',
     settings: 'Settings',
     fallback: 'engram',
   },
@@ -286,6 +287,7 @@ export const dictEn: Dict = {
       mgmtUnavailable: 'Configure Supabase to create accounts.',
     },
     suspended: {
+      meta: 'Account suspended — engram',
       title: 'Account suspended',
       body: 'Your account has been suspended. Contact the administrator to reactivate it.',
       signOut: 'Sign out',
