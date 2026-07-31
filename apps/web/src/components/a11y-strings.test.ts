@@ -17,10 +17,43 @@ import { describe, expect, it } from 'vitest'
  * calendar cells) plus a keyboard shortcut that selected on a French label and
  * was therefore dead in English.
  *
- * Two rules, both chosen to have no false positives on the current tree:
+ * Three rules, all chosen to have no false positives on the current tree:
  *  1. no accented literal — the French smoking gun;
  *  2. no multi-word literal — catches a hardcoded *English* sentence too, while
- *     leaving short code-ish literals alone (`page === 'root'`).
+ *     leaving short code-ish literals alone (`page === 'root'`);
+ *  3. no single WORD either — see below.
+ *
+ * WHY RULE 3, AND WHAT IT COST (T-047). Rules 1 and 2 shared a blind spot one
+ * word wide, and something was sitting in it: `aria-label="Fermer"` on the
+ * dialog and sheet primitives. Unaccented, single word, so neither rule fired —
+ * and it was not some corner of the app, it was the close button of EVERY modal
+ * engram opens. The guard stayed green for months while shipping French to
+ * every English user who ever opened a dialog.
+ *
+ * The obvious objection to rule 3 is that a one-word literal is often an
+ * identifier rather than copy. That objection is CORRECT, and it was measured
+ * rather than argued: applied to every literal the scanner can see, rule 3
+ * flagged three things in the whole tree — `'root'` and `'month'`, twice — and
+ * all three were comparison operands in already-translated code
+ * (`page === 'root' ? t(…) : t(…)`). Three flags, three false positives.
+ *
+ * So rule 3 is not softened with an exception list; it is scoped to the position
+ * where the objection cannot arise. A plain `attr="…"` literal IS the attribute
+ * value, and a bare word sitting there is copy or nothing. A literal recovered
+ * from inside `{ … }` is only somewhere in an expression, so rule 3 ignores it
+ * and rules 1 and 2 keep covering that position as before. Scoped that way, rule
+ * 3 flags exactly one thing on the tree it was written against: `Fermer`. No
+ * exception list exists, and none is wanted — a guard whose exception list grows
+ * is a guard being negotiated with.
+ *
+ * WHAT THIS GUARD STILL DOES NOT SEE, stated plainly so the green is not read as
+ * more than it is:
+ *  · values that are not JSX attributes. `dialog.tsx` carried the very same
+ *    French as a FUNCTION DEFAULT (`closeLabel = 'Fermer'`), and no attribute
+ *    scan reaches that. It was found by reading the file, not by this test.
+ *  · a bare word inside `{ … }` — `aria-label={open ? 'Close' : 'Open'}` passes.
+ *  · a string that reaches an attribute through a variable or a helper.
+ *  · single letters and 1-char literals, by construction of {@link WORD}.
  *
  * Exempt by construction: `t('…')` keys, `className` values (a prop may legally
  * take JSX, and a Tailwind class list is multi-word), and comments.
@@ -41,6 +74,14 @@ const ATTRS = ['aria-label', 'title', 'alt', 'placeholder']
 const ACCENTED = /[àâäéèêëîïôöùûüÿçœæÀÂÄÉÈÊËÎÏÔÖÙÛÜŸÇŒÆ]/
 /** Two letter-runs separated by a space — i.e. human prose, not an identifier. */
 const MULTI_WORD = /\p{L}\p{L}*\s+\p{L}/u
+/**
+ * A bare word, nothing else: letters only, at least two of them. An accessible
+ * name that is one plain word is still copy ("Fermer", "Close", "Suivant") and
+ * still has to come from the dictionary. Anchored and letters-only on purpose —
+ * `root`, `esc` and friends are words too, but they are not attribute VALUES
+ * here, and nothing in the tree passes one as an accessible name.
+ */
+const WORD = /^\p{L}{2,}$/u
 
 function tsxFilesIn(dir: string): string[] {
   const out: string[] = []
@@ -170,11 +211,22 @@ function offendersIn(src: string): { attr: string; line: number; literal: string
       const at = match.index ?? 0
       const read = readAttributeValue(src, at + attr.length)
       if (!read) continue
-      const candidates = read.value.startsWith('{')
-        ? literalsIn(stripClassNames(stripTranslationKeys(read.value)))
-        : [read.value.slice(1, -1)]
+      // A plain `attr="…"` literal IS the value. A literal fished out of `{ … }`
+      // might be anything the expression happens to contain — including the
+      // right-hand side of a comparison that PICKS between two translated
+      // strings (`page === 'root' ? t(…) : t(…)`). That distinction does not
+      // matter for rules 1 and 2, since no comparison operand in this tree is
+      // accented or multi-word, but it is the whole ballgame for rule 3: applied
+      // to expression literals it flagged `'root'` and `'month'` — three hits,
+      // three false positives, zero defects. So rule 3 is scoped to the position
+      // where a bare word can only be copy.
+      const isPlainString = !read.value.startsWith('{')
+      const candidates = isPlainString
+        ? [read.value.slice(1, -1)]
+        : literalsIn(stripClassNames(stripTranslationKeys(read.value)))
       for (const literal of candidates) {
-        if (!ACCENTED.test(literal) && !MULTI_WORD.test(literal)) continue
+        const prose = ACCENTED.test(literal) || MULTI_WORD.test(literal)
+        if (!prose && !(isPlainString && WORD.test(literal))) continue
         out.push({ attr, line: src.slice(0, at).split('\n').length, literal })
       }
     }
@@ -212,6 +264,30 @@ describe('rendered a11y strings go through i18n', () => {
       'Série de ${n} jours',
       'Switch to light theme',
     ])
+  })
+
+  it('detects a single unaccented word — the blind spot that shipped (T-047)', () => {
+    // Verbatim, as it stood in `sheet.tsx` and (as a function default) in
+    // `dialog.tsx`. Both rules that existed before returned false on it: no
+    // accent, no space. Every modal in the app announced its close button in
+    // French to an English screen reader, and the suite stayed green.
+    expect(offendersIn('<button aria-label="Fermer" />').map((o) => o.literal)).toEqual(['Fermer'])
+    // The English equivalent is just as wrong when it is hardcoded.
+    expect(offendersIn('<button aria-label="Close" />').map((o) => o.literal)).toEqual(['Close'])
+  })
+
+  it('keeps rule 3 off expression literals, where a bare word is an operand', () => {
+    // The measured false positives, verbatim from the tree. Both pick between
+    // two TRANSLATED strings; the bare word is the discriminator, never the
+    // label. Flagging these would have made the guard something to be silenced.
+    const operands = [
+      "<input placeholder={page === 'root' ? t('cmd.placeholder') : t('cmd.filterPlaceholder')} />",
+      "<button aria-label={view === 'month' ? t('planning.prevMonth') : t('planning.prevWeek')} />",
+    ]
+    for (const sample of operands) expect(offendersIn(sample), sample).toEqual([])
+    // The price of that scoping, stated as a test so it is a known hole and not
+    // a surprise: a hardcoded word inside braces gets through.
+    expect(offendersIn("<button aria-label={open ? 'Close' : 'Open'} />")).toEqual([])
   })
 
   it('does not flag a translated attribute, whatever the call shape', () => {

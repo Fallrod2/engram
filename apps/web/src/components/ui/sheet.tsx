@@ -3,6 +3,7 @@ import * as SheetPrimitive from '@radix-ui/react-dialog'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 const Sheet = SheetPrimitive.Root
 const SheetTrigger = SheetPrimitive.Trigger
@@ -48,6 +49,7 @@ interface SheetContentProps
     VariantProps<typeof sheetVariants> {}
 
 function SheetContent({ side = 'right', className, children, ...props }: SheetContentProps) {
+  const t = useT()
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -55,7 +57,7 @@ function SheetContent({ side = 'right', className, children, ...props }: SheetCo
         {children}
         <SheetPrimitive.Close
           className="absolute right-4 top-4 rounded-sm text-text-faint transition-colors duration-fast hover:text-text"
-          aria-label="Fermer"
+          aria-label={t('common.close')}
         >
           <X className="size-4" />
         </SheetPrimitive.Close>
