@@ -1,0 +1,51 @@
+-- Pre-folded search columns for card content search (T-030). HAND-WRITTEN
+-- (house pattern 0004/0006/0007/0008/0009/0010/0011): there is NO 0012 snapshot
+-- — 0007+ have none — so do NOT `drizzle-kit generate` over this file. Every
+-- statement is core SQL and applies on PGlite (`bun run test:db`) exactly as it
+-- does on Postgres and on Supabase.
+--
+-- WHY THESE COLUMNS EXIST — a measured decision, not a precaution. Search has to
+-- ignore case AND accents (« theorie » must find « Théorie »: this is a
+-- French-first app, and a search that misses accents is a broken search). The
+-- fold is expressed in core SQL — lower + replace + translate — because
+-- `unaccent` is NOT portable here: a bare PGlite reports « extension "unaccent"
+-- is not available », and even with the bundle registered `unaccent()` is STABLE
+-- rather than IMMUTABLE, so it can appear neither in an index nor in a generated
+-- column. See `src/db/fold.ts` for the full record.
+--
+-- But folding AT QUERY TIME is unaffordable. `translate()` costs
+-- O(len(text) × len(table)) per call, and the table below is 260 characters, on
+-- two columns, for every row of the caller's corpus, on every keystroke.
+-- Measured on 5 000 cards (one user, 20 000 rows in the table):
+--
+--     raw LIKE, no fold ............................   1.6 ms
+--     lower() only .................................   5.6 ms
+--     translate, 26-char table, front only .........  52.4 ms
+--     translate, 260-char table, front only ........ 351.3 ms
+--     translate, 260-char table, front OR back ..... 743.7 ms   <- unshippable
+--     pre-folded columns, front OR back ............   2.4 ms   <- this migration
+--
+-- End to end the search endpoint went from ~1 500-2 000 ms to single-digit ms.
+-- The fold is now paid ONCE, at write time, on ONE row.
+--
+-- NO BACKFILL STATEMENT IS NEEDED and none is possible: a STORED generated
+-- column is computed by Postgres for every existing row as part of this ALTER,
+-- and may never be written by the application. `NOT NULL` is safe for the same
+-- reason — `front`/`back` are already NOT NULL and the expression is total.
+--
+-- NO INDEX, DELIBERATELY. The predicate is a substring match (`LIKE '%x%'`),
+-- which no core-Postgres index can serve; only a `pg_trgm` GIN index could, and
+-- `pg_trgm` is exactly as unavailable in a bare PGlite as `unaccent` (verified:
+-- « extension "pg_trgm" is not available »). Adding one would therefore split
+-- the schema between environments to save 2 ms. If the corpus ever outgrows
+-- that, the upgrade is a GIN trigram index on these two columns and it requires
+-- no application change.
+--
+-- ⚠️ THE EXPRESSION BELOW IS FROZEN INTO THE SCHEMA. It is the literal form of
+-- `foldSql()` in `src/db/fold.ts`; changing FOLD_FROM/FOLD_TO there does NOT
+-- re-fold existing rows and needs a migration that drops and re-adds these two
+-- columns. `src/services/card-search.spec.ts` compares the stored column against
+-- the live expression on a corpus of tricky strings, so the two cannot drift
+-- apart unnoticed.
+ALTER TABLE "card" ADD COLUMN "front_fold" text GENERATED ALWAYS AS (translate(replace(replace(replace(replace(lower("front"), 'œ', 'oe'), 'æ', 'ae'), 'ß', 'ss'), 'ĳ', 'ij'), 'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüýÿĀāĂăĄąĆćĈĉĊċČčĎďĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĨĩĪīĬĭĮįİĴĵĶķĹĺĻļĽľŃńŅņŇňŌōŎŏŐőŔŕŖŗŘřŚśŜŝŞşŠšŢţŤťŨũŪūŬŭŮůŰűŲųŴŵŶŷŸŹźŻżŽžƠơƯưǍǎǏǐǑǒǓǔǕǖǗǘǙǚǛǜǞǟǠǡǦǧǨǩǪǫǬǭǰǴǵǸǹǺǻȀȁȂȃȄȅȆȇȈȉȊȋȌȍȎȏȐȑȒȓȔȕȖȗȘșȚțȞȟȦȧȨȩȪȫȬȭȮȯȰȱȲȳØøĐđÐðĦħŁłŦŧıȷÞþ', 'AAAAAACEEEEIIIINOOOOOUUUUYaaaaaaceeeeiiiinooooouuuuyyAaAaAaCcCcCcCcDdEeEeEeEeEeGgGgGgGgHhIiIiIiIiIJjKkLlLlLlNnNnNnOoOoOoRrRrRrSsSsSsSsTtTtUuUuUuUuUuUuWwYyYZzZzZzOoUuAaIiOoUuUuUuUuUuAaAaGgKkOoOojGgNnAaAaAaEeEeIiIiOoOoRrRrUuUuSsTtHhAaEeOoOoOoOoYyOoDdDdHhLlTtijTt')) STORED NOT NULL;--> statement-breakpoint
+ALTER TABLE "card" ADD COLUMN "back_fold" text GENERATED ALWAYS AS (translate(replace(replace(replace(replace(lower("back"), 'œ', 'oe'), 'æ', 'ae'), 'ß', 'ss'), 'ĳ', 'ij'), 'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüýÿĀāĂăĄąĆćĈĉĊċČčĎďĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĨĩĪīĬĭĮįİĴĵĶķĹĺĻļĽľŃńŅņŇňŌōŎŏŐőŔŕŖŗŘřŚśŜŝŞşŠšŢţŤťŨũŪūŬŭŮůŰűŲųŴŵŶŷŸŹźŻżŽžƠơƯưǍǎǏǐǑǒǓǔǕǖǗǘǙǚǛǜǞǟǠǡǦǧǨǩǪǫǬǭǰǴǵǸǹǺǻȀȁȂȃȄȅȆȇȈȉȊȋȌȍȎȏȐȑȒȓȔȕȖȗȘșȚțȞȟȦȧȨȩȪȫȬȭȮȯȰȱȲȳØøĐđÐðĦħŁłŦŧıȷÞþ', 'AAAAAACEEEEIIIINOOOOOUUUUYaaaaaaceeeeiiiinooooouuuuyyAaAaAaCcCcCcCcDdEeEeEeEeEeGgGgGgGgHhIiIiIiIiIJjKkLlLlLlNnNnNnOoOoOoRrRrRrSsSsSsSsTtTtUuUuUuUuUuUuWwYyYZzZzZzOoUuAaIiOoUuUuUuUuUuAaAaGgKkOoOojGgNnAaAaAaEeEeIiIiOoOoRrRrUuUuSsTtHhAaEeOoOoOoOoYyOoDdDdHhLlTtijTt')) STORED NOT NULL;

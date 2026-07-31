@@ -85,6 +85,13 @@
       "when": 1784500000000,
       "tag": "0011_generation_origin",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784600000000,
+      "tag": "0012_card_search_fold",
+      "breakpoints": true
     }
   ]
 }

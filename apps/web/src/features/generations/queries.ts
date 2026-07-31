@@ -113,6 +113,9 @@ export function useResolveGeneration() {
       // "create card" matrix — prefix invalidation covers listByDeck/cardCount/
       // listBySubject/detail under each root key.
       void qc.invalidateQueries({ queryKey: qk.cards.all })
+      // Accepted proposals become real cards, so content search must see them
+      // (T-030) — its keys live outside `cards.all` on purpose.
+      void qc.invalidateQueries({ queryKey: qk.cardSearch.all })
       void qc.invalidateQueries({ queryKey: qk.decks.all })
       void qc.invalidateQueries({ queryKey: qk.subjects.all })
       void qc.invalidateQueries({ queryKey: qk.dueCounts.all })

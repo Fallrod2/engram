@@ -65,6 +65,10 @@ function invalidateCardCounts(
   subjectId: string,
 ) {
   void qc.invalidateQueries({ queryKey: qk.cards.listByDeck(deckId) })
+  // Content search reads the same rows through its own keys (T-030). Without
+  // this, a card created or deleted here stays in ⌘K and on /search until their
+  // own staleTime lapses — the search would keep offering a card that is gone.
+  void qc.invalidateQueries({ queryKey: qk.cardSearch.all })
   // The per-deck totals shown on the Subjects screens now come from one
   // aggregate query (Phase 7 §2.2) — invalidate that single key, not N probes.
   void qc.invalidateQueries({ queryKey: qk.decks.cardCountsAll })
@@ -142,8 +146,12 @@ export function useUpdateCard(deckId: string) {
         action: { label: t('common.retry'), onClick: () => mutation.mutate(vars) },
       })
     },
-    // Editing front/back never touches FSRS state → only the card list moves.
-    onSettled: () => void qc.invalidateQueries({ queryKey: key }),
+    // Editing front/back never touches FSRS state → only the card list moves…
+    // and the search index, which matches on exactly that text.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: key })
+      void qc.invalidateQueries({ queryKey: qk.cardSearch.all })
+    },
   })
   return mutation
 }

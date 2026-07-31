@@ -21,6 +21,8 @@ import { useShell } from './shell-context'
  */
 const KEY_TOKEN_LABELS: Record<string, TKey> = {
   Enter: 'session.keyEnter',
+  Space: 'session.keySpace',
+  Escape: 'session.keyEsc',
 }
 
 /** Render a binding's space-separated tokens, one `<Kbd>` each. */

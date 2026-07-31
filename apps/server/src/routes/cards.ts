@@ -1,5 +1,8 @@
 import { Hono } from 'hono'
 import {
+  bulkCardIdsSchema,
+  bulkCardResultSchema,
+  bulkMoveCardsSchema,
   cardSchema,
   createCardSchema,
   idParamSchema,
@@ -9,9 +12,12 @@ import {
   reviewCardSchema,
   reviewPreviewSchema,
   reviewResultSchema,
+  searchCardsQuerySchema,
+  searchCardsResponseSchema,
   undoReviewResponseSchema,
   undoReviewSchema,
   updateCardSchema,
+  CARD_SEARCH_LIMIT_DEFAULT,
 } from '@engram/shared'
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
@@ -26,8 +32,57 @@ import {
   updateCard,
 } from '../services/cards.service'
 import { reviewCard, undoReview, type ReviewInput } from '../services/review.service'
+import { bulkDeleteCards, bulkMoveCards, searchCards } from '../services/card-search.service'
 
 export const cardsRouter = new Hono()
+
+/**
+ * Content search. DECLARED BEFORE `/:id` — Hono matches in registration order,
+ * so the reverse would make `/search` a card whose id is the string "search".
+ */
+cardsRouter.get('/search', zValidator('query', searchCardsQuerySchema), async (c) => {
+  const q = c.req.valid('query')
+  return ok(
+    c,
+    searchCardsResponseSchema,
+    await searchCards(db, requireUserId(c), {
+      q: q.q,
+      limit: q.limit ?? CARD_SEARCH_LIMIT_DEFAULT,
+      offset: q.offset ?? 0,
+      now: new Date(),
+      ...(q.subjectId ? { subjectId: q.subjectId } : {}),
+      ...(q.deckId ? { deckId: q.deckId } : {}),
+      ...(q.state ? { state: q.state } : {}),
+      // Both are forwarded on `!== undefined`, never on truthiness: `false` is
+      // meaningful for `overdue` (the non-backlog half) and explicit for
+      // `hideArchived` (archived kept), so dropping it would resurrect exactly
+      // the bug where the schema advertised a filter the server ignored.
+      ...(q.overdue !== undefined ? { overdue: q.overdue } : {}),
+      ...(q.hideArchived !== undefined ? { hideArchived: q.hideArchived } : {}),
+    }),
+  )
+})
+
+/**
+ * Bulk operations, as POST on a sub-resource rather than `DELETE /api/cards`
+ * with a body: a body on DELETE is legal but widely mangled (fetch, proxies and
+ * some CDNs drop it), and losing the body of a bulk DELETE fails OPEN. Two
+ * explicit paths instead of one action-discriminated endpoint because the two
+ * bodies genuinely differ — a move carries a destination deck, a delete must not
+ * — and a discriminated union would defer that difference to runtime.
+ *
+ * Both are atomic (one transaction), capped at `CARD_BULK_MAX` by the schema,
+ * and answer with what actually happened rather than 204.
+ */
+cardsRouter.post('/bulk/delete', zValidator('json', bulkCardIdsSchema), async (c) => {
+  const { cardIds } = c.req.valid('json')
+  return ok(c, bulkCardResultSchema, await bulkDeleteCards(db, requireUserId(c), cardIds))
+})
+
+cardsRouter.post('/bulk/move', zValidator('json', bulkMoveCardsSchema), async (c) => {
+  const { cardIds, deckId } = c.req.valid('json')
+  return ok(c, bulkCardResultSchema, await bulkMoveCards(db, requireUserId(c), cardIds, deckId))
+})
 
 cardsRouter.get('/', zValidator('query', listCardsQuerySchema), async (c) => {
   const q = c.req.valid('query')

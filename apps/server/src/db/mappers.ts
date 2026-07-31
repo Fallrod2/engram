@@ -9,7 +9,13 @@ import { SEED_CARD_ID_FIELD, type SchedulableCard } from '../services/fsrs'
  * `exactOptionalPropertyTypes`, so the key is omitted when falsy.
  */
 
-type CardRow = InferSelectModel<typeof card>
+/**
+ * Everything of a card row EXCEPT the generated search columns. `front_fold` /
+ * `back_fold` are a database-side search index (migration 0012), never an input
+ * to scheduling, so requiring them here would force every caller to SELECT two
+ * columns it has no use for.
+ */
+type CardRow = Omit<InferSelectModel<typeof card>, 'frontFold' | 'backFold'>
 type ReviewLogRow = InferSelectModel<typeof reviewLog>
 
 /**

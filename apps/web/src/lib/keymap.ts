@@ -27,6 +27,7 @@ export type KeyGroup =
   | 'import.generation'
   | 'planning'
   | 'session'
+  | 'search'
 
 export interface KeyBinding {
   /** Space-separated key tokens, each rendered as one `<Kbd>` (e.g. `'G D'`). */
@@ -57,6 +58,9 @@ export const NAV_CHORDS: readonly NavChord[] = [
   { key: 'p', to: '/planning', label: 'shortcuts.chords.planning' },
   { key: 'a', to: '/analytics', label: 'shortcuts.chords.analytics' },
   { key: 'i', to: '/import', label: 'shortcuts.chords.import' },
+  // `f` for "find": `s` is Matières and `r` is the session, and the screen this
+  // opens is the one the ⌘K palette hands off to.
+  { key: 'f', to: '/search', label: 'shortcuts.chords.search' },
 ]
 
 /** Display form of a chord, e.g. `'d'` → `'G D'`. */
@@ -94,6 +98,7 @@ export type ContextId = Extract<
   | 'import.generation'
   | 'planning'
   | 'session'
+  | 'search'
 >
 
 /** i18n key for the "current screen" help section label. */
@@ -106,6 +111,7 @@ export const CONTEXT_LABELS: Record<ContextId, TKey> = {
   'import.generation': 'shortcuts.contextLabels.importGeneration',
   planning: 'shortcuts.contextLabels.planning',
   session: 'shortcuts.contextLabels.session',
+  search: 'shortcuts.contextLabels.search',
 }
 
 /**
@@ -180,6 +186,17 @@ export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
     { keys: 'Q', label: 'shortcuts.keys.confirmExit', group: 'session' },
     { keys: 'R', label: 'shortcuts.keys.restartSession', group: 'session' },
   ],
+  search: [
+    { keys: '/', label: 'shortcuts.keys.focusSearch', group: 'search' },
+    { keys: 'J K', label: 'shortcuts.keys.listNav', group: 'search' },
+    { keys: 'Enter', label: 'shortcuts.keys.editCard', group: 'search' },
+    { keys: 'Space', label: 'shortcuts.keys.toggleSelect', group: 'search' },
+    { keys: '⇧ J K', label: 'shortcuts.keys.extendSelect', group: 'search' },
+    { keys: 'A', label: 'shortcuts.keys.selectPage', group: 'search' },
+    { keys: 'M', label: 'shortcuts.keys.moveSelected', group: 'search' },
+    { keys: '⌫', label: 'shortcuts.keys.deleteSelected', group: 'search' },
+    { keys: 'Escape', label: 'shortcuts.keys.clearSelect', group: 'search' },
+  ],
 }
 
 /**
@@ -195,5 +212,6 @@ export function contextForPathname(pathname: string): ContextId | null {
   if (/^\/subjects\/[^/]+/.test(pathname)) return 'subjects.detail'
   if (pathname === '/subjects') return 'subjects.index'
   if (pathname === '/planning') return 'planning'
+  if (pathname === '/search') return 'search'
   return null
 }

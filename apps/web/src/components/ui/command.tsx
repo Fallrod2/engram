@@ -17,11 +17,25 @@ function Command({ className, ...props }: React.ComponentPropsWithoutRef<typeof 
   )
 }
 
-function CommandDialog({ children, ...props }: React.ComponentPropsWithoutRef<typeof Dialog>) {
+/**
+ * `filter` is forwarded to the cmdk root rather than left at its default: the
+ * palette now mixes locally-scored actions with rows Postgres already matched,
+ * and only the root can arbitrate between them (see `command-filter.ts`).
+ */
+function CommandDialog({
+  children,
+  filter,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Dialog> & {
+  filter?: React.ComponentPropsWithoutRef<typeof CommandPrimitive>['filter']
+}) {
   return (
     <Dialog {...props}>
       <DialogContent className="overflow-hidden p-0">
-        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:text-text-faint [&_[cmdk-input-wrapper]_svg]:size-4 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-2 [&_[cmdk-item]_svg]:size-4">
+        <Command
+          {...(filter ? { filter } : {})}
+          className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:text-text-faint [&_[cmdk-input-wrapper]_svg]:size-4 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-2 [&_[cmdk-item]_svg]:size-4"
+        >
           {children}
         </Command>
       </DialogContent>
