@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { parseQcm, type ParsedQcm, type QcmOption } from './qcm'
+import {
+  MAX_OPTIONS,
+  MIN_OPTIONS,
+  OPTION_LETTERS,
+  parseQcm,
+  type ParsedQcm,
+  type QcmOption,
+} from './qcm'
 
 /** Options lettered A, B, C… from their texts — the only shape we accept. */
 function options(...texts: readonly string[]): QcmOption[] {
@@ -271,6 +278,42 @@ describe('parseQcm — recognised', () => {
 describe('parseQcm — rejected (the caller falls back to plain Markdown)', () => {
   it.each(REJECTED)('rejects %s', (_label, front, back) => {
     expect(parseQcm(front, back)).toBeNull()
+  })
+})
+
+/**
+ * The option count is ONE decision with three readers: this parser, the review
+ * session's keyboard map (`OPTION_KEYS`, derived from `OPTION_LETTERS`) and the
+ * demo-seed suite. It used to be written out in all three, so changing it in one
+ * place left the others quietly wrong — a fifth option the parser accepts and no
+ * key can select. These tests fail if the bounds and the parser ever disagree,
+ * which is what makes `MAX_OPTIONS` the single place to edit.
+ */
+describe('parseQcm — the option bounds are the exported constants', () => {
+  /** A front with `n` options, lettered from A, in the nominal shape. */
+  function frontWith(n: number): string {
+    const lines = Array.from(
+      { length: n },
+      (_, i) => `- ${String.fromCharCode(65 + i)}) Réponse ${i + 1}`,
+    )
+    return `${CAPITAL}\n\n${lines.join('\n')}`
+  }
+
+  it('OPTION_LETTERS is exactly the letters MAX_OPTIONS allows, from A', () => {
+    expect(OPTION_LETTERS).toHaveLength(MAX_OPTIONS)
+    expect(OPTION_LETTERS).toEqual(
+      Array.from({ length: MAX_OPTIONS }, (_, i) => String.fromCharCode(65 + i)),
+    )
+  })
+
+  it('accepts exactly MIN_OPTIONS and exactly MAX_OPTIONS', () => {
+    expect(parseQcm(frontWith(MIN_OPTIONS), 'A) Parce que.')?.options).toHaveLength(MIN_OPTIONS)
+    expect(parseQcm(frontWith(MAX_OPTIONS), 'A) Parce que.')?.options).toHaveLength(MAX_OPTIONS)
+  })
+
+  it('rejects one option below MIN_OPTIONS and one above MAX_OPTIONS', () => {
+    expect(parseQcm(frontWith(MIN_OPTIONS - 1), 'A) Parce que.')).toBeNull()
+    expect(parseQcm(frontWith(MAX_OPTIONS + 1), 'A) Parce que.')).toBeNull()
   })
 })
 
