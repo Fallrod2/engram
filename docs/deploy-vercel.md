@@ -403,9 +403,11 @@ pas été basculé en tâche de fond, pour trois raisons :
    que le navigateur attend : s'il échoue, la transaction est annulée (rien de
    semé), la requête échoue, et la suivante le rejoue. Rien à réconcilier.
 
-Depuis le lot perf, le semis émet **15 requêtes SQL** (contre 101 : une insertion
-par carte et par journal de révision). Combiné à `cdg1`, ce n'est plus une attente
-de quinze secondes mais quelques centaines de millisecondes.
+Depuis le lot perf, le semis émet **18 requêtes SQL** (contre 101 : une insertion
+par carte et par journal de révision) — 15 au moment du lot, puis +1 pour la remise
+à zéro des préférences du compte partagé et +2 pour la note d'exemple et sa
+génération pré-enregistrée. Combiné à `cdg1`, ce n'est plus une attente de quinze
+secondes mais quelques centaines de millisecondes.
 
 ### `GET /api/demo/status` — un état réel, sans étapes inventées
 

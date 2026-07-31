@@ -145,7 +145,11 @@ export async function demoSeedStatus(
   return { state: (await isSeedRunning(db)) ? 'seeding' : 'pending', readyAt: null }
 }
 
-/** Delete every user-owned row for `userId` (child → parent, scoped). */
+/**
+ * Delete every user-owned row for `userId` (child → parent, scoped). Exactly one
+ * DELETE per table, so adding a table here also moves the seed's statement budget
+ * pinned in `demo.service.spec.ts`.
+ */
 export async function wipeUserData(tx: Tx, userId: string): Promise<void> {
   await tx
     .delete(examSubject)
@@ -616,9 +620,12 @@ export function demoSampleGenerationItems(): GenerationItem[] {
  * the work the database does. The row-at-a-time version emitted 101 statements
  * (25 `INSERT … RETURNING` for the cards, each followed by up to 4 more for its
  * review logs) and took ~15 s in production at ~80 ms/round-trip. This one emits
- * 15 — 7 scoped DELETEs plus one multi-row INSERT per table. `demo.service.spec.ts`
- * pins that count ("emits a bounded number of statements"), so a `for` loop that
- * sneaks an insert back in fails the suite instead of silently costing seconds.
+ * 18: 9 scoped DELETEs (the 8 in `wipeUserData`, plus the `app_settings` reset
+ * below), then one INSERT per table written — 8 of them, batched into a single
+ * multi-row statement wherever the table takes more than one row — and finally
+ * the marker upsert. `demo.service.spec.ts` pins that count ("emits a bounded
+ * number of statements"), so a `for` loop that sneaks an insert back in fails the
+ * suite instead of silently costing seconds.
  *
  * TWO CONSEQUENCES OF BATCHING, both load-bearing:
  *
