@@ -14,6 +14,11 @@ import { cn } from '@/lib/utils'
  *
  * `indeterminate` is the header state: SOME rows of this page are selected. It
  * cannot be expressed as a prop in HTML, hence the ref.
+ *
+ * `onCheckedChange` also receives the event, because a checkbox inside a
+ * multi-select list has to know HOW it was ticked (Shift held or not) and the
+ * change event is the only place that still knows — see
+ * `search-results-table.tsx#isShiftClick`.
  */
 export function Checkbox({
   checked,
@@ -24,7 +29,7 @@ export function Checkbox({
 }: Omit<React.ComponentPropsWithoutRef<'input'>, 'type' | 'checked' | 'onChange'> & {
   checked: boolean
   indeterminate?: boolean
-  onCheckedChange: (checked: boolean) => void
+  onCheckedChange: (checked: boolean, event: React.ChangeEvent<HTMLInputElement>) => void
 }) {
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -37,7 +42,7 @@ export function Checkbox({
         ref={ref}
         type="checkbox"
         checked={checked}
-        onChange={(e) => onCheckedChange(e.target.checked)}
+        onChange={(e) => onCheckedChange(e.target.checked, e)}
         className={cn(
           'peer size-4 cursor-pointer appearance-none rounded-xs border border-border-strong bg-surface-2',
           'transition-colors duration-fast hover:border-accent',

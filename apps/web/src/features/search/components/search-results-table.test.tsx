@@ -61,6 +61,8 @@ function renderTable(over: Partial<Parameters<typeof SearchResultsTable>[0]> = {
 }
 
 const rows = () => screen.getAllByRole('row').slice(1) // drop the header row
+/** The per-row boxes, header "select the page" box excluded by its name. */
+const boxes = () => screen.getAllByRole('checkbox', { name: 'Sélectionner cette carte' })
 
 describe('<SearchResultsTable> keyboard', () => {
   it('Space toggles the row under the cursor', () => {
@@ -140,8 +142,24 @@ describe('<SearchResultsTable> mouse', () => {
 
   it('the row checkbox selects without opening the card', () => {
     const s = renderTable()
-    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Sélectionner cette carte' })[2]!)
+    fireEvent.click(boxes()[2]!)
     expect(s.onToggle).toHaveBeenCalledWith('c')
+    expect(s.onOpen).not.toHaveBeenCalled()
+  })
+
+  /**
+   * The regression the test above USED to hide. "Shift+click extends" was
+   * asserted by clicking the `<tr>` — never the box — while the box is exactly
+   * what a hand aims at to pick a range. It swallowed the click before the row
+   * could read `shiftKey` and silently degraded the gesture to a plain toggle:
+   * rows 1 and 3 selected, row 2 skipped. So click the BOX, not the row.
+   */
+  it('Shift+click ON THE CHECKBOX extends the range, like anywhere else on the row', () => {
+    const s = renderTable()
+    fireEvent.click(boxes()[2]!, { shiftKey: true })
+    expect(s.onExtend).toHaveBeenCalledWith('c')
+    // Not a toggle, and not an open either: one gesture, one action.
+    expect(s.onToggle).not.toHaveBeenCalled()
     expect(s.onOpen).not.toHaveBeenCalled()
   })
 })

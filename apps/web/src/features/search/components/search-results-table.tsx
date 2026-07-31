@@ -25,6 +25,20 @@ import {
 } from '../selection'
 
 /**
+ * Was this checkbox ticked with `Shift` held?
+ *
+ * A checkbox's `change` is ALWAYS derived from a click — the browser flips
+ * `checked` as the click's activation behaviour and React's own change plugin
+ * reads the click for checkboxes — so the modifiers of the gesture are still on
+ * the native event. A toggle driven from the keyboard produces a synthetic
+ * click with no modifiers, and correctly falls through to a plain toggle.
+ */
+function isShiftClick(event: React.ChangeEvent<HTMLInputElement>): boolean {
+  const native: Event = event.nativeEvent
+  return native instanceof MouseEvent && native.shiftKey
+}
+
+/**
  * The result list.
  *
  * KEYBOARD IS THE POINT, not a retrofit. `useRovingList` already owns the
@@ -34,7 +48,10 @@ import {
  *   - `Shift`+arrow/`j`/`k` MOVES the cursor and extends the range in one go,
  *     the way every file manager behaves — so a run of forty cards is one held
  *     key, not forty deliberate presses.
- * `Shift`+click does the same with the mouse, and `Escape` releases everything.
+ * `Shift`+click does the same with the mouse, ANYWHERE on the row — the
+ * checkbox included, which is the target a hand actually aims at for a
+ * multi-select and which used to degrade the gesture into a plain toggle.
+ * `Escape` releases everything.
  */
 export function SearchResultsTable({
   hits,
@@ -170,6 +187,15 @@ export function SearchResultsTable({
                     'bg-accent-subtle data-[active]:bg-accent-subtle hover:bg-accent-subtle',
                 )}
               >
+                {/* The cell keeps swallowing the click UNCONDITIONALLY, and the
+                    Shift test is duplicated on the checkbox instead of being
+                    delegated to the row. Letting a Shift+click bubble would run
+                    BOTH handlers: ticking a native checkbox flips it and emits
+                    its change event no matter what an ancestor does with the
+                    click (the flip is the click's activation behaviour, decided
+                    before dispatch), so the row would extend the range while the
+                    box toggled the same card back out of it. One gesture, one
+                    decision — and it can only be taken where the change lands. */}
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   {selected && (
                     <span
@@ -179,7 +205,10 @@ export function SearchResultsTable({
                   )}
                   <Checkbox
                     checked={selected}
-                    onCheckedChange={() => onToggle(hit.card.id)}
+                    onCheckedChange={(_checked, e) => {
+                      if (isShiftClick(e)) onExtend(hit.card.id)
+                      else onToggle(hit.card.id)
+                    }}
                     aria-label={t('search.selectRow')}
                   />
                 </TableCell>
