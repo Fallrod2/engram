@@ -5,7 +5,7 @@ import { localDayKey } from '@/lib/calendar'
 import { formatLongDay, formatRelativeDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { SUBJECT_BG_CLASS, pigmentSlotForHex } from '@/lib/pigments'
-import { useT } from '@/lib/i18n'
+import { usePlural, useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -43,6 +43,7 @@ export const DayDetailPanel = forwardRef<
   ref,
 ) {
   const t = useT()
+  const plural = usePlural()
   const total = day?.total ?? 0
   const segments = useMemo(() => daySegments(day, subjectsById), [day, subjectsById])
   const maxSeg = segments.reduce((m, s) => Math.max(m, s.count), 0)
@@ -63,11 +64,13 @@ export const DayDetailPanel = forwardRef<
             <div className="flex flex-col gap-3">
               <div className="flex items-baseline gap-2">
                 <span className="font-mono text-lg tabular-nums text-text">{total}</span>
-                <span className="text-sm text-text-muted">reviews prévues</span>
+                <span className="text-sm text-text-muted">
+                  {t(`planning.scheduled_${plural(total)}`)}
+                </span>
               </div>
               {day && day.overdueCount > 0 && (
                 <p className="-mt-2 font-mono text-xs tabular-nums text-text-muted">
-                  dont {day.overdueCount} en retard
+                  {t(`planning.overdueOf_${plural(day.overdueCount)}`, { count: day.overdueCount })}
                 </p>
               )}
               {segments.length > 0 && (
@@ -107,15 +110,15 @@ export const DayDetailPanel = forwardRef<
               <div className="flex flex-col gap-1">
                 <Button disabled className="w-full">
                   <GraduationCap />
-                  Réviser
+                  {t('planning.reviewCta')}
                 </Button>
-                <p className="text-2xs text-text-muted">Révision disponible le jour même.</p>
+                <p className="text-2xs text-text-muted">{t('planning.reviewSameDayOnly')}</p>
               </div>
             </div>
           ) : dayExams.length === 0 ? (
             <div className="flex items-center gap-2 text-sm text-text-muted">
               <CalendarOff className="size-4 text-text-faint" strokeWidth={1.75} />
-              Rien de prévu ce jour.
+              {t('planning.nothingPlanned')}
             </div>
           ) : null}
         </>
@@ -124,7 +127,7 @@ export const DayDetailPanel = forwardRef<
       {dayExams.length > 0 && (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
           <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint">
-            Examens
+            {t('planning.examsHeading')}
           </p>
           {dayExams.map((exam) => (
             <div key={exam.id} className="group/ex flex items-center gap-2">
@@ -154,7 +157,7 @@ export const DayDetailPanel = forwardRef<
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onSelect={() => onEditExam(exam)}>
                     <Pencil />
-                    Éditer
+                    {t('common.edit')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -162,7 +165,7 @@ export const DayDetailPanel = forwardRef<
                     onSelect={() => onDeleteExam(exam)}
                   >
                     <Trash2 />
-                    Supprimer
+                    {t('common.delete')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

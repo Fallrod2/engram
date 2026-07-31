@@ -90,7 +90,7 @@ export function DayCell({
           ))}
           {overflow > 0 && (
             <span className="px-1 font-mono text-2xs tabular-nums text-text-muted">
-              +{overflow} examen{overflow > 1 ? 's' : ''}
+              {t(`planning.moreExams_${plural(overflow)}`, { count: overflow })}
             </span>
           )}
         </div>

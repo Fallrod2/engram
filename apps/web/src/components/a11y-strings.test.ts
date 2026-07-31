@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -247,6 +248,107 @@ function scan(): string[] {
   return offenders
 }
 
+/* ────────────────────────── the visible-text half ──────────────────────────
+ *
+ * T-046. Everything above inspects ATTRIBUTES. The planning day panel was
+ * shipping French in the place users actually read — the element's own text:
+ *
+ *     <span className="text-sm text-text-muted">reviews prévues</span>
+ *
+ * Nothing above sees that, because there is no attribute to see. Nor did any
+ * `grep` for a quoted French string, since JSX text is not quoted at all. Ten
+ * such strings were live across `day-detail-panel.tsx` and `exam-list.tsx`,
+ * including a whole disabled CTA and an empty state.
+ *
+ * WHY A PARSER AND NOT A REGEX. "Text between > and <" is not a thing you can
+ * match in a .tsx file: generics (`useState<Foo>(x)`), comparisons (`a > b`) and
+ * arrow functions all produce the same characters outside any JSX. So this half
+ * asks the TypeScript parser for the real `JsxText` nodes. `typescript` is
+ * already a devDependency (it is what `bun run check` runs), so this costs no
+ * new install, and the AST removes the entire class of "my regex thought this
+ * was JSX" bugs rather than patching them one at a time.
+ *
+ * THE CRITERION IS STRICTER HERE THAN FOR ATTRIBUTES, and deliberately so: a
+ * JSX text node has no expression position to be ambiguous about. Whatever is
+ * written there is rendered to a human, so a bare word IS copy — which matters,
+ * because two of the ten defects ("Examens", "Supprimer") are exactly that, and
+ * the attribute-side scoping of rule 3 would have let them through.
+ *
+ * That leaves two things that are text but not copy, and both are handled
+ * WITHOUT a list of forgiven strings:
+ *
+ *  · key glyphs. `<Kbd>e</Kbd>`, `<Kbd>esc</Kbd>` — the name of a physical key,
+ *    identical in every language. Exempted STRUCTURALLY, by the element that
+ *    contains them, so the exemption cannot be borrowed by anything else.
+ *  · the wordmark. `engram` is a proper noun, spelled the same in both
+ *    dictionaries (it is `pageTitle.fallback` and `auth.title` verbatim). This
+ *    one IS a named constant, and it is the only one. A product has one name; if
+ *    this list ever reaches two entries, the second one is a bug.
+ */
+
+/** Elements whose text is a key name, not prose. Same in FR and EN. */
+const GLYPH_ELEMENTS = new Set(['Kbd', 'kbd'])
+/** The product name. The only string exempt by identity — see above. */
+const WORDMARK = 'engram'
+
+function isCopy(text: string): boolean {
+  return ACCENTED.test(text) || MULTI_WORD.test(text) || WORD.test(text)
+}
+
+/** The JSX element a child node sits in, by tag name (`''` for a fragment). */
+function hostTagName(node: ts.Node, sf: ts.SourceFile): string {
+  const parent = node.parent
+  if (parent && ts.isJsxElement(parent)) return parent.openingElement.tagName.getText(sf)
+  return ''
+}
+
+/** Every hardcoded string RENDERED AS TEXT in one source, as `{ line, text }`. */
+function visibleTextIn(src: string): { line: number; text: string }[] {
+  const sf = ts.createSourceFile('scan.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const out: { line: number; text: string }[] = []
+
+  const record = (node: ts.Node, raw: string) => {
+    const text = raw.trim()
+    if (!text || text === WORDMARK) return
+    if (GLYPH_ELEMENTS.has(hostTagName(node, sf))) return
+    if (!isCopy(text)) return
+    out.push({ line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, text })
+  }
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxText(node)) record(node, node.text)
+    // `<span>{'Close'}</span>` renders exactly like `<span>Close</span>`; a
+    // guard that saw only the second would name the first as the way around it.
+    else if (
+      ts.isJsxExpression(node) &&
+      node.expression &&
+      ts.isStringLiteralLike(node.expression) &&
+      node.parent &&
+      (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))
+    ) {
+      record(node, node.expression.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sf)
+  return out
+}
+
+function scanVisibleText(): string[] {
+  const offenders: string[] = []
+  for (const dir of SCANNED) {
+    for (const file of tsxFilesIn(join(WEB_SRC, dir))) {
+      // Raw source: the parser knows a comment from a text node by itself, and
+      // blanking comments first would only shift the positions it reports.
+      for (const o of visibleTextIn(readFileSync(file, 'utf8'))) {
+        offenders.push(`${relative(WEB_SRC, file)}:${o.line} — ${o.text}`)
+      }
+    }
+  }
+  return offenders
+}
+
 describe('rendered a11y strings go through i18n', () => {
   it('has no hardcoded label in aria-label / title / alt / placeholder', () => {
     // A failure lists file:line and the offending text. The fix is always the
@@ -300,5 +402,68 @@ describe('rendered a11y strings go through i18n', () => {
       '<img alt="" />',
     ]
     for (const sample of ok) expect(offendersIn(sample), sample).toEqual([])
+  })
+})
+
+describe('rendered VISIBLE TEXT goes through i18n (T-046)', () => {
+  it('has no hardcoded copy in a JSX text node', () => {
+    // Same fix as the attribute half: add the string to dict.fr.ts AND
+    // dict.en.ts, then render `{t('…')}`.
+    expect(scanVisibleText()).toEqual([])
+  })
+
+  it('actually detects hardcoded text (the guard is not vacuous)', () => {
+    // The planning panel verbatim, as it shipped. The first is the one the
+    // ticket names; the second and third are the single words that the
+    // attribute half's rule 3 could not be scoped to catch, and that this half
+    // catches because a JSX text node has no ambiguous position to worry about.
+    const sample = `
+      <div>
+        <span className="text-sm text-text-muted">reviews prévues</span>
+        <p className="text-2xs uppercase">Examens</p>
+        <DropdownMenuItem><Trash2 />Supprimer</DropdownMenuItem>
+      </div>`
+    expect(visibleTextIn(sample).map((o) => o.text)).toEqual([
+      'reviews prévues',
+      'Examens',
+      'Supprimer',
+    ])
+  })
+
+  it('sees text hidden in a string-literal expression child', () => {
+    // `{'Close'}` renders identically to bare `Close`; naming only the second
+    // would document the way around the first.
+    expect(visibleTextIn(`<span>{'Close'}</span>`).map((o) => o.text)).toEqual(['Close'])
+  })
+
+  it('does not mistake TypeScript for JSX', () => {
+    // The reason this half parses instead of matching "text between > and <".
+    // Every line below contains that shape and none of it is rendered.
+    const notJsx = `
+      const [x, setX] = useState<Record<string, number>>({})
+      const bigger = a > b && c < d
+      const fn = (a: number) => a > 2 ? 'yes' : 'no'
+      type Only<T> = T extends string ? never : T`
+    expect(visibleTextIn(notJsx)).toEqual([])
+  })
+
+  it('leaves key glyphs and the wordmark alone', () => {
+    const ok = [
+      '<Kbd>esc</Kbd>',
+      '<Kbd>e</Kbd>',
+      '<kbd>Enter</kbd>',
+      '<span className="font-semibold">engram</span>',
+      `<span>{t('planning.pastExams')}</span>`,
+      '<span className="font-mono">{past.length}</span>',
+      '<><SubjectDot />{subject?.name ?? t("planning.subjectFallback")}</>',
+    ]
+    for (const sample of ok) expect(visibleTextIn(sample), sample).toEqual([])
+  })
+
+  it('exempts the key glyph by its element, not by its text', () => {
+    // `esc` is forgiven inside <Kbd> and nowhere else, so the exemption cannot
+    // be borrowed by a real string that happens to look like a key name.
+    expect(visibleTextIn('<Kbd>Retour</Kbd>')).toEqual([])
+    expect(visibleTextIn('<span>Retour</span>').map((o) => o.text)).toEqual(['Retour'])
   })
 })
