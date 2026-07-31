@@ -225,6 +225,30 @@ describe('fsrs preview determinism (production scheduler, fuzz on)', () => {
     ).toBe(shownNow)
   })
 
+  it('preview_also_shifts_when_the_rep_count_changes', () => {
+    // The SECOND gap the fix does not close, and the reason the header comment
+    // no longer promises that the preview always equals the interval written:
+    // `reps` is half the seed (`GenSeedStrategyWithCardId` returns
+    // `String(card_id + reps)`), so a rating that lands between the preview and
+    // the button press — two tabs on the same card — redraws the fuzz.
+    const before = matureCard('card-abc') // reps: 4
+    const after = { ...before, reps: before.reps + 1 } // the other tab graded it
+    const shownBefore = previewAll(before, t0)[Rating.Good].card.scheduled_days
+    const shownAfter = previewAll(after, t0)[Rating.Good].card.scheduled_days
+    expect(shownAfter).not.toBe(shownBefore)
+    // …and the difference is ENTIRELY the fuzz seed: the textbook interval does
+    // not read `reps` at all, so the unfuzzed scheduler returns the same day.
+    expect(sched.repeat(after, t0)[Rating.Good].card.scheduled_days).toBe(
+      sched.repeat(before, t0)[Rating.Good].card.scheduled_days,
+    )
+    // Which is why this is a limit of the PROMISE, not a defect: in the real
+    // race the concurrent rating also rewrites the memory state, and the shown
+    // number was stale for reasons that have nothing to do with the fuzz.
+    const reallyAfter = schedule(before, Rating.Good as Grade, t0).card
+    expect(reallyAfter.stability).not.toBe(before.stability)
+    expect(reallyAfter.last_review?.getTime()).not.toBe(before.last_review?.getTime())
+  })
+
   it('preview_without_card_id_is_still_deterministic', () => {
     // Defensive: a card built by hand (not via `toFsrsCard`) has no `card_id`.
     // The seed then falls back to the rep count — degraded (all such cards share
