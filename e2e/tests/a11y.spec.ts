@@ -97,8 +97,11 @@ test('token colour contrast meets WCAG (canvas-measured, both themes)', async ({
         ctx.clearRect(0, 0, 4, 4)
         ctx.fillStyle = css
         ctx.fillRect(0, 0, 4, 4)
-        const d = ctx.getImageData(1, 1, 1, 1).data
-        return [d[0], d[1], d[2]]
+        const [r, g, b] = ctx.getImageData(1, 1, 1, 1).data
+        if (r === undefined || g === undefined || b === undefined) {
+          throw new Error(`canvas returned no pixel data for ${css}`)
+        }
+        return [r, g, b]
       }
       const lin = (x: number) => {
         const s = x / 255
@@ -127,7 +130,7 @@ test('token colour contrast meets WCAG (canvas-measured, both themes)', async ({
         ['--accent-fg', '--accent'],
         ['--danger-fg', '--danger'],
         ['--success-fg', '--success'],
-      ]) {
+      ] as const) {
         const r = ratio(v(fg), v(bg))
         if (r < 3) fails.push(`${mode} ${fg} on ${bg} = ${r.toFixed(2)} (< 3)`)
       }
