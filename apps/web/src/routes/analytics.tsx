@@ -24,6 +24,7 @@ import {
 } from '@/features/analytics/queries'
 import { parseWindow, windowLabel, type AnalyticsWindow } from '@/features/analytics/window'
 import { sparkFromHeatmap } from '@/features/analytics/metrics'
+import { panelBody } from '@/features/analytics/panel-state'
 import { WindowFilter } from '@/features/analytics/components/window-filter'
 import { SubjectFilter } from '@/features/analytics/components/subject-filter'
 import { ReadinessOverview } from '@/features/analytics/components/readiness-overview'
@@ -216,6 +217,26 @@ function AnalyticsPage() {
     }
   }
 
+  /**
+   * Every panel's skeleton/error/data decision, in one tested place.
+   *
+   * These were seven hand-written `data || isError` gates, and the review
+   * measured that dropping the `|| isError` from any of them left the entire
+   * suite green — `read-guard.test.ts` only asks that SOME status member be read
+   * on the handle, and each of these panels also reads `isFetching` and passes
+   * `error={…}` down, so the gate's own term was redundant to that scan. The
+   * handle goes in whole (see `panel-state.ts`): there is no term at the call
+   * site left to drop, and `panel-state.test.ts` owns the rule itself.
+   */
+  const heatmap = heatmapQuery.data
+  const tilesBody = panelBody({ data: tilesLanded, isError: tilesFailed })
+  const readinessBody = panelBody(readinessQuery, subjectsUnavailable)
+  const heatmapBody = panelBody(heatmapQuery)
+  const volumeBody = panelBody(volumeQuery)
+  const studyTimeBody = panelBody(studyTimeQuery)
+  const retentionBody = panelBody(retentionQuery, subjectsUnavailable)
+  const hardestBody = panelBody(hardestQuery, subjectsUnavailable)
+
   const clampYear = (y: number) => Math.min(currentYear, Math.max(currentYear - 5, y))
 
   return (
@@ -235,7 +256,7 @@ function AnalyticsPage() {
 
       <div className="flex flex-col gap-6">
         {/* KPI tiles */}
-        {tilesLanded || tilesFailed ? (
+        {tilesBody !== 'skeleton' ? (
           <div className={tilesFetching ? 'opacity-50 transition-opacity duration-base' : ''}>
             <StatTilesRow
               streaks={streaksQuery.data}
@@ -256,7 +277,7 @@ function AnalyticsPage() {
         {/* Exam readiness — a forecast, so neither the window nor the year
             stepper touches it. Placed high: it is the only panel that can change
             what someone does in the next hour. */}
-        {readinessQuery.data || readinessQuery.isError || subjectsUnavailable ? (
+        {readinessBody !== 'skeleton' ? (
           <ReadinessOverview
             data={readinessQuery.data}
             subjects={subjects}
@@ -277,7 +298,7 @@ function AnalyticsPage() {
             frame survives a failed read (T-066): the year stepper stays usable,
             so "ask again" and "ask for another year" are the same gesture, and
             the grid of 365 pulsing squares stops pretending to be on its way. */}
-        {heatmapQuery.data || heatmapQuery.isError ? (
+        {heatmapBody !== 'skeleton' ? (
           <ChartCard
             title={t('analytics.activity')}
             isFetching={heatmapQuery.isFetching}
@@ -294,11 +315,11 @@ function AnalyticsPage() {
                 />
               </div>
             }
-            {...(heatmapQuery.data ? { table: <HeatmapTable data={heatmapQuery.data} /> } : {})}
+            {...(heatmap ? { table: <HeatmapTable data={heatmap} /> } : {})}
           >
-            {heatmapQuery.data ? (
+            {heatmap ? (
               <ActivityHeatmap
-                data={heatmapQuery.data}
+                data={heatmap}
                 year={year}
                 minYear={currentYear - 5}
                 onYearChange={(dir) => setYear((y) => clampYear(y + dir))}
@@ -318,7 +339,7 @@ function AnalyticsPage() {
 
         {/* Windowed charts */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {volumeQuery.data || volumeQuery.isError ? (
+          {volumeBody !== 'skeleton' ? (
             <ReviewVolumeChart
               data={volumeQuery.data}
               windowLabel={label}
@@ -331,7 +352,7 @@ function AnalyticsPage() {
             <ChartCardSkeleton />
           )}
 
-          {studyTimeQuery.data || studyTimeQuery.isError ? (
+          {studyTimeBody !== 'skeleton' ? (
             <StudyTimeChart
               data={studyTimeQuery.data}
               windowLabel={label}
@@ -345,7 +366,7 @@ function AnalyticsPage() {
           )}
         </div>
 
-        {retentionQuery.data || retentionQuery.isError || subjectsUnavailable ? (
+        {retentionBody !== 'skeleton' ? (
           <RetentionBySubjectChart
             data={retentionQuery.data}
             subjects={subjects}
@@ -363,7 +384,7 @@ function AnalyticsPage() {
           <ChartCardSkeleton height={180} />
         )}
 
-        {hardestQuery.data || hardestQuery.isError || subjectsUnavailable ? (
+        {hardestBody !== 'skeleton' ? (
           <HardestCardsPanel
             data={hardestQuery.data}
             subjects={subjects}
