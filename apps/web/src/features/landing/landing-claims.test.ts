@@ -41,6 +41,13 @@ describe('landing claim: the AI providers cover OCR too', () => {
    * component is not. It catches the change someone would actually make — "OCR
    * can't use provider X, drop it from the list" — which is the failure that
    * would make the landing lie.
+   *
+   * The pattern is anchored to the END of the line, and that anchor is the whole
+   * test. Written first as a `toContain` of the same text, it stayed GREEN under
+   * a mutation to `= PROVIDER_ORDER.filter((p) => p !== 'ollama')` — the narrowed
+   * declaration still *contains* the wide one as a prefix. A guard that survives
+   * the exact edit it exists to catch is worse than none, so nothing may follow
+   * the name.
    */
   it('declares the OCR provider list as the generation list, verbatim', () => {
     const source = readSource('../ai/ai-settings-card.tsx')
@@ -49,7 +56,7 @@ describe('landing claim: the AI providers cover OCR too', () => {
       'The OCR selector no longer offers the generation providers. `landing.providers.body` ' +
         '(dict.fr.ts / dict.en.ts) claims one list covers generation AND photo reading: ' +
         'split that copy, or render two lists on the landing.',
-    ).toContain('const OCR_PROVIDER_ORDER: AiProviderId[] = PROVIDER_ORDER')
+    ).toMatch(/^const OCR_PROVIDER_ORDER: AiProviderId\[\] = PROVIDER_ORDER\s*$/m)
   })
 
   /**
