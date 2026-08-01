@@ -1686,7 +1686,13 @@ export const dictFr = {
       body: 'Crée ton compte, importe un cours et lance ta première session en moins de deux minutes. Gratuit, self-hosted, open source.',
     },
     hero: {
-      eyebrow: 'Répétition espacée · FSRS v5',
+      // LANDING CLAIM ↔ SOURCE : `FSRSVersion` (ts-fsrs), c'est-à-dire la
+      // génération d'algorithme sur laquelle `FSRS_PARAMS`
+      // (apps/server/src/services/fsrs.ts) planifie réellement. Disait
+      // « FSRS v5 » jusqu'au 01/08/2026 alors que le serveur était en FSRS-6
+      // depuis bien avant — la v5 était le numéro du PAQUET npm, pas de l'algo.
+      // Garde des deux côtés : apps/server/src/services/fsrs-version.test.ts.
+      eyebrow: 'Répétition espacée · FSRS-6',
       title: 'Retiens plus, en révisant moins.',
       subtitle:
         'engram programme chaque révision au bon moment et transforme tes notes — Markdown, PDF ou photo de cours — en cartes prêtes à réviser.',
@@ -1764,7 +1770,11 @@ export const dictFr = {
       label: 'Trois gestes, un seul outil',
       review: {
         title: 'Session 100 % clavier',
-        body: 'Espace pour révéler, 1 à 4 pour noter. L’ordonnancement FSRS choisit la prochaine carte. Aucune souris, aucune friction.',
+        // LANDING CLAIM ↔ SOURCE : `VERDICTS`
+        // (apps/web/src/features/review/verdict.ts). {wrong} / {right} sont
+        // INJECTÉS — la landing ne peut pas nommer un bouton que la session
+        // n'affiche plus. Ne pas réécrire les deux verdicts en dur ici.
+        body: 'Espace pour révéler, puis « {wrong} » ou « {right} » — les notes 1 à 4 restent sous les doigts. L’ordonnancement FSRS choisit la prochaine carte, sans souris.',
       },
       import: {
         title: 'Import intelligent',
@@ -1801,12 +1811,22 @@ export const dictFr = {
       },
       step2: {
         title: 'Valide les cartes générées',
-        body: 'L’IA propose recto/verso ; tu acceptes, édites ou rejettes carte par carte.',
+        // LANDING CLAIM ↔ SOURCE : `generationKindSchema` (packages/shared/src/domain.ts)
+        // et le parseur `qcm.ts` du même paquet. Les deux formats RÉVISABLES
+        // aujourd'hui sont le recto/verso et le QCM ; le cloze existe en sortie de
+        // génération ('mixed') mais n'a pas de révision dédiée (R-1 ouvert) — ne
+        // pas le promettre ici avant qu'il soit livré.
+        body: 'L’IA propose des cartes recto/verso et des QCM ; tu acceptes, édites ou rejettes carte par carte.',
       },
       step3: {
         title: 'Révise ce qui t’attend',
         body: 'engram te présente les cartes du jour, pile quand c’est le bon moment.',
       },
+      // LANDING CLAIM ↔ SOURCE : `ACCEPT_EXTENSIONS` / `MAX_UPLOAD_BYTES`
+      // (apps/web/src/components/import/dropzone.tsx). La liste elle-même est
+      // rendue depuis la constante — ces deux clés ne sont que l'habillage.
+      formatsLabel: 'Formats acceptés',
+      formatsLimit: '{size} Mo max par fichier',
     },
     providers: {
       label: 'IA multi-provider',
@@ -1815,7 +1835,12 @@ export const dictFr = {
       // en dessous, depuis `PROVIDER_ORDER`. Une phrase qui les recite serait un
       // second inventaire à tenir à jour à la main — c’est exactement ce qui a
       // fait disparaître ChatGPT (abonnement) des puces.
-      body: 'La génération de cartes tourne sur le provider de ton choix : tu apportes ta clé, ou tu fais tourner un modèle en local sur ta machine.',
+      // LANDING CLAIM ↔ SOURCE : `OCR_PROVIDER_ORDER`
+      // (apps/web/src/features/ai/ai-settings-card.tsx). Deux sélecteurs dans les
+      // réglages, pas un : génération de cartes ET OCR des photos. La phrase ne
+      // peut couvrir les deux que tant que les deux listes n'en font qu'une —
+      // garde dans landing-claims.test.ts.
+      body: 'La génération de cartes et la lecture de tes photos de cours tournent sur le provider de ton choix : tu apportes ta clé, ou tu fais tourner un modèle en local sur ta machine. Les deux se règlent séparément.',
       local: 'local',
       experimental: 'expérimental',
       codexNote:
