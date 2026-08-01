@@ -10,7 +10,7 @@ import {
   generationSchema,
   examSchema,
 } from '@engram/shared'
-import type { card, subject, deck, note, generation, exam } from './schema'
+import type { CardRow, subject, deck, note, generation, exam } from './schema'
 import { toFsrsCard, fsrsCardToColumns, fsrsLogToRow } from './mappers'
 import { DEFAULT_DEV_USER_ID as U } from '../auth/config'
 import {
@@ -32,11 +32,13 @@ import {
 const now = new Date('2026-07-12T10:00:00.000Z')
 
 /**
- * `front_fold` / `back_fold` are excluded: they are STORED generated columns
+ * `CardRow` — the schema's own "everything but the folds", so this fixture is
+ * exactly the row shape `cardColumns` selects rather than a third restatement of
+ * the same `Omit`. `front_fold` / `back_fold` are STORED generated columns
  * (migration 0012) that Postgres computes and neither mapper reads, so a
  * hand-built fixture has nothing meaningful to put in them.
  */
-type FixtureCardRow = Omit<InferSelectModel<typeof card>, 'frontFold' | 'backFold'>
+type FixtureCardRow = CardRow
 
 function makeCardRow(overrides: Partial<FixtureCardRow> = {}) {
   const base: FixtureCardRow = {

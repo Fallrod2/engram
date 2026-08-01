@@ -9,7 +9,7 @@ import type {
   UpdateCard,
 } from '@engram/shared'
 import type { DB, Tx } from '../db/client'
-import { card } from '../db/schema'
+import { card, cardColumns } from '../db/schema'
 import { cardToDto } from '../db/dto'
 import { fsrsCardToColumns, toFsrsCard } from '../db/mappers'
 import { NotFoundError, ConflictError } from '../http/errors'
@@ -20,7 +20,7 @@ import { freshFsrsCard, previewAll } from './fsrs'
 /** Fetch a raw card row (scoped to `userId`) or throw 404. */
 export async function requireCardRow(db: DB, userId: string, id: string) {
   const [row] = await db
-    .select()
+    .select(cardColumns)
     .from(card)
     .where(and(eq(card.id, id), eq(card.userId, userId)))
   if (!row) throw new NotFoundError(`card ${id} not found`)
@@ -44,7 +44,7 @@ export async function listCards(
   const [totalRow] = await db.select({ n: count() }).from(card).where(where)
   const total = totalRow?.n ?? 0
   const rows = await db
-    .select()
+    .select(cardColumns)
     .from(card)
     .where(where)
     .orderBy(asc(card.createdAt))
@@ -78,7 +78,9 @@ export async function insertFreshCardRow(
       back: values.back,
       ...fsrsCardToColumns(freshFsrsCard(new Date())),
     })
-    .returning()
+    // The id is all this returns. `returning()` would echo the front and back we
+    // just sent, plus their folds — four copies of the text for one string.
+    .returning({ id: card.id })
   return row!.id
 }
 
@@ -113,7 +115,7 @@ export async function updateCard(
     .update(card)
     .set(set)
     .where(and(eq(card.id, id), eq(card.userId, userId)))
-    .returning()
+    .returning(cardColumns)
   return cardToDto(row!)
 }
 

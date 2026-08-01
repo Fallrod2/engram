@@ -1,6 +1,6 @@
 import type { Card as FsrsCard, ReviewLog as FsrsReviewLog } from 'ts-fsrs'
 import type { InferSelectModel } from 'drizzle-orm'
-import type { card, reviewLog } from './schema'
+import type { CardRow, reviewLog } from './schema'
 import { SEED_CARD_ID_FIELD, type SchedulableCard } from '../services/fsrs'
 
 /**
@@ -10,12 +10,12 @@ import { SEED_CARD_ID_FIELD, type SchedulableCard } from '../services/fsrs'
  */
 
 /**
- * Everything of a card row EXCEPT the generated search columns. `front_fold` /
- * `back_fold` are a database-side search index (migration 0012), never an input
- * to scheduling, so requiring them here would force every caller to SELECT two
- * columns it has no use for.
+ * `CardRow` (from the schema) is everything of a card row EXCEPT the generated
+ * search columns. `front_fold` / `back_fold` are a database-side search index
+ * (migration 0012), never an input to scheduling, so requiring them here would
+ * force every caller to SELECT two columns it has no use for — and since T-060
+ * the callers really do skip them, via `cardColumns`.
  */
-type CardRow = Omit<InferSelectModel<typeof card>, 'frontFold' | 'backFold'>
 type ReviewLogRow = InferSelectModel<typeof reviewLog>
 
 /**

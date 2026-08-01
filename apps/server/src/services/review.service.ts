@@ -2,7 +2,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import type { FSRS } from 'ts-fsrs'
 import type { ReviewResult, UndoReview, UndoReviewResponse } from '@engram/shared'
 import type { DB } from '../db/client'
-import { card, reviewLog } from '../db/schema'
+import { card, cardColumns, reviewLog } from '../db/schema'
 import { toFsrsCard, toFsrsLog, fsrsCardToColumns, fsrsLogToRow } from '../db/mappers'
 import { cardToDto, reviewLogToDto } from '../db/dto'
 import { schedule, toGrade, scheduler } from './fsrs'
@@ -35,7 +35,7 @@ export async function reviewCard(
   return db.transaction(async (tx) => {
     // Scoped SELECT: a card owned by another user reads as 404 (never a 403).
     const [row] = await tx
-      .select()
+      .select(cardColumns)
       .from(card)
       .where(and(eq(card.id, cardId), eq(card.userId, userId)))
     if (!row) throw new NotFoundError(`card ${cardId} not found`)
@@ -60,7 +60,7 @@ export async function reviewCard(
       .values({ ...logRow, userId })
       .returning()
 
-    const [updatedCard] = await tx.select().from(card).where(eq(card.id, cardId))
+    const [updatedCard] = await tx.select(cardColumns).from(card).where(eq(card.id, cardId))
     if (!updatedCard) throw new NotFoundError(`card ${cardId} not found`)
     return { card: cardToDto(updatedCard), log: reviewLogToDto(insertedLog!) }
   })
@@ -93,7 +93,7 @@ export async function undoReview(
   return db.transaction(async (tx) => {
     // Scoped SELECT: a card owned by another user reads as 404 (never a 403).
     const [row] = await tx
-      .select()
+      .select(cardColumns)
       .from(card)
       .where(and(eq(card.id, cardId), eq(card.userId, userId)))
     if (!row) throw new NotFoundError(`card ${cardId} not found`)
@@ -122,7 +122,7 @@ export async function undoReview(
     await tx.update(card).set(fsrsCardToColumns(restored)).where(eq(card.id, cardId))
     await tx.delete(reviewLog).where(eq(reviewLog.id, log.id))
 
-    const [updatedCard] = await tx.select().from(card).where(eq(card.id, cardId))
+    const [updatedCard] = await tx.select(cardColumns).from(card).where(eq(card.id, cardId))
     if (!updatedCard) throw new NotFoundError(`card ${cardId} not found`)
     return { card: cardToDto(updatedCard), undoneLogId: log.id }
   })

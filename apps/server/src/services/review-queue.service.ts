@@ -2,7 +2,7 @@ import { and, asc, eq, lte, ne, sql, type SQL } from 'drizzle-orm'
 import { State } from 'ts-fsrs'
 import type { Card, DueCounts, QueueNewCards } from '@engram/shared'
 import type { DB } from '../db/client'
-import { card, deck, subject } from '../db/schema'
+import { card, cardColumns, deck, subject, type CardRow } from '../db/schema'
 import { cardToDto } from '../db/dto'
 import { localMidnight } from '../lib/day'
 import { newCardBudget } from './study-settings.service'
@@ -21,13 +21,18 @@ export interface DueQueueResult {
   newCards: QueueNewCards
 }
 
-type CardRow = typeof card.$inferSelect
-
-/** One page of the queue, restricted to `extra` (new vs already-seen). */
+/**
+ * One page of the queue, restricted to `extra` (new vs already-seen).
+ *
+ * `cardColumns`, not `select()`: this is the hottest read in the app — every
+ * session opens with it, up to `f.limit` cards — and SELECT * doubled the card
+ * text on the wire for the fold mirrors, which are a database-side search index
+ * that nothing downstream can even see (`cardToDto` takes a row without them).
+ */
 async function selectPage(db: DB, where: SQL | undefined, limit: number): Promise<CardRow[]> {
   if (limit <= 0) return []
   const rows = await db
-    .select()
+    .select({ card: cardColumns })
     .from(card)
     .innerJoin(deck, eq(deck.id, card.deckId))
     .innerJoin(subject, eq(subject.id, deck.subjectId))
