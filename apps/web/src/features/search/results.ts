@@ -40,6 +40,16 @@ export function isFreshFor(needle: string, res: Pick<SearchCardsResponse, 'query
  * `null` means "there are rows, render them". `corpusTotal === undefined` means
  * the corpus probe has not landed: we cannot yet tell `noResults` from
  * `noCards`, so the caller keeps its skeleton up rather than guessing.
+ *
+ * T-066 — waiting is only right while there is something to wait FOR. When the
+ * probe has FAILED, `corpusTotal` is undefined for good and "keep the skeleton
+ * up" becomes "shimmer for ever": the idle screen never resolved, and a search
+ * that answered zero printed a bare "0 cartes" over an empty table instead of
+ * its empty state. `corpusFailed` says which kind of unknown this is. It cannot
+ * conjure the missing figure, so it does the two things it can: it lets a real
+ * answer of zero be called `noResults` (true of the SEARCH, whatever the corpus
+ * holds), and it leaves the idle case to the caller, which owes the user a
+ * visible error and a retry rather than any empty state at all.
  */
 export type SearchEmptyKind = 'idle' | 'noResults' | 'noCards'
 
@@ -50,12 +60,56 @@ export function searchEmptyKind(input: {
   total: number | undefined
   /** Size of the whole corpus (the unfiltered probe), or `undefined`. */
   corpusTotal: number | undefined
+  /** Did the corpus probe FAIL? (As opposed to merely not having landed.) */
+  corpusFailed?: boolean
 }): SearchEmptyKind | null {
-  if (input.corpusTotal === undefined) return null
+  if (input.corpusTotal === undefined) {
+    // Not merely unknown — unknowable without another request. Only a search
+    // that came back with a real zero can still be described honestly.
+    if (!input.corpusFailed) return null
+    return input.searching && input.total === 0 ? 'noResults' : null
+  }
   if (input.corpusTotal === 0) return 'noCards'
   if (!input.searching) return 'idle'
   if (input.total === undefined) return null
   return input.total === 0 ? 'noResults' : null
+}
+
+/**
+ * What the results area of `/search` renders — the whole ladder, in order.
+ *
+ * It lived inline as a nested ternary, which was fine at three arms. T-066 adds
+ * a fourth (`corpusError`) whose entire reason for existing is a case nobody can
+ * reach from a unit test through the route component: the route reads its own
+ * URL search params, so mounting it means mounting a router. Naming the arms
+ * moves the decision somewhere it can be asserted, and the order — which is the
+ * part that actually bites — is stated once instead of being inferred from
+ * indentation.
+ *
+ * The order says: a failed SEARCH outranks everything (it is what the user just
+ * asked for); a decided empty state outranks a lost corpus probe (we know what
+ * to say, so say it); a lost probe outranks the skeleton ONLY when nothing else
+ * is coming, because a search still in flight will resolve its own skeleton.
+ */
+export type SearchBody = 'resultsError' | 'empty' | 'corpusError' | 'skeleton' | 'results'
+
+export function searchBody(input: {
+  /** The search request itself failed. */
+  resultsFailed: boolean
+  /** `searchEmptyKind`'s verdict. */
+  emptyKind: SearchEmptyKind | null
+  /** The corpus probe failed (not merely pending). */
+  corpusFailed: boolean
+  /** Is a needle or a filter in force? */
+  searching: boolean
+  /** Is there a response to draw rows from? */
+  hasData: boolean
+}): SearchBody {
+  if (input.resultsFailed) return 'resultsError'
+  if (input.emptyKind !== null) return 'empty'
+  if (input.corpusFailed && !input.searching) return 'corpusError'
+  if (!input.hasData) return 'skeleton'
+  return 'results'
 }
 
 /**
