@@ -3,5 +3,10 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["index.ts"]
+  // The whole directory, not a file list: `app-entry.ts` is the root of the
+  // bundle `gate:bundle` builds and Vercel runs in production, and an
+  // `["index.ts"]` include left it outside the gate — the least-checked file in
+  // the repo was the one serving traffic. Anything dropped into `api/` is
+  // typechecked by default from here on.
+  "include": ["."]
 }
