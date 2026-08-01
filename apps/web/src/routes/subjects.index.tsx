@@ -58,9 +58,19 @@ type Tab = 'active' | 'archived'
 function SubjectsPage() {
   const t = useT()
   const plural = usePlural()
+  // Only `subjectsListOptions` is in the route loader (with an `errorComponent`
+  // behind it), so it is the only read here whose failure cannot reach the
+  // screen. The other three run on mount and can fail under a rendered page.
+  //
+  // T-042 — `.data` alone made every one of their failures render as a ZERO on
+  // every row at once: "0 decks · 0 cartes · 0 à réviser" for an account full of
+  // them, which is the T-027 lie spread across a list. The handles are kept and
+  // a failed read now prints an em-dash, per column.
   const subjects = useQuery(subjectsListOptions()).data ?? []
-  const allDecks = useQuery(allDecksOptions()).data
-  const dueCounts = useQuery(dueCountsOptions()).data
+  const decksQuery = useQuery(allDecksOptions())
+  const dueQuery = useQuery(dueCountsOptions())
+  const allDecks = decksQuery.data
+  const dueCounts = dueQuery.data
 
   const [tab, setTab] = useState<Tab>('active')
   const [filter, setFilter] = useState('')
@@ -84,7 +94,8 @@ function SubjectsPage() {
   // `GET /decks/card-counts` request (Phase 7 §2.2) instead of a per-deck probe
   // fan-out. A subject's total is `undefined` (→ skeleton) until both the deck
   // list and the aggregate counts have loaded.
-  const cardCounts = useQuery(deckCardCountsOptions()).data
+  const cardCountsQuery = useQuery(deckCardCountsOptions())
+  const cardCounts = cardCountsQuery.data
   const cardTotalBySubject = useMemo(() => {
     const m = new Map<string, number | undefined>()
     if (allDecks === undefined || cardCounts === undefined) {
@@ -206,6 +217,9 @@ function SubjectsPage() {
         roving={roving}
         deckCountBySubject={deckCountBySubject}
         deckCountsReady={allDecks !== undefined}
+        decksUnknown={decksQuery.isError}
+        cardsUnknown={decksQuery.isError || cardCountsQuery.isError}
+        dueUnknown={dueQuery.isError}
         cardTotalBySubject={cardTotalBySubject}
         dueMap={dueMap}
         onNew={() => setCreateOpen(true)}
@@ -257,6 +271,9 @@ function SubjectsBody({
   roving,
   deckCountBySubject,
   deckCountsReady,
+  decksUnknown,
+  cardsUnknown,
+  dueUnknown,
   cardTotalBySubject,
   dueMap,
   onNew,
@@ -272,6 +289,10 @@ function SubjectsBody({
   roving: ReturnType<typeof useRovingList<HTMLAnchorElement>>
   deckCountBySubject: Map<string, number>
   deckCountsReady: boolean
+  /** The read behind each column FAILED — distinct from "not back yet" (T-042). */
+  decksUnknown: boolean
+  cardsUnknown: boolean
+  dueUnknown: boolean
   cardTotalBySubject: Map<string, number | undefined>
   dueMap: Map<string, number>
   onNew: () => void
@@ -335,7 +356,7 @@ function SubjectsBody({
         {visible.map((s, i) => {
           const deckCount = deckCountsReady ? (deckCountBySubject.get(s.id) ?? 0) : undefined
           const cardTotal = cardTotalBySubject.get(s.id)
-          const due = dueMap.get(s.id) ?? 0
+          const due = dueUnknown ? undefined : (dueMap.get(s.id) ?? 0)
           return (
             <EntityRow key={s.id}>
               <Link
@@ -358,20 +379,38 @@ function SubjectsBody({
                     {s.name}
                   </span>
                 </span>
-                {/* Mobile-only meta sub-line. */}
+                {/* Mobile-only meta sub-line. There is no room for a skeleton
+                    inside a text run, so the em-dash covers BOTH "not back yet"
+                    and "failed" here — `?? 0` covered them by asserting zero. */}
                 <span className="flex items-center gap-1.5 pl-[1.625rem] font-mono text-2xs tabular-nums text-text-muted sm:hidden">
                   <span>
-                    {t(`listMeta.decks_${plural(deckCount ?? 0)}`, { count: deckCount ?? 0 })}
+                    {deckCount === undefined
+                      ? t('listMeta.decksUnknown')
+                      : t(`listMeta.decks_${plural(deckCount)}`, { count: deckCount })}
                   </span>
                   <span className="text-border-strong">·</span>
                   <span>
-                    {t(`listMeta.cards_${plural(cardTotal ?? 0)}`, { count: cardTotal ?? 0 })}
+                    {cardTotal === undefined
+                      ? t('listMeta.cardsUnknown')
+                      : t(`listMeta.cards_${plural(cardTotal)}`, { count: cardTotal })}
                   </span>
                   <span className="text-border-strong">·</span>
-                  <span>{t(`listMeta.due_${plural(due)}`, { count: due })}</span>
+                  <span>
+                    {due === undefined
+                      ? t('listMeta.dueUnknown')
+                      : t(`listMeta.due_${plural(due)}`, { count: due })}
+                  </span>
                 </span>
-                <CountStat value={deckCount} className="hidden justify-self-end sm:block" />
-                <CountStat value={cardTotal} className="hidden justify-self-end sm:block" />
+                <CountStat
+                  value={deckCount}
+                  unknown={decksUnknown}
+                  className="hidden justify-self-end sm:block"
+                />
+                <CountStat
+                  value={cardTotal}
+                  unknown={cardsUnknown}
+                  className="hidden justify-self-end sm:block"
+                />
                 <DueCount
                   value={due}
                   colorHex={s.color}

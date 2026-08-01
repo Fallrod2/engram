@@ -21,6 +21,7 @@ export const dictEn: Dict = {
     startSession: 'Start a session',
     backToDashboard: 'Back to dashboard',
     unavailable: 'Unavailable right now.',
+    unknownValue: 'Value unavailable',
     skipToContent: 'Skip to content',
   },
 
@@ -326,6 +327,9 @@ export const dictEn: Dict = {
     cards_other: '{count} cards',
     due_one: '{count} due',
     due_other: '{count} due',
+    decksUnknown: '— decks',
+    cardsUnknown: '— cards',
+    dueUnknown: '— due',
   },
 
   cmd: {

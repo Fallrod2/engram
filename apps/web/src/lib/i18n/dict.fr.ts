@@ -25,6 +25,10 @@ export const dictFr = {
     startSession: 'Lancer une session',
     backToDashboard: 'Retour au tableau de bord',
     unavailable: 'Indisponible pour le moment.',
+    // T-042 : nom accessible du tiret des compteurs. « 0 » est une réponse,
+    // « — » veut dire qu'on n'a pas pu lire la valeur. Les deux ne se disent
+    // pas pareil, à l'écran comme au lecteur d'écran.
+    unknownValue: 'Valeur indisponible',
     skipToContent: 'Aller au contenu',
   },
 
@@ -355,6 +359,12 @@ export const dictFr = {
     cards_other: '{count} cartes',
     due_one: '{count} à réviser',
     due_other: '{count} à réviser',
+    // T-042 : les mêmes sous-lignes quand la lecture n'a pas abouti. Elles
+    // affichaient `?? 0`, donc « 0 carte · 0 à réviser » pendant le vol de la
+    // requête ET après son échec.
+    decksUnknown: '— decks',
+    cardsUnknown: '— cartes',
+    dueUnknown: '— à réviser',
   },
 
   cmd: {
