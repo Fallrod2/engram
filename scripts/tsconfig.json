@@ -16,8 +16,11 @@
       "@engram/shared": ["../packages/shared/src/index.ts"]
     }
   },
-  // The whole directory, not a file list: a list is what let `app-entry.ts` and
-  // this directory slip the gate in the first place. Anything dropped into
-  // `scripts/` is typechecked by default.
+  // The whole directory, not a file list: a file list is what let `api/`'s
+  // `app-entry.ts` slip the gate, and this directory had no tsconfig at all.
+  // Any *TypeScript* file dropped into `scripts/` is now checked by default.
+  // The one plain-JS script here, `gen-favicon-ico.mjs`, stays out: `allowJs`
+  // is off repo-wide, and turning it on would mean annotating that file rather
+  // than merely covering it.
   "include": ["."]
 }
