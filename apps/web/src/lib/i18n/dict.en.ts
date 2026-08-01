@@ -928,6 +928,7 @@ export const dictEn: Dict = {
     range: '{from}–{to} of {total}',
     results_one: '{count} card',
     results_other: '{count} cards',
+    resultsUnknown: '— cards',
     archivedBadge: 'Archived',
     prevPage: 'Previous page',
     nextPage: 'Next page',

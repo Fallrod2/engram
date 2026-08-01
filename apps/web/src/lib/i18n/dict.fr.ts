@@ -1032,6 +1032,10 @@ export const dictFr = {
     range: '{from}–{to} sur {total}',
     results_one: '{count} carte',
     results_other: '{count} cartes',
+    // T-067 : réponse écartée parce que périmée (elle répond à une frappe plus
+    // ancienne). Ses lignes restent à l'écran, grisées ; le compteur, lui,
+    // affichait « 0 cartes » — un chiffre que personne n'a donné.
+    resultsUnknown: '— cartes',
     archivedBadge: 'Archivée',
     prevPage: 'Page précédente',
     nextPage: 'Page suivante',

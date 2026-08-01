@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { CardSearchHit, SearchCardsResponse } from '@engram/shared'
-import { isFreshFor, pageBounds, searchBody, searchEmptyKind } from './results'
+import { dictEn } from '@/lib/i18n/dict.en'
+import { dictFr } from '@/lib/i18n/dict.fr'
+import type { PluralCategory, TFunction } from '@/lib/i18n'
+import { isFreshFor, pageBounds, resultsCountLabel, searchBody, searchEmptyKind } from './results'
 
 function hit(id: string): CardSearchHit {
   return {
@@ -223,6 +226,65 @@ describe('searchBody — which arm of the results area', () => {
     expect(searchBody({ ...base, searching: true, hasData: true, corpusFailed: true })).toBe(
       'results',
     )
+  })
+})
+
+/**
+ * T-067 — the count line over a STALE page. `isFreshFor` rejects a response that
+ * answers an older keystroke; its rows stay on screen, greyed and inert, and the
+ * line above them read `total ?? 0` — "0 cartes" over rows that are visibly not
+ * zero, from a server that never said zero. Both languages are pinned, since
+ * this is also where the plural rule differs (FR keeps 0 singular).
+ */
+describe('resultsCountLabel — a rejected answer is not a count of zero', () => {
+  const LOCALES = { fr: 'fr-FR', en: 'en-US' } as const
+
+  /** The real dictionaries + the real CLDR rule, without mounting React. */
+  function harness(lang: 'fr' | 'en'): {
+    t: TFunction
+    plural: (n: number) => PluralCategory
+  } {
+    const dict = lang === 'fr' ? dictFr : dictEn
+    const rules = new Intl.PluralRules(LOCALES[lang])
+    const t: TFunction = (key, vars) => {
+      const raw = key
+        .split('.')
+        .reduce<unknown>((acc, k) => (acc as Record<string, unknown> | undefined)?.[k], dict)
+      const template = typeof raw === 'string' ? raw : key
+      return vars
+        ? template.replace(/\{(\w+)\}/g, (_, name: string) =>
+            name in vars ? String(vars[name]) : `{${name}}`,
+          )
+        : template
+    }
+    return { t, plural: (n) => (rules.select(n) === 'one' ? 'one' : 'other') }
+  }
+
+  it('says the number when it has one', () => {
+    const { t, plural } = harness('fr')
+    expect(resultsCountLabel(t, plural, { total: 12, pages: 1, from: 1, to: 12 })).toBe('12 cartes')
+    expect(resultsCountLabel(t, plural, { total: 1, pages: 1, from: 1, to: 1 })).toBe('1 carte')
+  })
+
+  it('switches to the range as soon as one page cannot hold the answer', () => {
+    const { t, plural } = harness('en')
+    expect(resultsCountLabel(t, plural, { total: 57, pages: 3, from: 26, to: 50 })).toBe(
+      '26–50 of 57',
+    )
+  })
+
+  it('refuses to print a zero it was never given', () => {
+    for (const lang of ['fr', 'en'] as const) {
+      const { t, plural } = harness(lang)
+      const label = resultsCountLabel(t, plural, { total: undefined, pages: 0, from: 0, to: 0 })
+      expect(label, lang).not.toMatch(/\b0\b/)
+      expect(label, lang).toContain('—')
+    }
+  })
+
+  it('keeps a REAL zero saying zero — an answer of none is still an answer', () => {
+    const { t, plural } = harness('fr')
+    expect(resultsCountLabel(t, plural, { total: 0, pages: 0, from: 0, to: 0 })).toBe('0 carte')
   })
 })
 

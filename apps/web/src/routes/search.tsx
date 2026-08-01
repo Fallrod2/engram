@@ -29,7 +29,13 @@ import {
   useBulkMoveCards,
   useUpdateCardFromSearch,
 } from '@/features/search/queries'
-import { isFreshFor, pageBounds, searchBody, searchEmptyKind } from '@/features/search/results'
+import {
+  isFreshFor,
+  pageBounds,
+  resultsCountLabel,
+  searchBody,
+  searchEmptyKind,
+} from '@/features/search/results'
 import {
   EMPTY_SELECTION,
   SELECTION_MAX,
@@ -339,9 +345,7 @@ function SearchPage() {
       ) : (
         <>
           <p className="font-mono text-xs tabular-nums text-text-muted" role="status">
-            {pages > 1
-              ? t('search.range', { from: bounds.from, to: bounds.to, total: total ?? 0 })
-              : t(`search.results_${plural(total ?? 0)}`, { count: total ?? 0 })}
+            {resultsCountLabel(t, plural, { total, pages, from: bounds.from, to: bounds.to })}
           </p>
 
           <SearchResultsTable

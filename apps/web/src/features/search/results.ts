@@ -1,4 +1,5 @@
 import type { SearchCardsResponse } from '@engram/shared'
+import type { PluralCategory, TFunction } from '@/lib/i18n'
 
 /**
  * Reading a search response honestly: which answer belongs to what is on
@@ -122,4 +123,31 @@ export function searchBody(input: {
  */
 export function pageBounds(offset: number, shown: number): { from: number; to: number } {
   return { from: shown === 0 ? 0 : offset + 1, to: offset + shown }
+}
+
+/**
+ * The count line above the table — "1–25 sur 57", "12 cartes", or neither.
+ *
+ * T-067 — it used to be written inline as `total ?? 0`, and the `??` fired in
+ * exactly one situation: a response rejected as STALE (`isFreshFor` said it
+ * answers an older needle). The rows of that older answer stay on screen,
+ * greyed and inert, on purpose — collapsing the list under a typing user is
+ * worse — but the line above them then read "0 cartes", which is not what the
+ * screen shows, not what the server said, and not what the next answer will say
+ * either. A zero is a claim about the search; the honest state here is "we do
+ * not have the number yet", and the app already has a mark for that.
+ *
+ * `pages` is derived from the same `total`, so a stale page cannot show a pager
+ * either; nothing in this line is invented from a value we do not hold.
+ */
+export function resultsCountLabel(
+  t: TFunction,
+  plural: (count: number) => PluralCategory,
+  input: { total: number | undefined; pages: number; from: number; to: number },
+): string {
+  if (input.total === undefined) return t('search.resultsUnknown')
+  if (input.pages > 1) {
+    return t('search.range', { from: input.from, to: input.to, total: input.total })
+  }
+  return t(`search.results_${plural(input.total)}`, { count: input.total })
 }
