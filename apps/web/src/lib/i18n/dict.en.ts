@@ -1533,7 +1533,10 @@ export const dictEn: Dict = {
       body: 'Create your account, import a lecture and launch your first session in under two minutes. Free, self-hosted, open source.',
     },
     hero: {
-      eyebrow: 'Spaced repetition · FSRS v5',
+      // LANDING CLAIM ↔ SOURCE: `FSRS_PARAMS` (apps/server/src/services/fsrs.ts).
+      // Read "FSRS v5" until 01/08/2026; the server has scheduled with FSRS-6
+      // (ts-fsrs 5.x, 21 weights) since well before that.
+      eyebrow: 'Spaced repetition · FSRS-6',
       title: 'Remember more, review less.',
       subtitle:
         'engram schedules every review at the right time and turns your notes — Markdown, PDF or a photo of a lecture — into cards ready to study.',
@@ -1598,7 +1601,10 @@ export const dictEn: Dict = {
       label: 'Three moves, one tool',
       review: {
         title: '100% keyboard sessions',
-        body: 'Space to reveal, 1 to 4 to grade. FSRS scheduling picks the next card. No mouse, no friction.',
+        // {wrong} / {right} are INJECTED from `VERDICTS`
+        // (apps/web/src/features/review/verdict.ts) — do not retype the two
+        // verdicts here.
+        body: 'Space to reveal, then “{wrong}” or “{right}” — keys 1 to 4 stay under your fingers. FSRS scheduling picks the next card, no mouse needed.',
       },
       import: {
         title: 'Smart import',
@@ -1630,17 +1636,29 @@ export const dictEn: Dict = {
       },
       step2: {
         title: 'Approve the generated cards',
-        body: 'The AI proposes front/back; you accept, edit or reject card by card.',
+        // LANDING CLAIM ↔ SOURCE: `generationKindSchema` (packages/shared/src/domain.ts)
+        // and the `qcm.ts` parser. Front/back and multiple choice are the two
+        // formats the session can actually review; cloze exists as a generation
+        // output but has no review of its own yet (R-1) — do not promise it.
+        body: 'The AI proposes front/back cards and multiple-choice questions; you accept, edit or reject card by card.',
       },
       step3: {
         title: 'Review what is due',
         body: 'engram shows you today’s cards, exactly when the time is right.',
       },
+      // LANDING CLAIM ↔ SOURCE: `ACCEPT_EXTENSIONS` / `MAX_UPLOAD_BYTES`
+      // (apps/web/src/components/import/dropzone.tsx). The list itself is rendered
+      // from the constant — these two keys are only the wrapping.
+      formatsLabel: 'Accepted formats',
+      formatsLimit: '{size} MB max per file',
     },
     providers: {
       label: 'Multi-provider AI',
       title: 'Your AI, your key.',
-      body: 'Card generation runs on the provider of your choice: bring your own key, or run a model locally on your own machine.',
+      // Two selectors in the settings, not one: card generation AND photo OCR
+      // (`OCR_PROVIDER_ORDER` in ai-settings-card.tsx, today equal to
+      // `PROVIDER_ORDER`). Guarded in landing-page.test.tsx.
+      body: 'Card generation and reading your lecture photos both run on the provider of your choice: bring your own key, or run a model locally on your own machine. The two are configured separately.',
       local: 'local',
       experimental: 'experimental',
       codexNote:

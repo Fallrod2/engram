@@ -6,8 +6,10 @@ import { useReducedMotion } from '@/lib/motion'
 import { ArrowRight, Keyboard, LineChart, ScanLine } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AiProviderId } from '@engram/shared'
-import { useLang, useT, type TKey } from '@/lib/i18n'
+import { useLang, useT, type Lang, type TFunction, type TKey } from '@/lib/i18n'
 import { PROVIDER_ORDER, providerLabel } from '@/features/ai/providers'
+import { ACCEPT_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/components/import/dropzone'
+import { VERDICTS, type Verdict } from '@/features/review/verdict'
 import { useTheme } from '@/lib/theme'
 import { fetchHealth } from '@/lib/api'
 import { siteHost } from '@/lib/build-info'
@@ -30,6 +32,36 @@ import { useDemoBoot } from './use-demo-boot'
  * Mono, tight radii). The signature is the product's own idea made visible — the
  * *spacing rhythm* of FSRS reviews (§ RhythmStrip). Dark by default, light
  * supported; mobile-first; motion subtle (<250 ms) and reduced-motion aware.
+ */
+
+/**
+ * ═══ LANDING CLAIM ↔ SOURCE — the rule, 01/08/2026 (Alex) ═══
+ *
+ * Every sentence on this page that ENUMERATES something the app decides
+ * elsewhere — the AI providers, the file formats the picker accepts, the buttons
+ * the review session shows, the languages the toggle offers, the scheduler's
+ * version — is a claim that can go stale on its own, silently, because nothing
+ * on a marketing page fails when the product moves. It has already happened
+ * twice: the provider chips were five hand-typed strings and quietly lost
+ * `openai-codex` (29/07/2026), and the hero eyebrow was still printing "FSRS v5"
+ * long after the scheduler moved to FSRS-6.
+ *
+ * So, from now on, a parametric claim is one of two things and never a third:
+ *
+ *   1. DERIVED — the page maps over the source itself (`PROVIDER_ORDER`,
+ *      `ACCEPT_EXTENSIONS`, `VERDICTS`, `LANDING_LANG_ORDER`). Nothing to keep
+ *      in sync, because there is only one list.
+ *   2. LINKED — impossible or silly to derive, so it carries a comment marked
+ *      `LANDING CLAIM ↔ SOURCE:` naming the exact file and export, written for
+ *      the person editing THAT file, plus (whenever a machine can tell the two
+ *      apart) a guard in `landing-page.test.tsx` that reads the source and the
+ *      rendered page and refuses to let them disagree.
+ *
+ * `grep -rn 'LANDING CLAIM ↔ SOURCE' apps/web/src` lists every one of them.
+ *
+ * What cannot be mechanised is said out loud AT the claim rather than dressed up
+ * as a guard — see `INTERVALS` (an illustration, not a schedule) and
+ * `ThemedShot` (a screenshot no test can look at).
  */
 
 const GITHUB_URL = 'https://github.com/Fallrod2/engram'
@@ -189,6 +221,27 @@ function LandingHeader() {
   )
 }
 
+/**
+ * LANDING CLAIM ↔ SOURCE: `Lang` (`apps/web/src/lib/i18n/index.tsx`).
+ *
+ * The toggle used to be a literal `['fr', 'en'] as const`, which meant a third
+ * dictionary would have shipped with a switch that could not reach it. Exhaustive
+ * `Record` on purpose, exactly like `PROVIDER_NOTE` further down: the value is
+ * the rank the button takes in the group, so adding a language breaks THIS file
+ * until someone decides where it sits.
+ *
+ * `'system'` is deliberately not here. `LangPreference` includes it and it is the
+ * default, but following the OS is what already happens before anyone touches
+ * this control (`LangProvider`); the landing's switch is the explicit override,
+ * and the full three-way picker lives in Réglages (`appearance-controls.tsx`).
+ */
+const LANDING_LANG_ORDER: Record<Lang, number> = { fr: 0, en: 1 }
+
+/** The toggle's languages, in the order the `Record` above ranks them. */
+const LANDING_LANGS: Lang[] = (Object.keys(LANDING_LANG_ORDER) as Lang[]).sort(
+  (a, b) => LANDING_LANG_ORDER[a] - LANDING_LANG_ORDER[b],
+)
+
 /** Compact FR/EN segmented toggle, shared by the header and (historically) the
  *  footer. Single instance now lives in the header. */
 function LangToggle() {
@@ -200,7 +253,7 @@ function LangToggle() {
       role="group"
       aria-label={t('landing.nav.language')}
     >
-      {(['fr', 'en'] as const).map((code) => (
+      {LANDING_LANGS.map((code) => (
         <button
           key={code}
           type="button"
@@ -247,6 +300,12 @@ function Hero() {
 
       <div className="mx-auto w-full max-w-6xl px-4 pb-8 pt-16 sm:px-6 sm:pt-20 lg:px-8 lg:pt-28">
         <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+          {/* LANDING CLAIM ↔ SOURCE: `FSRS_PARAMS` (apps/server/src/services/fsrs.ts).
+              The eyebrow names the ALGORITHM version the scheduler actually runs.
+              It said "FSRS v5" until 01/08/2026, while the server had been on
+              FSRS-6 (ts-fsrs 5.x defaults, 21 weights) the whole time. Guarded
+              from the source side by apps/server/src/services/fsrs-version.test.ts,
+              which fails the day the weight count moves and names this string. */}
           <motion.span
             {...rise(0)}
             className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-1 px-3 py-1 font-mono text-2xs uppercase tracking-[0.12em] text-text-muted"
@@ -391,7 +450,17 @@ function DemoCta({ onFailedChange }: { onFailedChange: (failed: boolean) => void
 
 /* ------------------------------------------------------------ rhythm strip -- */
 
-/** FSRS-style expanding intervals (days). The growing gaps ARE the message. */
+/**
+ * FSRS-style expanding intervals (days). The growing gaps ARE the message.
+ *
+ * NOT a `LANDING CLAIM ↔ SOURCE`, and the distinction matters: these five numbers
+ * are an ILLUSTRATION of a shape, not a schedule the app produces. Real intervals
+ * fall out of `FSRS_PARAMS` per card, from its stability, difficulty and rating
+ * history — there is no ladder anywhere in the codebase to derive this from, and
+ * nothing here can fall out of date. Said out loud so a later reader does not
+ * mistake it for a table somebody forgot to refresh, and so nobody builds a guard
+ * that pretends to check it.
+ */
 const INTERVALS = [1, 3, 8, 21, 55] as const
 
 function RhythmStrip() {
@@ -481,13 +550,48 @@ function RhythmPill({ children, accent }: { children: ReactNode; accent?: boolea
 
 /* ----------------------------------------------------------------- pillars -- */
 
+/**
+ * The two verdict names, keyed by verdict rather than read by index — `VERDICTS`
+ * states that no consumer may depend on the POSITION of an entry, only on its
+ * `verdict`, and the landing is a consumer like any other.
+ */
+function verdictLabels(t: TFunction): Record<Verdict, string> {
+  const labels = { wrong: '', right: '' } as Record<Verdict, string>
+  for (const v of VERDICTS) labels[v.verdict] = t(v.label)
+  return labels
+}
+
 function Pillars() {
   const t = useT()
+  const verdicts = verdictLabels(t)
+  /*
+   * LANDING CLAIM ↔ SOURCE, one line per pillar. All three describe features that
+   * live elsewhere, and all three were written once and never revisited:
+   *
+   *  · review    → `VERDICTS` (features/review/verdict.ts) and the key router in
+   *    `use-review-session.ts`. The body used to say "Espace pour révéler, 1 à 4
+   *    pour noter", which stopped being what the screen SHOWS when T-047 replaced
+   *    the four-button grid with two verdicts (the `1`-`4` keys stayed live and
+   *    unadvertised, which is why the old sentence was not exactly false either —
+   *    just no longer a description of the app). The two button names are now
+   *    INTERPOLATED from the session dictionary through `VERDICTS`, so the landing
+   *    cannot name a control the session no longer offers.
+   *  · import    → `ACCEPT_EXTENSIONS` (components/import/dropzone.tsx). The prose
+   *    stays prose; the exact list is rendered under « Comment ça marche », see
+   *    <AcceptedFormats>.
+   *  · analytics → the panels that actually ship: `activity-heatmap.tsx` and
+   *    `retention-by-subject-chart.tsx` (features/analytics/components), the
+   *    projected load in `features/planning/`, and `Countdown` in
+   *    `planning/exam-list.tsx`. Prose over four separate screens rather than an
+   *    enumeration of one constant, so no guard is possible — this comment IS the
+   *    link: retire one of those panels and `landing.pillars.analytics.body` has
+   *    to be edited in the same commit.
+   */
   const pillars = [
     {
       icon: Keyboard,
       title: t('landing.pillars.review.title'),
-      body: t('landing.pillars.review.body'),
+      body: t('landing.pillars.review.body', { wrong: verdicts.wrong, right: verdicts.right }),
     },
     {
       icon: ScanLine,
@@ -598,7 +702,54 @@ function HowItWorks() {
           </li>
         ))}
       </ol>
+      <AcceptedFormats />
     </section>
+  )
+}
+
+/**
+ * LANDING CLAIM ↔ SOURCE: `ACCEPT_EXTENSIONS` and `MAX_UPLOAD_BYTES`
+ * (`apps/web/src/components/import/dropzone.tsx`).
+ *
+ * DERIVED, not retyped. The step above says "un fichier, ou une photo"; this row
+ * is the literal list the file picker puts in its `accept` attribute, so a format
+ * added to — or dropped from — the dropzone appears here on its own. Before this
+ * existed the page said "Markdown, PDF ou photo" and silently omitted `.txt` and
+ * `.markdown`, which the picker has always taken.
+ *
+ * The size cap is computed from the very constant the client validates against
+ * (itself aligned on the server's 10 MiB limit), so the landing cannot end up
+ * advertising a rounder number than the one that rejects the upload. It is shown
+ * in MiB-rounded MB, like the dropzone's own hint.
+ *
+ * `landing-page.test.tsx` compares the rendered chips to the constant and fails
+ * on any disagreement, in either direction.
+ */
+function AcceptedFormats() {
+  const t = useT()
+  const megabytes = Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))
+  return (
+    <div className="mt-10 flex flex-col gap-2 border-t border-border pt-6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
+      {/* A <span>, not a <SectionLabel>: this is a caption on the step list above,
+          not a new section, and an extra <h2> here would put a heading after the
+          <h3>s it belongs to (axe `heading-order` is gated in e2e/tests/a11y.spec.ts). */}
+      <span className="shrink-0 font-mono text-2xs font-semibold uppercase tracking-[0.12em] text-text-faint">
+        {t('landing.how.formatsLabel')}
+      </span>
+      <ul className="flex flex-wrap gap-1.5">
+        {ACCEPT_EXTENSIONS.map((ext) => (
+          <li
+            key={ext}
+            className="rounded-full border border-border bg-surface-2 px-2.5 py-0.5 font-mono text-2xs text-text-muted"
+          >
+            {ext}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-text-faint">
+        {t('landing.how.formatsLimit', { size: megabytes })}
+      </p>
+    </div>
   )
 }
 
@@ -633,6 +784,26 @@ const PROVIDER_NOTE: Record<AiProviderId, TKey | null> = {
   'openai-codex': 'landing.providers.experimental',
 }
 
+/**
+ * LANDING CLAIM ↔ SOURCE: `PROVIDER_ORDER` + `providerLabel`
+ * (`apps/web/src/features/ai/providers.ts`) for the chips, and
+ * `OCR_PROVIDER_ORDER` (`apps/web/src/features/ai/ai-settings-card.tsx`) for the
+ * clause that says the same list also reads your photos.
+ *
+ * The settings screen has TWO provider selectors, not one — card generation and
+ * OCR — and the landing spoke only of generation until 01/08/2026, which
+ * undersold the app by exactly one selector. Today the OCR list IS the generation
+ * list (`const OCR_PROVIDER_ORDER: AiProviderId[] = PROVIDER_ORDER`), which is
+ * the only reason one sentence may cover both. `landing-page.test.tsx` reads the
+ * settings file and goes red the day the OCR list becomes a set of its own — at
+ * which point this section needs two lists, or a narrower sentence.
+ *
+ * T-057, arbitrated by Alex on 01/08/2026: the chip list is UNCONDITIONAL and
+ * COMPLETE, experimental entries included. It is a capability list — what engram
+ * can talk to — not an availability list for this deployment. Nothing here may be
+ * filtered by a server flag; the one entry an instance can switch off says so in
+ * prose underneath.
+ */
 function Providers() {
   const t = useT()
 
@@ -820,6 +991,16 @@ const SHOT_SIZE: Record<ShotBase, { width: number; height: number }> = {
  * FR captures (finding: EN landing shipped 100% FR shots). Served from
  * `public/landing/`, so it never touches the JS bundle (§5.4). The four variants
  * per screen are regenerated by scripts/generate-landing-shots.ts.
+ *
+ * LANDING CLAIM ↔ SOURCE, with an honest hole in it. The VARIANT SPACE is derived:
+ * `resolved` theme (`lib/theme.tsx`) × `lang` (`lib/i18n`), so a third theme or a
+ * third dictionary shows up as a 404'd image — visibly wrong, never quietly
+ * wrong. What no test in this repo can check is whether a capture still SHOWS the
+ * current app: these are opaque WebP files, and a screen that has since gained a
+ * control or lost a button looks exactly as valid to a machine. Re-run
+ * `scripts/generate-landing-shots.ts` after any visible change to the dashboard,
+ * the review session or analytics — it needs the local Supabase stack, which is
+ * why it is a chore and not a check.
  */
 function ThemedShot({ base, alt, priority }: { base: ShotBase; alt: string; priority?: boolean }) {
   const { resolved } = useTheme()

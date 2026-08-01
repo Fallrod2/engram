@@ -41,9 +41,12 @@ vi.mock('@/lib/supabase', () => ({
 }))
 
 import { ThemeProvider } from '@/lib/theme'
-import { LangProvider, type TFunction, type TKey } from '@/lib/i18n'
+import { LangProvider, type Lang, type TFunction, type TKey } from '@/lib/i18n'
 import { dictFr } from '@/lib/i18n/dict.fr'
+import { dictEn } from '@/lib/i18n/dict.en'
 import { PROVIDER_ORDER, providerLabel } from '@/features/ai/providers'
+import { ACCEPT_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/components/import/dropzone'
+import { VERDICTS } from '@/features/review/verdict'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import LandingPage from './landing-page'
 
@@ -56,6 +59,12 @@ const tFr: TFunction = (key: TKey) =>
   key
     .split('.')
     .reduce<unknown>((acc, k) => (acc as Record<string, unknown>)?.[k], dictFr) as string
+
+/** The same, bound to EN — used by the parity halves of the claim guards below. */
+const tEn: TFunction = (key: TKey) =>
+  key
+    .split('.')
+    .reduce<unknown>((acc, k) => (acc as Record<string, unknown>)?.[k], dictEn) as string
 
 /** The `/api/health` payload, with the demo switch under the test's control. */
 function health(demoLoginEnabled: boolean) {
@@ -295,6 +304,84 @@ describe('<LandingPage> — provider chips', () => {
     // silently disagreed with the app. Guard it from coming back.
     renderLanding()
     expect(screen.queryByText(/Anthropic, Mistral, OpenRouter/)).toBeNull()
+  })
+})
+
+/**
+ * ═══ LANDING CLAIM ↔ SOURCE — the drift guards (01/08/2026) ═══
+ *
+ * Same shape as the provider-chip suite above, generalised to the rest of the
+ * page: every assertion here reads the SOURCE the app actually uses and the page
+ * as a visitor sees it, and refuses to let the two disagree. None of them
+ * re-types the expected value — a guard that hard-codes the list it is guarding
+ * is a second copy of that list, which is the bug, not the fix.
+ *
+ * What is deliberately NOT guarded, and why, is written at the claim itself in
+ * `landing-page.tsx`: the rhythm strip's intervals (an illustration, not a
+ * schedule) and the screenshots (opaque WebP; only a human can tell a stale
+ * capture from a current one).
+ */
+describe('<LandingPage> — parametric claims match their source', () => {
+  /** The accepted-format chips, read off the page. */
+  function formatChips(): string[] {
+    return Array.from(document.querySelectorAll('li'))
+      .map((li) => li.textContent ?? '')
+      .filter((text) => text.startsWith('.'))
+  }
+
+  it('lists exactly the extensions the file picker accepts, in the same order', () => {
+    // The prose used to say "Markdown, PDF ou photo" and quietly left out `.txt`
+    // and `.markdown`, both of which the dropzone has always taken.
+    renderLanding()
+    expect(formatChips()).toEqual([...ACCEPT_EXTENSIONS])
+  })
+
+  it('prints the upload cap the client actually enforces, not a rounder number', () => {
+    renderLanding()
+    const megabytes = Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))
+    expect(screen.getByText(`${megabytes} Mo max par fichier`)).toBeTruthy()
+  })
+
+  it('names the two review verdicts the session offers, in both languages', () => {
+    // Interpolated from `VERDICTS`, so this proves the wiring rather than the
+    // wording: rename a verdict in the session dictionary and the landing follows
+    // it in the same render. Restore a four-button grid and `VERDICTS` changes
+    // shape, which fails at the type level long before this test runs.
+    renderLanding()
+    for (const v of VERDICTS) {
+      expect(screen.getByText(new RegExp(tFr(v.label)), { selector: 'p' }), v.verdict).toBeTruthy()
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'en' }))
+    for (const v of VERDICTS) {
+      expect(screen.getByText(new RegExp(tEn(v.label)), { selector: 'p' }), v.verdict).toBeTruthy()
+    }
+  })
+
+  it('leaves no {placeholder} unresolved in the interpolated copy', () => {
+    // The failure mode of an interpolated claim is not a wrong word, it is a
+    // literal `{wrong}` shipped to production because the caller forgot a var.
+    renderLanding()
+    expect(document.body.textContent).not.toMatch(/\{[a-z]+\}/i)
+  })
+
+  it('offers one language button per dictionary the app ships', () => {
+    // `Lang` is the source; the toggle is derived from an exhaustive Record, so a
+    // third dictionary cannot ship with a switch that cannot reach it.
+    renderLanding()
+    const langs: Lang[] = ['fr', 'en']
+    for (const code of langs) expect(screen.getByRole('button', { name: code })).toBeTruthy()
+    const group = screen.getByRole('group', { name: 'Langue' })
+    expect(group.querySelectorAll('button')).toHaveLength(langs.length)
+  })
+
+  it('promises no card format the review session cannot open (no cloze)', () => {
+    // Cloze items exist as a 'mixed' generation output but have no review of
+    // their own (R-1). The landing may name front/back and QCM, and nothing else,
+    // until that ships.
+    renderLanding()
+    expect(document.body.textContent).not.toMatch(/cloze|texte à trous/i)
+    fireEvent.click(screen.getByRole('button', { name: 'en' }))
+    expect(document.body.textContent).not.toMatch(/cloze|fill-in-the-blank/i)
   })
 })
 
