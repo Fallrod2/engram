@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { MeResponse, StreaksResponse, Subject } from '@engram/shared'
+import type { DueCounts, MeResponse, StreaksResponse, Subject } from '@engram/shared'
 
 /**
  * T-042 — the shell chrome is mounted on EVERY screen, so a failed read here is
@@ -53,6 +53,7 @@ import { subjectsListOptions } from '@/features/subjects/queries'
 import { allDecksOptions } from '@/features/decks/queries'
 import { meQuery } from '@/features/admin/queries'
 import { streaksOptions } from '@/features/analytics/queries'
+import { dueCountsOptions } from '@/features/due-counts/queries'
 import { Sidebar } from './sidebar'
 import { CommandMenu } from './command-menu'
 
@@ -83,6 +84,15 @@ const STREAKS: StreaksResponse = {
   includesToday: true,
   lastStudyDay: '2026-07-01',
   totalStudyDays: 60,
+}
+
+const DUE_COUNTS: DueCounts = {
+  now: '2026-07-01T00:00:00.000Z',
+  total: 17,
+  overdueCount: 12,
+  todayCount: 5,
+  bySubject: [{ subjectId: SUBJECT.id, dueCount: 17, overdueCount: 12, todayCount: 5 }],
+  byDeck: [],
 }
 
 // jsdom's Storage is not fully implemented here (same shim as the sibling shell
@@ -135,6 +145,7 @@ const seedNoSubjects: Seed = (qc) => qc.setQueryData(subjectsListOptions().query
 const seedStreaks: Seed = (qc) => qc.setQueryData(streaksOptions(new Date()).queryKey, STREAKS)
 const seedMe: Seed = (qc) => qc.setQueryData(meQuery().queryKey, ME)
 const seedNoDecks: Seed = (qc) => qc.setQueryData(allDecksOptions().queryKey, [])
+const seedDueCounts: Seed = (qc) => qc.setQueryData(dueCountsOptions().queryKey, DUE_COUNTS)
 
 function renderWith(node: ReactNode, ...seeds: Seed[]) {
   failEverythingElse()
@@ -183,6 +194,43 @@ describe('<Sidebar> — the streak pill (T-042)', () => {
     expect(await screen.findByLabelText('Série indisponible')).toBeTruthy()
     expect(screen.queryByLabelText('Série de 0 jour')).toBeNull()
     expect(screen.queryByLabelText(/^Série de/)).toBeNull()
+  })
+})
+
+/**
+ * T-066 — the adjacent motif: the failed read that renders as a PERMANENT
+ * SKELETON. The rail's due counts had no `isError` branch at all, so a dropped
+ * `GET /review/counts` left the 12×10px shimmer up on every row of every screen
+ * until the next reload. A skeleton promises a number is on its way; nothing
+ * was. Pending and failed are two states, and they now look — and sound —
+ * different.
+ */
+describe('<Sidebar> — the due counts (T-066)', () => {
+  it('prints the two-part count when the read landed', async () => {
+    renderWith(<Sidebar />, seedSubjects, seedMe, seedStreaks, seedDueCounts)
+    expect(
+      await screen.findByLabelText('Session de révision, 12 cartes en retard, 5 pour aujourd’hui'),
+    ).toBeTruthy()
+  })
+
+  it('stops shimmering and says the figures are unavailable when the read failed', async () => {
+    const { container } = renderWith(<Sidebar />, seedSubjects, seedMe, seedStreaks)
+    // The row announces the loss instead of falling silent…
+    expect(await screen.findByLabelText(/Session de révision, chiffres indisponibles/)).toBeTruthy()
+    expect(
+      await screen.findByLabelText(/Théorie des langages, chiffres indisponibles/),
+    ).toBeTruthy()
+    // …and the count itself is the em-dash `<DueCount>` uses everywhere else,
+    // not the skeleton it used to be stuck on for ever.
+    expect(container.querySelector('.animate-pulse')).toBeNull()
+    expect(container.textContent).toContain('—')
+  })
+
+  it('never turns a failed count into a zero', async () => {
+    renderWith(<Sidebar />, seedSubjects, seedMe, seedStreaks)
+    await screen.findByLabelText('Session de révision, chiffres indisponibles')
+    expect(screen.queryByLabelText(/aucune carte à réviser/)).toBeNull()
+    expect(screen.queryByLabelText(/0 carte/)).toBeNull()
   })
 })
 

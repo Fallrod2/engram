@@ -101,6 +101,7 @@ export const dictEn: Dict = {
       todayOnly_one: '{count} card due today',
       todayOnly_other: '{count} cards due today',
       none: 'no cards due',
+      unknown: 'counts unavailable',
     },
     streak: {
       aria_one: 'Streak of {count} day',

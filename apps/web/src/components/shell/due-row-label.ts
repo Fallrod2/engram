@@ -7,6 +7,14 @@ export interface DueRowCounts {
 }
 
 /**
+ * What a row knows about its counts. `undefined` is "not back yet"; `'unknown'`
+ * is "the read failed and will not come back on its own" (T-066). They render
+ * differently — a shimmer against an em-dash — and they announce differently,
+ * which is the whole reason they are two values and not one.
+ */
+export type DueRowState = DueRowCounts | 'unknown' | undefined
+
+/**
  * Accessible name of a sidebar nav row that carries a due count (T-017).
  *
  * The rail used to be a dead end for a screen reader: collapsed, the badge was
@@ -23,13 +31,20 @@ export interface DueRowCounts {
  * an explicit "aucune carte à réviser". `counts === undefined` means the query
  * is still pending — the row falls back to its bare name instead of announcing a
  * zero it does not know yet.
+ *
+ * T-066 — `'unknown'` is the THIRD case, and it is not the pending one: a failed
+ * read is final until someone asks again, so the row says so out loud rather
+ * than staying silent for ever. Silence is right for a wait, wrong for a loss.
  */
 export function dueRowLabel(
   t: TFunction,
   plural: (count: number) => PluralCategory,
   name: string,
-  counts: DueRowCounts | undefined,
+  counts: DueRowState,
 ): string {
+  if (counts === 'unknown') {
+    return t('sidebar.dueRow.row', { name, counts: t('sidebar.dueRow.unknown') })
+  }
   if (!counts) return name
   const { overdueCount: overdue, todayCount: today } = counts
   let summary: string

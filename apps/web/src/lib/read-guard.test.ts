@@ -180,10 +180,9 @@ const ALLOWED = new Map<string, string>([
   // SKELETON. It asserts "still loading" rather than "empty", so it is not the
   // pattern T-042 was opened for — but it is the same family and these are the
   // known sites. They are listed here rather than left invisible.
-  [
-    'components/shell/sidebar.tsx::dueCountsOptions',
-    'ADJACENT: due counts shimmer for ever instead of failing',
-  ],
+  //
+  // T-066 is closing them one at a time; an entry disappears when its site
+  // branches on `isError`. The list must end EMPTY.
   [
     'routes/search.tsx::cardCorpusSizeOptions',
     'ADJACENT: no corpus size ⇒ no empty state ⇒ permanent results skeleton',

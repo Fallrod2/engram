@@ -122,6 +122,10 @@ export const dictFr = {
       todayOnly_one: '{count} carte pour aujourd’hui',
       todayOnly_other: '{count} cartes pour aujourd’hui',
       none: 'aucune carte à réviser',
+      // T-066 : la lecture des compteurs a échoué. Le rail affichait un
+      // scintillement sans fin — « toujours en train de charger » est une
+      // affirmation, et c'était la fausse. Le tiret le dit, la voix aussi.
+      unknown: 'chiffres indisponibles',
     },
     // Streak pill (footer). The count is the WHOLE content of the pill, so its
     // accessible name has to spell the unit out. FR puts 0 and 1 in the singular
