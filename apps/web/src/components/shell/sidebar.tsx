@@ -80,16 +80,27 @@ export function Sidebar() {
       : undefined
 
   // Ordered list of every focusable entry (nav items + real subjects) → roving.
+  //
+  // T-067 — the "Matières indisponibles" retry row occupies the subjects' slot
+  // when their read failed, so it takes their place HERE too. Left out, it kept
+  // its default `tabIndex=0` and became an extra Tab stop in a rail that has
+  // exactly one, unreachable by the arrow keys every other row answers to.
+  const subjectsFailed = subjectsQuery.isError
   const focusKeys = useMemo(() => {
     const keys: string[] = []
     for (const g of NAV_GROUPS) {
       for (const it of g.items) keys.push(`nav:${it.to}`)
-      if (g.id === 'subjects') for (const s of subjects) keys.push(`subj:${s.id}`)
+      if (g.id !== 'subjects') continue
+      if (subjectsFailed) keys.push(RETRY_KEY)
+      else for (const s of subjects) keys.push(`subj:${s.id}`)
     }
     return keys
-  }, [subjects])
+  }, [subjects, subjectsFailed])
+  const retryIndex = focusKeys.indexOf(RETRY_KEY)
 
-  const linkRefs = useRef<(HTMLAnchorElement | null)[]>([])
+  // `HTMLElement`, not `HTMLAnchorElement`: the retry row is a <button>, and it
+  // is a rail entry like any other.
+  const linkRefs = useRef<(HTMLElement | null)[]>([])
   const [rovingIndex, setRovingIndex] = useState(0)
   const rovingIndexRef = useRef(0)
   rovingIndexRef.current = rovingIndex
@@ -263,11 +274,16 @@ export function Sidebar() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <SubjectRowSkeleton key={i} collapsed={collapsed} />
                   ))
-                ) : subjectsQuery.isError ? (
+                ) : subjectsFailed ? (
                   <SubjectsUnavailableRow
                     t={t}
                     collapsed={collapsed}
                     onRetry={() => void subjectsQuery.refetch()}
+                    tabIndex={retryIndex === rovingIndex ? 0 : -1}
+                    ref={(el) => {
+                      linkRefs.current[retryIndex] = el
+                    }}
+                    onFocus={registerFocus(retryIndex)}
                   />
                 ) : (
                   subjects.map((s) => {
@@ -386,6 +402,9 @@ type DueSplit = Omit<SubjectDueSplit, 'subjectId'>
 
 /** A row's counts, or why it has none: `undefined` pending, `'unknown'` failed. */
 type DueState = DueSplit | 'unknown' | undefined
+
+/** Roving key of the "Matières indisponibles" row — it stands in for the list. */
+const RETRY_KEY = 'subj:unavailable'
 
 /** Shared row chrome: base classes + the 2px indigo active edge bar (spec §5). */
 const ROW_CLASS = cn(
@@ -561,16 +580,25 @@ function SubjectsUnavailableRow({
   t,
   collapsed,
   onRetry,
+  tabIndex,
+  onFocus,
+  ref,
 }: {
   t: TFunction
   collapsed: boolean
   onRetry: () => void
+  tabIndex: number
+  onFocus: () => void
+  ref: (el: HTMLButtonElement | null) => void
 }) {
   const label = t('sidebar.subjectsUnavailable')
   const button = (
     <button
+      ref={ref}
       type="button"
       onClick={onRetry}
+      tabIndex={tabIndex}
+      onFocus={onFocus}
       aria-label={collapsed ? label : undefined}
       className={cn(
         'flex h-8 items-center rounded-sm text-sm text-text-faint',

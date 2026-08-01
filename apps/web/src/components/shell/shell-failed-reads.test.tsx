@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { DueCounts, MeResponse, StreaksResponse, Subject } from '@engram/shared'
 
@@ -180,6 +180,29 @@ describe('<Sidebar> — the Matières group (T-042)', () => {
     renderWith(<Sidebar />, seedSubjects, seedMe, seedStreaks)
     expect(await screen.findByText('Théorie des langages')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Matières indisponibles/ })).toBeNull()
+  })
+
+  /**
+   * T-067.4 — the retry row stands in for the subject list, so it belongs to the
+   * rail's roving tabindex like the rows it replaces. Left out of `focusKeys` it
+   * kept a button's default `tabIndex=0`: an extra Tab stop in a rail that has
+   * exactly one, and unreachable by the arrow keys every other row answers to.
+   */
+  it('joins the rail roving tabindex instead of adding a Tab stop', async () => {
+    const { container } = renderWith(<Sidebar />, seedMe, seedStreaks)
+    const row = await screen.findByRole('button', { name: /Matières indisponibles/ })
+    const nav = container.querySelector('nav')!
+    // One tab stop for the whole rail, and it is not this row (roving starts at
+    // the first nav entry).
+    const stops = Array.from(nav.querySelectorAll('[tabindex="0"]'))
+    expect(stops.length).toBe(1)
+    expect(row.getAttribute('tabindex')).toBe('-1')
+
+    // …and the arrow keys DO reach it: it sits where the subject rows would,
+    // right after "Toutes les matières".
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(nav, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(row)
+    expect(row.getAttribute('tabindex')).toBe('0')
   })
 })
 
