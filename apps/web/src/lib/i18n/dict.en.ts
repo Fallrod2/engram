@@ -1533,9 +1533,11 @@ export const dictEn: Dict = {
       body: 'Create your account, import a lecture and launch your first session in under two minutes. Free, self-hosted, open source.',
     },
     hero: {
-      // LANDING CLAIM ↔ SOURCE: `FSRS_PARAMS` (apps/server/src/services/fsrs.ts).
-      // Read "FSRS v5" until 01/08/2026; the server has scheduled with FSRS-6
-      // (ts-fsrs 5.x, 21 weights) since well before that.
+      // LANDING CLAIM ↔ SOURCE: `FSRSVersion` (ts-fsrs) — the algorithm
+      // generation `FSRS_PARAMS` (apps/server/src/services/fsrs.ts) actually
+      // schedules on. Read "FSRS v5" until 01/08/2026, which was the npm package
+      // version rather than the algorithm's. Guarded from both sides by
+      // apps/server/src/services/fsrs-version.test.ts.
       eyebrow: 'Spaced repetition · FSRS-6',
       title: 'Remember more, review less.',
       subtitle:
@@ -1601,9 +1603,9 @@ export const dictEn: Dict = {
       label: 'Three moves, one tool',
       review: {
         title: '100% keyboard sessions',
-        // {wrong} / {right} are INJECTED from `VERDICTS`
-        // (apps/web/src/features/review/verdict.ts) — do not retype the two
-        // verdicts here.
+        // LANDING CLAIM ↔ SOURCE: `VERDICTS`
+        // (apps/web/src/features/review/verdict.ts). {wrong} / {right} are
+        // INJECTED — do not retype the two verdicts here.
         body: 'Space to reveal, then “{wrong}” or “{right}” — keys 1 to 4 stay under your fingers. FSRS scheduling picks the next card, no mouse needed.',
       },
       import: {
@@ -1655,9 +1657,11 @@ export const dictEn: Dict = {
     providers: {
       label: 'Multi-provider AI',
       title: 'Your AI, your key.',
-      // Two selectors in the settings, not one: card generation AND photo OCR
-      // (`OCR_PROVIDER_ORDER` in ai-settings-card.tsx, today equal to
-      // `PROVIDER_ORDER`). Guarded in landing-page.test.tsx.
+      // LANDING CLAIM ↔ SOURCE: `OCR_PROVIDER_ORDER`
+      // (apps/web/src/features/ai/ai-settings-card.tsx). Two selectors in the
+      // settings, not one: card generation AND photo OCR. One sentence may cover
+      // both only while the two lists are the same — guarded in
+      // landing-claims.test.ts.
       body: 'Card generation and reading your lecture photos both run on the provider of your choice: bring your own key, or run a model locally on your own machine. The two are configured separately.',
       local: 'local',
       experimental: 'experimental',

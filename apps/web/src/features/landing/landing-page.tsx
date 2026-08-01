@@ -300,12 +300,13 @@ function Hero() {
 
       <div className="mx-auto w-full max-w-6xl px-4 pb-8 pt-16 sm:px-6 sm:pt-20 lg:px-8 lg:pt-28">
         <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-          {/* LANDING CLAIM ↔ SOURCE: `FSRS_PARAMS` (apps/server/src/services/fsrs.ts).
-              The eyebrow names the ALGORITHM version the scheduler actually runs.
-              It said "FSRS v5" until 01/08/2026, while the server had been on
-              FSRS-6 (ts-fsrs 5.x defaults, 21 weights) the whole time. Guarded
-              from the source side by apps/server/src/services/fsrs-version.test.ts,
-              which fails the day the weight count moves and names this string. */}
+          {/* LANDING CLAIM ↔ SOURCE: `FSRSVersion` (ts-fsrs) — the generation
+              `FSRS_PARAMS` (apps/server/src/services/fsrs.ts) really schedules
+              on. The eyebrow names the ALGORITHM, not the package: it read
+              "FSRS v5" until 01/08/2026 because `ts-fsrs@5.x` was mistaken for
+              it. Guarded from the source side by
+              apps/server/src/services/fsrs-version.test.ts, which compares the
+              library's own version string to this copy in both dictionaries. */}
           <motion.span
             {...rise(0)}
             className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-1 px-3 py-1 font-mono text-2xs uppercase tracking-[0.12em] text-text-muted"

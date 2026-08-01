@@ -1686,10 +1686,12 @@ export const dictFr = {
       body: 'Crée ton compte, importe un cours et lance ta première session en moins de deux minutes. Gratuit, self-hosted, open source.',
     },
     hero: {
-      // LANDING CLAIM ↔ SOURCE: `FSRS_PARAMS` (apps/server/src/services/fsrs.ts).
-      // Disait « FSRS v5 » jusqu'au 01/08/2026 ; le serveur planifie en FSRS-6
-      // (ts-fsrs 5.x, 21 poids) depuis bien avant. Garde côté source :
-      // apps/server/src/services/fsrs-version.test.ts.
+      // LANDING CLAIM ↔ SOURCE : `FSRSVersion` (ts-fsrs), c'est-à-dire la
+      // génération d'algorithme sur laquelle `FSRS_PARAMS`
+      // (apps/server/src/services/fsrs.ts) planifie réellement. Disait
+      // « FSRS v5 » jusqu'au 01/08/2026 alors que le serveur était en FSRS-6
+      // depuis bien avant — la v5 était le numéro du PAQUET npm, pas de l'algo.
+      // Garde des deux côtés : apps/server/src/services/fsrs-version.test.ts.
       eyebrow: 'Répétition espacée · FSRS-6',
       title: 'Retiens plus, en révisant moins.',
       subtitle:
@@ -1768,10 +1770,10 @@ export const dictFr = {
       label: 'Trois gestes, un seul outil',
       review: {
         title: 'Session 100 % clavier',
-        // {wrong} / {right} sont INJECTÉS depuis `VERDICTS`
-        // (apps/web/src/features/review/verdict.ts) : la landing ne peut pas
-        // nommer un bouton que la session n'affiche plus. Ne pas réécrire les
-        // deux verdicts en dur ici.
+        // LANDING CLAIM ↔ SOURCE : `VERDICTS`
+        // (apps/web/src/features/review/verdict.ts). {wrong} / {right} sont
+        // INJECTÉS — la landing ne peut pas nommer un bouton que la session
+        // n'affiche plus. Ne pas réécrire les deux verdicts en dur ici.
         body: 'Espace pour révéler, puis « {wrong} » ou « {right} » — les notes 1 à 4 restent sous les doigts. L’ordonnancement FSRS choisit la prochaine carte, sans souris.',
       },
       import: {
@@ -1833,10 +1835,11 @@ export const dictFr = {
       // en dessous, depuis `PROVIDER_ORDER`. Une phrase qui les recite serait un
       // second inventaire à tenir à jour à la main — c’est exactement ce qui a
       // fait disparaître ChatGPT (abonnement) des puces.
-      // Deux sélecteurs dans les réglages, pas un : génération de cartes ET OCR
-      // des photos (`OCR_PROVIDER_ORDER` dans ai-settings-card.tsx, aujourd'hui
-      // égal à `PROVIDER_ORDER`). La phrase ne peut couvrir les deux que tant que
-      // les deux listes sont la même — garde dans landing-page.test.tsx.
+      // LANDING CLAIM ↔ SOURCE : `OCR_PROVIDER_ORDER`
+      // (apps/web/src/features/ai/ai-settings-card.tsx). Deux sélecteurs dans les
+      // réglages, pas un : génération de cartes ET OCR des photos. La phrase ne
+      // peut couvrir les deux que tant que les deux listes n'en font qu'une —
+      // garde dans landing-claims.test.ts.
       body: 'La génération de cartes et la lecture de tes photos de cours tournent sur le provider de ton choix : tu apportes ta clé, ou tu fais tourner un modèle en local sur ta machine. Les deux se règlent séparément.',
       local: 'local',
       experimental: 'expérimental',
