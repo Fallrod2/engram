@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { CardSearchHit, SearchCardsResponse } from '@engram/shared'
-import { isFreshFor, pageBounds, searchEmptyKind } from './results'
+import { dictEn } from '@/lib/i18n/dict.en'
+import { dictFr } from '@/lib/i18n/dict.fr'
+import type { PluralCategory, TFunction } from '@/lib/i18n'
+import { isFreshFor, pageBounds, resultsCountLabel, searchBody, searchEmptyKind } from './results'
 
 function hit(id: string): CardSearchHit {
   return {
@@ -95,6 +98,78 @@ describe('searchEmptyKind', () => {
 })
 
 /**
+ * T-066 — "unknown corpus" used to mean one thing: wait. It means two, and the
+ * second one never ends. While the probe is in flight, waiting is right. Once it
+ * has FAILED, waiting is a skeleton that outlives the session: the idle screen
+ * shimmered for ever, and a search answered with zero printed a bare "0 cartes"
+ * over an empty table because no empty state was allowed to fire.
+ */
+describe('searchEmptyKind — a failed corpus probe is not a pending one', () => {
+  it('still waits while the probe is merely in flight', () => {
+    expect(
+      searchEmptyKind({ searching: false, total: undefined, corpusTotal: undefined }),
+    ).toBeNull()
+    expect(
+      searchEmptyKind({
+        searching: false,
+        total: undefined,
+        corpusTotal: undefined,
+        corpusFailed: false,
+      }),
+    ).toBeNull()
+  })
+
+  it('calls a real zero "no results" once the probe has failed', () => {
+    // True of the SEARCH whatever the corpus holds: the server answered, and
+    // the answer was none. The nuance lost is "you have no cards at all", which
+    // is a gentler version of the same fact, never its opposite.
+    expect(
+      searchEmptyKind({ searching: true, total: 0, corpusTotal: undefined, corpusFailed: true }),
+    ).toBe('noResults')
+  })
+
+  it('refuses to invent an empty state for the idle screen', () => {
+    // `idle` quotes the corpus size and `noCards` claims the account is empty —
+    // both need the figure that just failed to arrive. `null` hands the case
+    // back to the caller, which owes the user an error and a retry.
+    expect(
+      searchEmptyKind({
+        searching: false,
+        total: undefined,
+        corpusTotal: undefined,
+        corpusFailed: true,
+      }),
+    ).toBeNull()
+  })
+
+  it('keeps waiting for the SEARCH even when the corpus is lost', () => {
+    // The needle's own answer is still on its way; that skeleton does resolve.
+    expect(
+      searchEmptyKind({
+        searching: true,
+        total: undefined,
+        corpusTotal: undefined,
+        corpusFailed: true,
+      }),
+    ).toBeNull()
+  })
+
+  it('changes nothing once the probe HAS landed', () => {
+    for (const corpusFailed of [true, false]) {
+      expect(
+        searchEmptyKind({ searching: false, total: undefined, corpusTotal: 0, corpusFailed }),
+      ).toBe('noCards')
+      expect(
+        searchEmptyKind({ searching: false, total: undefined, corpusTotal: 120, corpusFailed }),
+      ).toBe('idle')
+      expect(
+        searchEmptyKind({ searching: true, total: 7, corpusTotal: 120, corpusFailed }),
+      ).toBeNull()
+    }
+  })
+})
+
+/**
  * NOTE — there is no `withoutArchived` here any more, and its two tests were
  * DELETED rather than adapted. Hiding archived subjects used to be done on the
  * received page, which made `total` count rows the table did not draw; it is now
@@ -104,6 +179,114 @@ describe('searchEmptyKind', () => {
  * pages" case); the web's remaining share of it is sending the parameter, which
  * `params.test.ts` pins on `toApiQuery`.
  */
+
+/**
+ * The render ladder. The arm that matters is `corpusError`: before T-066 there
+ * was none, so an idle screen whose corpus probe had failed fell through to the
+ * skeleton and stayed there. The route cannot be mounted without a router, which
+ * is exactly why the decision lives here.
+ */
+describe('searchBody — which arm of the results area', () => {
+  const base = {
+    resultsFailed: false,
+    emptyKind: null,
+    corpusFailed: false,
+    searching: false,
+    hasData: false,
+  } as const
+
+  it('puts a failed search above everything else', () => {
+    expect(searchBody({ ...base, resultsFailed: true, emptyKind: 'noResults' })).toBe(
+      'resultsError',
+    )
+    expect(searchBody({ ...base, resultsFailed: true, corpusFailed: true })).toBe('resultsError')
+  })
+
+  it('prefers a decided empty state to a lost corpus probe', () => {
+    // `noResults` was reached WITHOUT the probe; saying it is better than
+    // saying "something broke".
+    expect(
+      searchBody({ ...base, emptyKind: 'noResults', corpusFailed: true, searching: true }),
+    ).toBe('empty')
+  })
+
+  it('shows the corpus error where the idle screen used to shimmer for ever', () => {
+    expect(searchBody({ ...base, corpusFailed: true })).toBe('corpusError')
+  })
+
+  it('keeps the skeleton while the SEARCH is still in flight, corpus or no corpus', () => {
+    // This one does resolve: the needle's own answer is coming.
+    expect(searchBody({ ...base, corpusFailed: true, searching: true })).toBe('skeleton')
+    expect(searchBody({ ...base, searching: true })).toBe('skeleton')
+  })
+
+  it('renders rows as soon as there are rows', () => {
+    expect(searchBody({ ...base, searching: true, hasData: true })).toBe('results')
+    // Even with a lost probe: the rows on screen are real.
+    expect(searchBody({ ...base, searching: true, hasData: true, corpusFailed: true })).toBe(
+      'results',
+    )
+  })
+})
+
+/**
+ * T-067 — the count line over a STALE page. `isFreshFor` rejects a response that
+ * answers an older keystroke; its rows stay on screen, greyed and inert, and the
+ * line above them read `total ?? 0` — "0 cartes" over rows that are visibly not
+ * zero, from a server that never said zero. Both languages are pinned, since
+ * this is also where the plural rule differs (FR keeps 0 singular).
+ */
+describe('resultsCountLabel — a rejected answer is not a count of zero', () => {
+  const LOCALES = { fr: 'fr-FR', en: 'en-US' } as const
+
+  /** The real dictionaries + the real CLDR rule, without mounting React. */
+  function harness(lang: 'fr' | 'en'): {
+    t: TFunction
+    plural: (n: number) => PluralCategory
+  } {
+    const dict = lang === 'fr' ? dictFr : dictEn
+    const rules = new Intl.PluralRules(LOCALES[lang])
+    const t: TFunction = (key, vars) => {
+      const raw = key
+        .split('.')
+        .reduce<unknown>((acc, k) => (acc as Record<string, unknown> | undefined)?.[k], dict)
+      const template = typeof raw === 'string' ? raw : key
+      return vars
+        ? template.replace(/\{(\w+)\}/g, (_, name: string) =>
+            name in vars ? String(vars[name]) : `{${name}}`,
+          )
+        : template
+    }
+    return { t, plural: (n) => (rules.select(n) === 'one' ? 'one' : 'other') }
+  }
+
+  it('says the number when it has one', () => {
+    const { t, plural } = harness('fr')
+    expect(resultsCountLabel(t, plural, { total: 12, pages: 1, from: 1, to: 12 })).toBe('12 cartes')
+    expect(resultsCountLabel(t, plural, { total: 1, pages: 1, from: 1, to: 1 })).toBe('1 carte')
+  })
+
+  it('switches to the range as soon as one page cannot hold the answer', () => {
+    const { t, plural } = harness('en')
+    expect(resultsCountLabel(t, plural, { total: 57, pages: 3, from: 26, to: 50 })).toBe(
+      '26–50 of 57',
+    )
+  })
+
+  it('refuses to print a zero it was never given', () => {
+    for (const lang of ['fr', 'en'] as const) {
+      const { t, plural } = harness(lang)
+      const label = resultsCountLabel(t, plural, { total: undefined, pages: 0, from: 0, to: 0 })
+      expect(label, lang).not.toMatch(/\b0\b/)
+      expect(label, lang).toContain('—')
+    }
+  })
+
+  it('keeps a REAL zero saying zero — an answer of none is still an answer', () => {
+    const { t, plural } = harness('fr')
+    expect(resultsCountLabel(t, plural, { total: 0, pages: 0, from: 0, to: 0 })).toBe('0 carte')
+  })
+})
 
 describe('pageBounds', () => {
   it('numbers the rows from 1 within the whole match set', () => {

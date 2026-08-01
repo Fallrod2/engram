@@ -23,13 +23,18 @@ import {
 } from '@/features/search/params'
 import {
   cardCorpusSizeOptions,
-  cardDetailOptions,
   cardSearchOptions,
   useBulkDeleteCards,
   useBulkMoveCards,
   useUpdateCardFromSearch,
 } from '@/features/search/queries'
-import { isFreshFor, pageBounds, searchEmptyKind } from '@/features/search/results'
+import {
+  isFreshFor,
+  pageBounds,
+  resultsCountLabel,
+  searchBody,
+  searchEmptyKind,
+} from '@/features/search/results'
 import {
   EMPTY_SELECTION,
   SELECTION_MAX,
@@ -40,6 +45,7 @@ import {
   type Selection,
   type SelectionResult,
 } from '@/features/search/selection'
+import { useEditCard } from '@/features/search/use-edit-card'
 import { BulkDeleteConfirm } from '@/features/search/components/bulk-delete-confirm'
 import { SearchEmpty } from '@/features/search/components/search-empty'
 import { SearchFilters, type FilterPatch } from '@/features/search/components/search-filters'
@@ -149,7 +155,24 @@ function SearchPage() {
   // received: "1–25 of 57" counts the same rows the table draws.
   const bounds = pageBounds(apiQuery.offset, hits.length)
 
-  const emptyKind = searchEmptyKind({ searching, total, corpusTotal: corpusQuery.data })
+  // T-066 — the corpus probe decides WHICH nothing this screen is showing, so a
+  // failed probe used to freeze the screen on its skeleton: `emptyKind` stayed
+  // null, `data` stayed undefined, and the idle screen shimmered until reload.
+  // Its failure is now a state of its own, both here and one branch down.
+  const corpusFailed = corpusQuery.isError && corpusQuery.data === undefined
+  const emptyKind = searchEmptyKind({
+    searching,
+    total,
+    corpusTotal: corpusQuery.data,
+    corpusFailed,
+  })
+  const body = searchBody({
+    resultsFailed: resultsQuery.isError,
+    emptyKind,
+    corpusFailed,
+    searching,
+    hasData: data !== undefined,
+  })
 
   // --- Selection -----------------------------------------------------------
 
@@ -206,15 +229,11 @@ function SearchPage() {
   // --- Card editor (deep-linked) -------------------------------------------
 
   const editId = search.edit
-  const hitForEdit = editId ? known.get(editId) : undefined
   // A ⌘K hand-off can name a card that is not on THIS page — same needle, but
-  // the row may sit at offset 40. Fetch it by id rather than opening an empty
-  // dialog, or worse, doing nothing after the user picked something.
-  const editFallback = useQuery({
-    ...cardDetailOptions(editId ?? ''),
-    enabled: editId !== undefined && hitForEdit === undefined,
-  })
-  const editCard = hitForEdit?.card ?? (editId ? (editFallback.data ?? null) : null)
+  // the row may sit at offset 40. `useEditCard` fetches it by id rather than
+  // opening an empty dialog, or worse, doing nothing after the user picked
+  // something; T-067 gave that second case the voice it was missing.
+  const { card: editCard } = useEditCard(editId, known)
 
   // --- Keyboard ------------------------------------------------------------
 
@@ -300,9 +319,9 @@ function SearchPage() {
         onReset={resetFilters}
       />
 
-      {resultsQuery.isError ? (
+      {body === 'resultsError' ? (
         <ErrorState kind="cards" onRetry={() => void resultsQuery.refetch()} />
-      ) : emptyKind !== null ? (
+      ) : body === 'empty' && emptyKind !== null ? (
         <SearchEmpty
           kind={emptyKind}
           corpusSize={corpusSize}
@@ -310,14 +329,19 @@ function SearchPage() {
           onResetFilters={resetFilters}
           onQuickFilter={(next) => patch(next)}
         />
-      ) : data === undefined ? (
+      ) : body === 'corpusError' ? (
+        // Nothing asked, and the one read that could have furnished this screen
+        // is gone. There is no honest empty state left to show — an invitation
+        // quoting a corpus size we do not have, or an onboarding screen for an
+        // account that may be full — so it says what happened and offers the
+        // only thing that can fix it.
+        <ErrorState kind="cards" onRetry={() => void corpusQuery.refetch()} />
+      ) : body === 'skeleton' ? (
         <SearchResultsSkeleton label={t('search.loading')} />
       ) : (
         <>
           <p className="font-mono text-xs tabular-nums text-text-muted" role="status">
-            {pages > 1
-              ? t('search.range', { from: bounds.from, to: bounds.to, total: total ?? 0 })
-              : t(`search.results_${plural(total ?? 0)}`, { count: total ?? 0 })}
+            {resultsCountLabel(t, plural, { total, pages, from: bounds.from, to: bounds.to })}
           </p>
 
           <SearchResultsTable

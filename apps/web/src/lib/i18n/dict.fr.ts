@@ -122,6 +122,10 @@ export const dictFr = {
       todayOnly_one: '{count} carte pour aujourd’hui',
       todayOnly_other: '{count} cartes pour aujourd’hui',
       none: 'aucune carte à réviser',
+      // T-066 : la lecture des compteurs a échoué. Le rail affichait un
+      // scintillement sans fin — « toujours en train de charger » est une
+      // affirmation, et c'était la fausse. Le tiret le dit, la voix aussi.
+      unknown: 'chiffres indisponibles',
     },
     // Streak pill (footer). The count is the WHOLE content of the pill, so its
     // accessible name has to spell the unit out. FR puts 0 and 1 in the singular
@@ -785,6 +789,10 @@ export const dictFr = {
     nextWeek: 'Semaine suivante',
     examsError: 'Impossible de charger les examens.',
     planError: 'Impossible de charger la charge prévue.',
+    // T-066 : la liste des matières n'a pas répondu. Rien ne disparaît de
+    // l'écran — mais chaque nom de matière retombe sur « Matière » et les
+    // pastilles des examens s'effacent, sans que rien ne dise pourquoi.
+    subjectsError: 'Matières indisponibles : les noms et les couleurs peuvent manquer.',
     legend: {
       load: 'Charge de révision',
       loadHint:
@@ -840,6 +848,11 @@ export const dictFr = {
     legendMore: 'Plus',
     colDay: 'Jour',
     colReviews: 'Reviews',
+    // T-066 : le chargeur de cette route est `Promise.allSettled`, donc aucun
+    // échec n'atteint l'écran d'erreur — la heatmap restait un damier de 365
+    // carrés qui pulsaient sans fin. « Toujours en train de charger » est une
+    // affirmation comme une autre, et c'était la fausse.
+    activityError: 'Impossible de charger l’activité.',
     volumeTitle: 'Volume par jour',
     volumeCaption: 'Reviews par jour et par note',
     volumeError: 'Impossible de charger le volume de reviews.',
@@ -878,6 +891,11 @@ export const dictFr = {
     dayUnit: 'j',
     period: 'sur {label}',
     notEnoughData: 'pas encore assez de données',
+    // T-066 : une tuile dont la source n'a pas répondu. Elle affiche « — » (le
+    // chiffre est inconnu, pas nul) et le dit ; la ligne de reprise est unique
+    // pour la rangée, parce que personne ne veut redemander une tuile.
+    tileUnavailable: 'indisponible',
+    tilesError: 'Certains chiffres n’ont pas pu être lus.',
     reviewsCount_one: '{count} review',
     reviewsCount_other: '{count} reviews',
     viewChart: 'Graphe',
@@ -889,6 +907,9 @@ export const dictFr = {
     // Filtre par matière (écran Analytics)
     allSubjects: 'Toutes les matières',
     subjectFilterAria: 'Matière',
+    // T-066 : liste des matières illisible. Un sélecteur vide et un sélecteur
+    // cassé s'ouvrent tous les deux sur « Toutes les matières » et rien d'autre.
+    subjectFilterUnavailable: 'Matières indisponibles',
     subjectScopeAll: 'toutes matières',
     streakScopeNote: 'Une série mesure une habitude, pas une matière : ce chiffre reste global.',
     retentionScopeNote:
@@ -1011,6 +1032,14 @@ export const dictFr = {
     range: '{from}–{to} sur {total}',
     results_one: '{count} carte',
     results_other: '{count} cartes',
+    // T-067 : réponse écartée parce que périmée (elle répond à une frappe plus
+    // ancienne). Ses lignes restent à l'écran, grisées ; le compteur, lui,
+    // affichait « 0 cartes » — un chiffre que personne n'a donné.
+    resultsUnknown: '— cartes',
+    // T-067 : la carte visée par `?edit=` n'est pas sur la page chargée, et sa
+    // lecture par id a échoué. L'écran ne faisait rien du tout — exactement ce
+    // que le commentaire au-dessus de la requête disait vouloir éviter.
+    editError: 'Impossible d’ouvrir cette carte.',
     archivedBadge: 'Archivée',
     prevPage: 'Page précédente',
     nextPage: 'Page suivante',
@@ -1320,6 +1349,11 @@ export const dictFr = {
         instructions: 'Ouvre la page de vérification et saisis ce code pour autoriser engram :',
         openPage: 'Ouvrir la page de vérification',
         waiting: 'En attente de l’autorisation…',
+        // T-066 : le sondage de liaison n'avait pas de branche d'erreur. Une
+        // panne durable laissait « en attente » et son spinner à l'écran pour
+        // toujours — la surface dont le seul rôle est de dire où en est la
+        // liaison affirmait un état qu'elle ne lisait plus.
+        pollError: 'Impossible de vérifier l’état de la liaison pour le moment.',
         linked: 'Compte ChatGPT lié.',
         startError: 'Impossible de démarrer la liaison. Réessaie.',
         status: {

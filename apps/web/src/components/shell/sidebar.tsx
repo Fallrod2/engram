@@ -60,27 +60,47 @@ export function Sidebar() {
     [subjectsQuery.data],
   )
   const dueMap = useMemo(() => splitBySubjectMap(dueQuery.data), [dueQuery.data])
+  // T-066 — a failed count read used to keep the mini shimmer up FOR EVER, on
+  // every row of a rail that is mounted on every screen. A skeleton is a promise
+  // that something is on its way; nothing was. `'unknown'` is the third state
+  // (see `DueState`), and it renders as the same em-dash `<DueCount>` already
+  // uses for an unknown figure everywhere else.
+  const dueUnknown = dueQuery.isError
+  const dueFor = (subjectId: string): DueState => (dueUnknown ? 'unknown' : dueMap.get(subjectId))
   // The "Session de révision" row carries the instance-wide split, shaped like a
   // per-subject row so both row kinds share one renderer and one label builder.
-  const totalDue: DueSplit | undefined = dueQuery.data
-    ? {
-        dueCount: dueQuery.data.total,
-        overdueCount: dueQuery.data.overdueCount,
-        todayCount: dueQuery.data.todayCount,
-      }
-    : undefined
+  const totalDue: DueState = dueUnknown
+    ? 'unknown'
+    : dueQuery.data
+      ? {
+          dueCount: dueQuery.data.total,
+          overdueCount: dueQuery.data.overdueCount,
+          todayCount: dueQuery.data.todayCount,
+        }
+      : undefined
 
   // Ordered list of every focusable entry (nav items + real subjects) → roving.
+  //
+  // T-067 — the "Matières indisponibles" retry row occupies the subjects' slot
+  // when their read failed, so it takes their place HERE too. Left out, it kept
+  // its default `tabIndex=0` and became an extra Tab stop in a rail that has
+  // exactly one, unreachable by the arrow keys every other row answers to.
+  const subjectsFailed = subjectsQuery.isError
   const focusKeys = useMemo(() => {
     const keys: string[] = []
     for (const g of NAV_GROUPS) {
       for (const it of g.items) keys.push(`nav:${it.to}`)
-      if (g.id === 'subjects') for (const s of subjects) keys.push(`subj:${s.id}`)
+      if (g.id !== 'subjects') continue
+      if (subjectsFailed) keys.push(RETRY_KEY)
+      else for (const s of subjects) keys.push(`subj:${s.id}`)
     }
     return keys
-  }, [subjects])
+  }, [subjects, subjectsFailed])
+  const retryIndex = focusKeys.indexOf(RETRY_KEY)
 
-  const linkRefs = useRef<(HTMLAnchorElement | null)[]>([])
+  // `HTMLElement`, not `HTMLAnchorElement`: the retry row is a <button>, and it
+  // is a rail entry like any other.
+  const linkRefs = useRef<(HTMLElement | null)[]>([])
   const [rovingIndex, setRovingIndex] = useState(0)
   const rovingIndexRef = useRef(0)
   rovingIndexRef.current = rovingIndex
@@ -254,11 +274,16 @@ export function Sidebar() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <SubjectRowSkeleton key={i} collapsed={collapsed} />
                   ))
-                ) : subjectsQuery.isError ? (
+                ) : subjectsFailed ? (
                   <SubjectsUnavailableRow
                     t={t}
                     collapsed={collapsed}
                     onRetry={() => void subjectsQuery.refetch()}
+                    tabIndex={retryIndex === rovingIndex ? 0 : -1}
+                    ref={(el) => {
+                      linkRefs.current[retryIndex] = el
+                    }}
+                    onFocus={registerFocus(retryIndex)}
                   />
                 ) : (
                   subjects.map((s) => {
@@ -269,7 +294,7 @@ export function Sidebar() {
                         subject={s}
                         t={t}
                         plural={plural}
-                        due={dueMap.get(s.id)}
+                        due={dueFor(s.id)}
                         collapsed={collapsed}
                         tabIndex={idx === rovingIndex ? 0 : -1}
                         ref={(el) => {
@@ -375,6 +400,12 @@ export function Sidebar() {
  */
 type DueSplit = Omit<SubjectDueSplit, 'subjectId'>
 
+/** A row's counts, or why it has none: `undefined` pending, `'unknown'` failed. */
+type DueState = DueSplit | 'unknown' | undefined
+
+/** Roving key of the "Matières indisponibles" row — it stands in for the list. */
+const RETRY_KEY = 'subj:unavailable'
+
 /** Shared row chrome: base classes + the 2px indigo active edge bar (spec §5). */
 const ROW_CLASS = cn(
   'group/nav relative flex h-8 items-center rounded-sm text-sm text-text-muted',
@@ -412,8 +443,8 @@ interface NavLinkProps {
   collapsed: boolean
   /** Whether this row carries a due count at all (only "Session de révision"). */
   showDue: boolean
-  /** The split; `undefined` while the counts query is still pending. */
-  due: DueSplit | undefined
+  /** The split, or the reason there is none (pending vs failed). */
+  due: DueState
   tabIndex: number
   onFocus: () => void
   ref: (el: HTMLAnchorElement | null) => void
@@ -437,6 +468,7 @@ function NavLink({
   // expanded they are a two-part number — neither is something a screen reader
   // should have to reconstruct, so the row spells it out itself.
   const name = showDue ? dueRowLabel(t, plural, label, due) : label
+  const counts = typeof due === 'object' ? due : undefined
   const row = (
     <Link
       ref={ref}
@@ -450,19 +482,15 @@ function NavLink({
       <span className="flex items-center justify-center">
         <Icon className="size-4 shrink-0" />
       </span>
-      {collapsed && showDue && due && (
-        <DueDot value={due.dueCount} overdue={due.overdueCount} className={DOT_GUTTER} />
+      {collapsed && showDue && counts && (
+        <DueDot value={counts.dueCount} overdue={counts.overdueCount} className={DOT_GUTTER} />
       )}
       {!collapsed && (
         <>
           <span className="truncate">{label}</span>
           {showDue && (
             <span className="ml-auto">
-              {due ? (
-                <DueCount value={due.dueCount} overdue={due.overdueCount} label={null} />
-              ) : (
-                <CountShimmer />
-              )}
+              <RowCount due={due} />
             </span>
           )}
         </>
@@ -485,8 +513,8 @@ interface SubjectNavRowProps {
   subject: Subject
   t: TFunction
   plural: (count: number) => PluralCategory
-  /** The split; `undefined` while the counts query is still pending. */
-  due: DueSplit | undefined
+  /** The split, or the reason there is none (pending vs failed). */
+  due: DueState
   collapsed: boolean
   tabIndex: number
   onFocus: () => void
@@ -505,6 +533,7 @@ function SubjectNavRow({
   ref,
 }: SubjectNavRowProps) {
   const name = dueRowLabel(t, plural, subject.name, due)
+  const counts = typeof due === 'object' ? due : undefined
   const row = (
     <Link
       ref={ref}
@@ -519,23 +548,14 @@ function SubjectNavRow({
       <span className="flex items-center justify-center">
         <SubjectDot color={subject.color} />
       </span>
-      {collapsed && due && (
-        <DueDot value={due.dueCount} overdue={due.overdueCount} className={DOT_GUTTER} />
+      {collapsed && counts && (
+        <DueDot value={counts.dueCount} overdue={counts.overdueCount} className={DOT_GUTTER} />
       )}
       {!collapsed && (
         <>
           <span className="truncate">{subject.name}</span>
           <span className="ml-auto">
-            {due ? (
-              <DueCount
-                value={due.dueCount}
-                overdue={due.overdueCount}
-                colorHex={subject.color}
-                label={null}
-              />
-            ) : (
-              <CountShimmer />
-            )}
+            <RowCount due={due} colorHex={subject.color} />
           </span>
         </>
       )}
@@ -560,16 +580,25 @@ function SubjectsUnavailableRow({
   t,
   collapsed,
   onRetry,
+  tabIndex,
+  onFocus,
+  ref,
 }: {
   t: TFunction
   collapsed: boolean
   onRetry: () => void
+  tabIndex: number
+  onFocus: () => void
+  ref: (el: HTMLButtonElement | null) => void
 }) {
   const label = t('sidebar.subjectsUnavailable')
   const button = (
     <button
+      ref={ref}
       type="button"
       onClick={onRetry}
+      tabIndex={tabIndex}
+      onFocus={onFocus}
       aria-label={collapsed ? label : undefined}
       className={cn(
         'flex h-8 items-center rounded-sm text-sm text-text-faint',
@@ -590,9 +619,27 @@ function SubjectsUnavailableRow({
   )
 }
 
-/** 12×10px mini shimmer for a pending due count (spec §1.6). */
-function CountShimmer() {
-  return <Skeleton className="h-2.5 w-3 rounded-sm" />
+/**
+ * The trailing figure of a nav row, in its three states (T-066).
+ *
+ * The shimmer used to cover two of them: pending AND failed. It is a promise
+ * that a number is coming, and on a dropped request nothing ever came — the rail
+ * shimmered until the next reload, on every screen, because it is mounted on all
+ * of them. `'unknown'` now falls through to the em-dash `<DueCount>` already
+ * renders for an unreadable figure, so "not yet" and "not at all" stop looking
+ * alike. The row's accessible name carries the same distinction (`dueRowLabel`).
+ */
+function RowCount({ due, colorHex }: { due: DueState; colorHex?: string }) {
+  if (due === undefined) return <Skeleton className="h-2.5 w-3 rounded-sm" />
+  if (due === 'unknown') return <DueCount value={undefined} label={null} />
+  return (
+    <DueCount
+      value={due.dueCount}
+      overdue={due.overdueCount}
+      {...(colorHex ? { colorHex } : {})}
+      label={null}
+    />
+  )
 }
 
 function SubjectRowSkeleton({ collapsed }: { collapsed: boolean }) {

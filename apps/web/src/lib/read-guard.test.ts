@@ -164,38 +164,20 @@ const ALLOWED = new Map<string, string>([
     'the card renders its own error and retry inline',
   ],
   [
-    'features/ai/ai-settings-card.tsx::inline',
-    'connectivity poll; its result IS the status being displayed',
-  ],
-  [
     'components/shell/command-cards.tsx::cardSearchOptions',
     '`settled` already requires a fresh successful echo before any hit is shown',
   ],
-  [
-    'routes/search.tsx::cardDetailOptions',
-    'by-id fallback for a ⌘K hand-off; the row is usually already in `known`',
-  ],
 
-  // ── ADJACENT MOTIF, not this lot: a failed read rendered as a PERMANENT
-  // SKELETON. It asserts "still loading" rather than "empty", so it is not the
-  // pattern T-042 was opened for — but it is the same family and these are the
-  // known sites. They are listed here rather than left invisible.
-  [
-    'components/shell/sidebar.tsx::dueCountsOptions',
-    'ADJACENT: due counts shimmer for ever instead of failing',
-  ],
-  [
-    'routes/search.tsx::cardCorpusSizeOptions',
-    'ADJACENT: no corpus size ⇒ no empty state ⇒ permanent results skeleton',
-  ],
-  ['routes/analytics.tsx::streaksOptions', 'ADJACENT: permanent StatTiles skeleton'],
-  ['routes/analytics.tsx::subjectsListOptions', 'ADJACENT: the subject filter empties'],
-  ['routes/analytics.tsx::heatmapOptions', 'ADJACENT: the streak sparkline flattens to []'],
-  [
-    'routes/analytics.tsx::deltasOptions',
-    'ADJACENT: the window-over-window deltas are simply not drawn',
-  ],
-  ['routes/planning.tsx::subjectsListOptions', 'ADJACENT: calendar chips lose their subject names'],
+  // ── The ADJACENT MOTIF used to be listed here, seven entries strong: a failed
+  // read rendered as a PERMANENT SKELETON, asserting "still loading" rather than
+  // "empty". T-066 closed every one of them, so there is nothing left to list —
+  // each site branches on `isError` now and the honesty test below would reject
+  // an entry kept for it.
+  //
+  // If a new one turns up, it is a defect to fix, not an entry to add. "Still
+  // loading" is an assertion like any other, and a skeleton that never resolves
+  // is a false one; an entry saying so would be documenting the bug rather than
+  // deciding anything.
 ])
 
 /* ─────────────────────────────── the scan ─────────────────────────────── */

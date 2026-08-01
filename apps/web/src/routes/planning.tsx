@@ -43,6 +43,7 @@ import { CalendarWeek } from '@/features/planning/calendar-week'
 import { DayDetailPanel } from '@/features/planning/day-detail-panel'
 import { ExamList, type ExamListHandle } from '@/features/planning/exam-list'
 import { ExamFormDialog } from '@/features/planning/exam-form-dialog'
+import { SubjectsUnavailableNotice } from '@/features/planning/subjects-unavailable-notice'
 import {
   DayDetailSkeleton,
   ExamListSkeleton,
@@ -265,6 +266,14 @@ function PlanningPage() {
           </Tabs>
         </div>
       </div>
+
+      {/* T-066 — the subject list names everything on this screen and blanks
+          nothing, so its failure is a notice, not a panel error: the calendar,
+          the day detail and the exam list are driven by their own (possibly
+          healthy) reads. Above both columns, because both are affected. */}
+      {subjectsQuery.isError && (
+        <SubjectsUnavailableNotice onRetry={() => void subjectsQuery.refetch()} />
+      )}
 
       {planEmpty ? (
         <EmptyState

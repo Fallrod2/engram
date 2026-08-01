@@ -101,6 +101,7 @@ export const dictEn: Dict = {
       todayOnly_one: '{count} card due today',
       todayOnly_other: '{count} cards due today',
       none: 'no cards due',
+      unknown: 'counts unavailable',
     },
     streak: {
       aria_one: 'Streak of {count} day',
@@ -709,6 +710,7 @@ export const dictEn: Dict = {
     nextWeek: 'Next week',
     examsError: 'Could not load exams.',
     planError: 'Could not load the forecast.',
+    subjectsError: 'Subjects unavailable: names and colours may be missing.',
     legend: {
       load: 'Review load',
       loadHint:
@@ -754,6 +756,7 @@ export const dictEn: Dict = {
     legendMore: 'More',
     colDay: 'Day',
     colReviews: 'Reviews',
+    activityError: 'Could not load activity.',
     volumeTitle: 'Volume per day',
     volumeCaption: 'Reviews per day and grade',
     volumeError: 'Could not load review volume.',
@@ -792,6 +795,8 @@ export const dictEn: Dict = {
     dayUnit: 'd',
     period: 'over {label}',
     notEnoughData: 'not enough data yet',
+    tileUnavailable: 'unavailable',
+    tilesError: 'Some figures could not be read.',
     reviewsCount_one: '{count} review',
     reviewsCount_other: '{count} reviews',
     viewChart: 'Chart',
@@ -803,6 +808,7 @@ export const dictEn: Dict = {
     // Subject filter (Analytics screen)
     allSubjects: 'All subjects',
     subjectFilterAria: 'Subject',
+    subjectFilterUnavailable: 'Subjects unavailable',
     subjectScopeAll: 'all subjects',
     streakScopeNote: 'A streak measures a habit, not a subject: this figure stays global.',
     retentionScopeNote:
@@ -922,6 +928,8 @@ export const dictEn: Dict = {
     range: '{from}–{to} of {total}',
     results_one: '{count} card',
     results_other: '{count} cards',
+    resultsUnknown: '— cards',
+    editError: 'Could not open this card.',
     archivedBadge: 'Archived',
     prevPage: 'Previous page',
     nextPage: 'Next page',
@@ -1206,6 +1214,7 @@ export const dictEn: Dict = {
         instructions: 'Open the verification page and enter this code to authorize engram:',
         openPage: 'Open the verification page',
         waiting: 'Waiting for authorization…',
+        pollError: 'Cannot check the link status right now.',
         linked: 'ChatGPT account linked.',
         startError: 'Could not start linking. Try again.',
         status: {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Check, ExternalLink, RotateCw, X } from 'lucide-react'
+import { Check, ExternalLink, RotateCw, Unplug, X } from 'lucide-react'
 import type {
   AiOcrSettings,
   AiProviderId,
@@ -615,7 +615,7 @@ export function startErrorMessage(err: unknown, t: TFunction): string {
   return t('settings.ai.codex.startError')
 }
 
-function CodexLinkSection({ status }: { status: AiProviderStatus }) {
+export function CodexLinkSection({ status }: { status: AiProviderStatus }) {
   const t = useT()
   const qc = useQueryClient()
   const startLink = useStartCodexLink()
@@ -695,10 +695,27 @@ function CodexLinkSection({ status }: { status: AiProviderStatus }) {
             {t('settings.ai.codex.openPage')}
           </a>
         </div>
-        <p className="flex items-center gap-1.5 text-xs text-text-muted">
-          <RotateCw className="size-3 animate-spin" aria-hidden />
-          {t('settings.ai.codex.waiting')}
-        </p>
+        {/* T-066 — the poll had no `isError` branch, so a poll that kept failing
+            left this spinner and "en attente d'autorisation" up for ever: the
+            surface whose ENTIRE job is to report a status was reporting one it
+            no longer had. The interval keeps running underneath (it self-heals
+            the moment the network comes back); the button is for asking now.
+            The code and the link stay on screen either way — the authorization
+            itself may well have succeeded, and this only says we cannot see it. */}
+        {pollQ.isError ? (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+            <Unplug className="size-3 shrink-0 text-text-faint" aria-hidden />
+            {t('settings.ai.codex.pollError')}
+            <Button variant="secondary" size="sm" onClick={() => void pollQ.refetch()}>
+              {t('common.retry')}
+            </Button>
+          </p>
+        ) : (
+          <p className="flex items-center gap-1.5 text-xs text-text-muted">
+            <RotateCw className="size-3 animate-spin" aria-hidden />
+            {t('settings.ai.codex.waiting')}
+          </p>
+        )}
       </div>
     )
   }
