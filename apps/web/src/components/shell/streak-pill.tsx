@@ -18,15 +18,22 @@ const SEEN_KEY = 'engram-streak-seen-day'
  * animation entirely (the resting state stays correct).
  */
 export function StreakPill({
-  current = 0,
+  current,
   includesToday = false,
   collapsed = false,
 }: {
-  current?: number
+  /**
+   * The streak, or `undefined` when the read did not land (T-042). It used to
+   * default to `0`, which is not "unknown" — it is "you broke your streak",
+   * said by a query that had failed. The pill keeps its footprint and shows an
+   * em-dash instead, so a failure never gets to award or withdraw anything.
+   */
+  current?: number | undefined
   includesToday?: boolean
   collapsed?: boolean
 }) {
-  const active = current > 0
+  const known = current !== undefined
+  const active = (current ?? 0) > 0
   const t = useT()
   const plural = usePlural()
   const reduce = useReducedMotion()
@@ -34,7 +41,7 @@ export function StreakPill({
   const flashControls = useAnimationControls()
 
   useEffect(() => {
-    if (reduce || !includesToday || current <= 0) return
+    if (reduce || !includesToday || current === undefined || current <= 0) return
     const today = localDayKey(new Date())
     try {
       if (localStorage.getItem(SEEN_KEY) === today) return
@@ -66,8 +73,14 @@ export function StreakPill({
       // over: an English user heard French, and `count > 1` gets FR's 0 wrong
       // ("0 jours"). `usePlural` applies the locale's own CLDR rule — FR keeps 0
       // and 1 singular, EN only 1.
-      aria-label={t(`sidebar.streak.aria_${plural(current)}`, { count: current })}
-      title={t('sidebar.streak.title', { count: current })}
+      aria-label={
+        known
+          ? t(`sidebar.streak.aria_${plural(current)}`, { count: current })
+          : t('sidebar.streak.unknownAria')
+      }
+      title={
+        known ? t('sidebar.streak.title', { count: current }) : t('sidebar.streak.unknownAria')
+      }
     >
       <motion.span
         aria-hidden
@@ -81,7 +94,7 @@ export function StreakPill({
       <Flame className={cn('relative size-4', active ? 'text-warning' : 'text-text-faint')} />
       {!collapsed && (
         <motion.span animate={numberControls} className="relative font-mono text-xs tabular-nums">
-          {current}
+          {known ? current : '—'}
         </motion.span>
       )}
     </span>

@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { useReducedMotion } from '@/lib/motion'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 import { dueBarWidth, dueCountTier } from '@/lib/due-count'
 import { SUBJECT_BG_CLASS, pigmentSlotForHex } from '@/lib/pigments'
 
@@ -25,8 +26,15 @@ export function DueCount({
   label,
   className,
 }: {
-  /** Total due — still `overdue + today`, never one half of it. */
-  value: number
+  /**
+   * Total due — still `overdue + today`, never one half of it.
+   *
+   * T-042 — `undefined` means the read did NOT land. `·` (the zero tier) is an
+   * answer: "nothing to review here". A failed `GET /review/counts` used to
+   * collapse to `0` on every row of every list at once, so a whole screen said
+   * "you are all caught up" from one dropped request. Unknown gets an em-dash.
+   */
+  value: number | undefined
   /** Cards whose due date is before today's local midnight (the backlog). */
   overdue?: number
   /** Stored subject hex; tints the >50 load bar. Omit for a neutral total. */
@@ -39,6 +47,18 @@ export function DueCount({
   label?: string | null
   className?: string
 }) {
+  const t = useT()
+  if (value === undefined) {
+    return (
+      <span
+        className={cn('font-mono text-xs tabular-nums text-text-faint', className)}
+        {...(label === null ? {} : { 'aria-label': t('common.unknownValue') })}
+      >
+        —
+      </span>
+    )
+  }
+
   const tier = dueCountTier(value)
   const backlog = Math.min(Math.max(overdue, 0), Math.max(value, 0))
   const today = Math.max(value, 0) - backlog

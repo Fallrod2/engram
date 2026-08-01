@@ -87,6 +87,30 @@ describe('<DueCount> backlog/today split (T-013)', () => {
   })
 })
 
+/**
+ * T-042 — `·` is an ANSWER: "nothing due here". A dropped `GET /review/counts`
+ * used to collapse to `0` on every row of every list at once, so one lost
+ * request told a whole screen it was all caught up. Unknown is now its own mark.
+ */
+describe('<DueCount> unknown reads (T-042)', () => {
+  it('renders an em-dash, not the zero tier, when the count is unknown', () => {
+    render(<DueCount value={undefined} />)
+    const el = screen.getByLabelText('Valeur indisponible')
+    expect(el.textContent).toBe('—')
+    expect(el.textContent).not.toBe('·')
+  })
+
+  it('still opts out of the accessible name when the caller owns the sentence', () => {
+    const { container } = render(<DueCount value={undefined} label={null} />)
+    expect((container.firstChild as HTMLElement).hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('leaves a genuine zero saying `·`, as it always did', () => {
+    render(<DueCount value={0} />)
+    expect(screen.getByLabelText('0 à réviser').textContent).toBe('·')
+  })
+})
+
 describe('<DueDot> collapsed-rail graduation (T-013)', () => {
   it('paints nothing at zero — the calm `·` has no dot form', () => {
     const { container } = render(<DueDot value={0} />)

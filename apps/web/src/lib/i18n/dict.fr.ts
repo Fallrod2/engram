@@ -25,6 +25,10 @@ export const dictFr = {
     startSession: 'Lancer une session',
     backToDashboard: 'Retour au tableau de bord',
     unavailable: 'Indisponible pour le moment.',
+    // T-042 : nom accessible du tiret des compteurs. « 0 » est une réponse,
+    // « — » veut dire qu'on n'a pas pu lire la valeur. Les deux ne se disent
+    // pas pareil, à l'écran comme au lecteur d'écran.
+    unknownValue: 'Valeur indisponible',
     skipToContent: 'Aller au contenu',
   },
 
@@ -95,6 +99,10 @@ export const dictFr = {
     collapseAria: 'Réduire la barre latérale',
     expand: 'Déployer',
     expandAria: 'Déployer la barre latérale',
+    // T-042 : la liste des matières du rail se lisait « aucune matière » quand
+    // sa requête échouait — sur tous les écrans à la fois, le rail étant monté
+    // partout. Une liste vide et une liste inconnue ne se ressemblent plus.
+    subjectsUnavailable: 'Matières indisponibles — réessayer',
     // Accessible name of a nav row that carries a due count (T-017). Collapsed,
     // the count is a graduated dot and the digits are gone entirely; expanded,
     // they are a two-part number. In BOTH states the row itself must announce
@@ -123,6 +131,9 @@ export const dictFr = {
       aria_one: 'Série de {count} jour',
       aria_other: 'Série de {count} jours',
       title: 'Série : {count} j',
+      // T-042 : `streak?.current ?? 0` faisait dire « série de 0 jour » à une
+      // requête qui avait échoué. « 0 » n'est pas « on ne sait pas ».
+      unknownAria: 'Série indisponible',
     },
   },
 
@@ -348,6 +359,12 @@ export const dictFr = {
     cards_other: '{count} cartes',
     due_one: '{count} à réviser',
     due_other: '{count} à réviser',
+    // T-042 : les mêmes sous-lignes quand la lecture n'a pas abouti. Elles
+    // affichaient `?? 0`, donc « 0 carte · 0 à réviser » pendant le vol de la
+    // requête ET après son échec.
+    decksUnknown: '— decks',
+    cardsUnknown: '— cartes',
+    dueUnknown: '— à réviser',
   },
 
   cmd: {
@@ -384,6 +401,9 @@ export const dictFr = {
     },
     noSubjects: "Aucune matière — crée-en une d'abord.",
     noDecks: 'Aucun deck dans cette matière.',
+    // T-042 : « aucune matière » est une affirmation sur le compte. Une lecture
+    // échouée n'a pas le droit de la prononcer — elle dit qu'elle ne sait pas.
+    listUnavailable: 'Liste indisponible pour le moment.',
     // Résultats de cartes (T-030). `searching` remplace « Aucun résultat »
     // pendant que la requête est en vol : l'app ne doit jamais affirmer qu'elle
     // n'a rien trouvé alors qu'elle n'a pas fini de chercher.
@@ -518,6 +538,10 @@ export const dictFr = {
     unknownBody: 'Impossible de savoir ce qu’il y a à réviser pour l’instant.',
     toReviewToday: 'à réviser aujourd’hui',
     overdue: 'dont {n} en retard',
+    // T-042 : le détail du jour (retard + examen imminent) vient d'UNE seconde
+    // requête. Quand elle échoue, son absence se lisait comme « pas de retard,
+    // pas d'examen » — une affirmation. On dit qu'on ne sait pas.
+    detailUnavailable: 'Retard et examens à venir indisponibles.',
     examPrompt: 'Examen',
     examTitle: '« {title} »',
     examPriorise: '. Priorise {names}.',

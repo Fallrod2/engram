@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck, Unplug } from 'lucide-react'
 import type { Subject } from '@engram/shared'
 import { cn } from '@/lib/utils'
 import { usePlural, useT, type PluralCategory, type TFunction } from '@/lib/i18n'
@@ -43,8 +43,14 @@ export function Sidebar() {
 
   // Real streak for the footer pill (was hard-coded `days={0}`, spec §5.3bis).
   // A stable `now` keeps the query from churning across renders.
+  //
+  // T-042 — the handle is kept and only `isSuccess` may feed a number. The pill
+  // read `streak?.current ?? 0`, so a failed read said "série de 0 jour": not an
+  // omission, an assertion, and the one assertion a streak surface must never
+  // make by accident. `undefined` now means unknown, and the pill says so.
   const [streakNow] = useState(() => new Date())
-  const streak = useQuery(streaksOptions(streakNow)).data
+  const streakQuery = useQuery(streaksOptions(streakNow))
+  const streak = streakQuery.isSuccess ? streakQuery.data : undefined
 
   const subjects = useMemo(
     () =>
@@ -239,30 +245,41 @@ export function Sidebar() {
                 )
               })}
 
-              {/* Real subjects (spec §5 item 4). */}
+              {/* Real subjects (spec §5 item 4). T-042 — three states, not two:
+                  `subjectsQuery.data ?? []` made a FAILED read render exactly
+                  like an account with no subject at all, on every screen at
+                  once, since this rail is mounted everywhere. */}
               {group.id === 'subjects' &&
-                (subjectsQuery.isPending
-                  ? Array.from({ length: 3 }).map((_, i) => (
-                      <SubjectRowSkeleton key={i} collapsed={collapsed} />
-                    ))
-                  : subjects.map((s) => {
-                      const idx = focusKeys.indexOf(`subj:${s.id}`)
-                      return (
-                        <SubjectNavRow
-                          key={s.id}
-                          subject={s}
-                          t={t}
-                          plural={plural}
-                          due={dueMap.get(s.id)}
-                          collapsed={collapsed}
-                          tabIndex={idx === rovingIndex ? 0 : -1}
-                          ref={(el) => {
-                            linkRefs.current[idx] = el
-                          }}
-                          onFocus={registerFocus(idx)}
-                        />
-                      )
-                    }))}
+                (subjectsQuery.isPending ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <SubjectRowSkeleton key={i} collapsed={collapsed} />
+                  ))
+                ) : subjectsQuery.isError ? (
+                  <SubjectsUnavailableRow
+                    t={t}
+                    collapsed={collapsed}
+                    onRetry={() => void subjectsQuery.refetch()}
+                  />
+                ) : (
+                  subjects.map((s) => {
+                    const idx = focusKeys.indexOf(`subj:${s.id}`)
+                    return (
+                      <SubjectNavRow
+                        key={s.id}
+                        subject={s}
+                        t={t}
+                        plural={plural}
+                        due={dueMap.get(s.id)}
+                        collapsed={collapsed}
+                        tabIndex={idx === rovingIndex ? 0 : -1}
+                        ref={(el) => {
+                          linkRefs.current[idx] = el
+                        }}
+                        onFocus={registerFocus(idx)}
+                      />
+                    )
+                  })
+                ))}
             </div>
           ))}
         </nav>
@@ -327,7 +344,7 @@ export function Sidebar() {
           )}
           {collapsed && (
             <StreakPill
-              current={streak?.current ?? 0}
+              current={streak?.current}
               includesToday={streak?.includesToday ?? false}
               collapsed
             />
@@ -342,10 +359,7 @@ export function Sidebar() {
             icon button is a third of the 240px bar. */}
         {!collapsed && (
           <div className="flex items-center gap-1">
-            <StreakPill
-              current={streak?.current ?? 0}
-              includesToday={streak?.includesToday ?? false}
-            />
+            <StreakPill current={streak?.current} includesToday={streak?.includesToday ?? false} />
             <ThemeToggle />
           </div>
         )}
@@ -532,6 +546,46 @@ function SubjectNavRow({
     <Tooltip>
       <TooltipTrigger asChild>{row}</TooltipTrigger>
       <TooltipContent side="right">{name}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * The Matières group when its read failed (T-042). Deliberately row-shaped and
+ * as quiet as the rest of the rail — a failure here is not the user's business
+ * to fix, only to be told about — but it is a BUTTON: the rail is the only
+ * place in the shell from which this list can be asked for again.
+ */
+function SubjectsUnavailableRow({
+  t,
+  collapsed,
+  onRetry,
+}: {
+  t: TFunction
+  collapsed: boolean
+  onRetry: () => void
+}) {
+  const label = t('sidebar.subjectsUnavailable')
+  const button = (
+    <button
+      type="button"
+      onClick={onRetry}
+      aria-label={collapsed ? label : undefined}
+      className={cn(
+        'flex h-8 items-center rounded-sm text-sm text-text-faint',
+        'transition-colors duration-fast hover:bg-surface-2 hover:text-text',
+        collapsed ? 'w-full justify-center px-0' : 'gap-2 px-2',
+      )}
+    >
+      <Unplug className="size-4 shrink-0" strokeWidth={1.75} />
+      {!collapsed && <span className="truncate text-xs">{label}</span>}
+    </button>
+  )
+  if (!collapsed) return button
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   )
 }

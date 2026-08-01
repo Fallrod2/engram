@@ -190,8 +190,15 @@ function PlanningPage() {
   const editingExam = exam && exam !== 'new' ? exams.find((e) => e.id === exam) : undefined
 
   // Vide total : 0 exam, forecast tout à zéro (aucune due sur la fenêtre).
+  //
+  // T-042 — the plan half already refused to speak on a failed read; the exam
+  // half did not. `examsQuery.data ?? []` made `exams.length === 0` true for a
+  // read that had failed, so a window with nothing due and an exams request that
+  // dropped rendered the full "rien de prévu" empty state over a real deadline.
+  // Both halves of the claim now need their own read to have landed.
   const planEmpty =
     !planQuery.isError &&
+    !examsQuery.isError &&
     (planQuery.data?.days.every((d) => d.total === 0) ?? false) &&
     exams.length === 0
 

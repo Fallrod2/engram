@@ -37,7 +37,14 @@ export function TodayPanel({
   const t = useT()
   const countsQuery = useQuery(dueCountsOptions())
   const counts = countsQuery.data
-  const today = useQuery(studyTodayOptions()).data
+  // T-042 — the SAME geste as the one this file was written to close, one query
+  // to the right: `useQuery(...).data` throws the handle away, so a failed read
+  // is indistinguishable from an empty one. `today?.overdueCount ?? 0` then made
+  // "dont N en retard" vanish, and the imminent-exam banner with it, on a read
+  // that had simply failed. The handle is kept, and only a SUCCESSFUL read is
+  // allowed to feed the two things this query alone knows.
+  const todayQuery = useQuery(studyTodayOptions())
+  const today = todayQuery.isSuccess ? todayQuery.data : undefined
 
   const total = counts?.total ?? 0
   const overdue = today?.overdueCount ?? 0
@@ -115,8 +122,17 @@ export function TodayPanel({
             <p className="text-xs text-text-muted">{t('today.nothingBody')}</p>
           </div>
         </div>
-        {prompt && (
-          <ExamPrompt prompt={prompt} subjectsById={subjectsById} t={t} {...(now ? { now } : {})} />
+        {todayQuery.isError ? (
+          <DetailUnavailable t={t} onRetry={() => void todayQuery.refetch()} />
+        ) : (
+          prompt && (
+            <ExamPrompt
+              prompt={prompt}
+              subjectsById={subjectsById}
+              t={t}
+              {...(now ? { now } : {})}
+            />
+          )
         )}
       </div>
     )
@@ -130,6 +146,11 @@ export function TodayPanel({
           <span className="text-sm text-text-muted">{t('today.toReviewToday')}</span>
         </div>
       )}
+      {/* The overdue split and the exam banner both come from `studyToday`, and
+          from nowhere else. Pending renders nothing — their absence asserts
+          nothing, and `counts` (which gates this whole branch) lands with them.
+          A FAILED read is another matter: it used to read as "no backlog, no
+          exam", which is a claim, so it says so instead. */}
       {overdue > 0 && (
         <p className="-mt-1 font-mono text-xs tabular-nums text-text-muted">
           {t('today.overdue', { n: overdue })}
@@ -162,8 +183,12 @@ export function TodayPanel({
         </ul>
       )}
 
-      {prompt && (
-        <ExamPrompt prompt={prompt} subjectsById={subjectsById} t={t} {...(now ? { now } : {})} />
+      {todayQuery.isError ? (
+        <DetailUnavailable t={t} onRetry={() => void todayQuery.refetch()} />
+      ) : (
+        prompt && (
+          <ExamPrompt prompt={prompt} subjectsById={subjectsById} t={t} {...(now ? { now } : {})} />
+        )
       )}
 
       <Button asChild className="mt-1 w-full">
@@ -172,6 +197,30 @@ export function TodayPanel({
           {t('common.reviewNow')}
         </Link>
       </Button>
+    </div>
+  )
+}
+
+/**
+ * The one thing a failed `studyToday` read is allowed to say: that the backlog
+ * split and the imminent-exam banner are missing, not absent. Deliberately the
+ * same chrome as `ExamPrompt` — it stands in the slot that banner would occupy,
+ * so nothing moves when the retry succeeds.
+ */
+function DetailUnavailable({ t, onRetry }: { t: TFunction; onRetry: () => void }) {
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-border bg-surface-2 px-2.5 py-2">
+      <Unplug className="mt-0.5 size-3.5 shrink-0 text-text-faint" strokeWidth={1.75} />
+      <p className="text-xs text-text-muted">
+        {t('today.detailUnavailable')}{' '}
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-sm underline underline-offset-2 transition-colors duration-fast hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {t('common.retry')}
+        </button>
+      </p>
     </div>
   )
 }

@@ -21,6 +21,7 @@ export const dictEn: Dict = {
     startSession: 'Start a session',
     backToDashboard: 'Back to dashboard',
     unavailable: 'Unavailable right now.',
+    unknownValue: 'Value unavailable',
     skipToContent: 'Skip to content',
   },
 
@@ -89,6 +90,7 @@ export const dictEn: Dict = {
     collapseAria: 'Collapse sidebar',
     expand: 'Expand',
     expandAria: 'Expand sidebar',
+    subjectsUnavailable: 'Subjects unavailable — retry',
     dueRow: {
       row: '{name}, {counts}',
       join: '{first}, {second}',
@@ -104,6 +106,7 @@ export const dictEn: Dict = {
       aria_one: 'Streak of {count} day',
       aria_other: 'Streak of {count} days',
       title: 'Streak: {count}d',
+      unknownAria: 'Streak unavailable',
     },
   },
 
@@ -324,6 +327,9 @@ export const dictEn: Dict = {
     cards_other: '{count} cards',
     due_one: '{count} due',
     due_other: '{count} due',
+    decksUnknown: '— decks',
+    cardsUnknown: '— cards',
+    dueUnknown: '— due',
   },
 
   cmd: {
@@ -360,6 +366,7 @@ export const dictEn: Dict = {
     },
     noSubjects: 'No subjects — create one first.',
     noDecks: 'No deck in this subject.',
+    listUnavailable: 'List unavailable right now.',
     cards: {
       searching: 'Searching your cards…',
       seeAll_one: 'See the result in Card search',
@@ -488,6 +495,7 @@ export const dictEn: Dict = {
     unknownBody: 'We can’t tell what is due right now.',
     toReviewToday: 'to review today',
     overdue: 'incl. {n} overdue',
+    detailUnavailable: 'Backlog and upcoming exams unavailable.',
     examPrompt: 'Exam',
     examTitle: '“{title}”',
     examPriorise: '. Prioritise {names}.',
