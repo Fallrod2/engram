@@ -183,13 +183,6 @@ const ALLOWED = new Map<string, string>([
   //
   // T-066 is closing them one at a time; an entry disappears when its site
   // branches on `isError`. The list must end EMPTY.
-  ['routes/analytics.tsx::streaksOptions', 'ADJACENT: permanent StatTiles skeleton'],
-  ['routes/analytics.tsx::subjectsListOptions', 'ADJACENT: the subject filter empties'],
-  ['routes/analytics.tsx::heatmapOptions', 'ADJACENT: the streak sparkline flattens to []'],
-  [
-    'routes/analytics.tsx::deltasOptions',
-    'ADJACENT: the window-over-window deltas are simply not drawn',
-  ],
   ['routes/planning.tsx::subjectsListOptions', 'ADJACENT: calendar chips lose their subject names'],
 ])
 

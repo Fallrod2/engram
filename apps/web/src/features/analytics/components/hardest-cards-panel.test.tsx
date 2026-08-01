@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { HardestCardsResponse, Subject } from '@engram/shared'
 import { HardestCardsPanel } from './hardest-cards-panel'
@@ -88,5 +88,28 @@ describe('<HardestCardsPanel>', () => {
     renderPanel(response([card({ subjectId: 'gone' })]))
     // Nothing renderable left → the same honest empty state.
     expect(screen.getByText('Pas encore assez de révisions pour classer tes cartes.')).toBeTruthy()
+  })
+
+  /**
+   * T-066 — the line above is honest about ONE unknown subject among known ones.
+   * It stops being honest when the whole list failed to load: the panel then
+   * drops every card and blames the user's review history for a dropped request.
+   */
+  it('says the panel could not load when it is the SUBJECT list that failed', () => {
+    const onRetry = vi.fn()
+    render(
+      <HardestCardsPanel
+        data={response([card({ front: 'Pumping lemma' })])}
+        subjects={[]}
+        subjectsUnavailable
+        isFetching={false}
+        error={false}
+        onRetry={onRetry}
+      />,
+    )
+    expect(screen.queryByText('Pas encore assez de révisions pour classer tes cartes.')).toBeNull()
+    expect(screen.getByText('Impossible de charger les cartes les plus dures.')).toBeTruthy()
+    screen.getByText('Réessayer').click()
+    expect(onRetry).toHaveBeenCalled()
   })
 })

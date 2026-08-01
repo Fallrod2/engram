@@ -755,6 +755,7 @@ export const dictEn: Dict = {
     legendMore: 'More',
     colDay: 'Day',
     colReviews: 'Reviews',
+    activityError: 'Could not load activity.',
     volumeTitle: 'Volume per day',
     volumeCaption: 'Reviews per day and grade',
     volumeError: 'Could not load review volume.',
@@ -793,6 +794,8 @@ export const dictEn: Dict = {
     dayUnit: 'd',
     period: 'over {label}',
     notEnoughData: 'not enough data yet',
+    tileUnavailable: 'unavailable',
+    tilesError: 'Some figures could not be read.',
     reviewsCount_one: '{count} review',
     reviewsCount_other: '{count} reviews',
     viewChart: 'Chart',
@@ -804,6 +807,7 @@ export const dictEn: Dict = {
     // Subject filter (Analytics screen)
     allSubjects: 'All subjects',
     subjectFilterAria: 'Subject',
+    subjectFilterUnavailable: 'Subjects unavailable',
     subjectScopeAll: 'all subjects',
     streakScopeNote: 'A streak measures a habit, not a subject: this figure stays global.',
     retentionScopeNote:

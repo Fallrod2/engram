@@ -1,3 +1,4 @@
+import { Unplug } from 'lucide-react'
 import type { Subject } from '@engram/shared'
 import {
   Select,
@@ -27,10 +28,17 @@ export const ALL_SUBJECTS = '__all__'
 
 export function SubjectFilter({
   subjects,
+  unavailable = false,
   value,
   onChange,
 }: {
   subjects: Subject[]
+  /**
+   * The list read failed (T-066). An empty picker and a broken one look
+   * identical — both open onto "Toutes les matières" and nothing else — so the
+   * control says which one it is and stops offering a choice it cannot honour.
+   */
+  unavailable?: boolean
   /** `undefined` = every subject. */
   value: string | undefined
   onChange: (subjectId: string | undefined) => void
@@ -42,6 +50,19 @@ export function SubjectFilter({
       a.position - b.position ||
       a.name.localeCompare(b.name),
   )
+
+  if (unavailable) {
+    // Same geometry as the live control so the header row does not shift.
+    return (
+      <p
+        role="status"
+        className="flex h-9 w-56 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface-2 px-3 text-sm text-text-faint"
+      >
+        <Unplug className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+        {t('analytics.subjectFilterUnavailable')}
+      </p>
+    )
+  }
 
   return (
     <Select

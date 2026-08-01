@@ -32,6 +32,7 @@ import { ActivityHeatmap } from '@/features/analytics/components/activity-heatma
 import { HeatmapLegend } from '@/features/analytics/components/heatmap-legend'
 import { YearStepper } from '@/features/analytics/components/year-stepper'
 import { ChartCard } from '@/features/analytics/components/chart-card'
+import { ChartEmpty } from '@/features/analytics/components/chart-empty'
 import { ChartTableView } from '@/features/analytics/components/chart-table-view'
 import { ReviewVolumeChart } from '@/features/analytics/components/review-volume-chart'
 import { StudyTimeChart } from '@/features/analytics/components/study-time-chart'
@@ -115,6 +116,17 @@ function AnalyticsPage() {
   const window = parseWindow(win)
   const subjectsQuery = useQuery(subjectsListOptions())
   const subjects = subjectsQuery.data ?? []
+  /**
+   * T-066 — the subject list is this screen's only CROSS-CUTTING read: three
+   * panels resolve their rows through it and DROP whatever they cannot name.
+   * `?? []` therefore did not merely empty the filter, it turned a failed read
+   * into "no exam coming up", "not enough reviews to rank" and "no retention
+   * data" — the exact mistake `<ReadinessOverview>` carries a comment against.
+   * So it is passed down as a fact, and each panel shows its own error and its
+   * own retry rather than an empty state it has not earned.
+   */
+  const subjectsUnavailable = subjectsQuery.isError
+  const retrySubjects = () => void subjectsQuery.refetch()
   // An id nobody owns is dropped rather than sent: it would key its own empty
   // cache entry and render four "no data" panels that are really "no such
   // subject". Until the list has loaded we keep the URL's value, so a reload on
@@ -169,11 +181,40 @@ function AnalyticsPage() {
     )
   }
 
-  const tilesReady = streaksQuery.data && volumeQuery.data && studyTimeQuery.data
   const spark = sparkHeatmapQuery.data
     ? sparkFromHeatmap(sparkHeatmapQuery.data.days, todayKey)
     : []
   const tilesFetching = volumeQuery.isFetching || studyTimeQuery.isFetching
+
+  /**
+   * The KPI row, T-066. It used to be `streaks && volume && studyTime ? row :
+   * skeleton`, and this route's loader is `Promise.allSettled` ON PURPOSE — so a
+   * failure never reaches `AnalyticsError`, and one dropped request left four
+   * tiles pulsing until the tab was closed.
+   *
+   * Granularity: per-tile for the FIGURES, one retry for the ROW. The five
+   * sources map almost one-to-one onto the four tiles, so blanking the row
+   * because one failed would hide three answers that did arrive; but four retry
+   * buttons in four 100px boxes is noise, and nobody wants to re-ask for one
+   * tile. The skeleton now only covers the honest case: still waiting, nothing
+   * broken.
+   */
+  // Spelled out one handle at a time rather than `[…].some(q => q.isError)`:
+  // `read-guard.test.ts` matches `<handle>.<status>` by shape, and an array
+  // hides the very question it exists to ask. Naming them also lists, in one
+  // place, exactly which reads this row depends on.
+  const tilesFailed =
+    streaksQuery.isError ||
+    volumeQuery.isError ||
+    studyTimeQuery.isError ||
+    deltasQuery.isError ||
+    sparkHeatmapQuery.isError
+  const tilesLanded = streaksQuery.data && volumeQuery.data && studyTimeQuery.data
+  const retryTiles = () => {
+    for (const q of [streaksQuery, volumeQuery, studyTimeQuery, deltasQuery, sparkHeatmapQuery]) {
+      if (q.isError) void q.refetch()
+    }
+  }
 
   const clampYear = (y: number) => Math.min(currentYear, Math.max(currentYear - 5, y))
 
@@ -183,23 +224,29 @@ function AnalyticsPage() {
         {/* One filter rank, two axes: a period and a subject (spec §1.5). */}
         <div className="flex flex-wrap items-center gap-3">
           <WindowFilter value={window} onChange={setWindow} />
-          <SubjectFilter subjects={subjects} value={subjectId} onChange={setSubject} />
+          <SubjectFilter
+            subjects={subjects}
+            unavailable={subjectsUnavailable}
+            value={subjectId}
+            onChange={setSubject}
+          />
         </div>
       </PageHeaderRow>
 
       <div className="flex flex-col gap-6">
         {/* KPI tiles */}
-        {tilesReady && streaksQuery.data && volumeQuery.data && studyTimeQuery.data ? (
+        {tilesLanded || tilesFailed ? (
           <div className={tilesFetching ? 'opacity-50 transition-opacity duration-base' : ''}>
             <StatTilesRow
               streaks={streaksQuery.data}
               spark={spark}
-              studyMs={studyTimeQuery.data.totalMs}
-              totals={volumeQuery.data.totals}
+              studyMs={studyTimeQuery.data?.totalMs}
+              totals={volumeQuery.data?.totals}
               deltas={deltasQuery.data ?? null}
               windowLabel={label}
               reduce={reduce}
               subjectScoped={!!subjectId}
+              {...(tilesFailed ? { onRetry: retryTiles } : {})}
             />
           </div>
         ) : (
@@ -209,21 +256,28 @@ function AnalyticsPage() {
         {/* Exam readiness — a forecast, so neither the window nor the year
             stepper touches it. Placed high: it is the only panel that can change
             what someone does in the next hour. */}
-        {readinessQuery.data || readinessQuery.isError ? (
+        {readinessQuery.data || readinessQuery.isError || subjectsUnavailable ? (
           <ReadinessOverview
             data={readinessQuery.data}
             subjects={subjects}
+            subjectsUnavailable={subjectsUnavailable}
             now={now}
             isFetching={readinessQuery.isFetching}
             error={readinessQuery.isError}
-            onRetry={() => void readinessQuery.refetch()}
+            onRetry={() => {
+              if (readinessQuery.isError) void readinessQuery.refetch()
+              if (subjectsUnavailable) retrySubjects()
+            }}
           />
         ) : (
           <ReadinessSkeleton />
         )}
 
-        {/* Activity heatmap — its own year stepper, NOT window-scoped */}
-        {heatmapQuery.data ? (
+        {/* Activity heatmap — its own year stepper, NOT window-scoped. The card
+            frame survives a failed read (T-066): the year stepper stays usable,
+            so "ask again" and "ask for another year" are the same gesture, and
+            the grid of 365 pulsing squares stops pretending to be on its way. */}
+        {heatmapQuery.data || heatmapQuery.isError ? (
           <ChartCard
             title={t('analytics.activity')}
             isFetching={heatmapQuery.isFetching}
@@ -240,14 +294,23 @@ function AnalyticsPage() {
                 />
               </div>
             }
-            table={<HeatmapTable data={heatmapQuery.data} />}
+            {...(heatmapQuery.data ? { table: <HeatmapTable data={heatmapQuery.data} /> } : {})}
           >
-            <ActivityHeatmap
-              data={heatmapQuery.data}
-              year={year}
-              minYear={currentYear - 5}
-              onYearChange={(dir) => setYear((y) => clampYear(y + dir))}
-            />
+            {heatmapQuery.data ? (
+              <ActivityHeatmap
+                data={heatmapQuery.data}
+                year={year}
+                minYear={currentYear - 5}
+                onYearChange={(dir) => setYear((y) => clampYear(y + dir))}
+              />
+            ) : (
+              <ChartEmpty
+                variant="error"
+                title={t('analytics.activityError')}
+                onRetry={() => void heatmapQuery.refetch()}
+                height={140}
+              />
+            )}
           </ChartCard>
         ) : (
           <HeatmapSkeleton />
@@ -282,27 +345,35 @@ function AnalyticsPage() {
           )}
         </div>
 
-        {retentionQuery.data || retentionQuery.isError ? (
+        {retentionQuery.data || retentionQuery.isError || subjectsUnavailable ? (
           <RetentionBySubjectChart
             data={retentionQuery.data}
             subjects={subjects}
+            subjectsUnavailable={subjectsUnavailable}
             windowLabel={label}
             isFetching={retentionQuery.isFetching}
             error={retentionQuery.isError}
-            onRetry={() => void retentionQuery.refetch()}
+            onRetry={() => {
+              if (retentionQuery.isError) void retentionQuery.refetch()
+              if (subjectsUnavailable) retrySubjects()
+            }}
             {...(selectedSubject ? { highlightSubjectId: selectedSubject.id } : {})}
           />
         ) : (
           <ChartCardSkeleton height={180} />
         )}
 
-        {hardestQuery.data || hardestQuery.isError ? (
+        {hardestQuery.data || hardestQuery.isError || subjectsUnavailable ? (
           <HardestCardsPanel
             data={hardestQuery.data}
             subjects={subjects}
+            subjectsUnavailable={subjectsUnavailable}
             isFetching={hardestQuery.isFetching}
             error={hardestQuery.isError}
-            onRetry={() => void hardestQuery.refetch()}
+            onRetry={() => {
+              if (hardestQuery.isError) void hardestQuery.refetch()
+              if (subjectsUnavailable) retrySubjects()
+            }}
           />
         ) : (
           <HardestCardsSkeleton />

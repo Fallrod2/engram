@@ -33,6 +33,7 @@ import { ReadinessBar } from './readiness-bar'
 export function ReadinessOverview({
   data,
   subjects,
+  subjectsUnavailable = false,
   now,
   isFetching,
   error,
@@ -40,6 +41,13 @@ export function ReadinessOverview({
 }: {
   data: ExamReadinessResponse | undefined
   subjects: Subject[]
+  /**
+   * The subject LIST failed (T-066). Every row here is filtered by `known`, so
+   * without it this panel has nothing it can draw — and drawing nothing looked
+   * exactly like "no exam coming up", the one thing the comment below says it
+   * must never say by accident.
+   */
+  subjectsUnavailable?: boolean
   now: Date
   isFetching: boolean
   error: boolean
@@ -55,9 +63,10 @@ export function ReadinessOverview({
   let body: ReactNode
   let table: ReactNode
 
-  if (error && !data) {
+  if ((error && !data) || subjectsUnavailable) {
     // A failed read is NOT "no exam coming up" — that mistake would quietly
-    // reassure someone the week before a partial.
+    // reassure someone the week before a partial. It reaches this panel by two
+    // doors: its own request, and the subject list every row is matched against.
     body = (
       <ChartEmpty
         variant="error"

@@ -67,12 +67,13 @@ function response(subjects: ExamReadinessResponse['subjects']): ExamReadinessRes
 
 function renderOverview(
   data: ExamReadinessResponse | undefined,
-  opts: { error?: boolean; onRetry?: () => void } = {},
+  opts: { error?: boolean; onRetry?: () => void; subjectsUnavailable?: boolean } = {},
 ) {
   return render(
     <ReadinessOverview
       data={data}
-      subjects={SUBJECTS}
+      subjects={opts.subjectsUnavailable ? [] : SUBJECTS}
+      subjectsUnavailable={opts.subjectsUnavailable ?? false}
       now={NOW}
       isFetching={false}
       error={opts.error ?? false}
@@ -164,5 +165,24 @@ describe('<ReadinessOverview>', () => {
     renderOverview(response([{ subjectId: 'gone', today: breakdown(), exams: [exam()] }]))
     expect(screen.getByText('Aucun examen à venir.')).toBeTruthy()
     expect(screen.queryByText('Partiel de théorie des langages')).toBeNull()
+  })
+
+  /**
+   * T-066 — the reassuring empty line had a SECOND door into this panel, and it
+   * was wide open: every row is matched against the subject list, so a failed
+   * `GET /api/subjects` filtered all of them out and the panel said "no exam
+   * coming up" with its own readiness payload sitting right there. Exactly the
+   * week-before-a-partial reassurance the error branch above exists to prevent.
+   */
+  it('never says "no exam coming up" when it is the SUBJECT list that failed', () => {
+    const onRetry = vi.fn()
+    renderOverview(response([{ subjectId: 's1', today: breakdown(), exams: [exam()] }]), {
+      subjectsUnavailable: true,
+      onRetry,
+    })
+    expect(screen.queryByText('Aucun examen à venir.')).toBeNull()
+    expect(screen.getByText('Impossible de charger la préparation aux examens.')).toBeTruthy()
+    screen.getByText('Réessayer').click()
+    expect(onRetry).toHaveBeenCalled()
   })
 })

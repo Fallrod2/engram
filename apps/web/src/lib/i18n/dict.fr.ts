@@ -844,6 +844,11 @@ export const dictFr = {
     legendMore: 'Plus',
     colDay: 'Jour',
     colReviews: 'Reviews',
+    // T-066 : le chargeur de cette route est `Promise.allSettled`, donc aucun
+    // échec n'atteint l'écran d'erreur — la heatmap restait un damier de 365
+    // carrés qui pulsaient sans fin. « Toujours en train de charger » est une
+    // affirmation comme une autre, et c'était la fausse.
+    activityError: 'Impossible de charger l’activité.',
     volumeTitle: 'Volume par jour',
     volumeCaption: 'Reviews par jour et par note',
     volumeError: 'Impossible de charger le volume de reviews.',
@@ -882,6 +887,11 @@ export const dictFr = {
     dayUnit: 'j',
     period: 'sur {label}',
     notEnoughData: 'pas encore assez de données',
+    // T-066 : une tuile dont la source n'a pas répondu. Elle affiche « — » (le
+    // chiffre est inconnu, pas nul) et le dit ; la ligne de reprise est unique
+    // pour la rangée, parce que personne ne veut redemander une tuile.
+    tileUnavailable: 'indisponible',
+    tilesError: 'Certains chiffres n’ont pas pu être lus.',
     reviewsCount_one: '{count} review',
     reviewsCount_other: '{count} reviews',
     viewChart: 'Graphe',
@@ -893,6 +903,9 @@ export const dictFr = {
     // Filtre par matière (écran Analytics)
     allSubjects: 'Toutes les matières',
     subjectFilterAria: 'Matière',
+    // T-066 : liste des matières illisible. Un sélecteur vide et un sélecteur
+    // cassé s'ouvrent tous les deux sur « Toutes les matières » et rien d'autre.
+    subjectFilterUnavailable: 'Matières indisponibles',
     subjectScopeAll: 'toutes matières',
     streakScopeNote: 'Une série mesure une habitude, pas une matière : ce chiffre reste global.',
     retentionScopeNote:

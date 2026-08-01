@@ -54,12 +54,19 @@ function groupBySubject(data: HardestCardsResponse, subjects: Subject[]): Group[
 export function HardestCardsPanel({
   data,
   subjects,
+  subjectsUnavailable = false,
   isFetching,
   error,
   onRetry,
 }: {
   data: HardestCardsResponse | undefined
   subjects: Subject[]
+  /**
+   * The subject LIST failed (T-066). `groupBySubject` drops every card whose
+   * subject it cannot name, so an unread list emptied the panel and the empty
+   * state then blamed the user's review history for it.
+   */
+  subjectsUnavailable?: boolean
   isFetching: boolean
   error: boolean
   onRetry: () => void
@@ -70,7 +77,7 @@ export function HardestCardsPanel({
   const isEmpty = data !== undefined && groups.length === 0
 
   let body: React.ReactNode
-  if (error && !data) {
+  if ((error && !data) || subjectsUnavailable) {
     body = (
       <ChartEmpty
         variant="error"

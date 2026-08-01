@@ -62,6 +62,7 @@ function buildTableColumns(t: TFunction): ChartColumn<Row>[] {
 export function RetentionBySubjectChart({
   data,
   subjects,
+  subjectsUnavailable = false,
   windowLabel,
   isFetching,
   error,
@@ -70,6 +71,12 @@ export function RetentionBySubjectChart({
 }: {
   data: RetentionResponse | undefined
   subjects: Subject[]
+  /**
+   * The subject LIST failed (T-066). Every bar is named through it, so without
+   * it the chart has no rows — and no rows read as "not enough mature reviews",
+   * a claim about the user's history rather than about a dropped request.
+   */
+  subjectsUnavailable?: boolean
   windowLabel: string
   isFetching: boolean
   error: boolean
@@ -104,7 +111,7 @@ export function RetentionBySubjectChart({
 
   let body: React.ReactNode
   let table: React.ReactNode
-  if (error && !data) {
+  if ((error && !data) || subjectsUnavailable) {
     body = (
       <ChartEmpty
         variant="error"
