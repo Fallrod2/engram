@@ -1,9 +1,26 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import { LangProvider } from '@/lib/i18n'
 import { DueCount, DueDot } from './due-count'
 
 afterEach(cleanup)
+
+/** jsdom's Storage is not fully implemented here; `LangProvider` reads it. */
+function installMockStorage() {
+  const store = new Map<string, string>()
+  const mock: Storage = {
+    get length() {
+      return store.size
+    },
+    clear: () => store.clear(),
+    getItem: (k) => store.get(k) ?? null,
+    key: (i) => Array.from(store.keys())[i] ?? null,
+    removeItem: (k) => void store.delete(k),
+    setItem: (k, v) => void store.set(k, String(v)),
+  }
+  Object.defineProperty(globalThis, 'localStorage', { value: mock, configurable: true })
+}
 
 describe('<DueCount> intensity encoding (design §6.1)', () => {
   it('renders a retreating `·` in text-faint at zero', () => {
@@ -81,9 +98,45 @@ describe('<DueCount> backlog/today split (T-013)', () => {
     expect((container.firstChild as HTMLElement).hasAttribute('aria-label')).toBe(false)
   })
 
-  it('keeps the legacy label for callers that do not supply one', () => {
+  /**
+   * T-067 — this case used to pin `` `${value} à réviser` ``, a hardcoded French
+   * template, as "the legacy label". It was not legacy, it was live: every
+   * caller that omits `label` — the subject list on `/subjects`, the deck list
+   * on a subject's page, one instance per row — went through it, so an English
+   * screen reader was told "12 à réviser" on every row of both screens.
+   *
+   * `a11y-strings.test.ts` never saw it and could not have: the value reaches
+   * the attribute through a spread object (`{...aria}`), not through the
+   * `aria-label=` position that scan reads. So the behaviour is pinned here
+   * instead, in BOTH languages — which is what the old case should have said.
+   */
+  it('names itself from the dictionary when the caller supplies no label', () => {
     render(<DueCount value={12} />)
+    // Provider-free render = the default FR context, so the FR wording holds.
     expect(screen.getByLabelText('12 à réviser')).toBeTruthy()
+  })
+
+  it('says it in ENGLISH when the UI is English', () => {
+    installMockStorage()
+    localStorage.setItem('engram-lang', 'en')
+    render(
+      <LangProvider>
+        <DueCount value={12} />
+      </LangProvider>,
+    )
+    expect(screen.getByLabelText('12 due')).toBeTruthy()
+    expect(screen.queryByLabelText(/à réviser/)).toBeNull()
+  })
+
+  it('takes the plural rule from the active locale, not from a hand-rolled `s`', () => {
+    installMockStorage()
+    localStorage.setItem('engram-lang', 'en')
+    render(
+      <LangProvider>
+        <DueCount value={1} />
+      </LangProvider>,
+    )
+    expect(screen.getByLabelText('1 due')).toBeTruthy()
   })
 })
 

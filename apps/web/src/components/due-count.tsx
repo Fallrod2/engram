@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import { useReducedMotion } from '@/lib/motion'
 import { cn } from '@/lib/utils'
-import { useT } from '@/lib/i18n'
+import { usePlural, useT } from '@/lib/i18n'
 import { dueBarWidth, dueCountTier } from '@/lib/due-count'
 import { SUBJECT_BG_CLASS, pigmentSlotForHex } from '@/lib/pigments'
 
@@ -43,11 +43,20 @@ export function DueCount({
    * Accessible name of the count. `null` opts OUT entirely — for callers whose
    * container already carries the full sentence (the sidebar rows, T-017), so
    * the figure is never announced twice or, worse, announced two different ways.
+   *
+   * Omitted entirely → the count names itself from the dictionary. T-067 — that
+   * fallback was a hardcoded French template (`` `${value} à réviser` ``), and
+   * every caller that does not pass a label uses it: the subject lists on
+   * `/subjects` and on a subject's own page, on every row. An English screen
+   * reader was told "12 à réviser". `a11y-strings.test.ts` could not see it —
+   * the value reaches the attribute through a spread object, not through the
+   * `aria-label=` position it scans.
    */
   label?: string | null
   className?: string
 }) {
   const t = useT()
+  const plural = usePlural()
   if (value === undefined) {
     return (
       <span
@@ -62,7 +71,12 @@ export function DueCount({
   const tier = dueCountTier(value)
   const backlog = Math.min(Math.max(overdue, 0), Math.max(value, 0))
   const today = Math.max(value, 0) - backlog
-  const aria = label === null ? {} : { 'aria-label': label ?? `${value} à réviser` }
+  // The same sentence the mobile sub-line prints one row above (`listMeta.due`),
+  // so the badge and the text under it never say the count two different ways.
+  const aria =
+    label === null
+      ? {}
+      : { 'aria-label': label ?? t(`listMeta.due_${plural(value)}`, { count: value }) }
 
   if (tier === 'zero') {
     return (
