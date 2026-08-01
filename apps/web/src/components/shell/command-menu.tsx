@@ -132,8 +132,15 @@ export function CommandMenu() {
   const [search, setSearch] = useState('')
   const [cardSubjectId, setCardSubjectId] = useState<string | null>(null)
 
-  const subjects = (useQuery(subjectsListOptions()).data ?? []).filter((s) => !s.archived)
-  const decks = useQuery(allDecksOptions()).data ?? []
+  // T-042 — the palette's own copy says "Aucune matière" / "Aucun deck" when
+  // these lists come back empty. That is a CLAIM about the account, and
+  // `.data ?? []` let a failed read make it: the picker told a user with fifteen
+  // subjects that they had none, and offered no way to find out otherwise. The
+  // handles are kept so an empty list and an unknown list can be told apart.
+  const subjectsQuery = useQuery(subjectsListOptions())
+  const decksQuery = useQuery(allDecksOptions())
+  const subjects = (subjectsQuery.data ?? []).filter((s) => !s.archived)
+  const decks = decksQuery.data ?? []
   const dueCounts = useQuery(dueCountsOptions()).data
   const dueBySubject = bySubjectMap(dueCounts)
 
@@ -376,7 +383,7 @@ export function CommandMenu() {
           <CommandGroup heading={t('cmd.groups.subjects')}>
             {subjects.length === 0 && (
               <CommandItem value="aucune matière" disabled>
-                {t('cmd.noSubjects')}
+                {subjectsQuery.isSuccess ? t('cmd.noSubjects') : t('cmd.listUnavailable')}
               </CommandItem>
             )}
             {subjects.map((s) => (
@@ -405,7 +412,7 @@ export function CommandMenu() {
           <CommandGroup heading={t('cmd.groups.decks')}>
             {cardDecks.length === 0 && (
               <CommandItem value="aucun deck" disabled>
-                {t('cmd.noDecks')}
+                {decksQuery.isSuccess ? t('cmd.noDecks') : t('cmd.listUnavailable')}
               </CommandItem>
             )}
             {cardDecks.map((d) => (
