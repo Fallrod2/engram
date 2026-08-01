@@ -1341,6 +1341,11 @@ export const dictFr = {
         instructions: 'Ouvre la page de vérification et saisis ce code pour autoriser engram :',
         openPage: 'Ouvrir la page de vérification',
         waiting: 'En attente de l’autorisation…',
+        // T-066 : le sondage de liaison n'avait pas de branche d'erreur. Une
+        // panne durable laissait « en attente » et son spinner à l'écran pour
+        // toujours — la surface dont le seul rôle est de dire où en est la
+        // liaison affirmait un état qu'elle ne lisait plus.
+        pollError: 'Impossible de vérifier l’état de la liaison pour le moment.',
         linked: 'Compte ChatGPT lié.',
         startError: 'Impossible de démarrer la liaison. Réessaie.',
         status: {

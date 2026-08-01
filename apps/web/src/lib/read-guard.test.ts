@@ -164,10 +164,6 @@ const ALLOWED = new Map<string, string>([
     'the card renders its own error and retry inline',
   ],
   [
-    'features/ai/ai-settings-card.tsx::inline',
-    'connectivity poll; its result IS the status being displayed',
-  ],
-  [
     'components/shell/command-cards.tsx::cardSearchOptions',
     '`settled` already requires a fresh successful echo before any hit is shown',
   ],

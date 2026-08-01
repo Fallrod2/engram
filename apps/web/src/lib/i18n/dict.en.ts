@@ -1212,6 +1212,7 @@ export const dictEn: Dict = {
         instructions: 'Open the verification page and enter this code to authorize engram:',
         openPage: 'Open the verification page',
         waiting: 'Waiting for authorization…',
+        pollError: 'Cannot check the link status right now.',
         linked: 'ChatGPT account linked.',
         startError: 'Could not start linking. Try again.',
         status: {
