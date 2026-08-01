@@ -227,8 +227,14 @@ function AnalyticsPage() {
    * `error={…}` down, so the gate's own term was redundant to that scan. The
    * handle goes in whole (see `panel-state.ts`): there is no term at the call
    * site left to drop, and `panel-state.test.ts` owns the rule itself.
+   *
+   * That scan reads the SOURCE of this file and looks for `…Query` in the
+   * condition of any ternary rendering a `*Skeleton`, so a local alias for a
+   * query payload (`const heatmap = heatmapQuery.data`) is a hole in it: the
+   * gate could be rewritten onto the alias and the scan would see nothing. No
+   * panel here keeps one — every payload is read as `xQuery.data` at its use
+   * site, which is what makes the scan's regex sufficient. Don't add one.
    */
-  const heatmap = heatmapQuery.data
   const tilesBody = panelBody({ data: tilesLanded, isError: tilesFailed })
   const readinessBody = panelBody(readinessQuery, subjectsUnavailable)
   const heatmapBody = panelBody(heatmapQuery)
@@ -315,11 +321,11 @@ function AnalyticsPage() {
                 />
               </div>
             }
-            {...(heatmap ? { table: <HeatmapTable data={heatmap} /> } : {})}
+            {...(heatmapQuery.data ? { table: <HeatmapTable data={heatmapQuery.data} /> } : {})}
           >
-            {heatmap ? (
+            {heatmapQuery.data ? (
               <ActivityHeatmap
-                data={heatmap}
+                data={heatmapQuery.data}
                 year={year}
                 minYear={currentYear - 5}
                 onYearChange={(dir) => setYear((y) => clampYear(y + dir))}

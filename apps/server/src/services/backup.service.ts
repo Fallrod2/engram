@@ -3,7 +3,17 @@ import { fileURLToPath } from 'node:url'
 import { eq, inArray } from 'drizzle-orm'
 import { backupSchema, BACKUP_VERSION, type Backup, type BackupImportResult } from '@engram/shared'
 import type { DB } from '../db/client'
-import { card, deck, exam, examSubject, generation, note, reviewLog, subject } from '../db/schema'
+import {
+  card,
+  cardColumns,
+  deck,
+  exam,
+  examSubject,
+  generation,
+  note,
+  reviewLog,
+  subject,
+} from '../db/schema'
 import { ApiError, ConflictError, ValidationError } from '../http/errors'
 
 /** ISO string for a `Date` column value. */
@@ -48,7 +58,10 @@ export async function exportBackup(db: DB, userId: string): Promise<Backup> {
     await Promise.all([
       db.select().from(subject).where(eq(subject.userId, userId)),
       db.select().from(deck).where(eq(deck.userId, userId)),
-      db.select().from(card).where(eq(card.userId, userId)),
+      // `cardColumns`, not `select()`: the dump has no field for the generated
+      // fold mirrors, so SELECT * shipped every card's text twice over on the
+      // way to a serializer that drops half of it.
+      db.select(cardColumns).from(card).where(eq(card.userId, userId)),
       db.select().from(reviewLog).where(eq(reviewLog.userId, userId)),
       db.select().from(note).where(eq(note.userId, userId)),
       db.select().from(generation).where(eq(generation.userId, userId)),

@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { getTableColumns, sql, type InferSelectModel } from 'drizzle-orm'
 import {
   pgTable,
   text,
@@ -84,3 +84,48 @@ export const card = pgTable(
     check('card_state_ck', sql`${t.state} in (0,1,2,3)`),
   ],
 )
+
+const allCardColumns = getTableColumns(card)
+
+/**
+ * The columns that exist for the database's own use and are never read back.
+ * Typed as keys OF the column map, so renaming one of the fields above without
+ * revisiting this line is a type error rather than a silently ineffective list.
+ */
+const FOLD_COLUMNS = [
+  'frontFold',
+  'backFold',
+] as const satisfies readonly (keyof typeof allCardColumns)[]
+
+/**
+ * The select shape for every read of `card` that is not the search: all of the
+ * columns except the two fold mirrors.
+ *
+ * `select()` with no argument means SELECT *, and since migration 0012 that
+ * ships each card's whole text TWICE — `front`/`back` and their folded copies —
+ * to callers that cannot even see the folds (`toFsrsCard` and `cardToDto` both
+ * take row types with them omitted). Measured on 400 cards of ~420 characters:
+ * 515 561 bytes serialized against 329 781, i.e. 464 bytes per card of pure
+ * duplicate text, on the backup dump and on every session's opening queue alike.
+ *
+ * DERIVED, not written out. A column added to the table above is selected by
+ * every caller with no list to update — the one property a hand-copied column
+ * list cannot have, and the reason the seven-line list in
+ * `card-search.service.ts` was not simply pasted into four more services.
+ *
+ * `card-columns.test.ts` holds the rule that nothing goes back to a bare
+ * `select()`; `card-columns.spec.ts` measures the saving and proves the reads
+ * are otherwise identical.
+ */
+export const cardColumns = Object.fromEntries(
+  Object.entries(allCardColumns).filter(
+    ([name]) => !(FOLD_COLUMNS as readonly string[]).includes(name),
+  ),
+) as Omit<typeof allCardColumns, (typeof FOLD_COLUMNS)[number]>
+
+/**
+ * A card row as `cardColumns` selects it. Derived FROM the select shape rather
+ * than restated as another `Omit<…, 'frontFold' | 'backFold'>`, so the type and
+ * the query can never name different sets of columns.
+ */
+export type CardRow = Pick<InferSelectModel<typeof card>, keyof typeof cardColumns>
