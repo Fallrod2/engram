@@ -48,10 +48,26 @@ export type SchedulableCard = FsrsCard & Partial<Record<typeof SEED_CARD_ID_FIEL
  * exactly like Anki, which seeds its own fuzz from the card id. Consequences:
  *
  *  - two previews of the same card, at any two instants, agree;
- *  - the preview equals what the review writes, provided the base interval is
- *    the same — see `fsrs.test.ts`, `preview_matches_the_review_that_follows`
- *    and the UTC-day-boundary characterisation next to it;
+ *  - the preview equals what the review writes, for the same card row rated in
+ *    the same UTC day — `fsrs.test.ts`, `preview_matches_the_review_that_follows`;
  *  - different cards still get different fuzz, so the load stays spread.
+ *
+ * TWO THINGS THAT PROMISE DOES NOT COVER, both outside the fuzz fix and both
+ * characterised in `fsrs.test.ts`:
+ *
+ *  1. THE UTC DAY ROLLS OVER between the preview and the rating. The base
+ *     interval is derived from `elapsed_days`, i.e. whole UTC days since
+ *     `last_review`, so the projection moves — by exactly the amount the
+ *     UNFUZZED scheduler moves, the fuzz contributing nothing to the drift
+ *     (`preview_shifts_only_when_the_elapsed_day_count_does`).
+ *  2. `reps` CHANGES UNDER THE PREVIEW — two tabs open on the same card, the
+ *     other one grades it first. `reps` is half the seed (`card_id + reps`), so
+ *     a rating that lands in between moves the fuzz factor and the interval
+ *     written differs from the one displayed
+ *     (`preview_also_shifts_when_the_rep_count_changes`). This is NOT a hole in
+ *     the fix: the same concurrent rating also rewrites `stability`,
+ *     `difficulty` and `last_review`, so the displayed number was stale before
+ *     the fuzz got anywhere near it.
  *
  * A card fed WITHOUT `card_id` falls back to a seed built from `reps` alone:
  * still deterministic, but shared by every card at the same rep. Cards coming

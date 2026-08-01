@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseQcm } from '@engram/shared'
+import { MAX_OPTIONS, MIN_OPTIONS, OPTION_LETTERS, parseQcm } from '@engram/shared'
 import { DEMO_QCM_CARDS } from './demo.service'
 
 /**
@@ -25,9 +25,6 @@ const EXPECTED_ANSWER: Record<string, string> = {
   'Que fait une ε-transition dans un automate fini non déterministe ?': 'B',
 }
 
-/** Mirrors `MAX_OPTIONS` in the parser: a 5th option `E` collides with edit. */
-const MAX_OPTIONS = 4
-
 describe('the demo seed speaks the QCM format', () => {
   it('seeds multiple-choice cards at all', () => {
     expect(DEMO_QCM_CARDS.length).toBeGreaterThan(0)
@@ -47,14 +44,14 @@ describe('the demo seed speaks the QCM format', () => {
         expect(parsed).not.toBeNull()
       })
 
-      it('carries a question, 2 to 4 options lettered from A, and a justification', () => {
+      it('carries a question, MIN..MAX options lettered from A, and a justification', () => {
         expect(parsed).not.toBeNull()
         if (parsed === null) return
         expect(parsed.question).not.toBe('')
-        expect(parsed.options.length).toBeGreaterThanOrEqual(2)
+        expect(parsed.options.length).toBeGreaterThanOrEqual(MIN_OPTIONS)
         expect(parsed.options.length).toBeLessThanOrEqual(MAX_OPTIONS)
         expect(parsed.options.map((o) => o.letter)).toEqual(
-          parsed.options.map((_, i) => String.fromCharCode(65 + i)),
+          OPTION_LETTERS.slice(0, parsed.options.length),
         )
         expect(parsed.options.every((o) => o.text.trim() !== '')).toBe(true)
         expect(parsed.explanation).not.toBe('')

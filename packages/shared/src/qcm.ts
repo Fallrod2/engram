@@ -88,8 +88,12 @@ const BACK_BARE_ANSWER = /^(?:([A-Za-z])|\(([A-Za-z])\))$/
 /** Any code fence anywhere in the front disqualifies the card (see `parseQcm`). */
 const CODE_FENCE = /```|~~~/
 
-/** Minimum number of options for the card to be a question and not a list. */
-const MIN_OPTIONS = 2
+/**
+ * Minimum number of options for the card to be a question and not a list.
+ * Exported for the same reason as `MAX_OPTIONS`: the callers that assert the
+ * bounds must read them, not restate them.
+ */
+export const MIN_OPTIONS = 2
 
 /**
  * Maximum number of options. A product constraint, not a parsing one: the
@@ -99,10 +103,26 @@ const MIN_OPTIONS = 2
  * would make its option `E` collide with card editing. The prompt asks for 3 to
  * 4 options anyway; beyond that, falling back to the Markdown rendering is the
  * safe behaviour.
+ *
+ * EXPORTED because this number does not belong to the parser alone: the review
+ * session needs the same cap to build its option keys, and the demo-seed suite
+ * needs it to assert the seeded cards respect it. Both used to restate it — a
+ * `4` and an `['a','b','c','d']` — which is the kind of duplication that stays
+ * invisible until the day someone changes one of the three. Derive from this
+ * constant (`OPTION_KEYS` below is how), never restate it.
  */
-const MAX_OPTIONS = 4
+export const MAX_OPTIONS = 4
 
 const LETTER_A = 'A'.charCodeAt(0)
+
+/**
+ * The option letters a QCM may use, uppercase and in order — `A` through the
+ * `MAX_OPTIONS`-th letter. Derived, so raising the cap extends this list rather
+ * than leaving the extra option unreachable from the keyboard.
+ */
+export const OPTION_LETTERS: readonly string[] = Array.from({ length: MAX_OPTIONS }, (_, i) =>
+  String.fromCharCode(LETTER_A + i),
+)
 
 interface BackAnswer {
   /** The answer letter as authored, not yet uppercased. */
@@ -141,7 +161,7 @@ function parseBackAnswer(back: string): BackAnswer | null {
  * not recognisably a QCM.
  *
  * Front — the options block must be the LAST block of the front:
- *  - between 2 and 4 option lines (see `MAX_OPTIONS`);
+ *  - between `MIN_OPTIONS` and `MAX_OPTIONS` option lines;
  *  - their letters, uppercased, must be distinct, consecutive AND start at A
  *    (A, B, C…). `A, B, D` or `B, C` return `null`; this is what keeps an
  *    ordinary bullet list from being mistaken for a question;

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useReducedMotion } from '@/lib/motion'
 import { toast } from 'sonner'
 import {
+  OPTION_LETTERS,
   parseQcm,
   type Card,
   type ParsedQcm,
@@ -30,11 +31,13 @@ import { orderQueue } from './queue-order'
 import { gradeForVerdict } from './verdict'
 
 /**
- * Keys A-D, mapped onto option indices 0-3 (spec: a QCM has 2 to 4 options).
- * Stops at D because E, S and U are already session shortcuts — the same
- * constraint that caps `MAX_OPTIONS` in `qcm.ts`.
+ * Keys a-d, mapped onto option indices 0-3. DERIVED from the parser's
+ * `MAX_OPTIONS` (via `OPTION_LETTERS`) rather than written out: the cap and the
+ * keys that address it are one decision, and it stops at D because E, S and U
+ * are already session shortcuts. Raising the cap in `qcm.ts` extends this list
+ * on its own, instead of leaving a fifth option no key can reach.
  */
-const OPTION_KEYS: readonly string[] = ['a', 'b', 'c', 'd']
+const OPTION_KEYS: readonly string[] = OPTION_LETTERS.map((letter) => letter.toLowerCase())
 
 export interface SessionApi {
   phase: Phase
