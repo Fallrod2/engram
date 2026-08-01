@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // Same compromise as `e2e/tsconfig.json`: these scripts run in Node, but the
+    // bodies of `page.evaluate()` / `page.addInitScript()` / `waitForFunction()`
+    // are serialised and executed in the browser, so they legitimately reference
+    // `document` and `window`. They are typechecked here like any other code,
+    // hence the DOM lib alongside the Node types.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    // `scripts/` sits outside every workspace, so Bun leaves it no
+    // `node_modules/@engram/shared` link and the bare specifier does not
+    // resolve. This mirrors the alias `vitest.config.ts` already applies at
+    // runtime — same target file, so the types match what the tests execute.
+    "paths": {
+      "@engram/shared": ["../packages/shared/src/index.ts"]
+    }
+  },
+  // The whole directory, not a file list: a list is what let `app-entry.ts` and
+  // this directory slip the gate in the first place. Anything dropped into
+  // `scripts/` is typechecked by default.
+  "include": ["."]
+}
