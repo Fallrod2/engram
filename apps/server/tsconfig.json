@@ -1,8 +1,18 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["bun"],
-    "rootDir": "src"
+    "types": ["bun"]
   },
-  "include": ["src"]
+  // The whole directory, not `["src"]`: `drizzle.config.ts` sits at the package
+  // root and was the last tracked TypeScript file in the repo outside every
+  // typechecked program. It belongs *here* rather than in a root config —
+  // it imports `./src/db/paths` and resolves `drizzle-kit` from this package's
+  // own devDependencies, so this is the only project that sees it under the
+  // same options as the code it pulls in. Checking it from elsewhere would mean
+  // a second, divergent view of `src/`.
+  //
+  // `rootDir: "src"` was removed with the widening: under `noEmit` it emits
+  // nothing, its only effect was to reject files outside `src` — which is
+  // precisely the hole being closed.
+  "include": ["."]
 }

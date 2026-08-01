@@ -22,6 +22,9 @@ export default defineConfig({
     // Only `*.test.ts` — the Playwright suites are `*.spec.ts` (as are the
     // server's bun:test DB specs), so neither is ever picked up here.
     include: [
+      // Root-level guards over the repo's own wiring — `tsconfig-coverage`
+      // checks that no tracked TypeScript file escapes `bun run typecheck`.
+      '*.test.ts',
       'apps/**/*.test.ts',
       'apps/**/*.test.tsx',
       'packages/**/*.test.ts',

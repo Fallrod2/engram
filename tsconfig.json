@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  // The repo root is a directory like any other, and it had no program: the
+  // last file to escape the gate was `vitest.config.ts` — the file that decides
+  // which tests run. An error there does not break a build, it silently stops
+  // collecting a suite.
+  //
+  // `*.ts` is deliberately non-recursive. Every subdirectory that holds
+  // TypeScript already has its own project (`apps/*`, `packages/*`, `api`,
+  // `e2e`, `scripts`); this one covers exactly what none of them do — files
+  // dropped at the root — without checking the same source twice under
+  // different options.
+  "include": ["*.ts"]
+}
