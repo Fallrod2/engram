@@ -1036,6 +1036,10 @@ export const dictFr = {
     // ancienne). Ses lignes restent à l'écran, grisées ; le compteur, lui,
     // affichait « 0 cartes » — un chiffre que personne n'a donné.
     resultsUnknown: '— cartes',
+    // T-067 : la carte visée par `?edit=` n'est pas sur la page chargée, et sa
+    // lecture par id a échoué. L'écran ne faisait rien du tout — exactement ce
+    // que le commentaire au-dessus de la requête disait vouloir éviter.
+    editError: 'Impossible d’ouvrir cette carte.',
     archivedBadge: 'Archivée',
     prevPage: 'Page précédente',
     nextPage: 'Page suivante',

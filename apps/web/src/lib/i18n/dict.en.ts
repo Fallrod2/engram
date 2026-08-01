@@ -929,6 +929,7 @@ export const dictEn: Dict = {
     results_one: '{count} card',
     results_other: '{count} cards',
     resultsUnknown: '— cards',
+    editError: 'Could not open this card.',
     archivedBadge: 'Archived',
     prevPage: 'Previous page',
     nextPage: 'Next page',

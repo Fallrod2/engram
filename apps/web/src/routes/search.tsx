@@ -23,7 +23,6 @@ import {
 } from '@/features/search/params'
 import {
   cardCorpusSizeOptions,
-  cardDetailOptions,
   cardSearchOptions,
   useBulkDeleteCards,
   useBulkMoveCards,
@@ -46,6 +45,7 @@ import {
   type Selection,
   type SelectionResult,
 } from '@/features/search/selection'
+import { useEditCard } from '@/features/search/use-edit-card'
 import { BulkDeleteConfirm } from '@/features/search/components/bulk-delete-confirm'
 import { SearchEmpty } from '@/features/search/components/search-empty'
 import { SearchFilters, type FilterPatch } from '@/features/search/components/search-filters'
@@ -229,15 +229,11 @@ function SearchPage() {
   // --- Card editor (deep-linked) -------------------------------------------
 
   const editId = search.edit
-  const hitForEdit = editId ? known.get(editId) : undefined
   // A ⌘K hand-off can name a card that is not on THIS page — same needle, but
-  // the row may sit at offset 40. Fetch it by id rather than opening an empty
-  // dialog, or worse, doing nothing after the user picked something.
-  const editFallback = useQuery({
-    ...cardDetailOptions(editId ?? ''),
-    enabled: editId !== undefined && hitForEdit === undefined,
-  })
-  const editCard = hitForEdit?.card ?? (editId ? (editFallback.data ?? null) : null)
+  // the row may sit at offset 40. `useEditCard` fetches it by id rather than
+  // opening an empty dialog, or worse, doing nothing after the user picked
+  // something; T-067 gave that second case the voice it was missing.
+  const { card: editCard } = useEditCard(editId, known)
 
   // --- Keyboard ------------------------------------------------------------
 

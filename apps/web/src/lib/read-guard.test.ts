@@ -167,10 +167,6 @@ const ALLOWED = new Map<string, string>([
     'components/shell/command-cards.tsx::cardSearchOptions',
     '`settled` already requires a fresh successful echo before any hit is shown',
   ],
-  [
-    'routes/search.tsx::cardDetailOptions',
-    'by-id fallback for a ⌘K hand-off; the row is usually already in `known`',
-  ],
 
   // ── The ADJACENT MOTIF used to be listed here, seven entries strong: a failed
   // read rendered as a PERMANENT SKELETON, asserting "still loading" rather than
