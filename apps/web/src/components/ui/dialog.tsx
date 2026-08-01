@@ -2,6 +2,7 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
 
 const Dialog = DialogPrimitive.Root
 const DialogTrigger = DialogPrimitive.Trigger
@@ -24,12 +25,23 @@ function DialogOverlay({
   )
 }
 
-/** Modal dialog — surface-3 panel, radius-lg, shadow-lg (spec §4). */
+/**
+ * Modal dialog — surface-3 panel, radius-lg, shadow-lg (spec §4).
+ *
+ * The ✕ names itself through `useT`, here, once (T-047). It used to take a
+ * `closeLabel` prop defaulting to the string `'Fermer'` — "for the callers that
+ * are localized", which is to say: correct only for the callers who remembered.
+ * Exactly one of them ever did, and it passed `t('common.close')`, the value
+ * that is now the only value. Every other dialog in the app announced its close
+ * button in French to an English screen reader.
+ *
+ * The prop is gone rather than merely re-defaulted: an opt-in that one caller in
+ * a dozen takes is not a feature, it is the defect with a knob on it.
+ */
 function DialogContent({
   className,
   children,
   hideClose,
-  closeLabel = 'Fermer',
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   /**
@@ -39,9 +51,8 @@ function DialogContent({
    * the user a state where it IS dismissible — it must never be a dead end.
    */
   hideClose?: boolean
-  /** Accessible name of the ✕, for the callers that are localized. */
-  closeLabel?: string
 }) {
+  const t = useT()
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -59,7 +70,7 @@ function DialogContent({
         {!hideClose && (
           <DialogPrimitive.Close
             className="absolute right-4 top-4 rounded-sm text-text-faint transition-colors duration-fast hover:text-text disabled:pointer-events-none"
-            aria-label={closeLabel}
+            aria-label={t('common.close')}
           >
             <X className="size-4" />
           </DialogPrimitive.Close>

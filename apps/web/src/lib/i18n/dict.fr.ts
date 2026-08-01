@@ -81,6 +81,7 @@ export const dictFr = {
     analytics: 'Analytics',
     import: 'Import',
     search: 'Recherche de cartes',
+    admin: 'Administration',
     settings: 'Réglages',
     fallback: 'engram',
   },
@@ -305,6 +306,7 @@ export const dictFr = {
       mgmtUnavailable: 'Configure Supabase pour créer des comptes.',
     },
     suspended: {
+      meta: 'Compte suspendu — engram',
       title: 'Compte suspendu',
       body: 'Ton compte a été suspendu. Contacte l’administrateur pour le réactiver.',
       signOut: 'Se déconnecter',
@@ -781,6 +783,22 @@ export const dictFr = {
     deleteExamDesc: 'Supprime cet examen. L’échéance disparaît du planning. Irréversible.',
     examEmptyTitle: 'Aucun examen à venir.',
     examEmptyMeta: 'Ajoute une échéance pour piloter tes révisions.',
+    // Right-rail day detail (T-046). The COUNT is rendered on its own, in the
+    // mono/tabular span the design calls for, so these carry the label alone —
+    // hence a bare plural rather than a `{count}` template.
+    scheduled_one: 'review prévue',
+    scheduled_other: 'reviews prévues',
+    overdueOf_one: 'dont {count} en retard',
+    overdueOf_other: 'dont {count} en retard',
+    reviewCta: 'Réviser',
+    reviewSameDayOnly: 'Révision disponible le jour même.',
+    nothingPlanned: 'Rien de prévu ce jour.',
+    examsHeading: 'Examens',
+    pastExams: 'Passés',
+    // Month-cell overflow chip: `+3 examens`. Was a hardcoded `s` on `> 1`,
+    // which gets FR wrong at 0 — `usePlural` applies the locale's CLDR rule.
+    moreExams_one: '+{count} examen',
+    moreExams_other: '+{count} examens',
     subjectFallback: 'Matière',
   },
 

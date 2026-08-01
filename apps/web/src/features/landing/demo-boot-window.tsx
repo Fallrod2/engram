@@ -130,7 +130,6 @@ export function DemoBootWindow(props: {
       <DialogContent
         className="max-w-md gap-0 overflow-hidden p-0 ring-1 ring-accent/10"
         hideClose={!failed}
-        closeLabel={t('common.close')}
         // Escape is honoured only once there is something to escape from.
         onEscapeKeyDown={(e) => {
           if (!failed) e.preventDefault()

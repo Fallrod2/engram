@@ -3,6 +3,7 @@ import { Ban } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
+import { useDocumentTitle } from '@/lib/use-document-title'
 
 /**
  * Dedicated "account suspended" screen (spec §2.1, amendment A3). The api client
@@ -17,6 +18,13 @@ export const Route = createFileRoute('/suspended')({
 function SuspendedPage() {
   const t = useT()
   const { signOut } = useAuth()
+  // The only bare route that named nothing (T-041). Rendering outside the shell
+  // means the shell's `document.title = 'engram'` effect never runs, so the tab
+  // kept whatever was there before — the long marketing title from the static
+  // index.html on a cold load, or the previous screen's on a client navigation.
+  // Every other bare route (login, signup, forgot, set-password, onboarding, the
+  // 404) already does this; this one was the gap.
+  useDocumentTitle(t('admin.suspended.meta'))
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-lg border border-border bg-surface-1 p-8 text-center">

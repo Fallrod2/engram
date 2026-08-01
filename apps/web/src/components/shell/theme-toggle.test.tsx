@@ -1,10 +1,23 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ThemeProvider } from '@/lib/theme'
 import { LangProvider, type Lang } from '@/lib/i18n'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeToggle } from './theme-toggle'
+
+/**
+ * Only the SYSTEM signal is mocked; `motion` itself stays real, because what the
+ * T-053 cases below read is the style the real renderer puts on the node. Same
+ * reasoning as `lib/motion.test.ts`: driving this through `matchMedia` would
+ * test motion's media-query plumbing, which caches a listener per module load
+ * and is not what is in question here.
+ */
+const system = { reduced: false }
+vi.mock('motion/react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('motion/react')>()),
+  useReducedMotion: () => system.reduced,
+}))
 
 /**
  * The theme toggle used to carry hardcoded French: `aria-label` ("Passer en
@@ -51,6 +64,7 @@ function installMatchMedia() {
 beforeEach(() => {
   installMockStorage()
   installMatchMedia()
+  system.reduced = false
 })
 afterEach(cleanup)
 
@@ -103,5 +117,63 @@ describe('<ThemeToggle> is localized (no hardcoded French)', () => {
     renderToggle('dark', 'en')
     fireEvent.focus(screen.getByRole('button'))
     await waitFor(() => expect(screen.getAllByText('Light theme').length).toBeGreaterThan(0))
+  })
+})
+
+/**
+ * ═══ The icon swap obeys the motion preference (T-053).
+ *
+ * It never did. This `motion.span` animated from the day it was written and the
+ * file did not mention `useReducedMotion` once, so the spin played for anyone
+ * who had asked their OS for less movement — and kept playing whatever the
+ * product override said. `motion` does not do this for you: it auto-respects the
+ * media query only under a `<MotionConfig reducedMotion="user">`, and this app
+ * mounts none.
+ *
+ * WHAT THIS FILE PROVES. jsdom has no animation engine, so nothing here observes
+ * a tween. What it does observe is the state motion puts in the DOM on MOUNT,
+ * which is exactly where the two cases differ and is not a tween at all:
+ *
+ *   animating  → `opacity: 0; transform: rotate(-30deg)`  (the `initial` pose,
+ *                the thing it is about to move away from)
+ *   reduced    → `opacity: 1; transform: none`            (`initial={false}`:
+ *                mounted at rest, with nothing to move away from)
+ *
+ * So a regression that dropped the `reduce` gate would put `rotate(-30deg)` back
+ * on the node under a reduced-motion preference, and these cases would fail.
+ * Confirmed in a real browser as well (Chromium, emulated `prefers-reduced-
+ * motion: reduce`, then `data-motion='full'`) — see the T-053 commit message.
+ */
+describe('<ThemeToggle> obeys the motion preference (T-053)', () => {
+  /** The `motion.span` wrapping the icon: the only span the button renders. */
+  function iconStyle(container: HTMLElement): string {
+    const span = container.querySelector('button > span')
+    return span?.getAttribute('style') ?? ''
+  }
+
+  it('mounts the icon at rest when the system asks for reduced motion', () => {
+    system.reduced = true
+    const { container } = renderToggle('dark', 'fr')
+    expect(iconStyle(container)).not.toContain('rotate')
+    expect(iconStyle(container)).toContain('transform: none')
+  })
+
+  it('still animates when the system asks for nothing', () => {
+    // The control case. Without it, the assertion above would also pass on a
+    // component that never animates at all, and would prove nothing.
+    system.reduced = false
+    const { container } = renderToggle('dark', 'fr')
+    expect(iconStyle(container)).toContain('rotate(-30deg)')
+  })
+
+  it('animates again when the user overrides the system from Settings', () => {
+    // `engram-motion: full` is the deliberate "yes, I know, animate anyway".
+    // This is what pins the component to `@/lib/motion` rather than to motion's
+    // raw hook: reading the raw one would still pass the two cases above and
+    // fail here, because the override is folded in by `lib/motion.ts` alone.
+    system.reduced = true
+    localStorage.setItem('engram-motion', 'full')
+    const { container } = renderToggle('dark', 'fr')
+    expect(iconStyle(container)).toContain('rotate(-30deg)')
   })
 })

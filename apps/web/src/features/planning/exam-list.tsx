@@ -89,7 +89,7 @@ export function ExamList({
         className="min-h-0 py-8"
         action={
           <Button variant="secondary" onClick={onNew}>
-            Nouvel examen
+            {t('planning.newExam')}
             {!coarse && <Kbd className="ml-1">n</Kbd>}
           </Button>
         }
@@ -124,7 +124,7 @@ export function ExamList({
           />
         ))}
         {upcoming.length === 0 && (
-          <p className="px-1 py-4 text-xs text-text-muted">Aucun examen à venir.</p>
+          <p className="px-1 py-4 text-xs text-text-muted">{t('planning.examEmptyTitle')}</p>
         )}
       </div>
 
@@ -132,7 +132,7 @@ export function ExamList({
         <Collapsible className="mt-1 border-t border-border pt-1">
           <CollapsibleTrigger className="group/col flex w-full items-center gap-1.5 rounded-sm px-1 py-1.5 text-2xs font-semibold uppercase tracking-[0.08em] text-text-faint hover:text-text-muted">
             <ChevronDown className="size-3 transition-transform duration-fast group-data-[state=closed]/col:-rotate-90" />
-            Passés
+            {t('planning.pastExams')}
             <span className="font-mono tabular-nums">{past.length}</span>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -222,12 +222,12 @@ function ExamRow({
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={onEdit}>
             <Pencil />
-            Éditer
+            {t('common.edit')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-danger [&_svg]:text-danger" onSelect={onDelete}>
             <Trash2 />
-            Supprimer
+            {t('common.delete')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
