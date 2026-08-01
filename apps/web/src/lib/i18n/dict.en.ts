@@ -710,6 +710,7 @@ export const dictEn: Dict = {
     nextWeek: 'Next week',
     examsError: 'Could not load exams.',
     planError: 'Could not load the forecast.',
+    subjectsError: 'Subjects unavailable: names and colours may be missing.',
     legend: {
       load: 'Review load',
       loadHint:

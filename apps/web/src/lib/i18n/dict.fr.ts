@@ -789,6 +789,10 @@ export const dictFr = {
     nextWeek: 'Semaine suivante',
     examsError: 'Impossible de charger les examens.',
     planError: 'Impossible de charger la charge prévue.',
+    // T-066 : la liste des matières n'a pas répondu. Rien ne disparaît de
+    // l'écran — mais chaque nom de matière retombe sur « Matière » et les
+    // pastilles des examens s'effacent, sans que rien ne dise pourquoi.
+    subjectsError: 'Matières indisponibles : les noms et les couleurs peuvent manquer.',
     legend: {
       load: 'Charge de révision',
       loadHint:

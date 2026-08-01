@@ -176,14 +176,16 @@ const ALLOWED = new Map<string, string>([
     'by-id fallback for a ⌘K hand-off; the row is usually already in `known`',
   ],
 
-  // ── ADJACENT MOTIF, not this lot: a failed read rendered as a PERMANENT
-  // SKELETON. It asserts "still loading" rather than "empty", so it is not the
-  // pattern T-042 was opened for — but it is the same family and these are the
-  // known sites. They are listed here rather than left invisible.
+  // ── The ADJACENT MOTIF used to be listed here, seven entries strong: a failed
+  // read rendered as a PERMANENT SKELETON, asserting "still loading" rather than
+  // "empty". T-066 closed every one of them, so there is nothing left to list —
+  // each site branches on `isError` now and the honesty test below would reject
+  // an entry kept for it.
   //
-  // T-066 is closing them one at a time; an entry disappears when its site
-  // branches on `isError`. The list must end EMPTY.
-  ['routes/planning.tsx::subjectsListOptions', 'ADJACENT: calendar chips lose their subject names'],
+  // If a new one turns up, it is a defect to fix, not an entry to add. "Still
+  // loading" is an assertion like any other, and a skeleton that never resolves
+  // is a false one; an entry saying so would be documenting the bug rather than
+  // deciding anything.
 ])
 
 /* ─────────────────────────────── the scan ─────────────────────────────── */
