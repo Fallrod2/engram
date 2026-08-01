@@ -488,6 +488,7 @@ export const dictEn: Dict = {
     unknownBody: 'We can’t tell what is due right now.',
     toReviewToday: 'to review today',
     overdue: 'incl. {n} overdue',
+    detailUnavailable: 'Backlog and upcoming exams unavailable.',
     examPrompt: 'Exam',
     examTitle: '“{title}”',
     examPriorise: '. Prioritise {names}.',

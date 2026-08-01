@@ -518,6 +518,10 @@ export const dictFr = {
     unknownBody: 'Impossible de savoir ce qu’il y a à réviser pour l’instant.',
     toReviewToday: 'à réviser aujourd’hui',
     overdue: 'dont {n} en retard',
+    // T-042 : le détail du jour (retard + examen imminent) vient d'UNE seconde
+    // requête. Quand elle échoue, son absence se lisait comme « pas de retard,
+    // pas d'examen » — une affirmation. On dit qu'on ne sait pas.
+    detailUnavailable: 'Retard et examens à venir indisponibles.',
     examPrompt: 'Examen',
     examTitle: '« {title} »',
     examPriorise: '. Priorise {names}.',
