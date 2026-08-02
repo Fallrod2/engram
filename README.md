@@ -2,7 +2,7 @@
 
 Dashboard de révision self-hosted : flashcards à répétition espacée (FSRS), import de notes (Markdown, PDF, photos) et génération de cartes par IA, planning et analytics de progression.
 
-engram est un outil personnel de révision qui repose sur un vrai moteur de répétition espacée (FSRS v5, via `ts-fsrs`) plutôt qu'une réimplémentation approximative : chaque review nourrit le calcul de la prochaine échéance et alimente les statistiques. Il est pensé d'abord pour un usage EPITA (théorie des langages, anglais, etc.), puis généraliste. Il tourne en **localhost par défaut, sans authentification** (les données restent alors sur la machine), et peut aussi être **déployé sur Vercel + Supabase cloud** derrière une authentification applicative — voir [docs/deploy-vercel.md](docs/deploy-vercel.md).
+engram est un outil personnel de révision qui repose sur un vrai moteur de répétition espacée (FSRS-6, via `ts-fsrs`) plutôt qu'une réimplémentation approximative : chaque review nourrit le calcul de la prochaine échéance et alimente les statistiques. Il est pensé d'abord pour un usage EPITA (théorie des langages, anglais, etc.), puis généraliste. Il tourne en **localhost par défaut, sans authentification** (les données restent alors sur la machine), et peut aussi être **déployé sur Vercel + Supabase cloud** derrière une authentification applicative — voir [docs/deploy-vercel.md](docs/deploy-vercel.md).
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="apps/web/public/landing/dashboard-light.webp" />
