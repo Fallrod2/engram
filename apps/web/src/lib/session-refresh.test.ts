@@ -6,10 +6,12 @@ import {
 } from '@supabase/supabase-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  createRefreshGate,
   REFRESH_MARGIN_MS,
   revivalFailureAction,
   shouldRefreshSession,
   watchSessionRevival,
+  type RefreshOutcome,
 } from './session-refresh'
 
 /**
@@ -136,6 +138,60 @@ describe('revivalFailureAction — what a failed refresh means', () => {
   })
 })
 
+describe('createRefreshGate — one token exchange, however many askers', () => {
+  const fresh: RefreshOutcome = { error: null, accessToken: 'tok-fresh' }
+
+  it('concurrent asks share ONE exchange and all read the same token', async () => {
+    // The T-069 case: the wake watcher and three 401ing queries ask in the same
+    // instant. supabase-js ROTATES the refresh token, so a second exchange would
+    // present one the first has just invalidated.
+    const refresh = vi.fn<() => Promise<RefreshOutcome>>().mockResolvedValue(fresh)
+    const gate = createRefreshGate(refresh)
+    const answers = await Promise.all([gate.run(), gate.run(), gate.run()])
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(answers.map((a) => a.accessToken)).toEqual(['tok-fresh', 'tok-fresh', 'tok-fresh'])
+  })
+
+  it('inFlight is raised synchronously and lowered when the exchange settles', async () => {
+    let settle!: (value: RefreshOutcome) => void
+    const gate = createRefreshGate(
+      () =>
+        new Promise<RefreshOutcome>((resolve) => {
+          settle = resolve
+        }),
+    )
+    expect(gate.inFlight()).toBe(false)
+    const pending = gate.run()
+    // Synchronously, with no await in between: two events in one task must not
+    // both see an open gate.
+    expect(gate.inFlight()).toBe(true)
+    settle(fresh)
+    await pending
+    expect(gate.inFlight()).toBe(false)
+  })
+
+  it('a later ask, after the first settled, is a NEW exchange', async () => {
+    const refresh = vi.fn<() => Promise<RefreshOutcome>>().mockResolvedValue(fresh)
+    const gate = createRefreshGate(refresh)
+    await gate.run()
+    await gate.run()
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
+
+  it('a THROWN exchange rejects the askers and still reopens the gate', async () => {
+    // Sync throw, not a rejection: the gate must not wedge shut for the rest of
+    // the page's life because `refreshSession` blew up before its first await.
+    const refresh = vi.fn(() => {
+      throw new Error('storage lock timeout')
+    })
+    const gate = createRefreshGate(refresh)
+    await expect(gate.run()).rejects.toThrow('storage lock timeout')
+    expect(gate.inFlight()).toBe(false)
+    await expect(gate.run()).rejects.toThrow('storage lock timeout')
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe('watchSessionRevival — the events a timer cannot see', () => {
   const detachers: Array<() => void> = []
 
@@ -147,15 +203,16 @@ describe('watchSessionRevival — the events a timer cannot see', () => {
     Object.defineProperty(document, 'visibilityState', { value, configurable: true })
   }
 
-  type Refresh = () => Promise<{ error: unknown }>
+  type Refresh = () => Promise<RefreshOutcome>
+  const ok = (): RefreshOutcome => ({ error: null, accessToken: 'fresh' })
 
   /** A watcher over a session that expired 45 minutes ago (the wake-up case). */
-  function watchExpired(refresh: Refresh = vi.fn<Refresh>().mockResolvedValue({ error: null })) {
+  function watchExpired(refresh: Refresh = vi.fn<Refresh>().mockResolvedValue(ok())) {
     const signOut = vi.fn()
     detachers.push(
       watchSessionRevival({
         sessionExpiresAt: () => (Date.now() - 45 * 60_000) / 1000,
-        refresh,
+        gate: createRefreshGate(refresh),
         signOut,
       }),
     )
@@ -192,11 +249,11 @@ describe('watchSessionRevival — the events a timer cannot see', () => {
 
   it('a fresh session is left alone by every event', () => {
     setVisibility('visible')
-    const refresh = vi.fn().mockResolvedValue({ error: null })
+    const refresh = vi.fn().mockResolvedValue(ok())
     detachers.push(
       watchSessionRevival({
         sessionExpiresAt: () => (Date.now() + 50 * 60_000) / 1000,
-        refresh,
+        gate: createRefreshGate(refresh),
         signOut: vi.fn(),
       }),
     )
@@ -217,10 +274,10 @@ describe('watchSessionRevival — the events a timer cannot see', () => {
     // macOS wake dispatches focus and visibilitychange in the same task, and a
     // reconnect adds `online`. Three triggers, one token exchange.
     setVisibility('visible')
-    let settle!: (value: { error: unknown }) => void
+    let settle!: (value: RefreshOutcome) => void
     const refresh = vi.fn(
       () =>
-        new Promise<{ error: unknown }>((resolve) => {
+        new Promise<RefreshOutcome>((resolve) => {
           settle = resolve
         }),
     )
@@ -230,7 +287,7 @@ describe('watchSessionRevival — the events a timer cannot see', () => {
     window.dispatchEvent(new Event('online'))
     expect(refresh).toHaveBeenCalledTimes(1)
     // Once it settles the gate reopens — a later wake-up is still handled.
-    settle({ error: null })
+    settle(ok())
     await vi.waitFor(() => {
       window.dispatchEvent(new Event('focus'))
       expect(refresh).toHaveBeenCalledTimes(2)
@@ -242,6 +299,7 @@ describe('watchSessionRevival — the events a timer cannot see', () => {
     const { signOut } = watchExpired(
       vi.fn().mockResolvedValue({
         error: new AuthApiError('Invalid Refresh Token', 400, 'refresh_token_not_found'),
+        accessToken: null,
       }),
     )
     window.dispatchEvent(new Event('focus'))
@@ -250,9 +308,10 @@ describe('watchSessionRevival — the events a timer cannot see', () => {
 
   it('a network failure does NOT sign the user out', async () => {
     setVisibility('visible')
-    const refresh = vi
-      .fn()
-      .mockResolvedValue({ error: new AuthRetryableFetchError('Failed to fetch', 0) })
+    const refresh = vi.fn().mockResolvedValue({
+      error: new AuthRetryableFetchError('Failed to fetch', 0),
+      accessToken: null,
+    })
     const { signOut } = watchExpired(refresh)
     window.dispatchEvent(new Event('focus'))
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
@@ -284,10 +343,10 @@ describe('watchSessionRevival — the events a timer cannot see', () => {
 
   it('the detacher removes all three listeners', () => {
     setVisibility('visible')
-    const refresh = vi.fn().mockResolvedValue({ error: null })
+    const refresh = vi.fn().mockResolvedValue(ok())
     const detach = watchSessionRevival({
       sessionExpiresAt: () => (Date.now() - 60_000) / 1000,
-      refresh,
+      gate: createRefreshGate(refresh),
       signOut: vi.fn(),
     })
     detach()

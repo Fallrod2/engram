@@ -7,7 +7,7 @@ import {
   type AuthLinkTokens,
   type AuthLinkType,
 } from './auth-links'
-import { watchSessionRevival } from './session-refresh'
+import { createRefreshGate, watchSessionRevival, type RefreshGate } from './session-refresh'
 
 /**
  * Vanilla auth store (spec §3.2) — readable OUTSIDE React so the router's
@@ -207,6 +207,37 @@ export function forceSignOut(): void {
   onSignedOut()
 }
 
+/**
+ * The single token-exchange gate for the whole page, set by `init()`. `null`
+ * before init and whenever web auth is disabled — in both cases there is no
+ * Supabase session to revive, so `refreshAccessToken()` answers "no token" and
+ * every caller falls back to its pre-existing behaviour.
+ */
+let refreshGate: RefreshGate | null = null
+
+/**
+ * Exchange the refresh token for a new access token, and hand the token back.
+ *
+ * Injected into the API client (`configureAuth`) so a 401 can be retried ONCE
+ * with a fresh token instead of ending the session on the spot — see the retry
+ * comment in `api.ts`. Returns `null` on every failure, which the client reads as
+ * "this really is a dead session, sign out".
+ *
+ * Shares `refreshGate` with the wake watcher, so a wake-up refresh and a 401
+ * refresh in the same instant are ONE exchange against a rotating refresh token.
+ */
+export async function refreshAccessToken(): Promise<string | null> {
+  if (!refreshGate) return null
+  try {
+    const { error, accessToken } = await refreshGate.run()
+    return error ? null : accessToken
+  } catch {
+    // A THROWN refresh (fetch blew up, storage lock) is not an answer about the
+    // session — no fresh token, so no replay, and the caller's 401 stands.
+    return null
+  }
+}
+
 let started = false
 
 /** Hydrate from `getSession()` then subscribe to auth changes. Idempotent. */
@@ -283,16 +314,17 @@ export function init(): Promise<void> {
   // for the lifetime of the page (this module is a singleton and `init()` runs
   // once), so the detacher is deliberately dropped; the only teardown that
   // matters is the tab closing.
+  refreshGate = createRefreshGate(async () => {
+    const { data, error } = await client.auth.refreshSession()
+    return { error, accessToken: data.session?.access_token ?? null }
+  })
   watchSessionRevival({
     // Read from the store's own session rather than `getSession()`: that call
     // can itself trigger a proactive refresh, and the decision must be a pure
     // observation. `onAuthStateChange` above keeps this value current, including
     // for a rotation another tab performed.
     sessionExpiresAt: () => state.session?.expires_at ?? null,
-    refresh: async () => {
-      const { error } = await client.auth.refreshSession()
-      return { error }
-    },
+    gate: refreshGate,
     // Only reachable when the refresh failed definitively AND the access token
     // is genuinely expired. The ordinary dead-refresh-token path never gets
     // here: auth-js clears the session itself and emits `SIGNED_OUT`, which the
@@ -314,6 +346,7 @@ export const authStore = {
   init,
   setOnSignedOut,
   forceSignOut,
+  refreshAccessToken,
   captureAuthLink,
   getLinkState,
   subscribeLink,
