@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -117,6 +117,8 @@ export function QuickAddDialog({
   const [added, setAdded] = useState(0)
   const [preview, setPreview] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  /** The recto's DOM node — where the caret goes back after each card. */
+  const frontRef = useRef<HTMLTextAreaElement | null>(null)
 
   const form = useForm<QuickAddValues>({
     resolver: zodResolver(quickAddSchema),
@@ -174,10 +176,13 @@ export function QuickAddDialog({
     form.reset({ front: '', back: '' })
     setAdded((n) => n + 1)
     setPreview(false)
-    // RHF's own handle on the registered field, rather than a ref threaded
-    // through `FormControl`'s `Slot` and the `Textarea`: one mechanism, and the
-    // caret lands where the next card starts.
-    form.setFocus('front')
+    // Our own handle on the node, NOT `form.setFocus('front')`. The RHF call
+    // looks right and does nothing here: `FormControl` renders a Radix `Slot`,
+    // and the `field.ref` spread through it never reaches the `<textarea>`, so
+    // the field RHF would focus has no element behind it (measured — the caret
+    // stayed in the verso). Hence the composed ref below, which calls
+    // `field.ref` as well so RHF keeps whatever it does register.
+    frontRef.current?.focus()
   })
 
   /**
@@ -224,12 +229,22 @@ export function QuickAddDialog({
                 {listsPending ? (
                   // A skeleton, never a spinner (design system): the row keeps
                   // the height the `Select` will take, so nothing jumps.
-                  <Skeleton className="h-9 w-full rounded-sm" />
+                  <Skeleton className="h-8 w-full rounded-sm" />
+                ) : listsFailed ? (
+                  // No picker at all, rather than a disabled one showing an
+                  // empty value: with no list there is no deck NAME to display,
+                  // and a blank control that cannot be opened explains nothing.
+                  // The sentence below says what happens instead.
+                  <p className="text-2xs text-danger">
+                    {deckId
+                      ? t('session.quickAddDialog.deckErrorFallback')
+                      : t('session.quickAddDialog.deckError')}
+                  </p>
                 ) : (
                   <Select
                     {...(deckId ? { value: deckId } : {})}
                     onValueChange={setDeckId}
-                    disabled={listsFailed || groups.length === 0}
+                    disabled={groups.length === 0}
                   >
                     <SelectTrigger id="quick-add-deck">
                       <SelectValue placeholder={t('session.quickAddDialog.deckPlaceholder')} />
@@ -258,16 +273,6 @@ export function QuickAddDialog({
                     </SelectContent>
                   </Select>
                 )}
-                {/* A failed list is said out loud, and it does not have to be
-                    fatal: the deck of the card on screen is already known, so
-                    the typing goes on — only the CHOICE is lost. */}
-                {listsFailed && (
-                  <p className="text-2xs text-danger">
-                    {deckId
-                      ? t('session.quickAddDialog.deckErrorFallback')
-                      : t('session.quickAddDialog.deckError')}
-                  </p>
-                )}
                 {!listsPending && !listsFailed && groups.length === 0 && (
                   <p className="text-2xs text-text-muted">{t('session.quickAddDialog.noDecks')}</p>
                 )}
@@ -285,6 +290,12 @@ export function QuickAddDialog({
                         placeholder={t('composer.frontPlaceholder')}
                         className={cn('min-h-20', fieldState.error && 'border-danger')}
                         {...field}
+                        ref={(node: HTMLTextAreaElement | null) => {
+                          // Both, in this order: RHF first (it owns validation),
+                          // ours second (it owns the caret between two cards).
+                          field.ref(node)
+                          frontRef.current = node
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
