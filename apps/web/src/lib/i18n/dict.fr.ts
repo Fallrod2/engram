@@ -699,6 +699,7 @@ export const dictFr = {
     keyEdit: 'E',
     keySkip: 'S',
     keyUndo: 'U',
+    keyQuickAdd: 'N',
     revealHint: 'pour révéler',
     revealButton: 'Révéler la réponse',
     revealAria: 'Révéler la réponse',
@@ -720,6 +721,32 @@ export const dictFr = {
     editAria: 'Éditer cette carte',
     undo: 'Annuler',
     undoAria: 'Annuler la dernière note',
+    // T-032 : la notion qui manque se note quand elle est fraîche, sans sortir
+    // de la session.
+    quickAdd: 'Ajouter',
+    quickAddAria: 'Ajouter une carte sans quitter la session',
+    quickAddDialog: {
+      title: 'Nouvelle carte',
+      // Ce que la carte devient est dit AVANT de la saisir : elle ne s'insère
+      // pas dans la file en cours, et personne ne doit le découvrir en la
+      // cherchant dans les cartes restantes.
+      description:
+        'Elle naît « nouvelle » : elle sera servie par le budget de nouvelles cartes d’un prochain jour, pas par la session en cours.',
+      deck: 'Deck',
+      deckPlaceholder: 'Choisir un deck…',
+      deckLoading: 'Chargement des decks…',
+      // La liste a échoué, mais on connaît le deck de la carte affichée : la
+      // saisie reste possible, elle est seulement privée du choix.
+      deckErrorFallback:
+        'Impossible de charger la liste des decks — la carte ira dans le deck de la carte affichée.',
+      deckError: 'Impossible de charger la liste des decks.',
+      archivedSuffix: '(archivée)',
+      noDecks: 'Aucun deck ne peut recevoir de carte.',
+      done: 'Terminé',
+      discardTitle: 'Abandonner cette carte ?',
+      discardDesc: 'Le recto et le verso que tu viens de saisir seront perdus.',
+      discardConfirm: 'Abandonner',
+    },
     paused: 'Session en pause — appuie sur une touche ou clique pour reprendre',
     // La même phrase pour un doigt : ni touche à appuyer, ni clic à faire.
     pausedTouch: 'Session en pause — touche l’écran pour reprendre',

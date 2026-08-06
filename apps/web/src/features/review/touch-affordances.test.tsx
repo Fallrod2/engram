@@ -72,6 +72,7 @@ const BAR = {
   onEdit: () => {},
   onSkip: () => {},
   onUndo: () => {},
+  onQuickAdd: () => {},
 }
 
 /** Classes of the node, as a list (jsdom loads no stylesheet). */
@@ -168,6 +169,7 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
       for (const [name, word] of [
         ['Annuler la dernière note', 'Annuler'],
         ['Éditer cette carte', 'Éditer'],
+        ['Ajouter une carte sans quitter la session', 'Ajouter'],
         ['Passer cette carte sans la noter', 'Passer'],
       ] as const) {
         const btn = screen.getByRole('button', { name })
@@ -200,7 +202,7 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
     })
   })
 
-  it('gives the three actions a 44px row of their own, and only on touch', () => {
+  it('gives the per-card actions a 44px row of their own, and only on touch', () => {
     render(
       <TooltipProvider>
         <SessionContextBar {...BAR} />
@@ -230,47 +232,67 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
     })
   })
 
-  it('keeps the three actions live and in the same order on touch', () => {
+  it('keeps every action live and in the same order on touch', () => {
     const onEdit = vi.fn()
     const onSkip = vi.fn()
     const onUndo = vi.fn()
+    const onQuickAdd = vi.fn()
     withTouchPointer(() => {
       render(
         <TooltipProvider>
-          <SessionContextBar {...BAR} onEdit={onEdit} onSkip={onSkip} onUndo={onUndo} />
+          <SessionContextBar
+            {...BAR}
+            onEdit={onEdit}
+            onSkip={onSkip}
+            onUndo={onUndo}
+            onQuickAdd={onQuickAdd}
+          />
         </TooltipProvider>,
       )
       expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
         'Annuler la dernière note',
         'Éditer cette carte',
+        'Ajouter une carte sans quitter la session',
         'Passer cette carte sans la noter',
       ])
       for (const name of [
         'Annuler la dernière note',
         'Éditer cette carte',
+        'Ajouter une carte sans quitter la session',
         'Passer cette carte sans la noter',
       ]) {
         fireEvent.click(screen.getByRole('button', { name }))
       }
     })
-    expect([onUndo.mock.calls.length, onEdit.mock.calls.length, onSkip.mock.calls.length]).toEqual([
-      1, 1, 1,
-    ])
+    expect([
+      onUndo.mock.calls.length,
+      onEdit.mock.calls.length,
+      onQuickAdd.mock.calls.length,
+      onSkip.mock.calls.length,
+    ]).toEqual([1, 1, 1, 1])
   })
 
-  it('still refuses all three while an undo is in flight, on touch too (T-010)', () => {
+  it('still refuses every action while an undo is in flight, on touch too (T-010)', () => {
     const onSkip = vi.fn()
+    const onQuickAdd = vi.fn()
     withTouchPointer(() => {
       render(
         <TooltipProvider>
-          <SessionContextBar {...BAR} undoing onSkip={onSkip} />
+          <SessionContextBar {...BAR} undoing onSkip={onSkip} onQuickAdd={onQuickAdd} />
         </TooltipProvider>,
       )
       const skip = screen.getByRole('button', { name: 'Passer cette carte sans la noter' })
       expect((skip as HTMLButtonElement).disabled).toBe(true)
       fireEvent.click(skip)
+      // T-032 · the quick-add joins the same refusal: the reducer turns
+      // OPEN_QUICK_ADD down while `undoing`, so a live-looking button here would
+      // swallow the tap.
+      const add = screen.getByRole('button', { name: 'Ajouter une carte sans quitter la session' })
+      expect((add as HTMLButtonElement).disabled).toBe(true)
+      fireEvent.click(add)
     })
     expect(onSkip).not.toHaveBeenCalled()
+    expect(onQuickAdd).not.toHaveBeenCalled()
   })
 })
 

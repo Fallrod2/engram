@@ -14,6 +14,7 @@ import type { QueueNewCards } from '@engram/shared'
 import type { ReviewScope } from '@/lib/api'
 import { CardEditDialog } from '@/features/cards/card-edit-dialog'
 import { useReviewSession } from './use-review-session'
+import { QuickAddDialog } from './quick-add-dialog'
 import { emptyReason } from './new-card-budget'
 import { SessionExitButton, SessionHeader } from './session-header'
 import { useTouchSession } from './pointer-labels'
@@ -85,6 +86,17 @@ export function ReviewSession({ scope }: { scope: ReviewScope }) {
         }}
         card={api.current ?? null}
         onSubmit={api.submitEdit}
+      />
+      {/* T-032 — the card the user realises is missing, written where the idea
+          is fresh. Portalled by Radix like the editor above, so the session's
+          `inert` on `#app-shell` never reaches it. The session state underneath
+          is untouched: the dialog only reads which deck to pre-select. */}
+      <QuickAddDialog
+        open={api.quickAdding}
+        onOpenChange={(open) => {
+          if (!open) api.closeQuickAdd()
+        }}
+        currentDeckId={api.current?.deckId ?? null}
       />
       {api.confirmingExit && <ExitConfirm onResume={api.cancelExit} onQuit={api.confirmExit} />}
       {api.paused && <IdleOverlay onResume={api.resume} />}
@@ -225,6 +237,7 @@ function PlayView({ api }: { api: ReturnType<typeof useReviewSession> }) {
               onEdit={api.openEdit}
               onSkip={api.skip}
               onUndo={api.undo}
+              onQuickAdd={api.openQuickAdd}
             />
             <RatingBar
               revealed={api.revealed}

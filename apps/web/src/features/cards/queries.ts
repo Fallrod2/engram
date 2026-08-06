@@ -99,10 +99,16 @@ export function useCreateCard(deckId: string, subjectId: string) {
         createdAt: now,
         updatedAt: now,
       }
-      qc.setQueryData<CardsPage>(key, (old) => ({
-        cards: [...(old?.cards ?? []), optimistic],
-        total: (old?.total ?? 0) + 1,
-      }))
+      // Appended only when the page is ALREADY in the cache. T-032 calls this
+      // hook from the review session, where the deck's card list has usually
+      // never been loaded: seeding an entry from nothing would leave a page
+      // claiming `total: 1` for a deck that holds two hundred cards, and the
+      // next visit to that deck would render it — cached data first, refetch
+      // after — before the invalidation below corrected it. Where the list IS on
+      // screen (the composer's core loop) `old` is defined and nothing changes.
+      qc.setQueryData<CardsPage>(key, (old) =>
+        old ? { cards: [...old.cards, optimistic], total: old.total + 1 } : old,
+      )
       return { previous, tempId: optimistic.id }
     },
     onError: (_err, input, ctx) => {
@@ -112,10 +118,12 @@ export function useCreateCard(deckId: string, subjectId: string) {
       })
     },
     onSuccess: (created, _input, ctx) => {
+      // Same rule as `onMutate`: swap the temp row for the real one where the
+      // page exists, and seed NOTHING where it does not — `onSettled`
+      // invalidates the key either way, so an absent page is refetched whole
+      // rather than fabricated one card at a time.
       qc.setQueryData<CardsPage>(key, (old) =>
-        old
-          ? { ...old, cards: old.cards.map((c) => (c.id === ctx?.tempId ? created : c)) }
-          : { cards: [created], total: 1 },
+        old ? { ...old, cards: old.cards.map((c) => (c.id === ctx?.tempId ? created : c)) } : old,
       )
     },
     onSettled: () => invalidateCardCounts(qc, deckId, subjectId),

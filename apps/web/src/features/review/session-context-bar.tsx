@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Pencil, SkipForward, Undo2 } from 'lucide-react'
+import { Pencil, Plus, SkipForward, Undo2 } from 'lucide-react'
 import { FSRS_STATE_LABEL_KEYS, glyphClass } from '@/components/fsrs-state-glyph'
 import { Kbd } from '@/components/ui/kbd'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -277,6 +277,7 @@ export function SessionContextBar({
   onEdit,
   onSkip,
   onUndo,
+  onQuickAdd,
 }: {
   remaining: RemainingByState
   /** FSRS difficulty of the card on screen; `null` when there is no card. */
@@ -288,15 +289,23 @@ export function SessionContextBar({
   onEdit: () => void
   onSkip: () => void
   onUndo: () => void
+  /** Open the quick-add dialog — the discoverable face of `N` (T-032). */
+  onQuickAdd: () => void
 }) {
   const t = useT()
   const touch = useTouchSession()
   const name = useShortcutName()
 
-  // The three per-card actions, declared once and rendered in whichever row the
+  // The per-card actions, declared once and rendered in whichever row the
   // pointer type puts them in. Order is the same on both: Annuler · Éditer ·
-  // Passer — undo looks BACKWARD (the card you just left), while the two others
-  // act on the card in front of you.
+  // Ajouter · Passer — undo looks BACKWARD (the card you just left), the two
+  // middle ones write cards, and Passer is what moves on.
+  //
+  // "Ajouter" (T-032) is the odd one out and sits with the writers on purpose:
+  // it is the only action here that touches NO card of the lot. It is placed
+  // after "Éditer" because the two are the same gesture at two different
+  // targets — fix what is on screen, or write what is missing from it — and
+  // before "Passer", which ends the card.
   //
   // "Annuler" exists only when there is something to take back, rather than
   // standing there permanently dead; once armed it STAYS mounted for the whole
@@ -324,6 +333,21 @@ export function SessionContextBar({
         touch={touch}
         disabled={undoing}
         onClick={onEdit}
+      />
+      {/* Disabled while an undo is in flight, like its neighbours and for the
+          same measured reason: UNDO_OK re-seeds the card clock from `paused`
+          alone, so a dialog opened in that window would have its freeze thrown
+          away and the typing would be counted as recall time. The reducer
+          refuses OPEN_QUICK_ADD there, so the button has to say so rather than
+          swallow the tap. */}
+      <ActionButton
+        icon={Plus}
+        label={name('session.quickAddAria', t('session.keyQuickAdd'))}
+        labelKey="session.quickAdd"
+        shortcut={t('session.keyQuickAdd')}
+        touch={touch}
+        disabled={undoing}
+        onClick={onQuickAdd}
       />
       <ActionButton
         icon={SkipForward}
