@@ -123,17 +123,37 @@ export function QuickAddDialog({
   /**
    * Where the focus came from, so it can go back there on close.
    *
-   * Radix restores focus to its `DialogTrigger`, and this dialog HAS none: it is
-   * opened by the `N` key or by a button three components away in the session
-   * strip, so `triggerRef` is null and Radix's default drops the focus on
-   * `<body>` — measured, not assumed. From there Tab restarts at the top of the
-   * document and the session is left without a focused element.
+   * THE MECHANISM IS NECESSARY, AND TESTED. Radix restores focus to its
+   * `DialogTrigger`, and this dialog HAS none: it is opened by the `N` key or by
+   * a button three components away in the session strip, so `triggerRef` is null
+   * and Radix's default handler calls `preventDefault()` and focuses nothing —
+   * the focus lands on `<body>`, Tab restarts at the top of the document, and
+   * the full-screen session is left with no focused element. Take the
+   * `onCloseAutoFocus` below away and the focus-return test goes red.
    *
-   * Captured DURING RENDER, on the transition to `open`, and not in an effect:
-   * child effects run before the parent's, so by the time an effect here could
-   * look, Radix's focus scope has already moved the caret into the dialog and
-   * `document.activeElement` is the recto. Recording a DOM node is idempotent,
-   * and the `prevOpen` guard makes a repeated render a no-op.
+   * THE RENDER-TIME CAPTURE IS A CHOICE, AND IT IS NOT TESTED. Reading
+   * `document.activeElement` during the render in which `open` flips true reads
+   * it before anything in this commit has run, so the value cannot depend on
+   * when Radix decides to move the caret. That is the whole argument: it is
+   * robustness against a scheduling detail we do not own.
+   *
+   * What it is NOT is a fix for a bug this suite can see. Measured on the
+   * pinned `@radix-ui/react-focus-scope@1.1.12` (via `react-dialog@1.1.19`):
+   * capturing in a plain `useEffect([open])` here captures the SAME node — the
+   * opener button, not the recto — because `FocusScope` keeps its container in
+   * `useState` and its autofocus effect depends on that state, so it fires one
+   * commit later than this component's effects. All 27 tests in
+   * `quick-add-dialog.test.tsx` stay green on that version. No honest test
+   * separates the two: nothing in this tree moves the focus between the render
+   * and the parent effect, and a fixture built to move it would be testing a
+   * component that does not exist.
+   *
+   * So the reasoning below is documented, deliberate, and unguarded — if a
+   * future Radix autofocuses synchronously, this keeps working and an effect
+   * would not, and nothing in CI would have told you either way.
+   *
+   * Recording a DOM node is idempotent, and `prevOpenRef` makes a repeated
+   * render (StrictMode's double invoke included) a no-op.
    */
   const openerRef = useRef<HTMLElement | null>(null)
   const prevOpenRef = useRef(false)
