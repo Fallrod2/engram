@@ -7,6 +7,7 @@ import {
   type AuthLinkTokens,
   type AuthLinkType,
 } from './auth-links'
+import { watchSessionRevival } from './session-refresh'
 
 /**
  * Vanilla auth store (spec §3.2) — readable OUTSIDE React so the router's
@@ -274,6 +275,32 @@ export function init(): Promise<void> {
   supabase.auth.onAuthStateChange((event, session) => {
     setState({ status: session ? 'authenticated' : 'unauthenticated', session })
     if (event === 'SIGNED_OUT') onSignedOut()
+  })
+  // Revive the token on wake/refocus/reconnect. supabase-js's `autoRefreshToken`
+  // is a `setInterval` the browser throttles in a background tab and macOS
+  // suspends outright on sleep — see `session-refresh.ts` for the full account of
+  // which moments the library covers and which two it cannot. The watcher lives
+  // for the lifetime of the page (this module is a singleton and `init()` runs
+  // once), so the detacher is deliberately dropped; the only teardown that
+  // matters is the tab closing.
+  watchSessionRevival({
+    // Read from the store's own session rather than `getSession()`: that call
+    // can itself trigger a proactive refresh, and the decision must be a pure
+    // observation. `onAuthStateChange` above keeps this value current, including
+    // for a rotation another tab performed.
+    sessionExpiresAt: () => state.session?.expires_at ?? null,
+    refresh: async () => {
+      const { error } = await client.auth.refreshSession()
+      return { error }
+    },
+    // Only reachable when the refresh failed definitively AND the access token
+    // is genuinely expired. The ordinary dead-refresh-token path never gets
+    // here: auth-js clears the session itself and emits `SIGNED_OUT`, which the
+    // handler above already routes to `onSignedOut`. Guarded on the status so
+    // that, when both fire, the signed-out effect still runs exactly once.
+    signOut: () => {
+      if (state.status === 'authenticated') forceSignOut()
+    },
   })
   return readyPromise
 }
