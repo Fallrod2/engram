@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Pencil, SkipForward, Undo2 } from 'lucide-react'
 import { FSRS_STATE_LABEL_KEYS, glyphClass } from '@/components/fsrs-state-glyph'
 import { Kbd } from '@/components/ui/kbd'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useT, type TFunction, type TKey } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useShortcutName, useTouchSession } from './pointer-labels'
@@ -122,6 +123,75 @@ function DifficultyGauge({ difficulty, t }: { difficulty: number; t: TFunction }
         />
       ))}
     </div>
+  )
+}
+
+/**
+ * What is still ahead, split by FSRS state — four squares and four numbers.
+ *
+ * T-036: a screen reader has always been told which is which (the `sr-only`
+ * names below), and a sighted reader never was. `5 5 0 5` in four unexplained
+ * tints is the single densest thing on the session screen and the only one with
+ * no key anywhere on the page — the glyph vocabulary itself is documented in
+ * `fsrs-state-glyph.tsx`, which is not somewhere a user can look.
+ *
+ * So the group carries a LEGEND, on the same `Tooltip` the state glyph elsewhere
+ * already uses, listing the four states with their square, their name and their
+ * count. One tooltip and not four: the question is "what are these four
+ * colours", asked once, and four separate tooltips in a 24px strip would mean
+ * four hover targets 6px apart.
+ *
+ * `tabIndex={0}` is deliberate and is the price of the fix: the tooltip opens on
+ * focus as well as hover, so the legend is reachable in a session that is meant
+ * to be run without a mouse. It is one extra Tab stop, on a screen whose ratings
+ * are keyed `1`-`4` and whose actions are keyed `E`/`S` — Tab was not carrying
+ * traffic here.
+ */
+function RemainingCounters({ remaining, t }: { remaining: RemainingByState; t: TFunction }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          role="group"
+          tabIndex={0}
+          aria-label={t('session.remainingAria')}
+          className="flex items-center gap-3 rounded-xs font-mono tabular-nums"
+        >
+          {REMAINING_STATES.map((state) => {
+            const value = remaining[REMAINING_KEY_BY_STATE[state]]
+            return (
+              <span key={state} className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className={cn('inline-block size-2 shrink-0 rounded-xs', glyphClass(state))}
+                />
+                {/* The square carries no text, so the state name is spoken from
+                    here: the group reads "Nouvelle 3, Apprentissage 1, …". */}
+                <span className="sr-only">{t(FSRS_STATE_LABEL_KEYS[state])}</span>
+                <span className={value === 0 ? 'text-text-faint' : 'text-text-muted'}>{value}</span>
+              </span>
+            )
+          })}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="end">
+        <span className="mb-1 block text-2xs text-text-faint">{t('session.remainingAria')}</span>
+        <span className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0.5">
+          {REMAINING_STATES.map((state) => (
+            <span key={state} className="contents">
+              <span
+                aria-hidden
+                className={cn('inline-block size-2 shrink-0 rounded-xs', glyphClass(state))}
+              />
+              <span className="text-2xs text-text">{t(FSRS_STATE_LABEL_KEYS[state])}</span>
+              <span className="text-right font-mono text-2xs tabular-nums text-text-muted">
+                {remaining[REMAINING_KEY_BY_STATE[state]]}
+              </span>
+            </span>
+          ))}
+        </span>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -283,27 +353,7 @@ export function SessionContextBar({
             steps that follow can drop their own buttons next to these. */}
         {!touch && <div className="flex items-center gap-3">{actions}</div>}
         {difficulty !== null && <DifficultyGauge difficulty={difficulty} t={t} />}
-        <div
-          role="group"
-          aria-label={t('session.remainingAria')}
-          className="flex items-center gap-3 font-mono tabular-nums"
-        >
-          {REMAINING_STATES.map((state) => {
-            const value = remaining[REMAINING_KEY_BY_STATE[state]]
-            return (
-              <span key={state} className="flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className={cn('inline-block size-2 shrink-0 rounded-xs', glyphClass(state))}
-                />
-                {/* The square carries no text, so the state name is spoken from
-                    here: the group reads "Nouvelle 3, Apprentissage 1, …". */}
-                <span className="sr-only">{t(FSRS_STATE_LABEL_KEYS[state])}</span>
-                <span className={value === 0 ? 'text-text-faint' : 'text-text-muted'}>{value}</span>
-              </span>
-            )
-          })}
-        </div>
+        <RemainingCounters remaining={remaining} t={t} />
       </div>
       {/* `-ml-3` cancels the first button's own padding so its glyph lines up
           with the card's left edge one row above — the padding is the tap

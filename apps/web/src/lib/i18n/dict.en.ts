@@ -706,6 +706,9 @@ export const dictEn: Dict = {
     week: 'Week',
     prevMonth: 'Previous month',
     nextMonth: 'Next month',
+    datePlaceholder: 'YYYY-MM-DD',
+    dateInputAria: 'Date (YYYY-MM-DD) — {date}',
+    openCalendar: 'Open the calendar',
     prevWeek: 'Previous week',
     nextWeek: 'Next week',
     examsError: 'Could not load exams.',
@@ -774,8 +777,11 @@ export const dictEn: Dict = {
     retentionTitle: 'Retention by subject',
     retentionCaption: 'Retention by subject',
     retentionError: 'Could not load retention.',
-    retentionEmpty: 'Review a bit more to see your retention by subject.',
-    retentionHint: 'Retention is computed on mature cards (≥ 10 reviews).',
+    retentionEmpty: 'No subject has enough mature reviews yet.',
+    retentionHint_one: 'Retention appears from {count} mature review per subject.',
+    retentionHint_other: 'Retention appears from {count} mature reviews per subject.',
+    retentionRemaining_one: '{count} mature review to go',
+    retentionRemaining_other: '{count} mature reviews to go',
     colSubject: 'Subject',
     colMatureReviews: 'Mature reviews',
     colRetention: 'Retention',
@@ -1246,6 +1252,10 @@ export const dictEn: Dict = {
       'Configure a provider (Anthropic, OpenRouter, Ollama…) in Settings → Artificial intelligence.',
     noProviderCta: 'Settings',
     noProviderHint: 'No AI provider configured.',
+    demoNoSpendTitle: 'The demo does not run generations',
+    demoNoSpendBody:
+      'The demo account never spends on a paid API. Open the pre-recorded generation shipped with the demo: the card-by-card review there is real.',
+    demoNoSpendHint: 'The demo does not run generations — open the pre-recorded sample.',
     prerecordedTitle: 'Sample shipped with the demo',
     prerecordedBody:
       'These cards were written in advance and shipped with the demo account: no generation was run, and no credit was spent. The review below, however, is real — accepting, editing or rejecting genuinely puts the cards in the deck.',
@@ -1386,6 +1396,10 @@ export const dictEn: Dict = {
     rejectUnsupported: 'Unsupported file type',
     rejectUnsupportedDetail: '{name} — .md, .pdf, or a photo',
     provider: {
+      demoNoSpend: {
+        title: 'The demo does not read photos',
+        body: 'The demo account never spends on a paid API. Paste your text, or import a Markdown file: the demo\u2019s pre-recorded generation shows the card-by-card review.',
+      },
       noProvider: {
         title: 'No AI provider configured for OCR',
         body: 'Set one up in Settings → Artificial intelligence to transcribe your photos.',
@@ -1425,6 +1439,8 @@ export const dictEn: Dict = {
       takePhoto: 'Take a photo',
     },
     error: {
+      demoNoSpend:
+        'The demo does not read photos: the demo account never spends on a paid API. Paste your text, or import a Markdown file.',
       noProvider: 'No AI provider configured for OCR (see Settings → AI).',
       noVision:
         'The configured provider can’t read images — pick a dedicated OCR provider (Settings → AI → OCR).',
@@ -1493,6 +1509,8 @@ export const dictEn: Dict = {
       noAccount: 'No account yet?',
       signUpLink: 'Create an account',
       forgot: 'Forgot your password?',
+      orSeparator: 'or',
+      demoNote: 'A ready-made account, with a full history to browse.',
     },
     signup: {
       title: 'Create an account',

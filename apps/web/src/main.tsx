@@ -56,6 +56,10 @@ authStore.setOnSignedOut(() => {
 configureAuth({
   getAccessToken: () => authStore.token(),
   onUnauthorized: () => authStore.forceSignOut(),
+  // …but only after ONE retry with a freshly exchanged token (T-069): the token
+  // that expired while the machine slept must not cost the user their session.
+  // See the retry block in `lib/api.ts` for why replaying is safe on every method.
+  refreshAccessToken: () => authStore.refreshAccessToken(),
   // A newly-suspended account mid-use (IAM, amendment A3): route to the dedicated
   // screen instead of a silent cascade of failing queries. Idempotent — repeated
   // 403s just re-navigate to the same bare route.

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { dictEn } from '@/lib/i18n/dict.en'
 import { dictFr } from '@/lib/i18n/dict.fr'
 import { ExitConfirm } from './exit-confirm'
@@ -147,7 +148,11 @@ describe('T-029/T-047 — the rating zone advertises no key it cannot be given',
 
 describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', () => {
   it('hides its label under 640px on a keyboard (the 24px strip must hold at 320px)', () => {
-    render(<SessionContextBar {...BAR} />)
+    render(
+      <TooltipProvider>
+        <SessionContextBar {...BAR} />
+      </TooltipProvider>,
+    )
     const skip = screen.getByRole('button', { name: 'Passer cette carte sans la noter (S)' })
     // `hidden sm:inline` — the aria-label is what carries the meaning there.
     expect(classes(skip.querySelector('span')!)).toContain('hidden')
@@ -155,7 +160,11 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
 
   it('shows the label unconditionally on touch — a lone glyph is what read as decoration', () => {
     withTouchPointer(() => {
-      render(<SessionContextBar {...BAR} />)
+      render(
+        <TooltipProvider>
+          <SessionContextBar {...BAR} />
+        </TooltipProvider>,
+      )
       for (const [name, word] of [
         ['Annuler la dernière note', 'Annuler'],
         ['Éditer cette carte', 'Éditer'],
@@ -169,11 +178,19 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
   })
 
   it('stops announcing a key the device does not have, and only then', () => {
-    render(<SessionContextBar {...BAR} />)
+    render(
+      <TooltipProvider>
+        <SessionContextBar {...BAR} />
+      </TooltipProvider>,
+    )
     expect(screen.getByRole('button', { name: 'Éditer cette carte (E)' })).toBeTruthy()
     cleanup()
     withTouchPointer(() => {
-      render(<SessionContextBar {...BAR} />)
+      render(
+        <TooltipProvider>
+          <SessionContextBar {...BAR} />
+        </TooltipProvider>,
+      )
       expect(screen.queryByRole('button', { name: 'Éditer cette carte (E)' })).toBeNull()
       const edit = screen.getByRole('button', { name: 'Éditer cette carte' })
       // The shortcut is still DECLARED — it still fires. Only the sentence read
@@ -184,7 +201,11 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
   })
 
   it('gives the three actions a 44px row of their own, and only on touch', () => {
-    render(<SessionContextBar {...BAR} />)
+    render(
+      <TooltipProvider>
+        <SessionContextBar {...BAR} />
+      </TooltipProvider>,
+    )
     const keyboardRows = [...document.body.firstElementChild!.firstElementChild!.children].map(
       (r) => classes(r),
     )
@@ -192,7 +213,11 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
     expect(keyboardRows[0]).toContain(CONTEXT_INFO_ROW)
     cleanup()
     withTouchPointer(() => {
-      render(<SessionContextBar {...BAR} />)
+      render(
+        <TooltipProvider>
+          <SessionContextBar {...BAR} />
+        </TooltipProvider>,
+      )
       const rows = [...document.body.firstElementChild!.firstElementChild!.children].map((r) =>
         classes(r),
       )
@@ -210,7 +235,11 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
     const onSkip = vi.fn()
     const onUndo = vi.fn()
     withTouchPointer(() => {
-      render(<SessionContextBar {...BAR} onEdit={onEdit} onSkip={onSkip} onUndo={onUndo} />)
+      render(
+        <TooltipProvider>
+          <SessionContextBar {...BAR} onEdit={onEdit} onSkip={onSkip} onUndo={onUndo} />
+        </TooltipProvider>,
+      )
       expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
         'Annuler la dernière note',
         'Éditer cette carte',
@@ -232,7 +261,11 @@ describe('T-029 — Éditer and Passer are words, on a target a thumb can hit', 
   it('still refuses all three while an undo is in flight, on touch too (T-010)', () => {
     const onSkip = vi.fn()
     withTouchPointer(() => {
-      render(<SessionContextBar {...BAR} undoing onSkip={onSkip} />)
+      render(
+        <TooltipProvider>
+          <SessionContextBar {...BAR} undoing onSkip={onSkip} />
+        </TooltipProvider>,
+      )
       const skip = screen.getByRole('button', { name: 'Passer cette carte sans la noter' })
       expect((skip as HTMLButtonElement).disabled).toBe(true)
       fireEvent.click(skip)

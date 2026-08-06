@@ -13,6 +13,42 @@ describe('isApiKeyError', () => {
   })
 })
 
+/**
+ * T-058 — the demo is refused a SPENDING run by policy, not by a missing key.
+ * Told "no AI provider configured", a demo visitor goes to Réglages to flip a
+ * switch that is not theirs (its AI config is read-only) — a true sentence and
+ * a dead end.
+ */
+describe('classifyGenerationError — the demo refusal', () => {
+  const demo403 = new ApiError(403, 'la démo ne lance pas de génération', 'forbidden', {
+    reason: 'demo_no_spend',
+  })
+
+  it('reads the structured reason, never the prose', () => {
+    expect(classifyGenerationError(demo403)).toBe('demoNoSpend')
+  })
+
+  it('outranks apiKeyMissing — both are true, one leads somewhere', () => {
+    const withKeyWords = new ApiError(403, 'no ANTHROPIC_API_KEY here', 'forbidden', {
+      reason: 'demo_no_spend',
+    })
+    expect(classifyGenerationError(withKeyWords)).toBe('demoNoSpend')
+  })
+
+  it('an ordinary 403 is NOT the demo refusal', () => {
+    expect(classifyGenerationError(new ApiError(403, 'nope', 'forbidden'))).toBe('generic')
+    expect(
+      classifyGenerationError(new ApiError(403, 'nope', 'forbidden', { reason: 'other' })),
+    ).toBe('generic')
+    // Right reason, wrong status: the contract is both, or neither.
+    expect(
+      classifyGenerationError(
+        new ApiError(500, 'nope', 'internal_error', { reason: 'demo_no_spend' }),
+      ),
+    ).toBe('generic')
+  })
+})
+
 describe('classifyGenerationError', () => {
   it('classifies a 503 service_unavailable as apiKeyMissing', () => {
     expect(classifyGenerationError(new ApiError(503, 'x', 'service_unavailable'))).toBe(

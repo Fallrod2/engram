@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { useReducedMotion } from '@/lib/motion'
 import { ArrowRight, Keyboard, LineChart, ScanLine } from 'lucide-react'
@@ -11,16 +10,11 @@ import { PROVIDER_ORDER, providerLabel } from '@/features/ai/providers'
 import { ACCEPT_EXTENSIONS, MAX_UPLOAD_BYTES } from '@/components/import/dropzone'
 import { VERDICTS, type Verdict } from '@/features/review/verdict'
 import { useTheme } from '@/lib/theme'
-import { fetchHealth } from '@/lib/api'
 import { siteHost } from '@/lib/build-info'
-import { qk } from '@/lib/query-keys'
-import { AUTH_ENABLED_WEB } from '@/lib/supabase'
 import { useAuthStatus } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
-import { DemoBootWindow } from './demo-boot-window'
-import { useDemoBoot } from './use-demo-boot'
+import { DemoCta } from './demo-cta'
 
 /**
  * Public landing page (landing spec §2). Rendered OUTSIDE the app shell for a
@@ -368,84 +362,6 @@ function Hero() {
         </motion.div>
       </div>
     </section>
-  )
-}
-
-/* ---------------------------------------------------------------- demo CTA -- */
-
-/**
- * "Try the demo" CTA (landing spec §2). Three things worth knowing:
- *
- *  1. AVAILABILITY IS LEARNED AT RUNTIME, not at build time. `GET /api/health` is
- *     public and reports `demoLoginEnabled` — the exact predicate the server route
- *     uses. So Alex can turn the demo on by setting the env vars on Vercel, with
- *     NO front-end redeploy. Nothing about the demo is baked into the bundle: the
- *     account's password lives on the server only and has no `VITE_` twin.
- *  2. IT NEVER SENDS CREDENTIALS. `POST /api/demo/session` takes no input; the
- *     server signs in with its own env credentials and hands back a token pair,
- *     which we install with `supabase.auth.setSession`. `AUTH_ENABLED_WEB` is part
- *     of the condition because without a Supabase client there is nowhere to put
- *     the session (local dev / e2e, where the whole auth flow is off anyway).
- *  3. WHILE THE PROBE IS IN FLIGHT we hold the button's footprint with a skeleton
- *     rather than popping the CTA in (or spinning): the hero must not reflow under
- *     the reader. Probe failed, or no demo → nothing is rendered at all.
- *  4. THE WAIT IS OWNED BY `useDemoBoot`: open a session, wait for the server to
- *     finish seeding, and only THEN sign the browser in — that order is what keeps
- *     this page (and the boot window) mounted, because `routes/index.tsx` swaps
- *     the landing for the dashboard as soon as the auth status flips. Past 500 ms
- *     a window appears saying which step is running; see `use-demo-boot.ts` for
- *     why 500 ms and why it is often never shown at all. A boot that never crosses
- *     that threshold behaves EXACTLY as before: a pending button, then the app.
- */
-function DemoCta({ onFailedChange }: { onFailedChange: (failed: boolean) => void }) {
-  const t = useT()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
-
-  const boot = useDemoBoot({
-    onEnter: () => void navigate({ to: '/' }),
-    onFailedChange,
-    // The boot already paid for `GET /api/me`; hand it to the cache so the app
-    // shell does not immediately ask again.
-    onPrimed: (me) => qc.setQueryData(qk.me, me),
-  })
-  // Deliberately stays true through `ready`: the landing is about to unmount and
-  // the button must not become clickable again in between.
-  const pending = boot.state.phase === 'working' || boot.state.phase === 'ready'
-
-  const health = useQuery({
-    queryKey: qk.health,
-    queryFn: ({ signal }) => fetchHealth(signal),
-    // One shot: a server that cannot answer its own health probe is not going to
-    // serve a demo session either, and the landing must never retry-storm.
-    retry: false,
-    staleTime: 5 * 60_000,
-  })
-
-  if (health.isPending) {
-    return (
-      <Skeleton
-        role="status"
-        aria-label={t('landing.hero.demoCtaLoading')}
-        className="h-9 w-36 rounded-sm"
-      />
-    )
-  }
-  if (!AUTH_ENABLED_WEB || !health.data?.demoLoginEnabled) return null
-
-  return (
-    <>
-      <Button type="button" variant="outline" size="lg" disabled={pending} onClick={boot.start}>
-        {pending ? t('landing.hero.demoCtaPending') : t('landing.hero.demoCta')}
-      </Button>
-      <DemoBootWindow
-        open={boot.windowOpen}
-        state={boot.state}
-        onRetry={boot.retry}
-        onDismiss={boot.dismiss}
-        onEnterAnyway={boot.enterAnyway}
-      />
-    </>
   )
 }
 
@@ -851,6 +767,10 @@ function Providers() {
 function FinalCta() {
   const t = useT()
   const signedIn = useSignedIn()
+  // T-034: this block used to offer "create an account" and "sign in" only. A
+  // reader who has just scrolled the whole page is the likeliest person to want
+  // the demo, and it was the one CTA row that did not have it.
+  const [demoFailed, setDemoFailed] = useState(false)
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
       <div className="relative overflow-hidden rounded-lg border border-border bg-surface-1 px-6 py-12 text-center sm:px-10 sm:py-16">
@@ -866,21 +786,31 @@ function FinalCta() {
         <p className="mx-auto mt-4 max-w-xl text-pretty text-sm leading-relaxed text-text-muted sm:text-base">
           {t('landing.finalCta.body')}
         </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          {signedIn ? (
-            <OpenAppButton size="lg" />
-          ) : (
-            <>
-              <Button asChild size="lg" className="min-w-44">
-                <Link to="/signup">
-                  {t('landing.nav.createAccount')}
-                  <ArrowRight />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link to="/login">{t('landing.nav.signIn')}</Link>
-              </Button>
-            </>
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            {signedIn ? (
+              <OpenAppButton size="lg" />
+            ) : (
+              <>
+                <Button asChild size="lg" className="min-w-44">
+                  <Link to="/signup">
+                    {t('landing.nav.createAccount')}
+                    <ArrowRight />
+                  </Link>
+                </Button>
+                <DemoCta onFailedChange={setDemoFailed} />
+                <Button asChild variant="ghost" size="lg">
+                  <Link to="/login">{t('landing.nav.signIn')}</Link>
+                </Button>
+              </>
+            )}
+          </div>
+          {/* Under the whole row, for the same reason as the hero: a message
+              inside the row would widen its column and shove the buttons. */}
+          {demoFailed && (
+            <p role="alert" className="max-w-sm text-pretty text-xs text-danger">
+              {t('landing.hero.demoError')}
+            </p>
           )}
         </div>
       </div>

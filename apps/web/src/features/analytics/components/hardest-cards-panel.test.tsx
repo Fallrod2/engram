@@ -61,10 +61,13 @@ describe('<HardestCardsPanel>', () => {
     expect(groups[1]?.textContent).toContain('Chomsky hierarchy')
   })
 
-  it('renders the difficulty with exactly one decimal', () => {
+  it('renders the difficulty with exactly one decimal, out of 10', () => {
+    // T-036 — `7.4` alone is a number with no unit. The scale used to live only
+    // in the aria-label, so the one reader who could not see the list was the
+    // only one told what it was out of.
     renderPanel(response([card({ difficulty: 8 }), card({ cardId: 'c2', difficulty: 6.28 })]))
-    expect(screen.getByText('8.0')).toBeTruthy()
-    expect(screen.getByText('6.3')).toBeTruthy()
+    expect(screen.getByText(/^8\.0/).textContent).toBe('8.0/10')
+    expect(screen.getByText(/^6\.3/).textContent).toBe('6.3/10')
     expect(screen.getByLabelText('Difficulté de cette carte : 8.0 sur 10')).toBeTruthy()
   })
 

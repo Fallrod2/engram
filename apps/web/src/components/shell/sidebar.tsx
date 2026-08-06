@@ -66,7 +66,28 @@ export function Sidebar() {
   // (see `DueState`), and it renders as the same em-dash `<DueCount>` already
   // uses for an unknown figure everywhere else.
   const dueUnknown = dueQuery.isError
-  const dueFor = (subjectId: string): DueState => (dueUnknown ? 'unknown' : dueMap.get(subjectId))
+  /**
+   * T-036 — a subject the counts response does not mention reads ZERO, not
+   * "still loading".
+   *
+   * `GET /review/counts` enumerates every non-archived subject, zeros included,
+   * so a name that is in the rail but not in that answer is a subject created
+   * SINCE it was computed — the optimistic row a fresh "Nouvelle matière" puts
+   * up before the counts query has refetched. It necessarily holds no cards.
+   * Falling through to `undefined` made that row shimmer next to neighbours
+   * showing `·`, so two subjects with the same (empty) backlog looked like two
+   * different states, and the newest one looked broken.
+   *
+   * The skeleton still means what it says: it survives only while the counts
+   * query has genuinely not answered yet, in which case NO row has a figure.
+   */
+  const dueLoaded = dueQuery.data !== undefined
+  const dueFor = (subjectId: string): DueState => {
+    if (dueUnknown) return 'unknown'
+    const split = dueMap.get(subjectId)
+    if (split) return split
+    return dueLoaded ? { dueCount: 0, overdueCount: 0, todayCount: 0 } : undefined
+  }
   // The "Session de révision" row carries the instance-wide split, shaped like a
   // per-subject row so both row kinds share one renderer and one label builder.
   const totalDue: DueState = dueUnknown

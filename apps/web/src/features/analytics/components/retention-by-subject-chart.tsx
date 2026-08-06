@@ -102,10 +102,47 @@ export function RetentionBySubjectChart({
   })
 
   const rated = rows.filter((r) => r.retention !== null).sort((a, b) => b.retention! - a.retention!)
+  // Closest to the bar first: "you need 2 more" is a nudge, "you need 10 more" is
+  // an explanation, and the reader wants the nudge at the top.
   const unrated = rows
     .filter((r) => r.retention === null)
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => b.reviews - a.reviews || a.name.localeCompare(b.name))
   const allEmpty = data !== undefined && rated.length === 0
+
+  /**
+   * The threshold, read from the server rather than restated (T-033). `retention`
+   * returns `minSample` alongside every row precisely so the UI can say WHY a bar
+   * is missing; the copy used to say "not enough data yet", which is an excuse
+   * rather than an answer — a reader with 20 days of history has no way to know
+   * whether they are one review short or fifty.
+   *
+   * It counts MATURE reviews (the server's `state = Review` filter), which is the
+   * other half of the surprise: a beginner can have reviewed every day and still
+   * have almost none, because a card in Learning has not been scheduled yet. The
+   * copy names them "mature" for that reason.
+   */
+  const minSample = data?.minSample ?? 0
+  const remainingFor = (r: Row): number => Math.max(0, minSample - r.reviews)
+
+  /** The per-subject countdown, shown under the bars AND in place of them. */
+  const missingList = unrated.length > 0 && (
+    <ul className="mt-3 flex flex-col gap-1.5 border-t border-border pt-3">
+      {unrated.map((r) => (
+        <li key={r.subjectId} className="flex items-center gap-2 opacity-70">
+          <SubjectDot color={r.color} />
+          <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{r.name}</span>
+          <span className="font-mono text-xs text-text-faint">
+            {r.reviews}/{minSample}
+          </span>
+          <span className="text-xs text-text-faint">
+            {t(`analytics.retentionRemaining_${plural(remainingFor(r))}`, {
+              count: remainingFor(r),
+            })}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
   const highlighted = highlightSubjectId ? byId.get(highlightSubjectId) : undefined
   const colorById = new Map(rows.map((r) => [r.subjectId, r.color]))
 
@@ -121,13 +158,28 @@ export function RetentionBySubjectChart({
       />
     )
   } else if (allEmpty) {
+    // The countdown stays visible here too. Hiding every subject the moment none
+    // of them qualifies is what made this state unreadable: the reader lost both
+    // the list AND the reason, and was left with "review a bit more".
     body = (
-      <ChartEmpty
-        title={t('analytics.retentionEmpty')}
-        hint={t('analytics.retentionHint')}
-        height={180}
-      />
+      <div>
+        <ChartEmpty
+          title={t('analytics.retentionEmpty')}
+          hint={t(`analytics.retentionHint_${plural(minSample)}`, { count: minSample })}
+          height={unrated.length > 0 ? 96 : 180}
+        />
+        {missingList}
+      </div>
     )
+    if (unrated.length > 0)
+      table = (
+        <ChartTableView
+          columns={tableColumns}
+          rows={unrated}
+          rowKey={(r) => r.subjectId}
+          caption={t('analytics.retentionCaption')}
+        />
+      )
   } else {
     body = (
       <div>
@@ -194,18 +246,7 @@ export function RetentionBySubjectChart({
           </p>
         )}
 
-        {unrated.length > 0 && (
-          <ul className="mt-3 flex flex-col gap-1.5 border-t border-border pt-3">
-            {unrated.map((r) => (
-              <li key={r.subjectId} className="flex items-center gap-2 opacity-70">
-                <SubjectDot color={r.color} />
-                <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{r.name}</span>
-                <span className="font-mono text-xs text-text-faint">—</span>
-                <span className="text-xs text-text-faint">{t('analytics.notEnoughData')}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        {missingList}
       </div>
     )
     table = (
@@ -223,7 +264,9 @@ export function RetentionBySubjectChart({
       title={t('analytics.retentionTitle')}
       subtitle={windowLabel}
       isFetching={isFetching}
-      showToggle={!allEmpty && !(error && !data)}
+      // A table exists whenever there is a row to put in it — including the
+      // all-empty case, where the rows are the countdowns.
+      showToggle={Boolean(table)}
       table={table}
     >
       {body}

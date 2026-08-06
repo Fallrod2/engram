@@ -39,6 +39,7 @@ export function GenerationLaunchPanel({
   onNewDeck,
   banner,
   providerUnavailable = false,
+  demoNoSpend = false,
 }: {
   kind: GenerationKind
   onKindChange: (kind: GenerationKind) => void
@@ -58,19 +59,29 @@ export function GenerationLaunchPanel({
    * BEFORE the visitor picks a type, creates a target deck and clicks.
    */
   providerUnavailable?: boolean
+  /**
+   * The caller is the DEMO account (T-058). It only changes the WORDING of the
+   * blocker — `providerUnavailable` still does the disabling — because "no
+   * provider configured" is true here and useless: the demo would be refused
+   * with a key too (`requireNotDemoSpend`), and its AI config is read-only.
+   */
+  demoNoSpend?: boolean
 }) {
   const t = useT()
   const noDecks = deckGroups.every((g) => g.decks.length === 0)
   const canLaunch = !!deckId && !contentEmpty && !pending && !providerUnavailable
   // Ordered by which blocker the visitor should fix first: a missing provider
-  // makes the deck and the content irrelevant.
-  const hint = providerUnavailable
-    ? t('generation.noProviderHint')
-    : contentEmpty
-      ? t('generation.hintEmpty')
-      : !deckId
-        ? t('generation.hintNoDeck')
-        : null
+  // makes the deck and the content irrelevant. The demo reason outranks it —
+  // both are true of a demo visitor and only one of them leads anywhere.
+  const hint = demoNoSpend
+    ? t('generation.demoNoSpendHint')
+    : providerUnavailable
+      ? t('generation.noProviderHint')
+      : contentEmpty
+        ? t('generation.hintEmpty')
+        : !deckId
+          ? t('generation.hintNoDeck')
+          : null
 
   return (
     <div

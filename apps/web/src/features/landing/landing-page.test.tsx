@@ -391,33 +391,53 @@ describe('<LandingPage> — parametric claims match their source', () => {
  * front-end deploy — and that clicking it never sends a credential.
  */
 describe('<LandingPage> — demo CTA', () => {
-  const demoButton = () => screen.queryByRole('button', { name: 'Essayer la démo' })
+  // TWO of them since T-034: the hero's and the closing block's. `getAllBy` is
+  // the assertion, not a workaround — a landing that grew a third entrance, or
+  // lost one, changes this number and has to say so.
+  const demoButtons = () => screen.queryAllByRole('button', { name: 'Essayer la démo' })
+  const firstDemoButton = async () =>
+    (await screen.findAllByRole('button', { name: 'Essayer la démo' }))[0]!
 
-  it('is absent while the availability probe is in flight (a skeleton holds the slot)', () => {
+  it('is absent while the availability probe is in flight (a skeleton holds each slot)', () => {
     fetchHealth.mockReturnValue(new Promise(() => {})) // never settles
     renderLanding()
-    expect(demoButton()).toBeNull()
-    expect(screen.getByRole('status')).toBeTruthy()
-    expect(screen.getByRole('status').getAttribute('aria-label')).toBe('Vérification de la démo')
+    expect(demoButtons()).toHaveLength(0)
+    const holders = screen.getAllByRole('status')
+    expect(holders).toHaveLength(2)
+    for (const h of holders) expect(h.getAttribute('aria-label')).toBe('Vérification de la démo')
   })
 
   it('stays hidden when the server reports no demo login', async () => {
     renderLanding() // default health: demoLoginEnabled false
     await settleDemoProbe()
-    expect(demoButton()).toBeNull()
+    expect(demoButtons()).toHaveLength(0)
   })
 
   it('stays hidden when the health probe itself fails', async () => {
     fetchHealth.mockRejectedValue(new Error('offline'))
     renderLanding()
     await settleDemoProbe()
-    expect(demoButton()).toBeNull()
+    expect(demoButtons()).toHaveLength(0)
   })
 
   it('appears when the server reports a demo login, with no rebuild involved', async () => {
     fetchHealth.mockResolvedValue(health(true))
     renderLanding()
-    expect(await screen.findByRole('button', { name: 'Essayer la démo' })).toBeTruthy()
+    await screen.findAllByRole('button', { name: 'Essayer la démo' })
+    expect(demoButtons()).toHaveLength(2)
+  })
+
+  it('the closing block offers the demo too, not just "sign in"', async () => {
+    // The reader who has scrolled the whole page is the likeliest to want it, and
+    // this was the one CTA row that did not have it (T-034).
+    fetchHealth.mockResolvedValue(health(true))
+    renderLanding()
+    await screen.findAllByRole('button', { name: 'Essayer la démo' })
+    const sections = document.querySelectorAll('main > section')
+    const closing = sections[sections.length - 1]!
+    expect(closing.textContent).toContain('Essayer la démo')
+    expect(closing.textContent).toContain('Créer un compte')
+    expect(closing.textContent).toContain('Se connecter')
   })
 
   it('opens the session and enters the app, sending NO credential', async () => {
@@ -425,7 +445,7 @@ describe('<LandingPage> — demo CTA', () => {
     createDemoSession.mockResolvedValue({ accessToken: 'acc', refreshToken: 'ref' })
     setSession.mockResolvedValue({ error: null })
     renderLanding()
-    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    fireEvent.click(await firstDemoButton())
     await waitFor(() => expect(setSession).toHaveBeenCalled())
     // No argument at all: the browser never holds nor transmits the demo password.
     expect(createDemoSession).toHaveBeenCalledWith()
@@ -439,7 +459,7 @@ describe('<LandingPage> — demo CTA', () => {
     createDemoSession.mockReturnValue(new Promise((r) => (release = r)))
     setSession.mockResolvedValue({ error: null })
     renderLanding()
-    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    fireEvent.click(await firstDemoButton())
     const pending = await screen.findByRole('button', { name: 'Ouverture de la démo…' })
     expect((pending as HTMLButtonElement).disabled).toBe(true)
     release({ accessToken: 'acc', refreshToken: 'ref' })
@@ -450,12 +470,12 @@ describe('<LandingPage> — demo CTA', () => {
     fetchHealth.mockResolvedValue(health(true))
     createDemoSession.mockRejectedValue(new Error('503'))
     renderLanding()
-    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    fireEvent.click(await firstDemoButton())
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toBe(
       'La démo est indisponible pour le moment. Réessaie dans un instant.',
     )
-    expect((demoButton() as HTMLButtonElement).disabled).toBe(false)
+    expect((demoButtons()[0] as HTMLButtonElement).disabled).toBe(false)
     expect(navigate).not.toHaveBeenCalled()
   })
 
@@ -464,7 +484,7 @@ describe('<LandingPage> — demo CTA', () => {
     createDemoSession.mockResolvedValue({ accessToken: 'acc', refreshToken: 'ref' })
     setSession.mockResolvedValue({ error: { message: 'bad token' } })
     renderLanding()
-    fireEvent.click(await screen.findByRole('button', { name: 'Essayer la démo' }))
+    fireEvent.click(await firstDemoButton())
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(navigate).not.toHaveBeenCalled()
   })
@@ -472,8 +492,8 @@ describe('<LandingPage> — demo CTA', () => {
   it('is localized like the rest of the page', async () => {
     fetchHealth.mockResolvedValue(health(true))
     renderLanding()
-    await screen.findByRole('button', { name: 'Essayer la démo' })
+    await screen.findAllByRole('button', { name: 'Essayer la démo' })
     fireEvent.click(screen.getByRole('button', { name: 'en' }))
-    expect(screen.getByRole('button', { name: 'Try the demo' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Try the demo' })).toHaveLength(2)
   })
 })

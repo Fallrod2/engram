@@ -49,6 +49,28 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * True iff this failure is the demo account being refused a SPENDING call
+ * (T-058): `403 forbidden` carrying `details.reason === 'demo_no_spend'`.
+ *
+ * The server tags it structurally, exactly like the OCR 503's `details.reason`,
+ * so a client never has to match on French prose. It lives here rather than in
+ * one feature's `errors.ts` because two flows hit the same rule — a generation
+ * and a photo extraction — and a second copy of this predicate would be a second
+ * chance to get the contract subtly wrong.
+ */
+export function isDemoNoSpendError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false
+  if (err.status !== 403 || err.code !== 'forbidden') return false
+  const details: unknown = err.details
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'reason' in details &&
+    (details as { reason?: unknown }).reason === 'demo_no_spend'
+  )
+}
+
 async function toApiError(res: Response): Promise<ApiError> {
   try {
     const parsed = apiErrorSchema.safeParse(await res.json())
@@ -100,7 +122,53 @@ async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T
   Object.assign(headers, accessToken ? { Authorization: `Bearer ${accessToken}` } : authHeader())
   init.headers = headers
   if (signal) init.signal = signal
-  const res = await fetch(`/api${path}`, init)
+  let res = await fetch(`/api${path}`, init)
+
+  // ═══ ONE retry after a refresh, and only one (T-069) ═══
+  //
+  // A 401 used to mean "sign out", full stop. But the commonest 401 in this app is
+  // not a dead session — it is a request that LEFT with a token that expired while
+  // the machine slept. `session-refresh.ts` narrows that window by refreshing on
+  // wake/refocus/reconnect; it cannot close it, because the queries TanStack Query
+  // refetches on that same wake are already on the wire when the refresh starts.
+  // Losing that race cost the user their session. So: ask for a fresh token, and
+  // if one comes back, send the request again.
+  //
+  // WHY REPLAYING A POST IS SAFE HERE — the question this retry lives or dies on.
+  // A 401 on `/api/*` has exactly one source: `createAuthMiddleware` throwing
+  // `UnauthorizedError` (missing/invalid/expired bearer), plus `requireUserId`'s
+  // identical throw. Both run BEFORE the route handler — the middleware gates the
+  // whole `/api/*` tree and `requireUserId` is the first line of every handler.
+  // No route returns 401 for a domain reason (`apps/server/src/http/errors.ts`
+  // reserves it for the gate; `http/auth.spec.ts` pins that every non-exempt route
+  // 401s without a token). A 401 therefore PROVES the request had no effect: no
+  // `review_log` row, no FSRS advance, no AI call billed. Replaying it is not an
+  // "idempotent enough" bet, it is a re-send of something that never happened.
+  //
+  // What is deliberately NOT retried:
+  //  · a request carrying an explicit `accessToken` (the demo boot). That token
+  //    was minted seconds ago and the ambient session may not even be established
+  //    yet — refreshing it is not the remedy for whatever went wrong.
+  //  · anything but 401. A 403 is an answer about PERMISSIONS, not about the
+  //    token; a fresh token would be refused identically.
+  //  · a second attempt. `refreshAccessToken` is asked once and the replay runs
+  //    once; a replay that 401s again falls straight through to sign-out below.
+  //    There is no loop and no recursion — just these few lines, executed once.
+  if (res.status === 401 && accessToken === undefined) {
+    const fresh = await refreshAccessToken()
+    if (fresh) {
+      // A SEPARATE init for the replay rather than a mutation of the first one:
+      // the original request object is already out on the wire, and rewriting its
+      // headers in place would leave no trace of which token each attempt
+      // actually carried. `body` is a string or a FormData — never a stream — so
+      // it is re-sendable as is.
+      res = await fetch(`/api${path}`, {
+        ...init,
+        headers: { ...headers, Authorization: `Bearer ${fresh}` },
+      })
+    }
+  }
+
   if (res.status === 401) {
     // A dead/absent session mid-use → sign out + navigate to /login (audit §8).
     onUnauthorized()
@@ -126,12 +194,24 @@ async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T
 let authHeader: () => Record<string, string> = () => ({})
 let onUnauthorized: () => void = () => {}
 let onSuspended: () => void = () => {}
+/**
+ * Default: no refresh is possible, so a 401 signs out exactly as it did before
+ * T-069. That is also the truth when web auth is disabled (dev/e2e) — the store
+ * has no Supabase client to refresh against.
+ */
+let refreshAccessToken: () => Promise<string | null> = async () => null
 
 export function configureAuth(opts: {
   getAccessToken: () => string | null
   onUnauthorized: () => void
   /** Called once when a request 403s with code `suspended` (IAM, amendment A3). */
   onSuspended?: () => void
+  /**
+   * Exchange the refresh token for a new access token and RETURN it, or `null`
+   * when the session is genuinely over. Wired to `authStore.refreshAccessToken`,
+   * which shares its single-flight gate with the wake watcher.
+   */
+  refreshAccessToken?: () => Promise<string | null>
 }): void {
   authHeader = () => {
     const token = opts.getAccessToken()
@@ -139,6 +219,7 @@ export function configureAuth(opts: {
   }
   onUnauthorized = opts.onUnauthorized
   onSuspended = opts.onSuspended ?? (() => {})
+  refreshAccessToken = opts.refreshAccessToken ?? (async () => null)
 }
 
 export const api = {

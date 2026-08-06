@@ -785,6 +785,13 @@ export const dictFr = {
     week: 'Semaine',
     prevMonth: 'Mois précédent',
     nextMonth: 'Mois suivant',
+    // T-036 : la date d'examen se tape. Le format est `AAAA-MM-JJ` — celui de
+    // `localDayKey`, celui que l'API stocke, et le seul qui ne change pas
+    // d'ordre entre FR et EN (03/04 ne désigne pas le même jour des deux côtés
+    // de la Manche). La forme longue reste, en nom accessible du champ.
+    datePlaceholder: 'AAAA-MM-JJ',
+    dateInputAria: 'Date (AAAA-MM-JJ) — {date}',
+    openCalendar: 'Ouvrir le calendrier',
     prevWeek: 'Semaine précédente',
     nextWeek: 'Semaine suivante',
     examsError: 'Impossible de charger les examens.',
@@ -870,8 +877,15 @@ export const dictFr = {
     retentionTitle: 'Rétention par matière',
     retentionCaption: 'Rétention par matière',
     retentionError: 'Impossible de charger la rétention.',
-    retentionEmpty: 'Révise encore un peu pour voir ta rétention par matière.',
-    retentionHint: 'La rétention se calcule sur les cartes mûres (≥ 10 reviews).',
+    // T-033 : le seuil ne se réécrit plus à la main dans la phrase, il vient du
+    // `minSample` que le service analytics renvoie avec chaque ligne — et il se
+    // compte en reviews MÛRES, ce qui est la moitié de la surprise : une carte
+    // en apprentissage n'a pas encore été planifiée, donc elle n'en produit pas.
+    retentionEmpty: "Aucune matière n'a encore assez de reviews mûres.",
+    retentionHint_one: 'La rétention apparaît à partir de {count} review mûre par matière.',
+    retentionHint_other: 'La rétention apparaît à partir de {count} reviews mûres par matière.',
+    retentionRemaining_one: 'encore {count} review mûre',
+    retentionRemaining_other: 'encore {count} reviews mûres',
     colSubject: 'Matière',
     colMatureReviews: 'Reviews mûres',
     colRetention: 'Rétention',
@@ -1389,6 +1403,13 @@ export const dictFr = {
     // disables « Générer » and explains why, instead of letting the visitor pick
     // a deck and discover the problem on the next screen.
     noProviderHint: 'Aucun provider IA configuré.',
+    // T-058 — pour le compte démo, « aucun provider configuré » est vrai et
+    // inutile : la démo serait refusée même avec une clé (`requireNotDemoSpend`),
+    // et sa config IA est en lecture seule. On dit la règle, et la sortie.
+    demoNoSpendTitle: 'La démo ne lance pas de génération',
+    demoNoSpendBody:
+      'Le compte de démonstration ne dépense jamais sur une API payante. Ouvre la génération pré-enregistrée livrée avec la démo : la revue carte par carte y est réelle.',
+    demoNoSpendHint: 'La démo ne lance pas de génération — ouvre l’exemple pré-enregistré.',
     // Provenance of the demo's pre-recorded generation (T-031). Three facts, and
     // none of them is optional: pré-écrites / rien lancé ni facturé / la revue
     // est réelle. Ce n'est pas un avertissement — voir `prerecorded-notice.tsx`.
@@ -1534,6 +1555,12 @@ export const dictFr = {
     rejectUnsupported: 'Type de fichier non supporté',
     rejectUnsupportedDetail: '{name} — .md, .pdf ou photo',
     provider: {
+      // T-058 — pas une erreur de configuration : une règle. Pas de CTA vers
+      // les Réglages, la config IA de la démo est en lecture seule.
+      demoNoSpend: {
+        title: 'La démo ne lit pas de photo',
+        body: 'Le compte de démonstration ne dépense jamais sur une API payante. Colle ton texte, ou importe un fichier Markdown : la génération pré-enregistrée de la démo montre la revue carte par carte.',
+      },
       noProvider: {
         title: 'Aucun fournisseur IA configuré pour l’OCR',
         body: 'Configure-le dans Réglages → Intelligence artificielle pour transcrire tes photos.',
@@ -1573,6 +1600,9 @@ export const dictFr = {
       takePhoto: 'Prendre une photo',
     },
     error: {
+      // T-058 — le 403 de la démo, dit honnêtement plutôt qu'en erreur générique.
+      demoNoSpend:
+        'La démo ne lit pas de photo : le compte de démonstration ne dépense jamais sur une API payante. Colle ton texte, ou importe un fichier Markdown.',
       noProvider: 'Aucun fournisseur IA configuré pour l’OCR (voir Réglages → IA).',
       noVision:
         'Le fournisseur configuré ne lit pas les images — choisis un provider OCR dédié (Réglages → IA → OCR).',
@@ -1645,6 +1675,11 @@ export const dictFr = {
       noAccount: 'Pas encore de compte ?',
       signUpLink: 'Créer un compte',
       forgot: 'Mot de passe oublié ?',
+      // T-034 : se déconnecter ne doit pas être un cul-de-sac. Le visiteur venu
+      // par la démo n'a pas de compte — la sortie doit être sur l'écran où on le
+      // dépose, pas seulement sur la landing.
+      orSeparator: 'ou',
+      demoNote: 'Un compte tout prêt, avec un historique complet à parcourir.',
     },
     signup: {
       title: 'Créer un compte',

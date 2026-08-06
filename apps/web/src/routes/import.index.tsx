@@ -43,6 +43,7 @@ import {
 } from '@/features/generations/queries'
 import { NoteEditDialog } from '@/features/notes/note-edit-dialog'
 import { describeUploadError } from '@/features/generations/errors'
+import { meQuery } from '@/features/admin/queries'
 
 const NO_SUBJECT = '__none__'
 /** Client-side cap on photos per batch (OCR spec §1.2, cost guard §0.2.1). */
@@ -84,6 +85,9 @@ function ImportPage() {
   const t = useT()
   const notes = useQuery(notesListOptions()).data ?? []
   const subjects = useQuery(subjectsListOptions()).data ?? []
+  // T-058 — the demo account is refused every SPENDING call, photo OCR included.
+  // The shell already holds this answer, so knowing it here costs no request.
+  const isDemo = useQuery(meQuery()).data?.isDemo === true
   const generations = useQuery(allGenerationsOptions()).data
 
   const upload = useUploadNote()
@@ -178,6 +182,14 @@ function ImportPage() {
       startUpload(file, subjectId)
     }
     if (images.length > 0) {
+      // T-058 — the demo is refused the OCR call by `requireNotDemoSpend`, so
+      // walking it onto the preview screen only buys it one 403 per page,
+      // classified as a generic failure. Said HERE instead: before the photos
+      // leave the drop, naming what does work on this account (paste, Markdown).
+      if (isDemo) {
+        toast.error(t('ocr.error.demoNoSpend'))
+        return
+      }
       const capped = images.slice(0, MAX_PHOTOS)
       if (images.length > MAX_PHOTOS) {
         toast.error(t('ocr.tooManyPhotos'), {

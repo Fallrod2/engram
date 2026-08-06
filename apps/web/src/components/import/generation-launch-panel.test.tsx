@@ -80,6 +80,21 @@ describe('<GenerationLaunchPanel> and the missing provider', () => {
     expect(screen.queryByText(/texte exploitable|usable text/)).toBeNull()
   })
 
+  /**
+   * T-058 — for the demo account both sentences are true ("no provider" AND
+   * "the demo never spends") and only one of them leads anywhere: its AI config
+   * is read-only, so "go configure a provider" is a dead end dressed up as an
+   * action.
+   */
+  it('gives the DEMO its own reason, not "configure a provider"', () => {
+    render(panel({ providerUnavailable: true, demoNoSpend: true }))
+    expect(generateButton()).toHaveProperty('disabled', true)
+    expect(
+      screen.getByText(/La démo ne lance pas de génération|The demo does not run generations/),
+    ).toBeTruthy()
+    expect(screen.queryByText(/Aucun provider IA configuré|No AI provider configured/)).toBeNull()
+  })
+
   it('still blocks on the pre-existing reasons when a provider IS available', () => {
     cleanup()
     render(panel({ deckId: undefined }))

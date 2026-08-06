@@ -5,13 +5,45 @@
  */
 
 /**
+ * A fenced code block: the opening fence and its info string, the body, the
+ * closing fence. Non-greedy, so two blocks in one card stay two blocks.
+ */
+const FENCED_CODE = /```[^\n]*\n?([\s\S]*?)```/g
+
+/**
+ * Placeholder a lifted code block is parked under while the inline rules run.
+ *
+ * NUL, written as an ESCAPE and never as a raw byte: a source file carrying a
+ * literal 0x00 is treated as binary by git, which silently turns every future
+ * diff of this file into `Bin 1170 -> 2709 bytes` and takes it out of review.
+ * The value itself is right — NUL cannot occur in card text a user typed, and
+ * it is not whitespace, so it survives the collapse below without ever being
+ * mistaken for content.
+ */
+const SLOT = '\u0000'
+
+/**
  * Flatten Markdown source to a single inline text line for dense table cells:
  * strips the common inline/block marks, collapses whitespace, joins lines.
  * Never produces HTML — it only ever removes characters.
+ *
+ * FENCED CODE IS KEPT, not deleted (T-036). It used to be replaced by a space,
+ * so a card whose front IS a code block — the normal shape of a programming
+ * card — previewed as an empty row in the deck list, in search results and in
+ * ⌘K. An empty row is indistinguishable from a broken one.
+ *
+ * The body is lifted OUT before the inline rules run and spliced back after,
+ * which is the whole reason for the placeholder dance: `#include`, `*p` and
+ * `- x` are code, and running the heading / italic / bullet rules over them
+ * would quietly eat the first characters of the very line being previewed.
  */
 export function flattenMarkdown(src: string): string {
-  return src
-    .replace(/```[\s\S]*?```/g, ' ') // fenced code blocks
+  const blocks: string[] = []
+  const lifted = src.replace(FENCED_CODE, (_match, body: string) => {
+    blocks.push(body.replace(/\s+/g, ' ').trim())
+    return `${SLOT}${blocks.length - 1}${SLOT}`
+  })
+  const flattened = lifted
     .replace(/`([^`]+)`/g, '$1') // inline code
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // images
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // links → text
@@ -22,6 +54,11 @@ export function flattenMarkdown(src: string): string {
     .replace(/(\*\*|__)(.*?)\1/g, '$2') // bold
     .replace(/(\*|_)(.*?)\1/g, '$2') // italic
     .replace(/~~(.*?)~~/g, '$2') // strikethrough
+    .replace(/\s+/g, ' ')
+  // Splice the code back in, then collapse once more: an empty block leaves a
+  // hole between two spaces, and the caller wants one clean line either way.
+  return flattened
+    .replace(new RegExp(`${SLOT}(\\d+)${SLOT}`, 'g'), (_m, i: string) => blocks[Number(i)] ?? '')
     .replace(/\s+/g, ' ')
     .trim()
 }

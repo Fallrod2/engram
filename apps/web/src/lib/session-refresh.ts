@@ -147,11 +147,65 @@ export function revivalFailureAction(read: RefreshFailureInput): 'sign-out' | 'w
   return read.expiresAt * 1000 <= read.nowMs ? 'sign-out' : 'wait'
 }
 
+/** What one token exchange came back with. */
+export interface RefreshOutcome {
+  /** `null`/`undefined` iff the exchange succeeded. */
+  error: unknown
+  /**
+   * The access token the exchange produced, `null` when it failed. Returned
+   * explicitly rather than read back from the store afterwards: `TOKEN_REFRESHED`
+   * reaches `onAuthStateChange` on its own schedule, so a caller that wants to
+   * REPLAY a request with the new token (the 401 retry in `api.ts`) must be handed
+   * the token, not told to go looking for it.
+   */
+  accessToken: string | null
+}
+
+/**
+ * One token exchange at a time, shared by everyone who can ask for one.
+ *
+ * Two callers now ask: this file's wake/refocus/reconnect watcher, and the 401
+ * retry in `api.ts`. They fire in exactly the same instant — the wake dispatches
+ * `focus` while the queries TanStack Query refetches on that same wake are already
+ * in flight and 401ing — and a browser tab must never run two refreshes on one
+ * refresh token: supabase-js rotates it, so the second exchange presents a token
+ * the first has just invalidated and fails for a reason that has nothing to do
+ * with the user's session.
+ *
+ * So the anti-burst guard is not duplicated on each side; it is this one object,
+ * built once in `auth-store.ts` and handed to both. A `run()` during an exchange
+ * returns THE SAME promise — the second caller waits for the first's answer and
+ * gets the same token out of it, which is precisely what it needs.
+ */
+export interface RefreshGate {
+  /** Ask for a fresh token; concurrent asks share one exchange. */
+  run: () => Promise<RefreshOutcome>
+  /** True while an exchange started through this gate has not settled. */
+  inFlight: () => boolean
+}
+
+export function createRefreshGate(refresh: () => Promise<RefreshOutcome>): RefreshGate {
+  let pending: Promise<RefreshOutcome> | null = null
+  return {
+    inFlight: () => pending !== null,
+    run: () => {
+      if (pending) return pending
+      // The async wrapper turns a SYNCHRONOUS throw from `refresh` into a
+      // rejection, so `.finally` still runs and the gate cannot wedge shut.
+      const started = (async () => refresh())().finally(() => {
+        pending = null
+      })
+      pending = started
+      return started
+    },
+  }
+}
+
 export interface SessionRevivalDeps {
   /** Expiry (seconds) of the session the store currently holds, or `null`. */
   sessionExpiresAt: () => number | null
-  /** `supabase.auth.refreshSession()`, narrowed to the field we decide on. */
-  refresh: () => Promise<{ error: unknown }>
+  /** The shared gate over `supabase.auth.refreshSession()`. */
+  gate: RefreshGate
   /** Run when the session is definitively over — the store's `forceSignOut`. */
   signOut: () => void
 }
@@ -179,24 +233,25 @@ export function watchSessionRevival(deps: SessionRevivalDeps): () => void {
     return () => {}
   }
 
-  let inFlight = false
-
   const consider = (): void => {
     if (
       !shouldRefreshSession({
         expiresAt: deps.sessionExpiresAt(),
         nowMs: Date.now(),
-        refreshInFlight: inFlight,
+        // The gate raises its flag SYNCHRONOUSLY inside `run()`, before the first
+        // await point. `focus` and `visibilitychange` are dispatched in the same
+        // task on wake; if the flag only went up inside the promise, both would
+        // already have called through. Consulting it here (rather than relying on
+        // the gate's own dedupe) also keeps ONE failure handler per exchange —
+        // a second `run()` would attach a second `.then` to the same promise and
+        // evaluate `signOut` twice.
+        refreshInFlight: deps.gate.inFlight(),
       })
     ) {
       return
     }
-    // Set SYNCHRONOUSLY, before the first await point. `focus` and
-    // `visibilitychange` are dispatched in the same task on wake; if the flag
-    // only went up inside the promise, both would already have called through.
-    inFlight = true
-    void deps
-      .refresh()
+    void deps.gate
+      .run()
       .then(({ error }) => {
         if (!error) return // `TOKEN_REFRESHED` has already updated the store.
         if (
@@ -213,10 +268,8 @@ export function watchSessionRevival(deps: SessionRevivalDeps): () => void {
         // `refreshSession()` returns auth failures in `{ error }`; a THROW is
         // something else entirely (a fetch that blew up, a storage lock). We do
         // not understand it, so we do not end the user's session over it — the
-        // ticker retries, and the 401 handler is the last line either way.
-      })
-      .finally(() => {
-        inFlight = false
+        // ticker retries, and the 401 handler is the last line either way. The
+        // gate reopens itself on this path too, so the watcher is never wedged.
       })
   }
 
