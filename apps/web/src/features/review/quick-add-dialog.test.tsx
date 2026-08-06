@@ -69,9 +69,12 @@ vi.mock('./session-timer', async (importOriginal) => {
 // wrapped in a real `<ShellProvider>`: that provider owns the command palette,
 // the g-chords and the sidebar, none of which this file has anything to say
 // about, and it would drag the whole shell into a review-screen test.
-vi.mock('@/components/shell/shell-context', () => ({
-  useShell: () => ({ setSessionActive: () => {} }),
-}))
+// STABLE, like the real provider's memoised value: `ReviewSession`'s mount
+// effect depends on `setSessionActive` and moves focus into the session
+// container, so a fresh object per render would re-run it on every render and
+// steal the focus back from whatever the user is doing.
+const SHELL = { setSessionActive: () => {} }
+vi.mock('@/components/shell/shell-context', () => ({ useShell: () => SHELL }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status: number
@@ -662,6 +665,29 @@ describe('<ReviewSession> — the quick add is reachable from the screen itself'
     )
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Nouvelle carte')).toBeTruthy()
+  })
+
+  it('gives the focus back to the control that opened it', async () => {
+    await renderScreen()
+    const trigger = screen.getByRole('button', {
+      name: 'Ajouter une carte sans quitter la session (N)',
+    })
+    trigger.focus()
+    fireEvent.click(trigger)
+    const dialog = await screen.findByRole('dialog')
+    // Radix moves focus INTO the dialog on open — the recto, which is where the
+    // user is about to type.
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // ...and back out to the trigger on close, rather than dropping it on
+    // `<body>` where the session's keys would still work but Tab would restart.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Ajouter une carte sans quitter la session (N)' }),
+      ),
+    )
   })
 
   it('hands the dialog the deck of the card on screen', async () => {

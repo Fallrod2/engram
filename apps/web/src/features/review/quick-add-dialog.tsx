@@ -120,6 +120,29 @@ export function QuickAddDialog({
   /** The recto's DOM node — where the caret goes back after each card. */
   const frontRef = useRef<HTMLTextAreaElement | null>(null)
 
+  /**
+   * Where the focus came from, so it can go back there on close.
+   *
+   * Radix restores focus to its `DialogTrigger`, and this dialog HAS none: it is
+   * opened by the `N` key or by a button three components away in the session
+   * strip, so `triggerRef` is null and Radix's default drops the focus on
+   * `<body>` — measured, not assumed. From there Tab restarts at the top of the
+   * document and the session is left without a focused element.
+   *
+   * Captured DURING RENDER, on the transition to `open`, and not in an effect:
+   * child effects run before the parent's, so by the time an effect here could
+   * look, Radix's focus scope has already moved the caret into the dialog and
+   * `document.activeElement` is the recto. Recording a DOM node is idempotent,
+   * and the `prevOpen` guard makes a repeated render a no-op.
+   */
+  const openerRef = useRef<HTMLElement | null>(null)
+  const prevOpenRef = useRef(false)
+  if (open && !prevOpenRef.current) {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+  }
+  prevOpenRef.current = open
+
   const form = useForm<QuickAddValues>({
     resolver: zodResolver(quickAddSchema),
     defaultValues: { front: '', back: '' },
@@ -207,7 +230,19 @@ export function QuickAddDialog({
           else requestClose()
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent
+          className="max-w-lg"
+          onCloseAutoFocus={(e) => {
+            const opener = openerRef.current
+            // `isConnected` because the session redraws underneath: a control
+            // that has since been unmounted cannot be focused, and falling
+            // through to Radix's default puts us back on `<body>` — no worse
+            // than doing nothing, and never an exception.
+            if (!opener?.isConnected) return
+            e.preventDefault()
+            opener.focus()
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{t('session.quickAddDialog.title')}</DialogTitle>
             <DialogDescription>{t('session.quickAddDialog.description')}</DialogDescription>
@@ -225,7 +260,12 @@ export function QuickAddDialog({
               className="flex flex-col gap-4"
             >
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="quick-add-deck">{t('session.quickAddDialog.deck')}</Label>
+                {/* `htmlFor` only where the control it names actually exists —
+                    the skeleton and the failure line have no id, and a label
+                    pointing at nothing is a label a screen reader drops. */}
+                <Label {...(listsPending || listsFailed ? {} : { htmlFor: 'quick-add-deck' })}>
+                  {t('session.quickAddDialog.deck')}
+                </Label>
                 {listsPending ? (
                   // A skeleton, never a spinner (design system): the row keeps
                   // the height the `Select` will take, so nothing jumps.
