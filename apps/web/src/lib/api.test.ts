@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { api, configureAuth, primeDemoAccount } from './api'
+import { ApiError, api, configureAuth, isDemoNoSpendError, primeDemoAccount } from './api'
 
 /**
  * API client auth wiring (spec §6.2). Proves the audit §9 fix: `init.headers` is
@@ -180,5 +180,45 @@ describe('api client — one retry after a refresh, and only one', () => {
     expect(refreshAccessToken).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * The demo's spending refusal, read structurally (T-058). Two flows depend on
+ * this one predicate — a generation and a photo extraction — so it lives beside
+ * `ApiError` rather than being copied into each feature's `errors.ts`.
+ */
+describe('isDemoNoSpendError', () => {
+  it('matches 403 forbidden + details.reason=demo_no_spend', () => {
+    expect(
+      isDemoNoSpendError(new ApiError(403, 'nope', 'forbidden', { reason: 'demo_no_spend' })),
+    ).toBe(true)
+  })
+
+  it('needs BOTH halves of the contract, never the prose', () => {
+    // Right status, no reason.
+    expect(isDemoNoSpendError(new ApiError(403, 'nope', 'forbidden'))).toBe(false)
+    // Right status, another reason.
+    expect(
+      isDemoNoSpendError(new ApiError(403, 'nope', 'forbidden', { reason: 'something' })),
+    ).toBe(false)
+    // Right reason, wrong status.
+    expect(
+      isDemoNoSpendError(new ApiError(500, 'nope', 'internal_error', { reason: 'demo_no_spend' })),
+    ).toBe(false)
+    // Right reason, `suspended` — a different 403 with its own screen.
+    expect(
+      isDemoNoSpendError(new ApiError(403, 'nope', 'suspended', { reason: 'demo_no_spend' })),
+    ).toBe(false)
+    // A French message saying so is NOT the contract.
+    expect(isDemoNoSpendError(new ApiError(403, 'la démo ne dépense jamais', 'forbidden'))).toBe(
+      false,
+    )
+  })
+
+  it('is false for anything that is not an ApiError', () => {
+    for (const value of [null, undefined, new Error('boom'), { status: 403 }]) {
+      expect(isDemoNoSpendError(value)).toBe(false)
+    }
   })
 })

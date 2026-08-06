@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { GenerationLaunchPanel, type DeckGroup } from '@/components/import/generation-launch-panel'
 import { GenerationStatusBadge } from '@/components/import/generation-status-badge'
-import { ApiKeyMissingBanner } from '@/components/import/generation-error-state'
+import { ApiKeyMissingBanner, DemoNoSpendNotice } from '@/components/import/generation-error-state'
 import { PrerecordedBadge } from '@/components/import/prerecorded-notice'
 import { useHotkeys } from '@/lib/use-hotkeys'
 import { useRovingList } from '@/lib/use-roving'
@@ -38,6 +38,7 @@ import { NoteEditDialog } from '@/features/notes/note-edit-dialog'
 import { generationsByNoteOptions, useStartGeneration } from '@/features/generations/queries'
 import { classifyGenerationError } from '@/features/generations/errors'
 import { aiSettingsOptions } from '@/features/ai/queries'
+import { meQuery } from '@/features/admin/queries'
 
 export const Route = createFileRoute('/import/$noteId/')({
   loader: ({ context, params }) =>
@@ -137,6 +138,20 @@ function NotePage() {
   const providerUnavailable =
     aiSettings !== undefined &&
     !aiSettings.statuses.some((s) => s.provider === aiSettings.settings.activeProvider && s.usable)
+
+  /**
+   * T-058 — for the DEMO account, "no AI provider configured" is true and
+   * useless. `GET /api/ai/settings` cannot say "I am the demo" (it answers about
+   * providers, not about who is asking), but `GET /api/me` already carries
+   * `isDemo`, and the app holds that answer for the shell anyway. So the reason
+   * is read from there and the same disabled button gets an honest explanation:
+   * the demo never spends, and the pre-recorded generation is the way in.
+   *
+   * It does not change WHETHER the launch is blocked — `requireNotDemoSpend`
+   * would refuse it regardless of any key. It changes what the visitor is told
+   * BEFORE they pick a type, create a deck and click.
+   */
+  const isDemo = useQuery(meQuery()).data?.isDemo === true
 
   const updateNote = useUpdateNote()
   const deleteNote = useDeleteNote()
@@ -296,9 +311,14 @@ function NotePage() {
               contentEmpty={contentEmpty}
               onLaunch={launch}
               pending={startGen.isPending}
-              providerUnavailable={providerUnavailable}
+              providerUnavailable={providerUnavailable || isDemo}
+              demoNoSpend={isDemo}
               {...(note.subjectId ? { onNewDeck: () => setNewDeckOpen(true) } : {})}
-              {...(showNoProviderBanner ? { banner: <ApiKeyMissingBanner /> } : {})}
+              {...(isDemo
+                ? { banner: <DemoNoSpendNotice /> }
+                : showNoProviderBanner
+                  ? { banner: <ApiKeyMissingBanner /> }
+                  : {})}
             />
           </div>
 

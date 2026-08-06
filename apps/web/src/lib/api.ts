@@ -49,6 +49,28 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * True iff this failure is the demo account being refused a SPENDING call
+ * (T-058): `403 forbidden` carrying `details.reason === 'demo_no_spend'`.
+ *
+ * The server tags it structurally, exactly like the OCR 503's `details.reason`,
+ * so a client never has to match on French prose. It lives here rather than in
+ * one feature's `errors.ts` because two flows hit the same rule — a generation
+ * and a photo extraction — and a second copy of this predicate would be a second
+ * chance to get the contract subtly wrong.
+ */
+export function isDemoNoSpendError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false
+  if (err.status !== 403 || err.code !== 'forbidden') return false
+  const details: unknown = err.details
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'reason' in details &&
+    (details as { reason?: unknown }).reason === 'demo_no_spend'
+  )
+}
+
 async function toApiError(res: Response): Promise<ApiError> {
   try {
     const parsed = apiErrorSchema.safeParse(await res.json())

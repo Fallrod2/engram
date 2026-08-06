@@ -1,5 +1,5 @@
 import type { TKey } from '@/lib/i18n'
-import { ApiError } from '@/lib/api'
+import { ApiError, isDemoNoSpendError } from '@/lib/api'
 import { DownscaleError } from './downscale'
 
 /**
@@ -10,6 +10,7 @@ import { DownscaleError } from './downscale'
  * outcome codes).
  */
 export type OcrErrorKind =
+  | 'demoNoSpend' // 403 details.reason=demo_no_spend — the demo never bills a read
   | 'noProvider' // 503 details.reason=no_provider — nothing configured for OCR
   | 'noVision' // 503 details.reason=no_vision — provider can't read images
   | 'noVisionProvider' // 503 without a structured reason (generic config banner)
@@ -34,6 +35,11 @@ export function classifyExtractError(err: unknown): OcrErrorKind {
     if (err.code === 'heic') return 'heic'
     return err.code === 'tooLarge' ? 'tooLarge' : 'unsupported'
   }
+  // Checked FIRST, and before any 503 reading: the demo is refused by POLICY,
+  // not by a missing configuration (T-058). Told it had "no provider", a demo
+  // visitor would go looking in Réglages for a switch that is not theirs to
+  // flip, and the sentence would be literally true and completely unhelpful.
+  if (isDemoNoSpendError(err)) return 'demoNoSpend'
   if (err instanceof ApiError) {
     if (err.code === 'service_unavailable' || err.status === 503) {
       // The server tags the two distinct causes with a structured `reason`
@@ -57,6 +63,7 @@ export function classifyExtractError(err: unknown): OcrErrorKind {
 
 /** Dict key carrying a clear, actionable message for each failure kind. */
 const MESSAGE_KEY: Record<OcrErrorKind, TKey> = {
+  demoNoSpend: 'ocr.error.demoNoSpend',
   noProvider: 'ocr.error.noProvider',
   noVision: 'ocr.error.noVision',
   noVisionProvider: 'ocr.error.noVisionProvider',

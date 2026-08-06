@@ -120,6 +120,19 @@ const ALLOWED = new Map<string, string>([
     'features/onboarding/ai-step.tsx::meQuery',
     'the demo notice is additive; absent = the normal form',
   ],
+  // T-058 — `isDemo` only ever REPLACES one honest sentence with a better one,
+  // or declines a call the server refuses anyway. Unread, both screens behave
+  // exactly as they did before the entry existed, and the server keeps the last
+  // word (`requireNotDemoSpend`): a failed read cannot let a demo visitor spend,
+  // and cannot tell a non-demo user they are the demo.
+  [
+    'routes/import.$noteId.index.tsx::meQuery',
+    'picks the demo wording over "no provider"; absent = the provider banner, as before',
+  ],
+  [
+    'routes/import.index.tsx::meQuery',
+    'declines a photo drop the server would 403; absent = the drop proceeds and is refused there',
+  ],
 
   // ── Pickers inside a form the user opened deliberately. An empty option list
   // is visibly a broken picker, in a dialog they can close and reopen; it makes

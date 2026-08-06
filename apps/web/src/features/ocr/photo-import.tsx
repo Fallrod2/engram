@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { DemoNoSpendNotice } from '@/components/import/generation-error-state'
 import { useCreateNote } from '@/features/notes/queries'
 import { useExtractImage } from './queries'
 import { classifyExtractError, ocrErrorMessageKey, type OcrErrorKind } from './errors'
@@ -41,7 +42,12 @@ function baseName(name: string): string {
   return dot > 0 ? name.slice(0, dot) : name
 }
 
-/** Banner variant (dict sub-key) for an OCR-config failure kind. */
+/**
+ * Banner variant (dict sub-key) for an OCR-CONFIG failure kind. `demoNoSpend` is
+ * deliberately absent: it is not a configuration problem, it gets the info-hued
+ * `DemoNoSpendNotice` instead, and above all it must not offer the "open
+ * Settings" CTA these three share — the demo's AI config is read-only.
+ */
 function providerBannerKey(kind: OcrErrorKind): 'noProvider' | 'noVision' | 'generic' {
   if (kind === 'noProvider') return 'noProvider'
   if (kind === 'noVision') return 'noVision'
@@ -121,7 +127,16 @@ export function PhotoImport({
         dispatch({ type: 'resolved', id: item.id, segment: res.markdown, warnings: res.warnings })
       } catch (e) {
         const kind = classifyExtractError(e)
-        if (kind === 'noProvider' || kind === 'noVision' || kind === 'noVisionProvider') {
+        // T-058 — `demoNoSpend` joins the banner kinds: it is the same shape of
+        // failure (nothing on this account will ever extract, retrying is
+        // pointless), and it belongs at the top of the screen rather than
+        // repeated identically under every page.
+        if (
+          kind === 'demoNoSpend' ||
+          kind === 'noProvider' ||
+          kind === 'noVision' ||
+          kind === 'noVisionProvider'
+        ) {
           setProviderError(kind)
         }
         // Store the classification *code*; the display point resolves it to text.
@@ -196,7 +211,9 @@ export function PhotoImport({
         title={t('ocr.title')}
       />
 
-      {providerError && (
+      {providerError === 'demoNoSpend' && <DemoNoSpendNotice scope="ocr" className="mb-4" />}
+
+      {providerError && providerError !== 'demoNoSpend' && (
         <div className="mb-4 rounded-md border border-warning/30 bg-warning-subtle px-4 py-3">
           <div className="flex items-start gap-3">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />

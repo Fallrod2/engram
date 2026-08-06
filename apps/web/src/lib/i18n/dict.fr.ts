@@ -1403,6 +1403,13 @@ export const dictFr = {
     // disables « Générer » and explains why, instead of letting the visitor pick
     // a deck and discover the problem on the next screen.
     noProviderHint: 'Aucun provider IA configuré.',
+    // T-058 — pour le compte démo, « aucun provider configuré » est vrai et
+    // inutile : la démo serait refusée même avec une clé (`requireNotDemoSpend`),
+    // et sa config IA est en lecture seule. On dit la règle, et la sortie.
+    demoNoSpendTitle: 'La démo ne lance pas de génération',
+    demoNoSpendBody:
+      'Le compte de démonstration ne dépense jamais sur une API payante. Ouvre la génération pré-enregistrée livrée avec la démo : la revue carte par carte y est réelle.',
+    demoNoSpendHint: 'La démo ne lance pas de génération — ouvre l’exemple pré-enregistré.',
     // Provenance of the demo's pre-recorded generation (T-031). Three facts, and
     // none of them is optional: pré-écrites / rien lancé ni facturé / la revue
     // est réelle. Ce n'est pas un avertissement — voir `prerecorded-notice.tsx`.
@@ -1548,6 +1555,12 @@ export const dictFr = {
     rejectUnsupported: 'Type de fichier non supporté',
     rejectUnsupportedDetail: '{name} — .md, .pdf ou photo',
     provider: {
+      // T-058 — pas une erreur de configuration : une règle. Pas de CTA vers
+      // les Réglages, la config IA de la démo est en lecture seule.
+      demoNoSpend: {
+        title: 'La démo ne lit pas de photo',
+        body: 'Le compte de démonstration ne dépense jamais sur une API payante. Colle ton texte, ou importe un fichier Markdown : la génération pré-enregistrée de la démo montre la revue carte par carte.',
+      },
       noProvider: {
         title: 'Aucun fournisseur IA configuré pour l’OCR',
         body: 'Configure-le dans Réglages → Intelligence artificielle pour transcrire tes photos.',
@@ -1587,6 +1600,9 @@ export const dictFr = {
       takePhoto: 'Prendre une photo',
     },
     error: {
+      // T-058 — le 403 de la démo, dit honnêtement plutôt qu'en erreur générique.
+      demoNoSpend:
+        'La démo ne lit pas de photo : le compte de démonstration ne dépense jamais sur une API payante. Colle ton texte, ou importe un fichier Markdown.',
       noProvider: 'Aucun fournisseur IA configuré pour l’OCR (voir Réglages → IA).',
       noVision:
         'Le fournisseur configuré ne lit pas les images — choisis un provider OCR dédié (Réglages → IA → OCR).',

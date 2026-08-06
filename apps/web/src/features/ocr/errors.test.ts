@@ -3,6 +3,33 @@ import { ApiError } from '@/lib/api'
 import { classifyExtractError, ocrErrorMessageKey } from './errors'
 import { DownscaleError } from './downscale'
 
+/**
+ * T-058 — a demo visitor who dropped a photo used to get the 403 back as a
+ * generic "l'extraction a échoué", i.e. as if something had gone wrong. Nothing
+ * went wrong: the demo never spends, and the way forward is paste or Markdown.
+ */
+describe('classifyExtractError — the demo refusal', () => {
+  const demo403 = new ApiError(403, 'la démo ne lit pas de photo', 'forbidden', {
+    reason: 'demo_no_spend',
+  })
+
+  it('reads the structured reason, never the prose', () => {
+    expect(classifyExtractError(demo403)).toBe('demoNoSpend')
+  })
+
+  it('carries its own message key, not the generic one', () => {
+    expect(ocrErrorMessageKey('demoNoSpend')).toBe('ocr.error.demoNoSpend')
+    expect(ocrErrorMessageKey('demoNoSpend')).not.toBe(ocrErrorMessageKey('generic'))
+  })
+
+  it('an ordinary 403 is NOT the demo refusal', () => {
+    expect(classifyExtractError(new ApiError(403, 'nope', 'forbidden'))).toBe('generic')
+    expect(classifyExtractError(new ApiError(403, 'nope', 'forbidden', { reason: 'x' }))).toBe(
+      'generic',
+    )
+  })
+})
+
 describe('classifyExtractError', () => {
   it('503 without a structured reason → noVisionProvider (generic)', () => {
     expect(classifyExtractError(new ApiError(503, 'x', 'service_unavailable'))).toBe(
