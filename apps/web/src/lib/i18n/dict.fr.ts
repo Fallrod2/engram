@@ -785,6 +785,13 @@ export const dictFr = {
     week: 'Semaine',
     prevMonth: 'Mois précédent',
     nextMonth: 'Mois suivant',
+    // T-036 : la date d'examen se tape. Le format est `AAAA-MM-JJ` — celui de
+    // `localDayKey`, celui que l'API stocke, et le seul qui ne change pas
+    // d'ordre entre FR et EN (03/04 ne désigne pas le même jour des deux côtés
+    // de la Manche). La forme longue reste, en nom accessible du champ.
+    datePlaceholder: 'AAAA-MM-JJ',
+    dateInputAria: 'Date (AAAA-MM-JJ) — {date}',
+    openCalendar: 'Ouvrir le calendrier',
     prevWeek: 'Semaine précédente',
     nextWeek: 'Semaine suivante',
     examsError: 'Impossible de charger les examens.',

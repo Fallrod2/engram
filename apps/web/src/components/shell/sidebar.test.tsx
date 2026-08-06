@@ -325,6 +325,22 @@ describe('<Sidebar> expanded due split (T-013)', () => {
     renderSidebar(EMPTY_COUNTS)
     expect(screen.getAllByText('·').length).toBeGreaterThan(0)
   })
+
+  /**
+   * T-036 — a subject the counts answer does not mention is a subject created
+   * SINCE that answer (the optimistic row a fresh "Nouvelle matière" puts up).
+   * It holds no cards, so it must read `·` like every other empty subject. It
+   * used to fall through to the pending skeleton and shimmer for ever next to
+   * neighbours showing a dot: same emptiness, two different-looking states.
+   */
+  it('a subject missing from a LOADED counts answer reads zero, not pending', () => {
+    const { container } = renderSidebar({
+      ...EMPTY_COUNTS,
+      bySubject: [], // the response landed, this subject simply is not in it
+    })
+    expect(screen.getAllByText('·').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('.animate-pulse')).toHaveLength(0)
+  })
 })
 
 describe('<Sidebar> due counts are announced (T-017)', () => {

@@ -21,6 +21,13 @@ import { ChartEmpty } from './chart-empty'
  *      reviews yet", quoting the threshold the server sends back.
  */
 
+/**
+ * Top of the FSRS difficulty scale. ts-fsrs keeps `difficulty` on 1..10 and the
+ * session's `DifficultyGauge` divides that same 10 into five segments — the two
+ * marks read the same number, so they must name the same maximum.
+ */
+const DIFFICULTY_MAX = 10
+
 interface Group {
   subjectId: string
   name: string
@@ -115,6 +122,12 @@ export function HardestCardsPanel({
                   <span className="min-w-0 flex-1 truncate text-sm text-text-muted">
                     {flattenMarkdown(c.front)}
                   </span>
+                  {/* T-036 — `7.4` alone is a number with no unit. The scale was
+                      only ever in the `aria-label`, so the one reader who could
+                      not see the list was the only one told what it was out of.
+                      The denominator is now printed, faintly: it costs three
+                      glyphs, it is the same `n/max` shape the retention
+                      countdown uses, and the label stays the sentence. */}
                   <span
                     className="font-mono text-xs tabular-nums text-text"
                     aria-label={t('analytics.hardestDifficultyAria', {
@@ -122,6 +135,7 @@ export function HardestCardsPanel({
                     })}
                   >
                     {c.difficulty.toFixed(1)}
+                    <span className="text-text-faint">/{DIFFICULTY_MAX}</span>
                   </span>
                 </li>
               ))}

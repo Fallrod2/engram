@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render as rtlRender, screen } from '@testing-library/react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { SessionContextBar } from './session-context-bar'
 
 afterEach(cleanup)
+
+/**
+ * The counters carry a legend `Tooltip` since T-036, and Radix refuses to mount
+ * one outside a provider. The app has exactly one, at the root (`main.tsx`), so
+ * the wrapper belongs to the harness rather than to every case below.
+ */
+const render = (ui: React.ReactElement) => rtlRender(<TooltipProvider>{ui}</TooltipProvider>)
 
 const NOOP = () => {}
 
@@ -41,6 +49,33 @@ describe('<SessionContextBar> remaining counters', () => {
     expect(values.map((v) => v.textContent)).toEqual(['0', '2', '0', '0'])
     expect(values[0]?.className).toContain('text-text-faint')
     expect(values[1]?.className).not.toContain('text-text-faint')
+  })
+
+  /**
+   * T-036 — `5 5 0 5` in four unexplained tints was the densest thing on the
+   * session screen and the only one with no key anywhere on the page. The
+   * screen reader always knew (`sr-only` names); the sighted reader never did.
+   */
+  it('opens a legend naming the four states, on focus and not only on hover', async () => {
+    render(
+      <SessionContextBar
+        remaining={{ new: 5, learning: 5, review: 0, relearning: 5 }}
+        difficulty={null}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+      />,
+    )
+    const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
+    // Reachable without a mouse — the session is meant to run from the keyboard.
+    expect(group.getAttribute('tabindex')).toBe('0')
+    fireEvent.focus(group)
+    const tip = await screen.findByRole('tooltip')
+    for (const name of ['Nouvelle', 'Apprentissage', 'Révision', 'Réapprentissage']) {
+      expect(tip.textContent, name).toContain(name)
+    }
   })
 })
 
