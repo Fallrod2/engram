@@ -1496,6 +1496,8 @@ export const dictEn: Dict = {
       noAccount: 'No account yet?',
       signUpLink: 'Create an account',
       forgot: 'Forgot your password?',
+      orSeparator: 'or',
+      demoNote: 'A ready-made account, with a full history to browse.',
     },
     signup: {
       title: 'Create an account',

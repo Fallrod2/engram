@@ -6,6 +6,7 @@ import { sanitizeRedirect } from '@/lib/auth-store'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { AuthBrand } from '@/features/auth/auth-brand'
 import { LoginForm } from '@/features/auth/login-form'
+import { LoginDemoEntry } from '@/features/auth/login-demo-entry'
 
 /**
  * Login screen (spec §3.4) — rendered OUTSIDE the app shell (RootLayout shows a
@@ -40,6 +41,10 @@ function LoginPage() {
           </CardHeader>
           <CardContent>
             <LoginForm />
+            {/* T-034: signing out must not be a dead end. Rendered only when the
+                SERVER says a demo login is configured — the same condition as the
+                landing CTA. */}
+            <LoginDemoEntry />
           </CardContent>
         </Card>
       </div>

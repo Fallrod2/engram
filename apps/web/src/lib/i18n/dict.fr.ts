@@ -1652,6 +1652,11 @@ export const dictFr = {
       noAccount: 'Pas encore de compte ?',
       signUpLink: 'Créer un compte',
       forgot: 'Mot de passe oublié ?',
+      // T-034 : se déconnecter ne doit pas être un cul-de-sac. Le visiteur venu
+      // par la démo n'a pas de compte — la sortie doit être sur l'écran où on le
+      // dépose, pas seulement sur la landing.
+      orSeparator: 'ou',
+      demoNote: 'Un compte tout prêt, avec un historique complet à parcourir.',
     },
     signup: {
       title: 'Créer un compte',
