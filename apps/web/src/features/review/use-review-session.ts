@@ -65,6 +65,8 @@ export interface SessionApi {
   confirmingExit: boolean
   /** Card-edit dialog open (E) — the card clock is frozen while it is. */
   editing: boolean
+  /** Quick-add dialog open (N) — the card clock is frozen while it is (T-032). */
+  quickAdding: boolean
   flashGrade: Grade | null
   /**
    * There is a rating to take back — i.e. the "Annuler" affordance exists. It
@@ -113,6 +115,10 @@ export interface SessionApi {
   closeEdit: () => void
   /** Persist an edit of the current card's content (never its FSRS state). */
   submitEdit: (values: { front: string; back: string }) => void
+  /** Open the quick-add dialog (N) — write the card you just realised is missing. */
+  openQuickAdd: () => void
+  /** Close the quick-add dialog and hand the keyboard back to the session. */
+  closeQuickAdd: () => void
   requestExit: () => void
   confirmExit: () => void
   cancelExit: () => void
@@ -239,23 +245,35 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     timerRef.current = createCardTimer(state.paused)
   }, [state.phase, state.index])
 
-  // Two independent reasons to freeze the card clock, one effect so a pause
-  // always wins over a resume: the tab being hidden, and the edit dialog being
-  // open — time spent fixing a typo is not recall time. Closing the dialog on a
+  /**
+   * Every reason the card clock must not be running, folded into ONE reading.
+   * The tab is hidden, or a dialog owns the screen — fixing a typo (`editing`)
+   * and writing the card you just realised was missing (`quickAdding`) are both
+   * time spent away from the question, not time spent recalling it.
+   *
+   * Declared once rather than re-listed at each site: the freeze is installed in
+   * one effect and *disarms the idle watcher* in another, and the two drifting
+   * apart is exactly how half a pause goes missing. T-032 added the third
+   * reason by extending this line, not by adding a fourth mechanism.
+   */
+  const clockFrozen = state.paused || state.editing || state.quickAdding
+
+  // One effect, so a pause always wins over a resume. Closing a dialog on a
   // hidden tab therefore does NOT restart the clock.
   useEffect(() => {
     const t = timerRef.current
     if (!t) return
-    if (state.paused || state.editing) t.pause()
+    if (clockFrozen) t.pause()
     else t.resume()
-  }, [state.paused, state.editing])
+  }, [clockFrozen])
 
   // --- Idle (mechanism A): silent stop, no overlay, auto-resume ------------
-  // Disarmed while editing: the dialog owns the keyboard, so its keystrokes are
-  // not presence signals for the *card* — and a `resume()` from here would
-  // undo the freeze the edit dialog just installed.
+  // Disarmed while any dialog is open: the dialog owns the keyboard, so its
+  // keystrokes are not presence signals for the *card* — and a `resume()` from
+  // here would undo the freeze that dialog just installed. Reads the same
+  // `clockFrozen` the freeze effect does, so the two can never disagree.
   useEffect(() => {
-    if (!isFlowPhase(state.phase) || state.paused || state.editing) return
+    if (!isFlowPhase(state.phase) || clockFrozen) return
     let idlePaused = false
     let timeout = window.setTimeout(onIdle, IDLE_MS)
     function onIdle() {
@@ -277,7 +295,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
       window.clearTimeout(timeout)
       for (const e of events) window.removeEventListener(e, onActivity)
     }
-  }, [state.phase, state.index, state.paused, state.editing, bumpCurrentPreview])
+  }, [state.phase, state.index, clockFrozen, bumpCurrentPreview])
 
   // --- Visibility (mechanism B): explicit pause + overlay ------------------
   useEffect(() => {
@@ -566,6 +584,24 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     [patchQueueCache],
   )
 
+  // --- Quick add (N) -------------------------------------------------------
+  /**
+   * T-032 · the card the user realises is missing WHILE revising. It is not an
+   * edit of anything on screen, so nothing here touches the reducer's cards, the
+   * frozen queue, `index`, `results` or the preview: the whole feature is one
+   * boolean and one freeze. The card itself is written by the dialog through the
+   * ordinary `POST /api/cards` mutation — it is born `New` and will be served by
+   * a future day's new-card budget, never spliced into the lot in progress.
+   */
+  const openQuickAdd = useCallback(() => {
+    // Same synchronous exclusion as `openEdit()`: `stateRef` only refreshes on
+    // render, so a U and an N landing in one tick would both read
+    // `undoing: false`, and the reducer's own guard would be read too late.
+    if (undoInFlightRef.current) return
+    dispatch({ type: 'OPEN_QUICK_ADD' })
+  }, [])
+  const closeQuickAdd = useCallback(() => dispatch({ type: 'CLOSE_QUICK_ADD' }), [])
+
   const retryRef = useRef<() => void>(() => {})
   retryRef.current = () => {
     const last = lastRateRef.current
@@ -687,15 +723,18 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           } else if (e.key.toLowerCase() === 'u') {
             e.preventDefault()
             undo()
+          } else if (e.key.toLowerCase() === 'n') {
+            e.preventDefault()
+            openQuickAdd()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
           } else {
             // A-D pick an option of the current QCM. LAST test of the branch so
             // it can never mask a shortcut above it — and none of A/B/C/D is
-            // taken in ASKING anyway (E edits, S skips, U undoes, Space/Enter
-            // reveal, Escape quits), which is exactly why `qcm.ts` caps a
-            // question at four options.
+            // taken in ASKING anyway (E edits, S skips, U undoes, N adds,
+            // Space/Enter reveal, Escape quits), which is exactly why `qcm.ts`
+            // caps a question at four options.
             const choice = OPTION_KEYS.indexOf(e.key.toLowerCase())
             // Nothing is swallowed unless it really does something: a D on a
             // 3-option QCM, or any letter on a card that is not a QCM, stays an
@@ -729,6 +768,9 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
           } else if (e.key.toLowerCase() === 'u') {
             e.preventDefault()
             undo()
+          } else if (e.key.toLowerCase() === 'n') {
+            e.preventDefault()
+            openQuickAdd()
           } else if (e.key === 'Escape') {
             e.preventDefault()
             requestExit()
@@ -773,6 +815,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     skip,
     undo,
     openEdit,
+    openQuickAdd,
     requestExit,
     confirmExit,
     cancelExit,
@@ -850,6 +893,7 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     paused: state.paused,
     confirmingExit: state.confirmingExit,
     editing: state.editing,
+    quickAdding: state.quickAdding,
     flashGrade,
     canUndo,
     undoing: state.undoing,
@@ -865,6 +909,8 @@ export function useReviewSession(scope: ReviewScope): SessionApi {
     openEdit,
     closeEdit,
     submitEdit,
+    openQuickAdd,
+    closeQuickAdd,
     requestExit,
     confirmExit,
     cancelExit,

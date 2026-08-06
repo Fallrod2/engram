@@ -335,6 +335,98 @@ describe('sessionReducer — card edit (OPEN_EDIT / CLOSE_EDIT)', () => {
   })
 })
 
+/**
+ * T-032 — the quick-add dialog, as a reducer concern. Everything it must NOT
+ * disturb is asserted here rather than trusted: the phase, the cursor, the
+ * results and the reveal state of the card on screen are all what the user comes
+ * back to when the dialog closes.
+ */
+describe('sessionReducer — quick add (OPEN_QUICK_ADD / CLOSE_QUICK_ADD)', () => {
+  it('opens from ASKING and from REVEALED without moving anything else', () => {
+    const fromAsking = sessionReducer(asking(3, 1), { type: 'OPEN_QUICK_ADD' })
+    expect(fromAsking.quickAdding).toBe(true)
+    expect(fromAsking.phase).toBe('ASKING')
+    expect(fromAsking.index).toBe(1)
+    expect(fromAsking.cards).toEqual(asking(3, 1).cards)
+    expect(fromAsking.results).toEqual([])
+    // Nothing about the card on screen moves — the editor is not opened either.
+    expect(fromAsking.editing).toBe(false)
+
+    const revealed = sessionReducer(asking(2), { type: 'REVEAL' })
+    const fromRevealed = sessionReducer(revealed, { type: 'OPEN_QUICK_ADD' })
+    expect(fromRevealed.quickAdding).toBe(true)
+    // The answer stays on screen: coming back from the dialog must not re-hide it.
+    expect(fromRevealed.phase).toBe('REVEALED')
+  })
+
+  it('keeps a QCM answer selected across the dialog', () => {
+    const picked = sessionReducer(asking(2), { type: 'SELECT_CHOICE', index: 2 })
+    const open = sessionReducer(picked, { type: 'OPEN_QUICK_ADD' })
+    expect(open.selectedChoice).toBe(2)
+    expect(sessionReducer(open, { type: 'CLOSE_QUICK_ADD' }).selectedChoice).toBe(2)
+  })
+
+  it('is ignored from SUBMITTING, SUMMARY, LOADING, EMPTY and ERROR', () => {
+    const submitting = sessionReducer(sessionReducer(asking(2), { type: 'REVEAL' }), {
+      type: 'RATE',
+      grade: 3,
+      durationMs: 400,
+    })
+    // Not a taste call: the per-card clock is re-created by an effect keyed on
+    // `[phase, index]`, so a dialog surviving the RATE_OK that follows would
+    // have its freeze thrown away and the typing counted as recall time.
+    expect(sessionReducer(submitting, { type: 'OPEN_QUICK_ADD' })).toBe(submitting)
+
+    const summary: SessionState = { ...asking(2, 2), phase: 'SUMMARY' }
+    expect(sessionReducer(summary, { type: 'OPEN_QUICK_ADD' })).toBe(summary)
+
+    const loading = initialState(NOW)
+    expect(sessionReducer(loading, { type: 'OPEN_QUICK_ADD' })).toBe(loading)
+
+    const empty: SessionState = { ...initialState(NOW), phase: 'EMPTY' }
+    expect(sessionReducer(empty, { type: 'OPEN_QUICK_ADD' })).toBe(empty)
+
+    const error: SessionState = { ...initialState(NOW), phase: 'ERROR' }
+    expect(sessionReducer(error, { type: 'OPEN_QUICK_ADD' })).toBe(error)
+  })
+
+  it('is refused while an undo is in flight, like OPEN_EDIT and SKIP_CARD', () => {
+    const undoing: SessionState = { ...asking(2), undoing: true }
+    expect(sessionReducer(undoing, { type: 'OPEN_QUICK_ADD' })).toBe(undoing)
+  })
+
+  it('is refused behind the pause overlay, which has already eaten the key', () => {
+    const paused: SessionState = { ...asking(2), paused: true }
+    expect(sessionReducer(paused, { type: 'OPEN_QUICK_ADD' })).toBe(paused)
+  })
+
+  it('never stacks with the card editor, in either order', () => {
+    const editing = sessionReducer(asking(2), { type: 'OPEN_EDIT' })
+    expect(sessionReducer(editing, { type: 'OPEN_QUICK_ADD' })).toBe(editing)
+
+    const adding = sessionReducer(asking(2), { type: 'OPEN_QUICK_ADD' })
+    expect(sessionReducer(adding, { type: 'OPEN_EDIT' })).toBe(adding)
+  })
+
+  it('CLOSE_QUICK_ADD closes; it is a no-op when nothing is open', () => {
+    const open = sessionReducer(asking(2), { type: 'OPEN_QUICK_ADD' })
+    const closed = sessionReducer(open, { type: 'CLOSE_QUICK_ADD' })
+    expect(closed.quickAdding).toBe(false)
+    expect(closed.phase).toBe('ASKING')
+    expect(closed.index).toBe(0)
+    const base = asking(2)
+    expect(sessionReducer(base, { type: 'CLOSE_QUICK_ADD' })).toBe(base)
+  })
+
+  it('a fresh session, and a REVIEW_AGAIN, start with the dialog shut', () => {
+    expect(initialState(NOW).quickAdding).toBe(false)
+    const summary: SessionState = { ...asking(2, 2), phase: 'SUMMARY', quickAdding: true }
+    expect(sessionReducer(summary, { type: 'REVIEW_AGAIN', sessionNow: NOW }).quickAdding).toBe(
+      false,
+    )
+  })
+})
+
 describe('sessionReducer — CARD_EDITED', () => {
   it('patches front/back of the targeted card only', () => {
     const base = asking(3, 1)

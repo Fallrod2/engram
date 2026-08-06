@@ -56,6 +56,24 @@ describe('chords ⊥ screen single-keys (spec §3.7.6)', () => {
   })
 })
 
+describe('the session context documents every key the session routes', () => {
+  /**
+   * The `?` help is the only place a user is TOLD a session shortcut exists —
+   * the screen itself shows `Espace révéler · 1-4 noter · Échap quitter` and
+   * nothing else. A key routed by `use-review-session` and absent from here is a
+   * feature nobody finds, which is what T-032's `N` would have been.
+   */
+  it('lists the bare letters the session acts on, N included', () => {
+    const keys = CONTEXT_KEYS.session.map((b) => b.keys)
+    for (const k of ['U', 'E', 'N', 'S', 'Q', 'R']) expect(keys, k).toContain(k)
+  })
+
+  it('gives each of those letters exactly one meaning', () => {
+    const letters = CONTEXT_KEYS.session.map((b) => b.keys).filter((k) => /^[A-Z]$/.test(k))
+    expect(new Set(letters).size).toBe(letters.length)
+  })
+})
+
 describe('context coverage', () => {
   it('every context id has at least one binding and a label', () => {
     for (const id of Object.keys(CONTEXT_KEYS) as ContextId[]) {

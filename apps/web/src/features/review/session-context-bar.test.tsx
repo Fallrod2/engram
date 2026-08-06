@@ -26,6 +26,7 @@ describe('<SessionContextBar> remaining counters', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
@@ -42,6 +43,7 @@ describe('<SessionContextBar> remaining counters', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
@@ -66,6 +68,7 @@ describe('<SessionContextBar> remaining counters', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     const group = screen.getByRole('group', { name: 'Cartes restantes par état' })
@@ -92,6 +95,7 @@ describe('<SessionContextBar> skip action', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     const button = screen.getByRole('button', {
@@ -111,6 +115,7 @@ describe('<SessionContextBar> skip action', () => {
         onEdit={NOOP}
         onSkip={onSkip}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Passer cette carte sans la noter (S)' }))
@@ -131,6 +136,7 @@ describe('<SessionContextBar> edit action', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     const button = screen.getByRole('button', { name: 'Éditer cette carte (E)' })
@@ -148,13 +154,14 @@ describe('<SessionContextBar> edit action', () => {
         onEdit={onEdit}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Éditer cette carte (E)' }))
     expect(onEdit).toHaveBeenCalledTimes(1)
   })
 
-  it('sits before "Passer" in the left slot (Annuler · Éditer · Passer)', () => {
+  it('sits before "Ajouter" and "Passer" in the left slot', () => {
     render(
       <SessionContextBar
         remaining={remaining}
@@ -164,10 +171,66 @@ describe('<SessionContextBar> edit action', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     const labels = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))
-    expect(labels).toEqual(['Éditer cette carte (E)', 'Passer cette carte sans la noter (S)'])
+    expect(labels).toEqual([
+      'Éditer cette carte (E)',
+      'Ajouter une carte sans quitter la session (N)',
+      'Passer cette carte sans la noter (S)',
+    ])
+  })
+})
+
+/**
+ * T-032 — the discoverable face of `N`. The shortcut is what the feature is FOR
+ * (the session is meant to run without a mouse), but a shortcut nobody is told
+ * about is a shortcut nobody uses: the button is how it gets found.
+ */
+describe('<SessionContextBar> quick-add action', () => {
+  const remaining = { new: 1, learning: 0, review: 0, relearning: 0 }
+
+  it('exposes the quick-add button under its full aria-label, key declared', () => {
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        difficulty={null}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+        onQuickAdd={NOOP}
+      />,
+    )
+    const button = screen.getByRole('button', {
+      name: 'Ajouter une carte sans quitter la session (N)',
+    })
+    expect(button.getAttribute('type')).toBe('button')
+    // The key is DECLARED on the control, not only spoken in its name — that is
+    // what an assistive technology reads to advertise the shortcut.
+    expect(button.getAttribute('aria-keyshortcuts')).toBe('N')
+  })
+
+  it('calls onQuickAdd on click', () => {
+    const onQuickAdd = vi.fn()
+    render(
+      <SessionContextBar
+        remaining={remaining}
+        difficulty={null}
+        canUndo={false}
+        undoing={false}
+        onEdit={NOOP}
+        onSkip={NOOP}
+        onUndo={NOOP}
+        onQuickAdd={onQuickAdd}
+      />,
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ajouter une carte sans quitter la session (N)' }),
+    )
+    expect(onQuickAdd).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -184,6 +247,7 @@ describe('<SessionContextBar> undo action', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     expect(screen.queryByRole('button', { name: 'Annuler la dernière note (U)' })).toBeNull()
@@ -199,6 +263,7 @@ describe('<SessionContextBar> undo action', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
     const button = screen.getByRole('button', { name: 'Annuler la dernière note (U)' })
@@ -208,6 +273,7 @@ describe('<SessionContextBar> undo action', () => {
     expect(labels).toEqual([
       'Annuler la dernière note (U)',
       'Éditer cette carte (E)',
+      'Ajouter une carte sans quitter la session (N)',
       'Passer cette carte sans la noter (S)',
     ])
   })
@@ -223,6 +289,7 @@ describe('<SessionContextBar> undo action', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={onUndo}
+        onQuickAdd={NOOP}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Annuler la dernière note (U)' }))
@@ -240,6 +307,7 @@ describe('<SessionContextBar> undo action', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={onUndo}
+        onQuickAdd={NOOP}
       />,
     )
     const button = screen.getByRole('button', { name: 'Annuler la dernière note (U)' })
@@ -255,10 +323,11 @@ describe('<SessionContextBar> affordance while an undo is in flight', () => {
   // The realistic combination since T-010: the hook computes `canUndo` from the
   // presence of a target ALONE, so an in-flight undo keeps the "Annuler" button
   // mounted and greyed out — it no longer disappears mid-request.
-  it('keeps the three controls mounted and disables all of them — no click swallowed', () => {
+  it('keeps every control mounted and disables all of them — no click swallowed', () => {
     const onEdit = vi.fn()
     const onSkip = vi.fn()
     const onUndo = vi.fn()
+    const onQuickAdd = vi.fn()
     render(
       <SessionContextBar
         remaining={remaining}
@@ -268,20 +337,30 @@ describe('<SessionContextBar> affordance while an undo is in flight', () => {
         onEdit={onEdit}
         onSkip={onSkip}
         onUndo={onUndo}
+        onQuickAdd={onQuickAdd}
       />,
     )
     const undo = screen.getByRole('button', { name: 'Annuler la dernière note (U)' })
     const edit = screen.getByRole('button', { name: 'Éditer cette carte (E)' })
     const skip = screen.getByRole('button', { name: 'Passer cette carte sans la noter (S)' })
+    // T-032 · the quick-add is refused in the same window, for a reason of its
+    // own: UNDO_OK re-seeds the card clock, which would discard the freeze an
+    // open dialog installed. Same refusal, so the same greyed-out affordance.
+    const add = screen.getByRole('button', {
+      name: 'Ajouter une carte sans quitter la session (N)',
+    })
     expect((undo as HTMLButtonElement).disabled).toBe(true)
     expect((edit as HTMLButtonElement).disabled).toBe(true)
     expect((skip as HTMLButtonElement).disabled).toBe(true)
+    expect((add as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(undo)
     fireEvent.click(edit)
     fireEvent.click(skip)
+    fireEvent.click(add)
     expect(onUndo).not.toHaveBeenCalled()
     expect(onEdit).not.toHaveBeenCalled()
     expect(onSkip).not.toHaveBeenCalled()
+    expect(onQuickAdd).not.toHaveBeenCalled()
   })
   // The `undoing: false` control already exists above: "calls onEdit on click" and
   // "calls onSkip on click" both fail if the buttons were disabled unconditionally,
@@ -301,6 +380,7 @@ describe('<SessionContextBar> difficulty gauge', () => {
         onEdit={NOOP}
         onSkip={NOOP}
         onUndo={NOOP}
+        onQuickAdd={NOOP}
       />,
     )
   }

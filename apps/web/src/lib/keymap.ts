@@ -181,6 +181,11 @@ export const CONTEXT_KEYS: Record<ContextId, readonly KeyBinding[]> = {
     { keys: 'Enter', label: 'shortcuts.keys.validateSuggested', group: 'session' },
     { keys: 'U', label: 'shortcuts.keys.undoReview', group: 'session' },
     { keys: 'E', label: 'shortcuts.keys.editCard', group: 'session' },
+    // T-032 — `N` is the app's create letter everywhere else (new subject, new
+    // deck, new card, new exam), and it was the only creation key still free in
+    // the session: `A`-`D` answer a QCM, `E` edits, `S` skips, `U` undoes, `R`
+    // restarts, `Q` confirms the exit. Same letter, same meaning, one screen more.
+    { keys: 'N', label: 'shortcuts.keys.newCard', group: 'session' },
     { keys: 'S', label: 'shortcuts.keys.skipCard', group: 'session' },
     { keys: 'Échap', label: 'shortcuts.keys.exitSession', group: 'session' },
     { keys: 'Q', label: 'shortcuts.keys.confirmExit', group: 'session' },

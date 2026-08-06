@@ -51,6 +51,14 @@ export interface SessionState {
   /** Card-edit dialog open (E). Orthogonal to `phase`; freezes the card clock. */
   editing: boolean
   /**
+   * Quick-add dialog open (N) — the card the user realises is MISSING while
+   * revising (T-032). Orthogonal to `phase` and to `editing`: it writes a new
+   * card in some deck and never touches the card on screen, so the session state
+   * underneath it is left exactly as it was. Freezes the card clock for the same
+   * reason `editing` does — time spent writing a card is not recall time.
+   */
+  quickAdding: boolean
+  /**
    * Index, into the CURRENT card's QCM options, of the one the user picked —
    * `null` when the card is not a multiple-choice question, or when nothing has
    * been picked on it yet (revealing with Space answers nothing).
@@ -91,6 +99,8 @@ export type Action =
   | { type: 'REVIEW_AGAIN'; sessionNow: string }
   | { type: 'OPEN_EDIT' }
   | { type: 'CLOSE_EDIT' }
+  | { type: 'OPEN_QUICK_ADD' }
+  | { type: 'CLOSE_QUICK_ADD' }
   | { type: 'CARD_EDITED'; cardId: string; front: string; back: string }
 
 /** A fresh session state at `LOADING` for the given frozen `now`. */
@@ -105,6 +115,7 @@ export function initialState(sessionNow: string): SessionState {
     paused: false,
     confirmingExit: false,
     editing: false,
+    quickAdding: false,
     selectedChoice: null,
     exited: false,
     submitError: false,
@@ -345,11 +356,40 @@ export function sessionReducer(state: SessionState, action: Action): SessionStat
       // save would then write onto THAT card (`submitEdit` re-reads
       // `cards[index]` at submit time), not the one being corrected.
       if (state.undoing) return state
+      // Symmetric to the test OPEN_QUICK_ADD makes on `editing`: one dialog at a
+      // time, so the card clock has exactly one freeze to lift.
+      if (state.quickAdding) return state
       return { ...state, editing: true }
 
     case 'CLOSE_EDIT':
       if (!state.editing) return state
       return { ...state, editing: false }
+
+    case 'OPEN_QUICK_ADD':
+      // Same window as OPEN_EDIT — ASKING / REVEALED — and for a reason that has
+      // nothing to do with the card being edited (this dialog edits none): the
+      // per-card clock is re-created by an effect keyed on `[phase, index]`,
+      // which seeds itself from `paused` ALONE. A dialog left open across a
+      // phase change would therefore get a brand-new timer running while the
+      // user is typing, and the freeze this dialog installs would be lost. The
+      // two transitions that can move the cursor under an open dialog are
+      // RATE_OK (only from SUBMITTING) and UNDO_OK (only while `undoing`), so
+      // refusing those two states is exactly what makes the freeze hold.
+      if (state.phase !== 'ASKING' && state.phase !== 'REVEALED') return state
+      if (state.undoing) return state
+      // Never on top of the pause overlay: while paused ANY key resumes, so a
+      // dialog opened here would sit behind an overlay that has already eaten
+      // its keystrokes.
+      if (state.paused) return state
+      // One dialog at a time. Unreachable through the UI (Radix makes the
+      // surface behind it inert, and the key router returns early while a modal
+      // is open), stated anyway so the invariant does not depend on Radix.
+      if (state.editing) return state
+      return { ...state, quickAdding: true }
+
+    case 'CLOSE_QUICK_ADD':
+      if (!state.quickAdding) return state
+      return { ...state, quickAdding: false }
 
     case 'CARD_EDITED': {
       // Patch the array the session actually RENDERS. The queue is frozen
