@@ -13,7 +13,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
-import { requireUserId } from '../http/identity'
+import { requireUserId, requireNotDemoSpend } from '../http/identity'
 import { PayloadTooLargeError, ServiceUnavailableError, ValidationError } from '../http/errors'
 import { detectImageMedia, detectSourceType, extractText } from '../services/extract'
 import { createNote, deleteNote, getNote, listNotes, updateNote } from '../services/notes.service'
@@ -33,6 +33,14 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
  * image should never approach it.
  */
 const EXTRACT_IMAGE_MAX_BYTES = 4 * 1024 * 1024
+
+/**
+ * The demo's refusal on the OCR route (T-058). OCR is a paid AI call like
+ * generation; the way out here is the flow that costs nothing — paste the text,
+ * or import a Markdown/PDF file.
+ */
+const DEMO_NO_OCR =
+  'La démo ne lance pas d’extraction IA réelle. Collez votre texte ou importez un fichier Markdown/PDF pour créer une note.'
 
 /** Actionable HEIC rejection (OCR spec §1.1). */
 const HEIC_MESSAGE =
@@ -97,7 +105,11 @@ notesRouter.post('/extract-image', async (c) => {
   // Scope the OCR provider resolution to the caller (spec BYOK §1.3): this
   // handler previously skipped `requireUserId`, which would have let it resolve
   // an unscoped provider. A public user without their own key → clean 503.
-  const userId = requireUserId(c)
+  //
+  // The demo is refused outright (T-058) — a spending route, and refused BEFORE
+  // the multipart body is read, so a refused visitor never uploads 4 MB for
+  // nothing.
+  const userId = requireNotDemoSpend(c, DEMO_NO_OCR)
   const body = await c.req.parseBody()
   const file = body['file']
   if (!(file instanceof File)) {
