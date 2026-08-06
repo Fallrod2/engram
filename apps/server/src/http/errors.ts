@@ -48,6 +48,25 @@ export class ForbiddenError extends ApiError {
 }
 
 /**
+ * 403 — the demo account tried to SPEND on a paid AI call (T-058). The demo
+ * resolves nothing of its own, so before this rule existed the refusal came from
+ * the *absence* of a configured key, not from a decision: the day a key lands on
+ * the deployment, every anonymous visitor of the public demo starts billing the
+ * owner. The decision is a flat refusal — no quota, no cap.
+ *
+ * `forbidden` is the right code (authenticated, not permitted); the structured
+ * `reason` is what a client maps to an honest banner without parsing French text
+ * (same contract as the OCR 503's `details.reason`). The MESSAGE is per route:
+ * "the demo does not run a real X" is only actionable when it names the way out
+ * (the pre-recorded generation, or pasting text).
+ */
+export class DemoSpendForbiddenError extends ApiError {
+  constructor(message: string) {
+    super(403, 'forbidden', message, { reason: 'demo_no_spend' })
+  }
+}
+
+/**
  * 403 — the account is suspended (IAM, spec §2.1 / amendment A15). A distinct
  * code from `forbidden` so the web can route to the dedicated "account suspended"
  * screen (via the api client's `onSuspended` hook) instead of a generic error.

@@ -18,8 +18,8 @@ import {
  * AI config is now PER USER (spec BYOK §1.2). Every service function takes a
  * `userId`. Under the bun:test bypass (no auth env) the admin is
  * `DEFAULT_DEV_USER_ID` — so ADMIN gets the process-env fallback, while any OTHER
- * user (a public signup) does NOT: THE security fix. The demo account is a read
- * alias of the admin config.
+ * user (a public signup) does NOT: THE security fix. Since T-058 the demo account
+ * is NOT an exception to that — it resolves as itself, like any other user.
  */
 
 let t: TestDb
@@ -131,22 +131,55 @@ describe('per-user isolation of the config (2 users, 2 configs)', () => {
   })
 })
 
-describe('demo account reads the ADMIN config (spec BYOK §1.2)', () => {
+/**
+ * T-058 — REPLACES "demo account reads the ADMIN config (spec BYOK §1.2)". The
+ * demo used to resolve generation/OCR through an admin read alias, which is what
+ * made a public visitor able to spend the admin's key; the decision (06/08/2026)
+ * is a flat refusal, so the alias is gone and the demo resolves as itself, i.e.
+ * nothing. The refusal proper is a rule at the two spending routes
+ * (`requireNotDemoSpend`) — pinned in `routes/demo-no-spend.spec.ts`.
+ */
+describe('the demo resolves NOTHING — the admin read alias is gone (T-058)', () => {
   const DEMO = 'demo-account-user'
-  it('demo resolves generation/OCR via the admin, without its own key', async () => {
+
+  it('does not resolve generation NOR OCR through the admin, key or no key', async () => {
+    process.env.ENGRAM_ADMIN_USER_ID = ADMIN
+    process.env.ENGRAM_DEMO_USER_ID = DEMO
+    process.env.ANTHROPIC_API_KEY = 'alex-env-key'
+    await updateAiSettings(db, ADMIN, { activeProvider: 'openrouter' })
+    await setAiKey(db, ADMIN, 'openrouter', 'admin-or-key')
+
+    // The admin resolves (both stored key and env fallback are live)…
+    expect((await resolveActiveProvider(db, ADMIN))!.secret).toBe('admin-or-key')
+    // …and the demo gets nothing: no alias to the admin's rows, no env fallback.
+    expect(await resolveActiveProvider(db, DEMO)).toBeNull()
+    expect(await resolveOcrProvider(db, DEMO)).toBeNull()
+    expect(await isAiConfigured(db, DEMO)).toBe(false)
+  })
+
+  it('the status surface the front reads agrees: nothing usable for the demo', async () => {
+    process.env.ENGRAM_ADMIN_USER_ID = ADMIN
+    process.env.ENGRAM_DEMO_USER_ID = DEMO
+    process.env.ANTHROPIC_API_KEY = 'alex-env-key'
+    await setAiKey(db, ADMIN, 'openrouter', 'admin-or-key')
+
+    const { settings, statuses } = await getAiSettings(db, DEMO)
+    const active = statuses.find((s) => s.provider === settings.activeProvider)!
+    // What disables "Générer" client-side, and it now matches the resolver — the
+    // one-account disagreement (status said no, resolver said yes) is closed.
+    expect(active.usable).toBe(false)
+    expect(statuses.every((s) => s.hasKey === false)).toBe(true)
+  })
+
+  it('the TEST/models path stays un-aliased too (no key exfiltration via baseUrl)', async () => {
     process.env.ENGRAM_ADMIN_USER_ID = ADMIN
     process.env.ENGRAM_DEMO_USER_ID = DEMO
     await updateAiSettings(db, ADMIN, { activeProvider: 'openrouter' })
     await setAiKey(db, ADMIN, 'openrouter', 'admin-or-key')
 
-    const cfg = await resolveActiveProvider(db, DEMO)
-    expect(cfg).not.toBeNull()
-    expect(cfg!.providerId).toBe('openrouter')
-    expect(cfg!.secret).toBe('admin-or-key')
-    // But the TEST/models path is deliberately NOT aliased (audit fix): the demo
-    // tests against its OWN config, so the admin's secret NEVER leaks — not even
-    // when an attacker-supplied baseUrl tries to redirect it (exfiltration
-    // vector). POST test itself stays reachable for the demo.
+    // The demo tests against its OWN config, so the admin's secret NEVER leaks —
+    // not even when an attacker-supplied baseUrl tries to redirect it
+    // (exfiltration vector). POST test itself stays reachable for the demo.
     const test = await resolveProviderForTest(db, DEMO, 'openrouter', {
       baseUrl: 'http://attacker.example',
     })
@@ -154,8 +187,10 @@ describe('demo account reads the ADMIN config (spec BYOK §1.2)', () => {
     expect(test!.keySource).toBeNull()
   })
 
-  it('no recursion when demoUserId === adminUserId (amendment §4)', async () => {
-    // The demo-reset bypass case: dev id == demo id. Must not loop forever.
+  it('demoUserId === adminUserId (dev bypass) still resolves its OWN key', async () => {
+    // The demo-reset bypass case: dev id == demo id. Used to be the recursion
+    // trap the alias had to dodge (amendment §4); with no alias left there is
+    // nothing to recurse into, and the local dev identity keeps working.
     process.env.ENGRAM_DEV_USER_ID = DEMO
     process.env.ENGRAM_DEMO_USER_ID = DEMO
     await setAiKey(db, DEMO, 'anthropic', 'self-key')

@@ -23,35 +23,32 @@ import { resolveCodexAccess } from './codex-access.service'
 const AI_KEY = 'ai'
 
 /**
- * Per-user scope context (spec BYOK §1.2). Two orthogonal decisions, resolved
- * ONCE at the entry of each resolver from the pure auth config:
+ * THE per-user scope decision (spec BYOK §1.2): the process env fallback (Alex's
+ * `ANTHROPIC_API_KEY` etc.) is consulted ONLY for the admin. A public signup with
+ * no app key of their own gets `keySource:null` → unusable → the clean 503, never
+ * Alex's key. Every user reads THEIR OWN rows — `userId` is the scope, full stop.
  *
- * - `effectiveUserId` — the demo account is a READ ALIAS of the admin config: a
- *   controlled showcase reads Alex's config so generation/OCR work for it, while
- *   a public signup never can. This is a NON-recursive substitution (amendment
- *   §4): we swap the id and read the admin's rows directly — never re-enter a
- *   resolver with the admin id (the `demoUserId === adminUserId` bypass case
- *   would recurse forever).
+ * THE DEMO READ ALIAS IS GONE (T-058). Until 06/08/2026 the demo resolved
+ * generation/OCR as the admin, so it could spend on the admin's key; what kept it
+ * from doing so was that no key resolved on the deployment, i.e. an accident of
+ * configuration rather than a rule. The rule now lives at the two spending routes
+ * (`requireNotDemoSpend` — POST /api/generations, POST /api/notes/extract-image),
+ * and the alias was removed with it because nothing else used it:
  *
- * - `allowEnv` — THE security fix. The process env fallback (Alex's
- *   `ANTHROPIC_API_KEY` etc.) is consulted ONLY for the admin (or the demo, which
- *   resolves AS the admin). A public signup with no app key gets `keySource:null`
- *   → unusable → the existing clean 503, never Alex's key.
+ *  - the status surface (`GET /api/ai/settings`) was never aliased (amendment §5)
+ *    — a user, demo included, sees THEIR OWN config, so the demo UI is unchanged;
+ *  - the test/models path was de-aliased by an earlier audit (see the SECURITY
+ *    note on `resolveProviderForTest`);
+ *  - the only remaining readers were the two spending routes (and the lazy
+ *    resolutions inside `ai/generator.ts` / `ai/vision.ts`, reachable only from
+ *    them), which now refuse the demo before resolving anything.
+ *
+ * The two layers say the same thing for the same reason, and that is the point:
+ * the guard refuses, and should a future spending route forget it, the resolver
+ * answers `null` for the demo → clean 503 instead of a silent charge. It also
+ * ends the one-account disagreement the status surface used to document (it
+ * reported "no provider" while the resolver returned a working one).
  */
-function resolveScope(userId: string): {
-  effectiveUserId: string
-  allowEnv: boolean
-  isDemoAlias: boolean
-} {
-  const cfg = resolveAuthConfig(process.env)
-  const adminUserId = resolveAdminUserId(cfg)
-  const isDemoAlias = Boolean(cfg.demoUserId && userId === cfg.demoUserId)
-  const effectiveUserId = isDemoAlias ? (adminUserId ?? userId) : userId
-  const allowEnv = adminUserId !== undefined && effectiveUserId === adminUserId
-  return { effectiveUserId, allowEnv, isDemoAlias }
-}
-
-/** Whether the env fallback is allowed for `userId` WITHOUT the demo alias (GET status). */
 function envAllowedFor(userId: string): boolean {
   const adminUserId = resolveAdminUserId(resolveAuthConfig(process.env))
   return adminUserId !== undefined && userId === adminUserId
@@ -234,22 +231,26 @@ function isUsable(
 }
 
 /**
- * Codex resolution shared by the three resolvers (audit C13): flag check + demo
- * exclusion + refresh-in-band + shape into a `ResolvedProviderConfig`. Returns
- * null (→ clean 503) when disabled, when the demo alias is active (ToS/quota —
- * a public demo must NEVER generate on Alex's personal subscription, audit C10),
- * when not linked, or when the model is empty.
+ * Codex resolution shared by the three resolvers (audit C13): flag check +
+ * refresh-in-band + shape into a `ResolvedProviderConfig`. Returns null (→ clean
+ * 503) when disabled, when not linked, or when the model is empty.
+ *
+ * The explicit demo exclusion this function used to carry (audit C10 — a public
+ * demo must NEVER generate on Alex's personal ChatGPT subscription) is gone with
+ * the demo read alias that made it necessary (T-058): the demo now resolves as
+ * itself, owns no OAuth credential, and cannot create one (`requireNotDemo` on
+ * the link routes) — so there is no longer a path from the demo to a linked
+ * subscription to exclude. The rule it expressed did not weaken, it generalized:
+ * the demo is refused at the spending routes, for EVERY provider.
  */
 async function resolveCodex(
   db: DB,
-  effectiveUserId: string,
-  isDemoAlias: boolean,
+  userId: string,
   model: string,
 ): Promise<ResolvedProviderConfig | null> {
   if (!resolveCodexConfig(process.env).enabled) return null
-  if (isDemoAlias) return null
   if (model.trim().length === 0) return null
-  const access = await resolveCodexAccess(db, effectiveUserId)
+  const access = await resolveCodexAccess(db, userId)
   if (!access) return null
   return {
     providerId: 'openai-codex',
@@ -267,18 +268,18 @@ export async function resolveActiveProvider(
   db: DB,
   userId: string,
 ): Promise<ResolvedProviderConfig | null> {
-  const { effectiveUserId, allowEnv, isDemoAlias } = resolveScope(userId)
-  const settings = await readSettings(db, effectiveUserId)
+  const allowEnv = envAllowedFor(userId)
+  const settings = await readSettings(db, userId)
   const provider = settings.activeProvider
   const pc = settings.providers[provider]
 
   // OAuth provider: its own resolution path (flag + refresh + no secret).
   if (provider === 'openai-codex') {
-    return resolveCodex(db, effectiveUserId, isDemoAlias, pc.model)
+    return resolveCodex(db, userId, pc.model)
   }
 
   const appSecret =
-    provider === 'ollama' ? undefined : await getCredentialSecret(db, effectiveUserId, provider)
+    provider === 'ollama' ? undefined : await getCredentialSecret(db, userId, provider)
   const { secret, keySource } = resolveSecret(provider, appSecret, allowEnv)
   const model = pc.model.trim()
   const baseUrl = pc.baseUrl?.trim() || undefined
@@ -315,8 +316,8 @@ export async function resolveOcrProvider(
   db: DB,
   userId: string,
 ): Promise<ResolvedProviderConfig | null> {
-  const { effectiveUserId, allowEnv, isDemoAlias } = resolveScope(userId)
-  const settings = await readSettings(db, effectiveUserId)
+  const allowEnv = envAllowedFor(userId)
+  const settings = await readSettings(db, userId)
   if (settings.ocr.mode === 'same') return resolveActiveProvider(db, userId)
 
   const provider = settings.ocr.provider
@@ -326,11 +327,11 @@ export async function resolveOcrProvider(
   // carries a vision transport (input_image data-URL), so the OCR runs on the
   // linked ChatGPT subscription (fix-codex-vision, supersedes audit C14).
   if (provider === 'openai-codex') {
-    return resolveCodex(db, effectiveUserId, isDemoAlias, settings.ocr.model)
+    return resolveCodex(db, userId, settings.ocr.model)
   }
 
   const appSecret =
-    provider === 'ollama' ? undefined : await getCredentialSecret(db, effectiveUserId, provider)
+    provider === 'ollama' ? undefined : await getCredentialSecret(db, userId, provider)
   const { secret, keySource } = resolveSecret(provider, appSecret, allowEnv)
   const model = settings.ocr.model.trim()
   const baseUrl = pc.baseUrl?.trim() || undefined
@@ -366,15 +367,11 @@ async function providerStatuses(db: DB, userId: string): Promise<AiProviderStatu
   // GET status is NOT demo-aliased (amendment §5): a user sees THEIR OWN config.
   // The env badge ("configuré (env)") therefore only ever appears for the admin.
   //
-  // ⚠️ CONSEQUENCE FOR `usable` BELOW, and it is not cosmetic: for the DEMO
-  // account this surface reports what the demo owns (nothing), while
-  // `resolveActiveProvider` resolves through the admin alias and returns a
-  // WORKING config. The two therefore disagree for exactly one account. The
-  // front reads this one, so a demo visitor sees "no provider" and a disabled
-  // button — which matches the intent of the demo — but the server-side 503
-  // guard still does not fire for it. Reported, not silently reconciled here:
-  // closing it means adding a demo rule to `POST /api/generations`, which is a
-  // product decision (T-031 report).
+  // This surface and `resolveActiveProvider` now agree for EVERY account,
+  // including the demo (T-058): the demo read alias that made them disagree for
+  // exactly one account is gone, and the demo is refused outright at the two
+  // spending routes. So `usable:false` for the demo is no longer a UI-only truth
+  // the server would have contradicted on click.
   const allowEnv = envAllowedFor(userId)
   const settings = await readSettings(db, userId)
   const keyed = await keyedProviders(db, userId)
@@ -533,13 +530,13 @@ export async function deleteAiKey(db: DB, userId: string, provider: AiProviderId
  * Reads the stored secret ONLY here (internal). Returns null if the provider has
  * no usable model (nothing to test).
  *
- * SECURITY (audit fix): unlike the generation/OCR resolvers, this path does NOT
- * apply the demo→admin read alias. Aliasing it let the demo pair an
- * attacker-supplied `baseUrl` with the admin's resolved secret and exfiltrate
- * `Authorization: Bearer <admin key>` to an arbitrary host (POST test is
- * reachable by the demo via `requireUserId`). The demo therefore tests against
- * ITS OWN config — consistent with GET /settings not being aliased (amendment
- * §5) — and this overrides the "POST test aliased" note of spec §1.2 / §5.
+ * SECURITY (audit fix): this path never applied the demo→admin read alias.
+ * Aliasing it let the demo pair an attacker-supplied `baseUrl` with the admin's
+ * resolved secret and exfiltrate `Authorization: Bearer <admin key>` to an
+ * arbitrary host (POST test is reachable by the demo via `requireUserId`). The
+ * demo therefore tests against ITS OWN config — and since T-058 removed the alias
+ * from the generation/OCR resolvers too, that is now simply what every resolver
+ * does. This overrides the "POST test aliased" note of spec §1.2 / §5.
  */
 export async function resolveProviderForTest(
   db: DB,
@@ -551,21 +548,19 @@ export async function resolveProviderForTest(
     model?: string | undefined
   },
 ): Promise<ResolvedProviderConfig | null> {
-  // No demo alias here (see the SECURITY note above): resolve against the
-  // caller's OWN config + admin-only env fallback, exactly like the status
-  // surface. This is what stops the admin key from ever reaching a demo-supplied
+  // The caller's OWN config + the admin-only env fallback (see the SECURITY note
+  // above): this is what stops the admin key from ever reaching a demo-supplied
   // baseUrl.
-  const effectiveUserId = userId
   const allowEnv = envAllowedFor(userId)
-  const settings = await readSettings(db, effectiveUserId)
+  const settings = await readSettings(db, userId)
   const pc = settings.providers[provider]
   const model = (candidate.model ?? pc.model).trim()
   if (model.length === 0) return null
 
-  // OAuth provider: IGNORE any candidate.key (audit C9) — resolve via the linked
-  // credential (refreshed). Not demo-aliased here, like the rest of this path.
+  // OAuth provider: IGNORE any candidate.key (audit C9) — resolve via the
+  // caller's own linked credential (refreshed).
   if (provider === 'openai-codex') {
-    return resolveCodex(db, effectiveUserId, false, model)
+    return resolveCodex(db, userId, model)
   }
 
   const baseUrl = (candidate.baseUrl ?? pc.baseUrl ?? '').trim() || undefined
@@ -577,7 +572,7 @@ export async function resolveProviderForTest(
       secret = candidate.key.trim()
       keySource = 'app'
     } else {
-      const appSecret = await getCredentialSecret(db, effectiveUserId, provider)
+      const appSecret = await getCredentialSecret(db, userId, provider)
       const resolved = resolveSecret(provider, appSecret, allowEnv)
       secret = resolved.secret
       keySource = resolved.keySource

@@ -10,7 +10,7 @@ import {
 import { db } from '../db/client'
 import { zValidator } from '../http/validate'
 import { ok } from '../http/respond'
-import { requireUserId } from '../http/identity'
+import { requireUserId, requireNotDemoSpend } from '../http/identity'
 import { ServiceUnavailableError } from '../http/errors'
 import { resolveActiveProvider } from '../services/ai-config.service'
 import {
@@ -23,9 +23,19 @@ import {
 
 export const generationsRouter = new Hono()
 
+/**
+ * The demo's refusal on this route (T-058). Names the way out — the demo ships a
+ * pre-recorded generation whose card-by-card review is the thing worth seeing —
+ * so the visitor reads a deliberate product limit, not a breakage.
+ */
+const DEMO_NO_GENERATION =
+  'La démo ne lance pas de génération IA réelle. Ouvrez la génération d’exemple fournie avec le compte de démonstration pour voir la revue carte par carte.'
+
 // POST /api/generations — launch a fire-and-forget generation job (202).
 generationsRouter.post('/', zValidator('json', startGenerationSchema), async (c) => {
-  const userId = requireUserId(c)
+  // THE spending route. Refused for the demo BEFORE anything is resolved (T-058):
+  // a real generation bills whoever's key resolves, and the demo login is public.
+  const userId = requireNotDemoSpend(c, DEMO_NO_GENERATION)
   // Resolve the active provider ONCE (single DB read, no TOCTOU): it is both the
   // 503 guard and the config stamped on the row + passed to the job. Scoped to
   // the caller (spec BYOK §1.3) — a user without their own key gets a clean 503.
