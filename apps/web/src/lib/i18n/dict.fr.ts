@@ -870,8 +870,15 @@ export const dictFr = {
     retentionTitle: 'Rétention par matière',
     retentionCaption: 'Rétention par matière',
     retentionError: 'Impossible de charger la rétention.',
-    retentionEmpty: 'Révise encore un peu pour voir ta rétention par matière.',
-    retentionHint: 'La rétention se calcule sur les cartes mûres (≥ 10 reviews).',
+    // T-033 : le seuil ne se réécrit plus à la main dans la phrase, il vient du
+    // `minSample` que le service analytics renvoie avec chaque ligne — et il se
+    // compte en reviews MÛRES, ce qui est la moitié de la surprise : une carte
+    // en apprentissage n'a pas encore été planifiée, donc elle n'en produit pas.
+    retentionEmpty: "Aucune matière n'a encore assez de reviews mûres.",
+    retentionHint_one: 'La rétention apparaît à partir de {count} review mûre par matière.',
+    retentionHint_other: 'La rétention apparaît à partir de {count} reviews mûres par matière.',
+    retentionRemaining_one: 'encore {count} review mûre',
+    retentionRemaining_other: 'encore {count} reviews mûres',
     colSubject: 'Matière',
     colMatureReviews: 'Reviews mûres',
     colRetention: 'Rétention',
