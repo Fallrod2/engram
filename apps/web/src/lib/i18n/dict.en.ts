@@ -1494,6 +1494,7 @@ export const dictEn: Dict = {
     invalidEmail: 'Invalid email address.',
     passwordRequired: 'Enter your password.',
     passwordMinHint: 'At least 8 characters',
+    pwnedPassword: 'This password appears in public data breaches. Please choose another one.',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     forgot: {

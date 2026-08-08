@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useT, type TFunction } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
+import { checkPwnedPassword, isBreachedPassword } from '@/lib/pwned-password'
 import { Button } from '@/components/ui/button'
 import { PasswordInput } from '@/components/ui/password-input'
 import {
@@ -62,6 +63,17 @@ export function SetPasswordForm({
 
   const onSubmit = form.handleSubmit(async ({ password }) => {
     setError(null)
+    // Same breached-password guard as `/signup` (A-4). This form is BOTH of the
+    // remaining places a password gets chosen — invite/recovery onboarding and
+    // the Settings "change password" dialog — so covering it here covers both,
+    // and there is no second copy of the rule to drift. `/login` is deliberately
+    // NOT covered: checking a password the user already has would ping HIBP on
+    // every sign-in for no benefit. The guard is about CHOOSING a password.
+    const breach = await checkPwnedPassword(password)
+    if (isBreachedPassword(breach)) {
+      form.setError('password', { message: t('auth.pwnedPassword') }, { shouldFocus: true })
+      return
+    }
     const result = await setPassword(password)
     if (result.error) {
       setError(t('auth.setPassword.error'))

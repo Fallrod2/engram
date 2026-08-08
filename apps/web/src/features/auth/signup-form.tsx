@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Link } from '@tanstack/react-router'
 import { useT, type TFunction } from '@/lib/i18n'
 import { useAuth } from '@/lib/auth'
+import { checkPwnedPassword, isBreachedPassword } from '@/lib/pwned-password'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AUTH_INPUT_CLASS, PasswordInput } from '@/components/ui/password-input'
@@ -59,6 +60,16 @@ export function SignupForm({ onSent }: { onSent: () => void }) {
 
   const onSubmit = form.handleSubmit(async ({ email, password }) => {
     setError(null)
+    // Breached-password guard (A-4), between the local rules and the network
+    // call: a single HIBP round trip, at submit, on a password that already
+    // passed length + confirmation. A hit REFUSES — no "create anyway" escape.
+    // Anything else (HIBP down, blocked, slow) falls through to `signUp`; see
+    // `lib/pwned-password.ts` for why fail-open is the deliberate direction.
+    const breach = await checkPwnedPassword(password)
+    if (isBreachedPassword(breach)) {
+      form.setError('password', { message: t('auth.pwnedPassword') }, { shouldFocus: true })
+      return
+    }
     const result = await signUp(email, password)
     if (result.error) {
       if (result.status === 422) setError(t('auth.signup.error.weakPassword'))
