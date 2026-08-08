@@ -1665,6 +1665,11 @@ export const dictFr = {
     invalidEmail: 'Adresse e-mail invalide.',
     passwordRequired: 'Saisis ton mot de passe.',
     passwordMinHint: '8 caractères minimum',
+    // Refus franc, pas un avertissement contournable (A-4). Volontairement SANS
+    // le nombre d'occurrences : « vu 3 645 804 fois » est anxiogène et ne change
+    // rien à ce qu'il faut faire. La consigne suffit : en choisir un autre.
+    pwnedPassword:
+      'Ce mot de passe apparaît dans des fuites de données publiques. Choisis-en un autre.',
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
     forgot: {
